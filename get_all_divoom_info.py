@@ -60,13 +60,13 @@ async def get_all_divoom_info(mac_address: str):
         sd_music_info = await divoom.get_sd_music_info()
         logger.info(f"SD Music Info (0xb4): {sd_music_info}")
 
-        # # --- Alarm Memorial ---
-        # logger.info("\n--- Alarm Memorial ---")
-        # alarm_time = await divoom.get_alarm_time()
-        # logger.info(f"Alarm Time (0x42): {alarm_time}")
+        # --- Alarm Memorial ---
+        logger.info("\n--- Alarm Memorial ---")
+        alarm_time = await divoom.get_alarm_time()
+        logger.info(f"Alarm Time (0x42): {alarm_time}")
 
-        # memorial_time = await divoom.get_memorial_time()
-        # logger.info(f"Memorial Time (0x53): {memorial_time}")
+        memorial_time = await divoom.get_memorial_time()
+        logger.info(f"Memorial Time (0x53): {memorial_time}")
 
         # # --- Tool ---
         # logger.info("\n--- Tool Information ---")
