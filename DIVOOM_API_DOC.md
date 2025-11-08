@@ -49,6 +49,12 @@ This documentation is structured with different sections accessible by changing 
 *   Brightness settings: [https://docin.divoom-gz.com/web/#/5/147](https://docin.divoom-gz.com/web/#/5/147)
 *   Other sections can be found by incrementing or decrementing the last number in the URL (e.g., `#/5/148`, `#/5/149`, etc.) to explore different commands and features.
 
+### Scraped API Documentation
+
+A local copy of the Divoom API documentation has been scraped and is available in markdown format within the `api_scraper/divoom_docs` directory. Each markdown file in this directory corresponds to a section of the official documentation.
+
+
+
 ## Set Work Mode (0x05)
 
 **Command Description:** Switch system working mode
