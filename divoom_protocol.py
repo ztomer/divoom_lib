@@ -33,21 +33,7 @@ class DivoomBluetoothProtocol(DivoomBase, System, AlarmMemorial, Game, Light, Mu
 
 
 
-    async def show_countdown(self, value=None, countdown=None):
-        """Show countdown tool on the Divoom device"""
-        if value == None:
-            value = 1
-        if isinstance(value, str):
-            value = int(value)
 
-        args = [0x03]
-        args += (0x01 if value == True or value ==
-                 1 else 0x00).to_bytes(1, byteorder='big')
-        if countdown != None:
-            args += int(countdown[0:2]).to_bytes(1, byteorder='big')
-            args += int(countdown[3:]).to_bytes(1, byteorder='big')
-        else:
-        return await self.send_command(Tool.SET_TOOL_INFO, args)
 
     async def show_design(self, number=None):
         """Show design on the Divoom device"""
