@@ -1,0 +1,5 @@
+I am currently unable to download the necessary library file ('divoom.py') from the internet due to tool limitations.
+
+To proceed, please manually download the 'divoom.py' file from the 'hass-divoom' repository (https://github.com/d03n3rfr1tz3/hass-divoom) and paste its content into a new file named 'divoom_lib.py' in the current project directory.
+
+Once you have created the file, I will continue with the project.
