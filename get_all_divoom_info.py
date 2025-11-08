@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from divoom_protocol import DivoomBluetoothProtocol
+from divoom_protocol import Divoom
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -11,21 +11,21 @@ async def get_all_divoom_info(
     write_characteristic_uuid: str = None,
     notify_characteristic_uuid: str = None,
     read_characteristic_uuid: str = None,
-    divoom_instance: DivoomBluetoothProtocol = None
+    divoom_instance: Divoom = None
 ):
     """
     Connects to the Divoom device and fetches all available information.
     """
     if divoom_instance:
         divoom = divoom_instance
-        logger.info("Using existing DivoomBluetoothProtocol instance. Fetching information...")
+        logger.info("Using existing Divoom instance. Fetching information...")
         should_disconnect = False
     else:
         if not all([write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid]):
-            logger.error("Characteristic UUIDs must be provided if no DivoomBluetoothProtocol instance is given.")
+            logger.error("Characteristic UUIDs must be provided if no Divoom instance is given.")
             return
 
-        divoom = DivoomBluetoothProtocol(
+        divoom = Divoom(
             mac=mac_address,
             write_characteristic_uuid=write_characteristic_uuid,
             notify_characteristic_uuid=notify_characteristic_uuid,

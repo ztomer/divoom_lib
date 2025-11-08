@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from divoom_protocol import DivoomBluetoothProtocol
+from divoom_protocol import Divoom
 
 # Configure logging for the entire application
 logging.basicConfig(level=logging.DEBUG,
@@ -15,7 +15,7 @@ async def main():
     # Create an instance of the DivoomBluetoothProtocol
     # We'll pass the notify characteristics as a list, though the class currently only uses one.
     # This might need adjustment if multiple notify characteristics are relevant for responses.
-    divoom = DivoomBluetoothProtocol(
+    divoom = Divoom(
         mac=MAC_ADDRESS,
         write_characteristic_uuid=WRITE_CHARACTERISTIC_UUID,
     )

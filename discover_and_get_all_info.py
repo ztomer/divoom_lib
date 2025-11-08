@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from bleak import BleakScanner, BleakClient
-from divoom_protocol import DivoomBluetoothProtocol
+from divoom_protocol import Divoom
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,7 +15,7 @@ def print_ok(message):
     """Prints a success message."""
     logger.info(f"[ Ok  ] {message}")
 
-async def get_all_divoom_info_logic(divoom_protocol_instance: DivoomBluetoothProtocol):
+async def get_all_divoom_info_logic(divoom_protocol_instance: Divoom):
     """
     Fetches all available information from the Divoom device using the provided protocol instance.
     """
@@ -141,7 +141,7 @@ async def discover_and_get_info():
             
             if not spp_characteristic_uuid:
                 print_info("Could not find a suitable SPP characteristic UUID. Using default.")
-                spp_characteristic_uuid = DivoomBluetoothProtocol.SPP_CHARACTERISTIC_UUID # Fallback to default
+                spp_characteristic_uuid = Divoom.SPP_CHARACTERISTIC_UUID # Fallback to default
 
             # If specific UUIDs are not found, you might need to manually set them
             # or implement a more robust discovery of these specific characteristics.
@@ -155,7 +155,7 @@ async def discover_and_get_info():
                 NOTIFY_CHARACTERISTIC_UUID = spp_characteristic_uuid
 
 
-            divoom_protocol_instance = DivoomBluetoothProtocol(
+            divoom_protocol_instance = Divoom(
                 mac=selected_device.address,
                 logger=logger,
                 client=client,

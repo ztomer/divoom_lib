@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from bleak import BleakScanner
-from divoom_protocol import DivoomBluetoothProtocol
+from divoom_protocol import Divoom
 
 def print_info(message):
     """Prints an informational message."""
@@ -53,7 +53,7 @@ async def main():
             print_info(
                 f"Attempting to connect to {timoo_device.name} ({timoo_device.address})...")
 
-            divoom_device = DivoomBluetoothProtocol(mac=timoo_device.address, gatt_characteristic_uuid="00001101-0000-1000-8000-00805f9b34fb")
+            divoom_device = Divoom(mac=timoo_device.address, gatt_characteristic_uuid="00001101-0000-1000-8000-00805f9b34fb")
 
             try:
                 await divoom_device.connect()
