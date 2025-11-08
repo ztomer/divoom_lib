@@ -68,33 +68,33 @@ async def get_all_divoom_info(mac_address: str):
         memorial_time = await divoom.get_memorial_time()
         logger.info(f"Memorial Time (0x53): {memorial_time}")
 
-        # # --- Tool ---
-        # logger.info("\n--- Tool Information ---")
-        # # Example for Timer (0)
-        # timer_info = await divoom.get_tool_info(0)
-        # logger.info(f"Timer Info (0x71, mode 0): {timer_info}")
-        # # Example for Score (1)
-        # score_info = await divoom.get_tool_info(1)
-        # logger.info(f"Score Info (0x71, mode 1): {score_info}")
-        # # Example for Noise (2)
-        # noise_info = await divoom.get_tool_info(2)
-        # logger.info(f"Noise Info (0x71, mode 2): {noise_info}")
-        # # Example for Countdown (3)
-        # countdown_info = await divoom.get_tool_info(3)
-        # logger.info(f"Countdown Info (0x71, mode 3): {countdown_info}")
+        # --- Tool ---
+        logger.info("\n--- Tool Information ---")
+        # Example for Timer (0)
+        timer_info = await divoom.get_tool_info(0)
+        logger.info(f"Timer Info (0x71, mode 0): {timer_info}")
+        # Example for Score (1)
+        score_info = await divoom.get_tool_info(1)
+        logger.info(f"Score Info (0x71, mode 1): {score_info}")
+        # Example for Noise (2)
+        noise_info = await divoom.get_tool_info(2)
+        logger.info(f"Noise Info (0x71, mode 2): {noise_info}")
+        # Example for Countdown (3)
+        countdown_info = await divoom.get_tool_info(3)
+        logger.info(f"Countdown Info (0x71, mode 3): {countdown_info}")
 
-        # # --- Sleep ---
-        # logger.info("\n--- Sleep Settings ---")
-        # sleep_scene = await divoom.get_sleep_scene()
-        # logger.info(f"Sleep Scene (0xa2): {sleep_scene}")
+        # --- Sleep ---
+        logger.info("\n--- Sleep Settings ---")
+        sleep_scene = await divoom.get_sleep_scene()
+        logger.info(f"Sleep Scene (0xa2): {sleep_scene}")
 
-        # # --- Light ---
-        # logger.info("\n--- Light Settings ---")
-        # light_mode = await divoom.get_light_mode()
-        # logger.info(f"Light Mode (0x46): {light_mode}")
+        # --- Light ---
+        logger.info("\n--- Light Settings ---")
+        light_mode = await divoom.get_light_mode()
+        logger.info(f"Light Mode (0x46): {light_mode}")
 
-        # user_define_info = await divoom.app_get_user_define_info(0) # Example for user_index 0
-        # logger.info(f"App Get User Define Info (0x8e): {user_define_info}")
+        user_define_info = await divoom.app_get_user_define_info(0)  # Example for user_index 0
+        logger.info(f"App Get User Define Info (0x8e): {user_define_info}")
 
 
     except Exception as e:
