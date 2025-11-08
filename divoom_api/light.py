@@ -57,3 +57,17 @@ class Light(DivoomBase):
         args += [0x01 if temp == True or temp == 1 else 0x00]
         args += [0x01 if calendar == True or calendar == 1 else 0x00]
         return await self.send_command(Light.SET_LIGHT_MODE, args)
+
+    async def show_design(self, number=None):
+        """Show design on the Divoom device"""
+        args = [0x05]
+        result = await self.send_command("set view", args)
+
+        if number != None:  # additionally change design tab
+            if isinstance(number, str):
+                number = int(number)
+
+            args = [0x17]
+            args += number.to_bytes(1, byteorder='big')
+            result = await self.send_command("set design", args)
+        return result
