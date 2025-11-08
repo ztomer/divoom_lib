@@ -6,13 +6,20 @@ import logging
 
 class System:
     async def get_work_mode(self):
-        """Get the current system working mode (0x13)."""
-        self.logger.info("Getting work mode (0x13)...")
+        """Get the current system working mode (0x06)."""
+        self.logger.info("Getting work mode (0x06)...")
         response = await self._send_command_and_wait_for_response("get work mode")
         if response:
             # Assuming the response is a single byte representing the mode
             return int.from_bytes(response, byteorder='big')
         return None
+
+    async def set_work_mode(self, mode: int):
+        """Switch system working mode (0x05).
+        Mode: 0-11"""
+        self.logger.info(f"Setting work mode to: {mode} (0x05)...")
+        args = [mode]
+        return await self.send_command("set work mode", args)
 
     async def send_sd_status(self, status: int):
         """Notify that there is an insertion or removal action on the TF card (0x15).

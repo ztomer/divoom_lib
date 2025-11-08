@@ -96,7 +96,7 @@ COMMANDS = {
     "get play status": 0x0b,
     "set sd play music id": 0x11,
     "set sd last next": 0x12,
-    "get work mode": 0x13,
+    "get work mode": 0x06,
     "send sd list over": 0x14,
     "send sd status": 0x15,
 }

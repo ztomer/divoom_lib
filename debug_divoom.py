@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from divoom_protocol import Divoom
+from divoom import Divoom
 
 # Configure logging for the entire application
 logging.basicConfig(level=logging.DEBUG,
