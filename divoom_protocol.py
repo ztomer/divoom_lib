@@ -44,8 +44,9 @@ class DivoomBluetoothProtocol:
     message_buf = []
     _response_event = None
     _response_data = None
+    SPP_CHARACTERISTIC_UUID = "49535343-6daa-4d02-abf6-19569aca69fe" # Identified as containing "SPP"
     
-    def __init__(self, mac=None, logger=None, write_characteristic_uuid=None, notify_characteristic_uuid=None, read_characteristic_uuid=None, escapePayload=False, client=None, use_ios_le_protocol=False):
+    def __init__(self, mac=None, logger=None, write_characteristic_uuid=None, notify_characteristic_uuid=None, read_characteristic_uuid=None, spp_characteristic_uuid=None, escapePayload=False, client=None, use_ios_le_protocol=False):
         self.type = "Ditoo" # Default to Ditoo
         self.screensize = 16
         self.chunksize = 200
@@ -54,6 +55,7 @@ class DivoomBluetoothProtocol:
         self.WRITE_CHARACTERISTIC_UUID = write_characteristic_uuid
         self.NOTIFY_CHARACTERISTIC_UUID = notify_characteristic_uuid
         self.READ_CHARACTERISTIC_UUID = read_characteristic_uuid
+        self.SPP_CHARACTERISTIC_UUID = spp_characteristic_uuid if spp_characteristic_uuid else DivoomBluetoothProtocol.SPP_CHARACTERISTIC_UUID
         self.escapePayload = escapePayload
         self.client = client # Store the provided client
         self.use_ios_le_protocol = use_ios_le_protocol
@@ -75,7 +77,6 @@ class DivoomBluetoothProtocol:
                 self.logger.info(f"Connected to Divoom device at {self.mac}")
                 
                 # Discover services and characteristics
-
                 
                 # Enable notifications for all characteristics that support it
                 for service in self.client.services:
@@ -83,6 +84,7 @@ class DivoomBluetoothProtocol:
                         if "notify" in characteristic.properties:
                             await self.client.start_notify(characteristic.uuid, self.notification_handler)
                             self.logger.info(f"Enabled notifications for {characteristic.uuid}")
+                            await asyncio.sleep(0.1) # Small delay to ensure notification is registered
 
             except Exception as e:
                 self.logger.error(f"Failed to connect to {self.mac}: {e}")
@@ -104,83 +106,30 @@ class DivoomBluetoothProtocol:
                 self.logger.error(f"Error disconnecting from {self.mac}: {e}")
                 
     def notification_handler(self, sender, data):
-        """Handler for GATT notifications, parsing iOS LE protocol."""
+        """Handler for GATT notifications, attempting to parse Basic Protocol responses."""
         self.logger.debug(f"Notification received from {sender}: {data.hex()}")
         self.message_buf.append(data) # Keep this for general debugging
 
-        # Check for iOS LE Header: 0xFE, 0xEF, 0xAA, 0x55
-        if len(data) >= 4 and data[0:4] == b'\xfe\xef\xaa\x55':
-            self.logger.debug("iOS LE Header found.")
-            # Data Length (2 bytes, little-endian)
-            data_length = int.from_bytes(data[4:6], byteorder='little')
-            self.logger.debug(f"iOS LE Data Length: {data_length}")
-
-            # Command Identifier (1 byte)
-            command_identifier = data[6]
-            self.logger.debug(f"iOS LE Command Identifier: 0x{command_identifier:02x}")
-
-            # Packet Number (4 bytes, only if Command Identifier is 0x01 for ACK)
-            # For now, let's assume we are interested in the actual response data
-            # The actual data starts after header (4), data_length (2), command_identifier (1), packet_number (4)
-            # So, actual data starts at index 11
+        # Attempt to parse Basic Protocol response: Head (0x01) + Len (2) + Cmd (1) + Data + Checksum (2) + Tail (0x02)
+        if len(data) >= 7 and data[0] == 0x01 and data[-1] == 0x02:
+            self.logger.info(f"Basic Protocol Header and Tail found. Full data: {data.hex()}")
             
-            # The Divoom API doc says: "Data: The data format remains unchanged from before."
-            # This means the 'Data' part of the iOS LE message should contain the original Divoom protocol message
-            # (Head + Len + Cmd + Mode + Checksum + Tail)
-            # However, the example response for Get Work Mode is just Cmd + Mode.
-            # This is a bit ambiguous. Let's assume the 'Data' part of the iOS LE message
-            # directly contains the command and its response.
-
-            # Let's try to extract the command and response from the 'Data' section of the iOS LE message.
-            # The 'Data' section starts after the Command Identifier and Packet Number.
-            # If Command Identifier is 0x01 (ACK confirmation), then Packet Number is present (4 bytes).
-            # If Command Identifier is 0x00 (no ACK), then Packet Number is not present.
-
-            # For now, let's assume the response we are looking for is the actual command response, not just an ACK.
-            # The Divoom API doc states: "upon receiving a command, the device will respond with the SPP_LE_CMD_ACK (0x33) command."
-            # This means 0x33 is the ACK. The actual response to a command like Get Work Mode (0x06) should contain 0x06.
-
-            if command_identifier == 0x33:
-                self.logger.info("Received SPP_LE_CMD_ACK (0x33).")
-                # This is just an ACK, not the actual command response we are waiting for.
-                # We should not set _response_data or _response_event for just an ACK.
-                # The actual response will have the command code (e.g., 0x06 for Get Work Mode)
-                return
+            response_command = data[3]
+            self.logger.info(f"Parsed response command: 0x{response_command:02x}")
             
-            # If it's not an ACK, it should be a command response.
-            # The 'Data' part of the iOS LE message starts after the header (4 bytes), data length (2 bytes),
-            # command identifier (1 byte), and packet number (4 bytes, if present).
-            # Assuming packet number is always present for responses that are not just ACKs.
-            # So, the actual Divoom protocol data starts at index 11.
-            
-            # Let's extract the 'Data' part of the iOS LE message.
-            # The Data Length field includes: packet number (4 bytes), Data (command + args), and Checksum (2 bytes).
-            # So, the actual data (command + args) is: data[11 : 11 + data_length - 4 - 2]
-            # This is getting complicated. Let's simplify.
-
-            # Let's assume the 'Data' part of the iOS LE message directly contains the Divoom command response.
-            # For 'Get Work Mode (0x06)' response: `Cmd (0x06) + Mode`.
-            # This means the actual response data should be at data[11] (command) and data[12] (mode).
-
-            # Let's try to extract the command and mode from the data.
-            # Assuming the structure is: FE EF AA 55 [len] [cmd_id] [packet_num] [cmd] [mode] [checksum]
-            # So, the actual command is at index 11, and mode at index 12.
-            
-            if len(data) >= 13: # Minimum length for a command response with mode
-                response_command = data[11]
-                response_mode = data[12]
-                self.logger.info(f"Parsed response: Command=0x{response_command:02x}, Mode=0x{response_mode:02x}")
-
-                # If this is a response to our 'get work mode' command (0x06)
-                if response_command == self.COMMANDS["get work mode"]:
-                    self.logger.info(f"Received response for Get Work Mode: Mode=0x{response_mode:02x}")
+            if response_command == self.COMMANDS["get work mode"]:
+                if len(data) >= 5: # Ensure there's a mode byte
+                    response_mode = data[4]
+                    self.logger.info(f"Received Basic Protocol response for Get Work Mode: Mode=0x{response_mode:02x}")
                     self._response_data = response_mode.to_bytes(1, byteorder='big') # Store as bytes
                     self._response_event.set()
                     return
-            
-            self.logger.warning(f"Unrecognized iOS LE notification data: {data.hex()}")
+                else:
+                    self.logger.warning(f"Basic Protocol response for Get Work Mode too short: {data.hex()}")
+            else:
+                self.logger.warning(f"Basic Protocol response for unknown command 0x{response_command:02x}: {data.hex()}")
         else:
-            self.logger.warning(f"Unrecognized notification data (not iOS LE format): {data.hex()}")
+            self.logger.warning(f"Unrecognized notification data (not Basic Protocol format): {data.hex()}")
         
         # If no specific response is parsed, clear the event to avoid false positives
         self._response_event.clear()
@@ -189,19 +138,19 @@ class DivoomBluetoothProtocol:
 
 
     async def get_work_mode(self):
-        """Get the current work mode from the Divoom device by sending command 0x06."""
+        """Get the current work mode from the Divoom device by directly reading the SPP characteristic."""
         if self.client is None or not self.client.is_connected:
             self.logger.error("Not connected to a Divoom device.")
             return None
 
-        self.logger.info("Requesting current work mode...")
-        response_mode = await self._send_command_and_wait_for_response("get work mode")
-
-        if response_mode is not None:
-            self.logger.info(f"Received work mode: {response_mode}")
-            return response_mode
-        else:
-            self.logger.warning("Failed to get work mode.")
+        self.logger.info("Attempting to read SPP mode directly...")
+        try:
+            spp_data = await self.client.read_gatt_char(self.SPP_CHARACTERISTIC_UUID)
+            spp_mode = spp_data.decode('ascii', errors='ignore')
+            self.logger.info(f"Successfully read SPP mode: {spp_mode}")
+            return spp_mode
+        except Exception as e:
+            self.logger.error(f"Error reading SPP characteristic {self.SPP_CHARACTERISTIC_UUID}: {e}")
             return None
                 
     async def _send_command_and_wait_for_response(self, command, args=None, timeout=5):
@@ -216,16 +165,18 @@ class DivoomBluetoothProtocol:
             return self._response_data
         except asyncio.TimeoutError:
             self.logger.warning(f"Timeout waiting for notification response to command: {command}")
-            # Fallback: try to read the characteristic directly
-            if self.READ_CHARACTERISTIC_UUID and self.client and self.client.is_connected:
-                try:
-                    read_data = await self.client.read_gatt_char(self.READ_CHARACTERISTIC_UUID)
-                    self.logger.info(f"Read data from {self.READ_CHARACTERISTIC_UUID}: {read_data.hex()}")
-                    self._response_data = read_data
-                    self._response_event.set()
-                    return self._response_data
-                except Exception as e:
-                    self.logger.error(f"Error reading from {self.READ_CHARACTERISTIC_UUID}: {e}")
+            # Fallback: try to read all readable characteristics
+            if self.client and self.client.is_connected:
+                self.logger.info("Attempting to read from all readable characteristics as a fallback...")
+                for service in self.client.services:
+                    for characteristic in service.characteristics:
+                        if "read" in characteristic.properties:
+                            try:
+                                read_data = await self.client.read_gatt_char(characteristic.uuid)
+                                self.logger.info(f"Fallback Read data from {characteristic.uuid}: {read_data.hex()} (ASCII: {read_data.decode('ascii', errors='ignore')})")
+                                # We are just logging all readable data for now, not setting _response_data
+                            except Exception as e:
+                                self.logger.error(f"Error reading from {characteristic.uuid} during fallback: {e}")
             return None
                 
     async def send_command(self, command, args=None):
