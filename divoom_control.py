@@ -43,35 +43,37 @@ async def main():
         for device in devices:
             print(f"  - {device.name} ({device.address})")
 
-        # Test connection to the first device found
-        device = devices[0]
-        print_info(
-            f"Attempting to connect to {device.name} ({device.address})...")
+        timoo_device = None
+        for d in devices:
+            if "Timoo-light-4" in d.name:
+                timoo_device = d
+                break
 
-        # Instantiate the new protocol class
-        divoom_device = DivoomBluetoothProtocol(mac=device.address, gatt_characteristic_uuid="00001101-0000-1000-8000-00805f9b34fb")
+        if timoo_device:
+            print_info(
+                f"Attempting to connect to {timoo_device.name} ({timoo_device.address})...")
 
-        try:
-            await divoom_device.connect()
-            print_ok(
-                f"Successfully connected to {device.name} ({device.address}).")
+            divoom_device = DivoomBluetoothProtocol(mac=timoo_device.address, gatt_characteristic_uuid="00001101-0000-1000-8000-00805f9b34fb")
 
-            # Example: Set brightness to 50
-            print_info("Setting brightness to 50...")
-            await divoom_device.send_brightness(50)
-            print_ok("Brightness set to 50.")
+            try:
+                await divoom_device.connect()
+                print_ok(
+                    f"Successfully connected to {timoo_device.name} ({timoo_device.address}).")
 
-            # Example: Turn off the device
-            print_info("Turning off the device...")
-            await divoom_device.send_off()
-            print_ok("Device turned off.")
+                print_info("Setting hot pick channel...")
+                await divoom_device.show_clock(hot=True)
+                print_ok("Hot pick channel set.")
 
-        except Exception as e:
-            print_err(
-                f"Error communicating with {device.name} ({device.address}): {e}")
-        finally:
-            await divoom_device.disconnect()
-            print_info(f"Disconnected from {device.name} ({device.address}).")
+            except Exception as e:
+                print_err(
+                    f"Error communicating with {timoo_device.name} ({timoo_device.address}): {e}")
+            finally:
+                await divoom_device.disconnect()
+                print_info(f"Disconnected from {timoo_device.name} ({timoo_device.address}).")
+        else:
+            print_wrn("Timoo-light-4 device not found.")
+
+
     else:
         print_wrn("No Divoom devices found.")
 
