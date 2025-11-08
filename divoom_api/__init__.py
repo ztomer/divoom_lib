@@ -1,6 +1,6 @@
-from .base import DivoomCommand
+
 from .system import System
-from .alarm import AlarmMemorial
+from .alarm import Alarm
 from .game import Game
 from .light import Light
 from .music import Music

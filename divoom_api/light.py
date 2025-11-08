@@ -2,36 +2,36 @@
 Divoom Light Commands
 """
 
-from .base import DivoomCommand, DivoomBase
+from .base import DivoomBase
 
 class Light(DivoomBase):
-    SET_LIGHT_MODE = DivoomCommand(0x45)
-    GET_LIGHT_MODE = DivoomCommand(0x46)
-    SET_LIGHT_PIC = DivoomCommand(0x44)
-    SET_LIGHT_PHONE_GIF = DivoomCommand(0x49)
-    SET_GIF_SPEED = DivoomCommand(0x16)
-    SET_LIGHT_PHONE_WORD_ATTR = DivoomCommand(0x87)
-    APP_NEW_SEND_GIF_CMD = DivoomCommand(0x8B)
-    SET_USER_GIF = DivoomCommand(0xB1)
-    MODIFY_USER_GIF_ITEMS = DivoomCommand(0xB6)
-    APP_NEW_USER_DEFINE = DivoomCommand(0x8C)
-    APP_BIG64_USER_DEFINE = DivoomCommand(0x8D)
-    APP_GET_USER_DEFINE_INFO = DivoomCommand(0x8E)
-    SET_RHYTHM_GIF = DivoomCommand(0xB7)
-    APP_SEND_EQ_GIF = DivoomCommand(0x1B)
-    DRAWING_MUL_PAD_CTRL = DivoomCommand(0x3A)
-    DRAWING_BIG_PAD_CTRL = DivoomCommand(0x3B)
-    DRAWING_PAD_CTRL = DivoomCommand(0x58)
-    DRAWING_PAD_EXIT = DivoomCommand(0x5A)
-    DRAWING_MUL_ENCODE_SINGLE_PIC = DivoomCommand(0x5B)
-    DRAWING_MUL_ENCODE_PIC = DivoomCommand(0x5C)
-    DRAWING_MUL_ENCODE_GIF_PLAY = DivoomCommand(0x6B)
-    DRAWING_ENCODE_MOVIE_PLAY = DivoomCommand(0x6C)
-    DRAWING_MUL_ENCODE_MOVIE_PLAY = DivoomCommand(0x6D)
-    DRAWING_CTRL_MOVIE_PLAY = DivoomCommand(0x6E)
-    DRAWING_MUL_PAD_ENTER = DivoomCommand(0x6F)
-    SAND_PAINT_CTRL = DivoomCommand(0x34)
-    PIC_SCAN_CTRL = DivoomCommand(0x35)
+    SET_LIGHT_MODE = 0x45
+    GET_LIGHT_MODE = 0x46
+    SET_LIGHT_PIC = 0x44
+    SET_LIGHT_PHONE_GIF = 0x49
+    SET_GIF_SPEED = 0x16
+    SET_LIGHT_PHONE_WORD_ATTR = 0x87
+    APP_NEW_SEND_GIF_CMD = 0x8B
+    SET_USER_GIF = 0xB1
+    MODIFY_USER_GIF_ITEMS = 0xB6
+    APP_NEW_USER_DEFINE = 0x8C
+    APP_BIG64_USER_DEFINE = 0x8D
+    APP_GET_USER_DEFINE_INFO = 0x8E
+    SET_RHYTHM_GIF = 0xB7
+    APP_SEND_EQ_GIF = 0x1B
+    DRAWING_MUL_PAD_CTRL = 0x3A
+    DRAWING_BIG_PAD_CTRL = 0x3B
+    DRAWING_PAD_CTRL = 0x58
+    DRAWING_PAD_EXIT = 0x5A
+    DRAWING_MUL_ENCODE_SINGLE_PIC = 0x5B
+    DRAWING_MUL_ENCODE_PIC = 0x5C
+    DRAWING_MUL_ENCODE_GIF_PLAY = 0x6B
+    DRAWING_ENCODE_MOVIE_PLAY = 0x6C
+    DRAWING_MUL_ENCODE_MOVIE_PLAY = 0x6D
+    DRAWING_CTRL_MOVIE_PLAY = 0x6E
+    DRAWING_MUL_PAD_ENTER = 0x6F
+    SAND_PAINT_CTRL = 0x34
+    PIC_SCAN_CTRL = 0x35
 
     async def show_clock(self, clock=None, twentyfour=None, weather=None, temp=None, calendar=None, color=None, hot=None):
         """Show clock on the Divoom device in the color"""
@@ -56,7 +56,7 @@ class Light(DivoomBase):
         args += [0x01 if weather == True or weather == 1 else 0x00]
         args += [0x01 if temp == True or temp == 1 else 0x00]
         args += [0x01 if calendar == True or calendar == 1 else 0x00]
-        return await self.send_command(Light.SET_LIGHT_MODE, args)
+        return await self.send_command("set light mode", args)
 
     async def show_design(self, number=None):
         """Show design on the Divoom device"""

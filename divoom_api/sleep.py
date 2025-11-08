@@ -2,16 +2,16 @@
 Divoom Sleep Commands
 """
 
-from .base import DivoomCommand
+from .base import DivoomBase
 
 class Sleep:
-    GET_SLEEP_SCENE = DivoomCommand(0xA2)
-    SET_SLEEP_SCENE_LISTEN = DivoomCommand(0xA3)
-    SET_SCENE_VOL = DivoomCommand(0xA4)
-    SET_SLEEP_COLOR = DivoomCommand(0xAD)
-    SET_SLEEP_LIGHT = DivoomCommand(0xAE)
-    SET_SLEEP_AUTO_OFF = DivoomCommand(0x40)
-    SET_SLEEP_SCENE = DivoomCommand(0x41)
+    GET_SLEEP_SCENE = 0xA2
+    SET_SLEEP_SCENE_LISTEN = 0xA3
+    SET_SCENE_VOL = 0xA4
+    SET_SLEEP_COLOR = 0xAD
+    SET_SLEEP_LIGHT = 0xAE
+    SET_SLEEP_AUTO_OFF = 0x40
+    SET_SLEEP_SCENE = 0x41
 
     async def show_sleep(self, value=None, sleeptime=None, sleepmode=None, volume=None, color=None, brightness=None, frequency=None, on: int = None):
         """Show sleep mode on the Divoom device and optionally sets mode, volume, time, color, frequency and brightness (0x40)."""
