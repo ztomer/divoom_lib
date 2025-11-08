@@ -38,27 +38,27 @@ async def get_all_divoom_info(mac_address: str):
         sound_control = await divoom.get_sound_control()
         logger.info(f"Sound Control (0xa8): {sound_control}")
 
-        # # --- Music Play ---
-        # logger.info("\n--- Music Play ---")
-        # sd_play_name = await divoom.get_sd_play_name()
-        # logger.info(f"SD Play Name (0x06): {sd_play_name}")
+        # --- Music Play ---
+        logger.info("\n--- Music Play ---")
+        sd_play_name = await divoom.get_sd_play_name()
+        logger.info(f"SD Play Name (0x06): {sd_play_name}")
 
-        # # Note: get_sd_music_list requires start_id and end_id, so we'll fetch total num first
-        # sd_music_list_total_num = await divoom.get_sd_music_list_total_num()
-        # logger.info(f"SD Music List Total Num (0x7d): {sd_music_list_total_num}")
-        # if sd_music_list_total_num and sd_music_list_total_num > 0:
-        #     # Fetching first 5 songs as an example
-        #     sd_music_list = await divoom.get_sd_music_list(0, min(4, sd_music_list_total_num - 1))
-        #     logger.info(f"SD Music List (first 5) (0x07): {sd_music_list}")
+        # Note: get_sd_music_list requires start_id and end_id, so we'll fetch total num first
+        sd_music_list_total_num = await divoom.get_sd_music_list_total_num()
+        logger.info(f"SD Music List Total Num (0x7d): {sd_music_list_total_num}")
+        if sd_music_list_total_num and sd_music_list_total_num > 0:
+            # Fetching first 5 songs as an example
+            sd_music_list = await divoom.get_sd_music_list(0, min(4, sd_music_list_total_num - 1))
+            logger.info(f"SD Music List (first 5) (0x07): {sd_music_list}")
 
-        # volume = await divoom.get_volume()
-        # logger.info(f"Volume (0x09): {volume}")
+        volume = await divoom.get_volume()
+        logger.info(f"Volume (0x09): {volume}")
 
-        # play_status = await divoom.get_play_status()
-        # logger.info(f"Play Status (0x0b): {play_status}")
+        play_status = await divoom.get_play_status()
+        logger.info(f"Play Status (0x0b): {play_status}")
 
-        # sd_music_info = await divoom.get_sd_music_info()
-        # logger.info(f"SD Music Info (0xb4): {sd_music_info}")
+        sd_music_info = await divoom.get_sd_music_info()
+        logger.info(f"SD Music Info (0xb4): {sd_music_info}")
 
         # # --- Alarm Memorial ---
         # logger.info("\n--- Alarm Memorial ---")

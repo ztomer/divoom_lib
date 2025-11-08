@@ -2,49 +2,7 @@
 Divoom Music Play Commands
 """
 
-from .base import DivoomCommand
-
 class Music:
-    GET_SD_PLAY_NAME = DivoomCommand(0x06)
-    GET_SD_MUSIC_LIST = DivoomCommand(0x07)
-    SET_VOL = DivoomCommand(0x08)
-    GET_VOL = DivoomCommand(0x09)
-    SET_PLAY_STATUS = DivoomCommand(0x0A)
-    GET_PLAY_STATUS = DivoomCommand(0x0B)
-    SET_SD_PLAY_MUSIC_ID = DivoomCommand(0x11)
-    SET_SD_LAST_NEXT = DivoomCommand(0x12)
-    SEND_SD_LIST_OVER = DivoomCommand(0x14)
-    GET_SD_MUSIC_LIST_TOTAL_NUM = DivoomCommand(0x7D)
-    GET_SD_MUSIC_INFO = DivoomCommand(0xB4)
-    SET_SD_MUSIC_INFO = DivoomCommand(0xB5)
-    SET_SD_MUSIC_POSITION = DivoomCommand(0xB8)
-    SET_SD_MUSIC_PLAY_MODE = DivoomCommand(0xB9)
-    APP_NEED_GET_MUSIC_LIST = DivoomCommand(0x47)
-    SEND_SD_CARD_STATUS = DivoomCommand(0x15)
-
-    async def send_playstate(self, value=None):
-        """Send play/pause state to the Divoom device"""
-        args = []
-        args += (0x01 if value == True or value ==
-                 1 else 0x00).to_bytes(1, byteorder='big')
-        return await self.send_command("set playstate", args)
-
-    async def show_radio(self, value=None, frequency=None):
-        """Show radio on the Divoom device and optionally changes to the given frequency"""
-        args = []
-        args += (0x01 if value == True or value ==
-                 1 else 0x00).to_bytes(1, byteorder='big')
-        result = await self.send_command("set radio", args)
-
-        if (value == True or value == 1) and frequency != None:
-            if isinstance(frequency, str):
-                frequency = float(frequency)
-
-            args = []
-            args += self._parse_frequency(frequency)
-            await self.send_command("set radio frequency", args)
-        return result
-
     async def get_sd_play_name(self):
         """Get the current sd card music playing name (0x06)."""
         self.logger.info("Getting SD play name (0x06)...")
