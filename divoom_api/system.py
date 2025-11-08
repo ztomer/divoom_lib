@@ -252,6 +252,18 @@ class System:
 
         if value[-2] == "°C":
             await self.send_command("set temp type", [0x00])
+        
         if value[-2] == "°F":
             await self.send_command("set temp type", [0x01])
         return result
+
+    async def send_brightness(self, value=None):
+        """Send brightness to the Divoom device"""
+        if value == None:
+            return
+        if isinstance(value, str):
+            value = int(value)
+
+        args = []
+        args += value.to_bytes(1, byteorder='big')
+        return await self.send_command("set brightness", args)

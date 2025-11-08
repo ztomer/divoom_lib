@@ -17,6 +17,9 @@ class DivoomBase:
 
     # Identified as containing "SPP"
     SPP_CHARACTERISTIC_UUID = "49535343-6daa-4d02-abf6-19569aca69fe"
+    WRITE_CHARACTERISTIC_UUID = None
+    NOTIFY_CHARACTERISTIC_UUID = None
+    READ_CHARACTERISTIC_UUID = None
 
     def __init__(self, mac=None, logger=None, write_characteristic_uuid=None, notify_characteristic_uuid=None, read_characteristic_uuid=None, spp_characteristic_uuid=None, escapePayload=False, use_ios_le_protocol=False):
         self.type = "Ditoo"  # Default to Ditoo
@@ -59,6 +62,9 @@ class DivoomBase:
                 self.logger.error(f"Failed to connect to {self.mac}: {e}")
                 raise
 
+        if not all([self.WRITE_CHARACTERISTIC_UUID, self.NOTIFY_CHARACTERISTIC_UUID, self.READ_CHARACTERISTIC_UUID]):
+            await self.discover_characteristics()
+
         # Enable notifications for all characteristics that support it
         for service in self.client.services:
             for characteristic in service.characteristics:
@@ -67,6 +73,25 @@ class DivoomBase:
                     self.logger.info(
                         f"Enabled notifications for {characteristic.uuid}")
         await asyncio.sleep(1.0)
+
+    async def discover_characteristics(self):
+        """Discover and set the characteristic UUIDs for the device."""
+        self.logger.info("Discovering characteristics...")
+        for service in self.client.services:
+            for char in service.characteristics:
+                if "write" in char.properties and not "write-without-response" in char.properties:
+                    self.WRITE_CHARACTERISTIC_UUID = char.uuid
+                    self.logger.info(f"Found WRITE characteristic: {char.uuid}")
+                if "notify" in char.properties:
+                    self.NOTIFY_CHARACTERISTIC_UUID = char.uuid
+                    self.logger.info(f"Found NOTIFY characteristic: {char.uuid}")
+                if "read" in char.properties:
+                    self.READ_CHARACTERISTIC_UUID = char.uuid
+                    self.logger.info(f"Found READ characteristic: {char.uuid}")
+        
+        if not all([self.WRITE_CHARACTERISTIC_UUID, self.NOTIFY_CHARACTERISTIC_UUID, self.READ_CHARACTERISTIC_UUID]):
+            self.logger.error("Could not discover all required characteristics.")
+            raise Exception("Could not discover all required characteristics.")
 
     async def disconnect(self):
         """Closes the connection to the Divoom device."""
@@ -387,209 +412,3 @@ class DivoomBase:
         else:
             header += [0x00, 0x0A, 0x0A, 0x04]  # Fixed header on single frames
         return header + framePart
-
-    def process_image(self, image, time=None):
-        frames = []
-        with Image.open(image) as img:
-
-            picture_frames = []
-            needsFlags = False
-            needsResize = False
-            frameSize = (self.screensize, self.screensize)
-            if self.screensize == 32:
-                # Pixoo-Max can handle 16x16 itself
-                if img.size[0] <= 16 and img.size[1] <= 16:
-                    frameSize = (16, 16)
-                else:
-                    needsFlags = True
-            if img.size[0] != frameSize[0] or img.size[1] != frameSize[1]:
-                needsResize = True
-
-            try:
-                while True:
-                    new_frame = Image.new('RGBA', img.size)
-                    new_frame.paste(img, (0, 0), img.convert('RGBA'))
-
-                    if needsResize:
-                        new_frame = new_frame.resize(
-                            frameSize, Image.Resampling.NEAREST)
-
-                    duration = img.info['duration'] if 'duration' in img.info else None
-                    picture_frames.append([new_frame, duration])
-                    img.seek(img.tell() + 1)
-            except EOFError:
-                pass
-
-            framesCount = len(picture_frames)
-            for pair in picture_frames:
-                picture_frame = pair[0]
-                picture_time = pair[1]
-
-                colors = []
-                pixels = [None] * frameSize[0] * frameSize[1]
-
-                for pos in itertools.product(range(frameSize[1]), range(frameSize[0])):
-                    y, x = pos
-                    r, g, b, a = picture_frame.getpixel((x, y))
-                    color = [r, g, b] if a > 32 else [0, 0, 0]
-                    if color not in colors:
-                        colors.append(color)
-                    color_index = colors.index(color)
-                    pixels[x + frameSize[1] * y] = color_index
-
-                if picture_time is None:
-                    picture_time = 0
-
-                colorCount = len(colors)
-                if colorCount >= (frameSize[0] * frameSize[1]):
-                    colorCount = 0
-
-                frame = self.process_frame(
-                    pixels, colors, colorCount, framesCount, picture_time if time is None else time, needsFlags)
-                frames.append(frame)
-
-        result = []
-
-        if needsFlags:  # Pixoo-Max expects two empty frames with flags 0x05 and 0x06 at the start
-            result.append(self.make_frame([0x00, 0x00, 0x05, 0x00, 0x00]))
-            result.append(self.make_frame(
-                [0x00, 0x00, 0x06, 0x00, 0x00, 0x00]))
-
-        for frame in frames:
-            result.append(self.make_frame(frame))
-
-        return [result, framesCount]
-
-    def process_text(self, text, font, size=None, time=None, color1=None, color2=None):
-        if color1 is None or len(color1) < 3:
-            color1 = [0xff, 0xff, 0xff]
-        if color2 is None or len(color2) < 3:
-            color2 = [0x01, 0x01, 0x01]
-
-        frames = []
-        picture_time = 50
-        text_margin = 0 if size is None else int((self.screensize - size) / 2)
-        text_speed_fast = int(math.ceil(self.screensize / 4))
-        text_speed_medium = int(math.ceil(self.screensize / 8))
-        text_speed_slow = int(math.ceil(self.screensize / 16))
-        needsFlags = True if self.screensize == 32 else False
-        frameSize = (self.screensize, self.screensize)
-        fontSize = self.screensize - \
-            (text_margin * 2) if size is None else size
-
-        if font is not None and 'divoom.ttf' in font:  # font calculation is a bit off for divoom.ttf
-            fontSize = int(math.ceil(fontSize * 1.2))
-            text_margin = int((self.screensize - fontSize) / 2)
-
-        self.logger.info("{0}: FONT: {1}".format(self.type, font))
-        fnt = ImageFont.load_default(fontSize)
-        try:
-            if font is not None:
-                fnt = ImageFont.truetype(font, fontSize)
-        except OSError:
-            pass
-
-        font_width = 60
-        with Image.new('RGBA', (self.screensize * 100, self.screensize)) as img_draw:
-            drw = ImageDraw.Draw(img_draw)
-            drw.fontmode = "1"
-            txt = drw.textbbox((0, 0), text, font=fnt)
-            font_width = txt[2]
-        if font is not None and 'divoom.ttf' in font:  # font calculation is a bit off for divoom.ttf
-            font_width = int(math.ceil(font_width * 1.2))
-
-        img_width = self.screensize + font_width + self.screensize + text_margin
-        with Image.new('RGBA', (img_width, self.screensize), tuple(color2 + [0x00])) as img:
-            drw = ImageDraw.Draw(img)
-            drw.fontmode = "1"
-            drw.text((self.screensize, text_margin), text,
-                     font=fnt, fill=tuple(color1 + [0xff]))
-
-            text_speed = text_speed_slow
-            framesCount = int(math.floor(
-                (img_width - self.screensize) / text_speed))
-            if framesCount > 60:  # frames are limited, therefore we need to do bigger jumps
-                text_speed = text_speed_medium
-                picture_time = int(
-                    picture_time * (text_speed_medium / text_speed_slow))
-                framesCount = int(math.floor(
-                    (img_width - self.screensize) / text_speed))
-                if framesCount > 60:  # frames are limited, therefore we need to do even bigger jumps
-                    text_speed = text_speed_fast
-                    picture_time = int(
-                        picture_time * (text_speed_fast / text_speed_medium))
-                    framesCount = int(math.floor(
-                        (img_width - self.screensize) / text_speed))
-            if framesCount > 60:
-                self.logger.warning(
-                    "{0}: text animation is too wide and is very likely cut off.".format(self.type))
-
-            for offset in range(framesCount):
-                colors = []
-                pixels = [None] * frameSize[0] * frameSize[1]
-
-                for pos in itertools.product(range(frameSize[1]), range(frameSize[0])):
-                    y, x = pos
-                    r, g, b, a = img.getpixel((x + (offset * text_speed), y))
-                    color = [r, g, b] if a > 32 else [0, 0, 0]
-                    if color not in colors:
-                        colors.append(color)
-                    color_index = colors.index(color)
-                    pixels[x + frameSize[1] * y] = color_index
-
-                colorCount = len(colors)
-                if colorCount >= (frameSize[0] * frameSize[1]):
-                    colorCount = 0
-
-                frame = self.process_frame(
-                    pixels, colors, colorCount, framesCount, picture_time if time is None else time, needsFlags)
-                frames.append(frame)
-
-        result = []
-
-        if needsFlags:  # Pixoo-Max expects two empty frames with flags 0x05 and 0x06 at the start
-            result.append(self.make_frame([0x00, 0x00, 0x05, 0x00, 0x00]))
-            result.append(self.make_frame(
-                [0x00, 0x00, 0x06, 0x00, 0x00, 0x00]))
-
-        for frame in frames:
-            result.append(self.make_frame(frame))
-
-        return [result, framesCount]
-
-    def process_frame(self, pixels, colors, colorCount, framesCount, time, needsFlags):
-        timeCode = [0x00, 0x00]
-        if framesCount > 1:
-            timeCode = time.to_bytes(2, byteorder='little')
-
-        paletteFlag = 0x00  # default palette flag.
-        if needsFlags:
-            # Pixoo-Max expects 0x03 flag. might indicate bigger palette size.
-            paletteFlag = 0x03
-
-        result = []
-        result += timeCode
-        result += [paletteFlag]
-        result += colorCount.to_bytes(2 if needsFlags else 1,
-                                      byteorder='little')
-        for color in colors:
-            result += self.convert_color(color)
-        result += self.process_pixels(pixels, colors)
-        return result
-
-    def process_pixels(self, pixels, colors):
-        """Correctly transform each pixel information based on https://github.com/RomRider/node-divoom-timebox-evo/blob/master/PROTOCOL.md#pixel-string-pixel_data """
-        bitsPerPixel = math.ceil(math.log(len(colors)) / math.log(2))
-        if bitsPerPixel == 0:
-            bitsPerPixel = 1
-
-        pixelString = ""
-        for pixel in pixels:
-            pixelBits = "{0:b}".format(pixel).zfill(8)
-            pixelString += pixelBits[::-1][:bitsPerPixel:]
-
-        result = []
-        for pixel in self.chunks(pixelString, 8):
-            result += [int(pixel[::-1], 2)]
-
-        return result

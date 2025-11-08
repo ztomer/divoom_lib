@@ -652,14 +652,3 @@ class Light(DivoomBase):
         args = [0x04]
         args += number.to_bytes(1, byteorder='big')
         return await self.send_command("set view", args)
-
-    async def send_brightness(self, value=None):
-        """Send brightness to the Divoom device"""
-        if value == None:
-            return
-        if isinstance(value, str):
-            value = int(value)
-
-        args = []
-        args += value.to_bytes(1, byteorder='big')
-        return await self.send_command("set brightness", args)

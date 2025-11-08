@@ -6,36 +6,13 @@ from divoom_protocol import Divoom
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def get_all_divoom_info(
-    mac_address: str,
-    write_characteristic_uuid: str = None,
-    notify_characteristic_uuid: str = None,
-    read_characteristic_uuid: str = None,
-    divoom_instance: Divoom = None
-):
+async def get_all_divoom_info(mac_address: str):
     """
     Connects to the Divoom device and fetches all available information.
     """
-    if divoom_instance:
-        divoom = divoom_instance
-        logger.info("Using existing Divoom instance. Fetching information...")
-        should_disconnect = False
-    else:
-        if not all([write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid]):
-            logger.error("Characteristic UUIDs must be provided if no Divoom instance is given.")
-            return
-
-        divoom = Divoom(
-            mac=mac_address,
-            write_characteristic_uuid=write_characteristic_uuid,
-            notify_characteristic_uuid=notify_characteristic_uuid,
-            read_characteristic_uuid=read_characteristic_uuid,
-            logger=logger,
-            use_ios_le_protocol=True
-        )
-        await divoom.connect()
-        logger.info("Connected to Divoom device. Fetching information...")
-        should_disconnect = True
+    divoom = Divoom(mac=mac_address, logger=logger, use_ios_le_protocol=True)
+    await divoom.connect()
+    logger.info("Connected to Divoom device. Fetching information...")
 
     try:
         # --- System Settings ---
@@ -43,23 +20,23 @@ async def get_all_divoom_info(
         work_mode = await divoom.get_work_mode()
         logger.info(f"Work Mode (0x13): {work_mode}")
 
-        # device_temp = await divoom.get_device_temp()
-        # logger.info(f"Device Temperature (0x59): {device_temp}")
+        device_temp = await divoom.get_device_temp()
+        logger.info(f"Device Temperature (0x59): {device_temp}")
 
-        # net_temp_disp = await divoom.get_net_temp_disp()
-        # logger.info(f"Network Temperature Display (0x73): {net_temp_disp}")
+        net_temp_disp = await divoom.get_net_temp_disp()
+        logger.info(f"Network Temperature Display (0x73): {net_temp_disp}")
 
-        # device_name = await divoom.get_device_name()
-        # logger.info(f"Device Name (0x76): {device_name}")
+        device_name = await divoom.get_device_name()
+        logger.info(f"Device Name (0x76): {device_name}")
 
-        # low_power_switch = await divoom.get_low_power_switch()
-        # logger.info(f"Low Power Switch (0xb3): {low_power_switch}")
+        low_power_switch = await divoom.get_low_power_switch()
+        logger.info(f"Low Power Switch (0xb3): {low_power_switch}")
 
-        # auto_power_off = await divoom.get_auto_power_off()
-        # logger.info(f"Auto Power Off (0xac): {auto_power_off} minutes")
+        auto_power_off = await divoom.get_auto_power_off()
+        logger.info(f"Auto Power Off (0xac): {auto_power_off} minutes")
 
-        # sound_control = await divoom.get_sound_control()
-        # logger.info(f"Sound Control (0xa8): {sound_control}")
+        sound_control = await divoom.get_sound_control()
+        logger.info(f"Sound Control (0xa8): {sound_control}")
 
         # # --- Music Play ---
         # logger.info("\n--- Music Play ---")
@@ -123,8 +100,7 @@ async def get_all_divoom_info(
     except Exception as e:
         logger.error(f"An error occurred: {e}")
     finally:
-        if should_disconnect:
-            await divoom.disconnect()
+        await divoom.disconnect()
 
 if __name__ == "__main__":
     # Replace with your Divoom device's MAC address
