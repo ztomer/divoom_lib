@@ -3,8 +3,11 @@ Divoom System Commands
 """
 import datetime
 import logging
+from .base import DivoomBase
 
-class System:
+class System(DivoomBase):
+    def __init__(self, mac=None, logger=None, write_characteristic_uuid=None, notify_characteristic_uuid=None, read_characteristic_uuid=None, spp_characteristic_uuid=None, escapePayload=False, use_ios_le_protocol=False):
+        super().__init__(mac, logger, write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid, spp_characteristic_uuid, escapePayload, use_ios_le_protocol)
     async def get_work_mode(self):
         """Get the current system working mode (0x06)."""
         self.logger.info("Getting work mode (0x06)...")
