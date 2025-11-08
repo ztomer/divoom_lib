@@ -37,6 +37,17 @@ class Tool(DivoomBase):
                  1 else 0x02).to_bytes(1, byteorder='big')
         return await self.send_command("set tool", args)
 
+    async def show_timer(self, value=None):
+        """Show timer tool on the Divoom device"""
+        if value == None:
+            value = 2
+        if isinstance(value, str):
+            value = int(value)
+
+        args = [0x00]
+        args += value.to_bytes(1, byteorder='big')
+        return await self.send_command("set tool", args)
+
     async def get_tool_info(self, tool_type: int):
         """Get information about the tools available in the device (0x71)."""
         self.logger.info(f"Getting tool info for type {tool_type} (0x71)...")

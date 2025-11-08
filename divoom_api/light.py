@@ -581,3 +581,85 @@ class Light(DivoomBase):
                 f"Unknown control for pic_scan_ctrl: {control}")
             return False
         return await self.send_command("pic scan ctrl", args)
+
+    async def show_effects(self, number):
+        """Show effects on the Divoom device"""
+        if number == None:
+            return
+        if isinstance(number, str):
+            number = int(number)
+
+        args = [0x03]
+        args += number.to_bytes(1, byteorder='big')
+        return await self.send_command("set view", args)
+
+    async def show_image(self, file, time=None):
+        """Show image or animation on the Divoom device"""
+        frames, framesCount = self.process_image(file, time=time)
+
+        result = None
+        if framesCount > 1:
+            """Sending as Animation"""
+            frameParts = []
+            framePartsSize = 0
+
+            for pair in frames:
+                frameParts += pair[0]
+                framePartsSize += pair[1]
+
+            index = 0
+            for framePart in self.chunks(frameParts, self.chunksize):
+                frame = self.make_framepart(framePartsSize, index, framePart)
+                result = await self.send_command("set animation frame", frame)
+                index += 1
+
+        elif framesCount == 1:
+            """Sending as Image"""
+            pair = frames[-1]
+            frame = self.make_framepart(pair[1], -1, pair[0])
+            result = await self.send_command("set image", frame)
+        return result
+
+    async def show_light(self, color, brightness=None, power=None):
+        """Show light on the Divoom device in the color"""
+        if power == None:
+            power = True
+        if brightness == None:
+            brightness = 100
+        if isinstance(brightness, str):
+            brightness = int(brightness)
+
+        args = [0x01]
+        if color is None or len(color) < 3:
+            args += [0xFF, 0xFF, 0xFF]
+            args += brightness.to_bytes(1, byteorder='big')
+            args += [0x01]
+        else:
+            args += self.convert_color(color)
+            args += brightness.to_bytes(1, byteorder='big')
+            args += [0x00]
+        args += [0x01 if power == True or power ==
+                 1 else 0x00, 0x00, 0x00, 0x00]
+        return await self.send_command("set view", args)
+
+    async def show_visualization(self, number, color1, color2):
+        """Show visualization on the Divoom device"""
+        if number == None:
+            return
+        if isinstance(number, str):
+            number = int(number)
+
+        args = [0x04]
+        args += number.to_bytes(1, byteorder='big')
+        return await self.send_command("set view", args)
+
+    async def send_brightness(self, value=None):
+        """Send brightness to the Divoom device"""
+        if value == None:
+            return
+        if isinstance(value, str):
+            value = int(value)
+
+        args = []
+        args += value.to_bytes(1, byteorder='big')
+        return await self.send_command("set brightness", args)
