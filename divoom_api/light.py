@@ -520,3 +520,53 @@ class Light:
                 f"Unknown control for pic_scan_ctrl: {control}")
             return False
         return await self.communicator.send_command("pic scan ctrl", args)
+
+    async def set_canonical_light(self, cache_dir: str, device_id: str, cache: dict | None = None):
+        # Build canonical 7-byte payload: [mode(1), R,G,B, brightness, effect_mode, on_off]
+        mode = 0x01
+        rgb = [0xFF, 0xFF, 0xFF]
+        brightness = 100
+        effect_mode = 0x00
+        power_state = 0x01
+        args = [mode] + rgb + [brightness, effect_mode, power_state]
+
+        self.logger.info(
+            f"Attempting canonical Light Mode payload: {[hex(x) for x in args]} (SPP)")
+        ok = await self.communicator.send_command_and_wait_for_response(0x45, args, timeout=3)
+        if ok is not None:
+            self.logger.info(f"Canonical (SPP) response: {ok}")
+            # Save successful payload to cache
+            try:
+                existing = cache or {}
+                existing.update({
+                    "last_successful_payload": [f"{b:02x}" for b in args],
+                    "last_successful_use_ios_le": False,
+                    "escapePayload": self.communicator.escapePayload,
+                })
+                cache.save_device_cache(cache_dir, device_id, existing)
+                self.logger.info(f"Persisted canonical SPP payload to cache for {device_id}")
+            except OSError as e:
+                self.logger.warning(f"Warning: failed to persist canonical payload: {e}")
+            return True
+
+        self.logger.info("No response for canonical (SPP). Trying iOS-LE framing...")
+        self.communicator.use_ios_le_protocol = True
+        ok2 = await self.communicator.send_command_and_wait_for_response(0x45, args, timeout=3)
+        if ok2 is not None:
+            self.logger.info(f"Canonical (iOS-LE) response: {ok2}")
+            try:
+                existing = cache or {}
+                existing.update({
+                    "last_successful_payload": [f"{b:02x}" for b in args],
+                    "last_successful_use_ios_le": True,
+                    "escapePayload": self.communicator.escapePayload,
+                })
+                cache.save_device_cache(cache_dir, device_id, existing)
+                self.logger.info(
+                    f"Persisted canonical iOS-LE payload to cache for {device_id}")
+            except OSError as e:
+                self.logger.warning(f"Warning: failed to persist canonical payload: {e}")
+            return True
+
+        self.logger.info("Canonical payload did not produce a response.")
+        return False
