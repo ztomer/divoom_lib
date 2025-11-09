@@ -13,6 +13,12 @@ class CloudChannel:
         self._divoom_instance = divoom_instance
         asyncio.create_task(self._update_message())
 
+    async def show(self):
+        """
+        Activates and displays the Cloud Channel.
+        """
+        await self._update_message()
+
     async def _update_message(self):
         """
         Updates the message queue based on the parameters used.

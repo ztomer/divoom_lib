@@ -25,9 +25,7 @@ COMMANDS = {
     "set alarm": 0x43,
     "set light pic": 0x44,
     "set light mode": 0x45,
-    "set channel (light mode)": 0x45, # Clarified to avoid ambiguity with "set light mode"
     "get light mode": 0x46,
-    "get current channel and brightness": 0x46, # Clarified to avoid ambiguity with "get light mode"
     "app need get music list": 0x47,
     "set light phone gif": 0x49,
     "set alarm gif": 0x51,
@@ -93,15 +91,14 @@ COMMANDS = {
     "set poweron voice vol": 0xbb,
     "set design": 0xbd,
     "set work mode": 0x05,
-    "get sd play name": 0x06,
     "get sd music list": 0x07,
     "get volume": 0x09,
     "get play status": 0x0b,
     "set sd play music id": 0x11,
     "set sd last next": 0x12,
-    "get work mode": 0x06,
     "send sd list over": 0x14,
     "send sd status": 0x15,
+    "get work mode": 0x06,
 }
 
 # System Work Modes (from system_settings.md)

@@ -1,28 +1,8 @@
 import asyncio
 import logging
-from bleak import BleakScanner
 from divoom_api.divoom_protocol import Divoom
 from divoom_api.utils.discovery import discover_divoom_devices
-
-def print_info(message):
-    """Prints an informational message."""
-    print(f"[ ==> ] {message}")
-
-
-def print_wrn(message):
-    """Prints a warning message."""
-    print(f"[ Wrn ] {message}")
-
-
-def print_err(message):
-    """Prints an error message."""
-    print(f"[ Err ] {message}")
-
-
-def print_ok(message):
-    """Prints a success message."""
-    print(f"[ Ok  ] {message}")
-
+from divoom_api.utils.logger_utils import print_info, print_wrn, print_err, print_ok
 
 async def main():
     """Main function to test the Divoom device discovery and connection."""

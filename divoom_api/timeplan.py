@@ -4,8 +4,6 @@ Divoom Timeplan Commands
 """
 
 class Timeplan:
-    SET_TIME_MANAGE_INFO = 0x56
-    SET_TIME_MANAGE_CTRL = 0x57
 
     def __init__(self, communicator):
         self.communicator = communicator

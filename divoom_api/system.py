@@ -240,18 +240,3 @@ class System:
         if response and len(response) >= 1:
             return response[0]  # 1: enabled, 0: disabled
         return None
-
-    async def get_current_channel_and_brightness(self):
-        """Obtain the current channel and brightness (0x46)."""
-        self.logger.info("Getting current channel and brightness (0x46)...")
-        response = await self.communicator.send_command_and_wait_for_response("get current channel and brightness")
-        if response and len(response) >= 2:
-            # Response format: 044655 CC BB
-            # Where CC is channel and BB is brightness
-            # The response data from send_command_and_wait_for_response will be the CMDDATA part
-            # So, response[0] should be CC (channel) and response[1] should be BB (brightness)
-            channel = response[0]
-            brightness = response[1]
-            self.logger.info(f"Current Channel: {channel}, Brightness: {brightness}")
-            return {"channel": channel, "brightness": brightness}
-        return None

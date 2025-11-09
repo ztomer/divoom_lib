@@ -4,13 +4,6 @@ Divoom Sleep Commands
 from .utils.converters import parse_frequency
 
 class Sleep:
-    GET_SLEEP_SCENE = 0xA2
-    SET_SLEEP_SCENE_LISTEN = 0xA3
-    SET_SCENE_VOL = 0xA4
-    SET_SLEEP_COLOR = 0xAD
-    SET_SLEEP_LIGHT = 0xAE
-    SET_SLEEP_AUTO_OFF = 0x40
-    SET_SLEEP_SCENE = 0x41
 
     def __init__(self, communicator):
         self.communicator = communicator

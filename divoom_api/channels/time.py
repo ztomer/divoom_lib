@@ -24,6 +24,12 @@ class TimeChannel:
             self._opts.update(opts)
         asyncio.create_task(self._update_message()) # Call async method from __init__
 
+    async def show(self):
+        """
+        Activates and displays the Time Channel with its current settings.
+        """
+        await self._update_message()
+
     async def _update_message(self):
         """
         Updates the message queue based on the parameters used.

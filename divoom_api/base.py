@@ -61,20 +61,6 @@ class DivoomBase:
         """
         return number2HexString(byte_value)
 
-    def number2HexString(self, byte_value: int) -> str:
-        """
-        Converts an integer (0-255) to its two-character hexadecimal string representation.
-        Wraps divoom_api.utils.converters.number2HexString.
-        """
-        return number2HexString(byte_value)
-
-    def boolean2HexString(self, boolean_value: bool) -> str:
-        """
-        Convert a boolean to "01" (true) or "00" (false) hexadecimal string.
-        Wraps divoom_api.utils.converters.boolean2HexString.
-        """
-        return boolean2HexString(boolean_value)
-
     def boolean2HexString(self, boolean_value: bool) -> str:
         """
         Convert a boolean to "01" (true) or "00" (false) hexadecimal string.

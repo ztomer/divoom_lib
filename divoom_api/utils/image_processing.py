@@ -39,3 +39,17 @@ def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
+def make_framepart(total_size, frame_id, data):
+    """
+    Constructs a frame part for image/animation transmission.
+    total_size: Total size of the image/animation data.
+    frame_id: Identifier for the current frame (-1 for static image, 0 for first animation frame, etc.).
+    data: List of bytes for the current frame part.
+    """
+    frame = []
+    frame += total_size.to_bytes(2, byteorder='little')
+    frame += frame_id.to_bytes(1, byteorder='big', signed=True)
+    frame += len(data).to_bytes(2, byteorder='little')
+    frame.extend(data)
+    return frame
