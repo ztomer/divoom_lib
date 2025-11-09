@@ -18,5 +18,3 @@ from .commands.temp_weather import TempWeatherCommand
 from .commands.date_time import DateTimeCommand
 from .drawing.text import DisplayText
 from .drawing.drawing import DisplayAnimation
-
-from .constants import *

@@ -4,26 +4,28 @@ from typing import List, Tuple, Optional, Union
 from bleak import BleakScanner, BleakClient
 from bleak.backends.device import BLEDevice
 
-async def discover_divoom_devices(device_name_substring: str, logger: logging.Logger) -> Optional[BLEDevice]:
+async def discover_divoom_devices(device_name_substring: str, logger: logging.Logger) -> List[BLEDevice]:
     """
-    Scans for Divoom devices whose name contains `device_name_substring` and returns the first matching device.
+    Scans for Divoom devices whose name contains `device_name_substring` and returns a list of matching devices.
     """
     logger.info(f"Scanning for Divoom device(s) containing '{device_name_substring}'...")
     devices = await BleakScanner.discover()
-
+    
+    matching_devices = []
     for device in devices:
         if device.name and device_name_substring.lower() in device.name.lower():
             logger.info(f"Found Divoom device: {device.name} ({device.address})")
-            return device
+            matching_devices.append(device)
     
-    logger.warning(f"No Divoom device containing '{device_name_substring}' found.")
-    if not devices:
-        logger.info("No Bluetooth devices were discovered at all.")
-    else:
-        logger.info("Discovered devices (no match found):")
-        for device in devices:
-            logger.info(f"  - {device.name} ({device.address})")
-    return None
+    if not matching_devices:
+        logger.warning(f"No Divoom device containing '{device_name_substring}' found.")
+        if not devices:
+            logger.info("No Bluetooth devices were discovered at all.")
+        else:
+            logger.info("Discovered devices (no match found):")
+            for device in devices:
+                logger.info(f"  - {device.name} ({device.address})")
+    return matching_devices
 
 async def discover_characteristics(mac_address: str, logger: logging.Logger) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """

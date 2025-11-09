@@ -1,5 +1,5 @@
 # divoom_api/display.py
-from .utils.image_processing import process_image, chunks
+from .utils.image_processing import process_image, chunks, make_framepart
 from .utils.converters import color_to_rgb_list
 
 class Display:
@@ -35,7 +35,7 @@ class Display:
     async def show_design(self, number=None):
         """Show design on the Divoom device"""
         args = [0x05]
-        result = await self.communicator.send_command("set view", args)
+        result = await self.communicator.send_command("set work mode", args)
 
         if number != None:  # additionally change design tab
             if isinstance(number, str):
@@ -47,15 +47,9 @@ class Display:
         return result
 
     async def show_effects(self, number):
-        """Show effects on the Divoom device"""
-        if number == None:
-            return
-        if isinstance(number, str):
-            number = int(number)
-
         args = [0x04]
         args += number.to_bytes(1, byteorder='big')
-        return await self.communicator.send_command("set view", args)
+        return await self.communicator.send_command("set work mode", args)
 
     async def show_image(self, file, time=None):
         """Show image or animation on the Divoom device"""
@@ -73,14 +67,14 @@ class Display:
 
             index = 0
             for framePart in chunks(frameParts, self.communicator.chunksize):
-                frame = self.communicator.make_framepart(framePartsSize, index, framePart)
+                frame = make_framepart(framePartsSize, index, framePart)
                 result = await self.communicator.send_command("set animation frame", frame)
                 index += 1
 
         elif framesCount == 1:
             """Sending as Image"""
             pair = frames[-1]
-            frame = self.communicator.make_framepart(pair[1], -1, pair[0])
+            frame = make_framepart(pair[1], -1, pair[0])
             result = await self.communicator.send_command("set image", frame)
         return result
 
@@ -105,7 +99,7 @@ class Display:
             args += [0x00]
         args += [0x01 if power == True or power ==
                  1 else 0x00, 0x00, 0x00, 0x00]
-        return await self.communicator.send_command("set view", args)
+        return await self.communicator.send_command("set light mode", args)
 
     async def show_visualization(self, number, color1, color2):
         """Show visualization on the Divoom device"""

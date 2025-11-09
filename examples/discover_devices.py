@@ -1,9 +1,18 @@
+import os
+import sys
 import asyncio
-from divoom_control import discover_divoom_devices, print_ok, print_wrn
+import logging
+
+# Add the project root to sys.path to allow importing divoom_api
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from divoom_api.utils.discovery import discover_divoom_devices
+from divoom_api.utils.logger_utils import print_ok, print_wrn
+
+logger = logging.getLogger(__name__)
 
 async def main():
     """Main function to test the Divoom device discovery."""
-    devices = await discover_divoom_devices()
+    devices = await discover_divoom_devices(device_name_substring="light", logger=logger)
     if devices:
         print_ok("Found the following Divoom devices:")
         for device in devices:
