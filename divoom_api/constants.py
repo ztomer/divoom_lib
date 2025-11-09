@@ -25,7 +25,9 @@ COMMANDS = {
     "set alarm": 0x43,
     "set light pic": 0x44,
     "set light mode": 0x45,
+    "set channel (light mode)": 0x45, # Clarified to avoid ambiguity with "set light mode"
     "get light mode": 0x46,
+    "get current channel and brightness": 0x46, # Clarified to avoid ambiguity with "get light mode"
     "app need get music list": 0x47,
     "set light phone gif": 0x49,
     "set alarm gif": 0x51,
@@ -60,6 +62,7 @@ COMMANDS = {
     "set alarm vol ctrl": 0x82,
     "set song dis ctrl": 0x83,
     "set light phone word attr": 0x87,
+    "set text content": 0x86,
     "send game shark": 0x88,
     "set poweron channel": 0x8a,
     "app new send gif cmd": 0x8b,
@@ -129,3 +132,56 @@ DIVOOM_DISP_WATCH_MODE = 0
 DIVOOM_DISP_SCORE_MODE = 1
 DIVOOM_DISP_NOISE_MODE = 2
 DIVOOM_DISP_COUNT_TIME_DOWN = 3
+
+# Time Display Types (from node-divoom-timebox-evo/src/types.ts)
+class TimeDisplayType:
+    FullScreen = 0
+    Rainbow = 1
+    WithBox = 2
+    AnalogSquare = 3
+    FullScreenNegative = 4
+    AnalogRound = 5
+
+# Lightning Types (from node-divoom-timebox-evo/src/types.ts)
+class LightningType:
+    PlainColor = 0
+    Love = 1
+    Plants = 2
+    NoMosquitto = 3
+    Sleeping = 4
+
+# Weather Types (from node-divoom-timebox-evo/src/types.ts)
+class WeatherType:
+    Clear = 1
+    CloudySky = 3
+    Thunderstorm = 5
+    Rain = 6
+    Snow = 8
+    Fog = 9
+
+# VJ Effect Types (from node-divoom-timebox-evo/src/types.ts)
+class VJEffectType:
+    Sparkles = 0
+    Lava = 1
+    VerticalRainbowLines = 2
+    Drops = 3
+    RainbowSwirl = 4
+    CMYFade = 5
+    RainbowLava = 6
+    PastelPatterns = 7
+    CMYWave = 8
+    Fire = 9
+    Countdown = 10
+    PinkBlueFade = 11
+    RainbowPolygons = 12
+    PinkBlueWave = 13
+    RainbowCross = 14
+    RainbowShapes = 15
+
+# Export constants similar to TIMEBOX_CONST in Node.js library
+TIMEBOX_CONST = {
+    "TimeType": TimeDisplayType,
+    "LightningType": LightningType,
+    "WeatherType": WeatherType,
+    "VJEffectType": VJEffectType
+}

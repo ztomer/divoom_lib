@@ -1,8 +1,7 @@
 """
 Divoom Sleep Commands
 """
-
-from .base import DivoomBase
+from .utils.converters import parse_frequency
 
 class Sleep:
     GET_SLEEP_SCENE = 0xA2
@@ -12,6 +11,10 @@ class Sleep:
     SET_SLEEP_LIGHT = 0xAE
     SET_SLEEP_AUTO_OFF = 0x40
     SET_SLEEP_SCENE = 0x41
+
+    def __init__(self, communicator):
+        self.communicator = communicator
+        self.logger = communicator.logger
 
     async def show_sleep(self, value=None, sleeptime=None, sleepmode=None, volume=None, color=None, brightness=None, frequency=None, on: int = None):
         """Show sleep mode on the Divoom device and optionally sets mode, volume, time, color, frequency and brightness (0x40)."""
@@ -38,21 +41,21 @@ class Sleep:
         args += sleeptime.to_bytes(1, byteorder='big')
         args += sleepmode.to_bytes(1, byteorder='big')
         args += on.to_bytes(1, byteorder='big')  # Added 'on' parameter
-        args += self._parse_frequency(frequency)
+        args += parse_frequency(frequency)
         args += volume.to_bytes(1, byteorder='big')
 
         if color is None or len(color) < 3:
             args += [0x00, 0x00, 0x00]
         else:
-            args += self.convert_color(color)
+            args += self.communicator.convert_color(color)
         args += brightness.to_bytes(1, byteorder='big')
 
-        return await self.send_command("set sleeptime", args)
+        return await self.communicator.send_command("set sleeptime", args)
 
     async def get_sleep_scene(self):
         """Get the current scene mode settings from the device (0xa2)."""
         self.logger.info("Getting sleep scene (0xa2)...")
-        response = await self._send_command_and_wait_for_response("get sleep scene")
+        response = await self.communicator.send_command_and_wait_for_response("get sleep scene")
         if response and len(response) >= 10:
             return {
                 "time": response[0],
@@ -75,13 +78,13 @@ class Sleep:
         args += on_off.to_bytes(1, byteorder='big')
         args += mode.to_bytes(1, byteorder='big')
         args += volume.to_bytes(1, byteorder='big')
-        return await self.send_command("set sleep scene listen", args)
+        return await self.communicator.send_command("set sleep scene listen", args)
 
     async def set_scene_volume(self, volume: int):
         """Set the volume level for the sleep mode listen feature (0xa4)."""
         self.logger.info(f"Setting scene volume to {volume} (0xa4)...")
         args = volume.to_bytes(1, byteorder='big')
-        return await self.send_command("set scene vol", list(args))
+        return await self.communicator.send_command("set scene vol", list(args))
 
     async def set_sleep_color(self, color: list):
         """Set the sleep mode color (0xad)."""
@@ -89,14 +92,14 @@ class Sleep:
         if color is None or len(color) < 3:
             self.logger.error("Color must be a list of 3 RGB values.")
             return False
-        args = self.convert_color(color)
-        return await self.send_command("set sleep color", args)
+        args = self.communicator.convert_color(color)
+        return await self.communicator.send_command("set sleep color", args)
 
     async def set_sleep_light(self, light: int):
         """Set the sleep mode brightness (0xae)."""
         self.logger.info(f"Setting sleep light to {light} (0xae)...")
         args = light.to_bytes(1, byteorder='big')
-        return await self.send_command("set sleep light", list(args))
+        return await self.communicator.send_command("set sleep light", list(args))
 
     async def set_sleep_scene(self, mode: int, on: int, fm_freq: list, volume: int, color: list, light: int):
         """Set the scene mode, including the sleep mode, without a time parameter (0x41)."""
@@ -107,6 +110,6 @@ class Sleep:
         args += on.to_bytes(1, byteorder='big')
         args.extend(fm_freq)  # Expecting a list of 2 bytes
         args += volume.to_bytes(1, byteorder='big')
-        args.extend(self.convert_color(color))
+        args.extend(self.communicator.convert_color(color))
         args += light.to_bytes(1, byteorder='big')
-        return await self.send_command("set sleep scene", args)
+        return await self.communicator.send_command("set sleep scene", args)

@@ -4,10 +4,13 @@ Divoom Alarm and Memorial Commands
 import datetime
 
 class Alarm:
+    def __init__(self, communicator):
+        self.communicator = communicator
+        self.logger = communicator.logger
     async def get_alarm_time(self):
         """Get alarm time (0x42)."""
-        self.logger.info("Getting alarm time (0x42)...")
-        response = await self._send_command_and_wait_for_response("get alarm time")
+        self.communicator.logger.info("Getting alarm time (0x42)...")
+        response = await self.communicator.send_command_and_wait_for_response("get alarm time")
         if response and len(response) >= 10:  # 10 sets of alarm info
             alarms = []
             for i in range(10):
@@ -38,12 +41,12 @@ class Alarm:
         args += total_length.to_bytes(2, byteorder='little')
         args += gif_id.to_bytes(1, byteorder='big')
         args.extend(data)
-        return await self.send_command("set alarm gif", args)
+        return await self.communicator.send_command("set alarm gif", args)
 
     async def get_memorial_time(self):
         """Get memorial time (0x53)."""
         self.logger.info("Getting memorial time (0x53)...")
-        response = await self._send_command_and_wait_for_response("get memorial time")
+        response = await self.communicator.send_command_and_wait_for_response("get memorial time")
         if response and len(response) >= 10 * 39:  # 10 records, each 39 bytes
             memorials = []
             for i in range(10):
@@ -71,7 +74,7 @@ class Alarm:
         args += total_length.to_bytes(2, byteorder='little')
         args += gif_id.to_bytes(1, byteorder='big')
         args.extend(data)
-        return await self.send_command("set memorial gif", args)
+        return await self.communicator.send_command("set memorial gif", args)
 
     async def set_alarm_listen(self, on_off: int, mode: int, volume: int):
         """Enable or disable the alarm audition feature (0xa5)."""
@@ -81,13 +84,13 @@ class Alarm:
         args += on_off.to_bytes(1, byteorder='big')
         args += mode.to_bytes(1, byteorder='big')
         args += volume.to_bytes(1, byteorder='big')
-        return await self.send_command("set alarm listen", args)
+        return await self.communicator.send_command("set alarm listen", args)
 
     async def set_alarm_volume(self, volume: int):
         """Set the volume level for the alarm audition feature (0xa6)."""
         self.logger.info(f"Setting alarm volume to {volume} (0xa6)...")
         args = volume.to_bytes(1, byteorder='big')
-        return await self.send_command("set alarm vol", list(args))
+        return await self.communicator.send_command("set alarm vol", list(args))
 
     async def set_alarm_volume_control(self, control: int, index: int):
         """Control the voice alarm feature (0x82)."""
@@ -96,4 +99,4 @@ class Alarm:
         args = []
         args += control.to_bytes(1, byteorder='big')
         args += index.to_bytes(1, byteorder='big')
-        return await self.send_command("set alarm vol ctrl", args)
+        return await self.communicator.send_command("set alarm vol ctrl", args)

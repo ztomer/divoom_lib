@@ -3,79 +3,17 @@ Divoom Light Commands
 """
 
 from .base import DivoomBase
+from .utils.converters import color_to_rgb_list
 
-class Light(DivoomBase):
-    SET_LIGHT_MODE = 0x45
-    GET_LIGHT_MODE = 0x46
-    SET_LIGHT_PIC = 0x44
-    SET_LIGHT_PHONE_GIF = 0x49
-    SET_GIF_SPEED = 0x16
-    SET_LIGHT_PHONE_WORD_ATTR = 0x87
-    APP_NEW_SEND_GIF_CMD = 0x8B
-    SET_USER_GIF = 0xB1
-    MODIFY_USER_GIF_ITEMS = 0xB6
-    APP_NEW_USER_DEFINE = 0x8C
-    APP_BIG64_USER_DEFINE = 0x8D
-    APP_GET_USER_DEFINE_INFO = 0x8E
-    SET_RHYTHM_GIF = 0xB7
-    APP_SEND_EQ_GIF = 0x1B
-    DRAWING_MUL_PAD_CTRL = 0x3A
-    DRAWING_BIG_PAD_CTRL = 0x3B
-    DRAWING_PAD_CTRL = 0x58
-    DRAWING_PAD_EXIT = 0x5A
-    DRAWING_MUL_ENCODE_SINGLE_PIC = 0x5B
-    DRAWING_MUL_ENCODE_PIC = 0x5C
-    DRAWING_MUL_ENCODE_GIF_PLAY = 0x6B
-    DRAWING_ENCODE_MOVIE_PLAY = 0x6C
-    DRAWING_MUL_ENCODE_MOVIE_PLAY = 0x6D
-    DRAWING_CTRL_MOVIE_PLAY = 0x6E
-    DRAWING_MUL_PAD_ENTER = 0x6F
-    SAND_PAINT_CTRL = 0x34
-    PIC_SCAN_CTRL = 0x35
-
-    async def show_clock(self, clock=None, twentyfour=None, weather=None, temp=None, calendar=None, color=None, hot=None):
-        """Show clock on the Divoom device in the color"""
-        if clock == None:
-            clock = 0
-        if twentyfour == None:
-            twentyfour = True
-        if weather == None:
-            weather = False
-        if temp == None:
-            temp = False
-        if calendar == None:
-            calendar = False
-
-        args = [0x00]
-        args += [0x01 if twentyfour == True or twentyfour == 1 else 0x00]
-        if clock >= 0 and clock <= 15:
-            args += clock.to_bytes(1, byteorder='big')  # clock mode/style
-            args += [0x01]  # clock activated
-        else:
-            args += [0x00, 0x00]  # clock mode/style = 0 and clock deactivated
-        args += [0x01 if weather == True or weather == 1 else 0x00]
-        args += [0x01 if temp == True or temp == 1 else 0x00]
-        args += [0x01 if calendar == True or calendar == 1 else 0x00]
-        return await self.send_command("set light mode", args)
-
-    async def show_design(self, number=None):
-        """Show design on the Divoom device"""
-        args = [0x05]
-        result = await self.send_command("set view", args)
-
-        if number != None:  # additionally change design tab
-            if isinstance(number, str):
-                number = int(number)
-
-            args = [0x17]
-            args += number.to_bytes(1, byteorder='big')
-            result = await self.send_command("set design", args)
-        return result
+class Light:
+    def __init__(self, communicator):
+        self.communicator = communicator
+        self.logger = communicator.logger
 
     async def get_light_mode(self):
         """Get the current light mode settings from the device (0x46)."""
         self.logger.info("Getting light mode (0x46)...")
-        response = await self._send_command_and_wait_for_response("get light mode")
+        response = await self.communicator.send_command_and_wait_for_response("get light mode")
         # Based on documentation, response has 20 bytes
         if response and len(response) >= 20:
             return {
@@ -100,7 +38,7 @@ class Light(DivoomBase):
         speed: Animation speed in milliseconds (2 bytes, little-endian)."""
         self.logger.info(f"Setting GIF speed to {speed}ms (0x16)...")
         args = speed.to_bytes(2, byteorder='little')
-        return await self.send_command("set gif speed", list(args))
+        return await self.communicator.send_command("set gif speed", list(args))
 
     async def set_light_phone_word_attr(self, control: int, **kwargs):
         """Set various attributes of the animated text (0x87).
@@ -156,8 +94,9 @@ class Light(DivoomBase):
         elif control == 5:  # Changing Text Color
             color = kwargs.get("color")
             text_box_id = kwargs.get("text_box_id")
-            if color is not None and len(color) == 3 and text_box_id is not None:
-                args.extend(self.convert_color(color))
+            if color is not None and text_box_id is not None:
+                rgb_color = color_to_rgb_list(color)
+                args.extend(rgb_color)
                 args += text_box_id.to_bytes(1, byteorder='big')
             else:
                 self.logger.error(
@@ -190,7 +129,7 @@ class Light(DivoomBase):
                 f"Unknown control word for set_light_phone_word_attr: {control}")
             return False
 
-        return await self.send_command("set light phone word attr", args)
+        return await self.communicator.send_command("set light phone word attr", args)
 
     async def app_new_send_gif_cmd(self, control_word: int, file_size: int = None, file_offset_id: int = None, file_data: list = None):
         """Used for the upgrade process to transfer animated data (0x8b)."""
@@ -222,7 +161,7 @@ class Light(DivoomBase):
                 f"Unknown control word for app_new_send_gif_cmd: {control_word}")
             return False
 
-        return await self.send_command("app new send gif cmd", args)
+        return await self.communicator.send_command("app new send gif cmd", args)
 
     async def set_user_gif(self, control_word: int, data: list = None, speed: int = None, text_length: int = None, mode: int = None, len_val: int = None):
         """Set a user-defined picture (0xb1)."""
@@ -270,7 +209,7 @@ class Light(DivoomBase):
                 f"Unknown control word for set_user_gif: {control_word}")
             return False
 
-        return await self.send_command("set user gif", args)
+        return await self.communicator.send_command("set user gif", args)
 
     async def modify_user_gif_items(self, data: int):
         """Get the number of user-defined items or delete a specific item (0xb6).
@@ -278,7 +217,7 @@ class Light(DivoomBase):
         self.logger.info(
             f"Modifying user GIF items with data {data} (0xb6)...")
         args = [data]
-        response = await self._send_command_and_wait_for_response("modify user gif items", args)
+        response = await self.communicator.send_command_and_wait_for_response("modify user gif items", args)
         if response and len(response) >= 1:
             return response[0]  # Item number
         return None
@@ -314,7 +253,7 @@ class Light(DivoomBase):
                 f"Unknown control word for app_new_user_define: {control_word}")
             return False
 
-        return await self.send_command("app new user define", args)
+        return await self.communicator.send_command("app new user define", args)
 
     async def app_big64_user_define(self, control_word: int, file_size: int = None, index: int = None, file_id: int = None, file_offset_id: int = None, file_data: list = None):
         """64 large canvas user-defined image frame transmission (0x8d)."""
@@ -330,7 +269,7 @@ class Light(DivoomBase):
                 args += file_id.to_bytes(4, byteorder='big')
             else:
                 self.logger.error(
-                    "Missing 'file_size', 'index', or 'file_id' for Start Sending control word.")
+                    "Missing 'file_size' or 'index' or 'file_id' for Start Sending control word.")
                 return False
         elif control_word == 1:  # Sending Data
             if file_size is not None and file_offset_id is not None and file_data is not None:
@@ -364,14 +303,14 @@ class Light(DivoomBase):
                 f"Unknown control word for app_big64_user_define: {control_word}")
             return False
 
-        return await self.send_command("app big64 user define", args)
+        return await self.communicator.send_command("app big64 user define", args)
 
     async def app_get_user_define_info(self, user_index: int):
         """64 custom image frame ID upload function (0x8e)."""
         self.logger.info(
             f"App get user define info for index {user_index} (0x8e)...")
         args = user_index.to_bytes(1, byteorder='big')
-        response = await self._send_command_and_wait_for_response("app get user define info", list(args))
+        response = await self.communicator.send_command_and_wait_for_response("app get user define info", list(args))
         if response and len(response) >= 1:
             control_word = response[0]
             if control_word == 1:
@@ -411,7 +350,7 @@ class Light(DivoomBase):
         args += total_length.to_bytes(2, byteorder='little')
         args += gif_id.to_bytes(1, byteorder='big')
         args.extend(data)
-        return await self.send_command("set rhythm gif", args)
+        return await self.communicator.send_command("set rhythm gif", args)
 
     async def app_send_eq_gif(self, pos: int, total_length: int, gif_id: int, data: list):
         """App sends EQ rhythm animation to the device (0x1b)."""
@@ -422,7 +361,7 @@ class Light(DivoomBase):
         args += total_length.to_bytes(2, byteorder='little')
         args += gif_id.to_bytes(1, byteorder='big')
         args.extend(data)
-        return await self.send_command("app send eq gif", args)
+        return await self.communicator.send_command("app send eq gif", args)
 
     async def drawing_mul_pad_ctrl(self, screen_id: int, r: int, g: int, b: int, num_points: int, offset_list: list):
         """Multiple screen drawing pad control (0x3a)."""
@@ -435,7 +374,7 @@ class Light(DivoomBase):
         args += b.to_bytes(1, byteorder='big')
         args += num_points.to_bytes(1, byteorder='big')
         args.extend(offset_list)
-        return await self.send_command("drawing mul pad ctrl", args)
+        return await self.communicator.send_command("drawing mul pad ctrl", args)
 
     async def drawing_big_pad_ctrl(self, canvas_width: int, screen_id: int, r: int, g: int, b: int, num_points: int, offset_list: list):
         """Controlling the large screen drawing pad (0x3b)."""
@@ -449,7 +388,7 @@ class Light(DivoomBase):
         args += b.to_bytes(1, byteorder='big')
         args += num_points.to_bytes(1, byteorder='big')
         args.extend(offset_list)
-        return await self.send_command("drawing big pad ctrl", args)
+        return await self.communicator.send_command("drawing big pad ctrl", args)
 
     async def drawing_pad_ctrl(self, r: int, g: int, b: int, num_points: int, offset_list: list):
         """Controlling the large screen drawing pad (0x58)."""
@@ -461,12 +400,12 @@ class Light(DivoomBase):
         args += b.to_bytes(1, byteorder='big')
         args += num_points.to_bytes(1, byteorder='big')
         args.extend(offset_list)
-        return await self.send_command("drawing pad ctrl", args)
+        return await self.communicator.send_command("drawing pad ctrl", args)
 
     async def drawing_pad_exit(self):
         """Exiting the drawing pad (0x5a)."""
         self.logger.info("Drawing pad exit (0x5a)...")
-        return await self.send_command("drawing pad exit")
+        return await self.communicator.send_command("drawing pad exit")
 
     async def drawing_mul_encode_single_pic(self, screen_id: int, data_length: int, data: list):
         """Sending a single image encoded to multiple screens (0x5b)."""
@@ -476,7 +415,7 @@ class Light(DivoomBase):
         args += screen_id.to_bytes(1, byteorder='big')
         args += data_length.to_bytes(2, byteorder='little')
         args.extend(data)
-        return await self.send_command("drawing mul encode single pic", args)
+        return await self.communicator.send_command("drawing mul encode single pic", args)
 
     async def drawing_mul_encode_pic(self, screen_id: int, total_length: int, pic_id: int, pic_data: list):
         """Sending encoded animation data to multiple screens for later playback (0x5c)."""
@@ -487,12 +426,12 @@ class Light(DivoomBase):
         args += total_length.to_bytes(2, byteorder='little')
         args += pic_id.to_bytes(1, byteorder='big')
         args.extend(pic_data)
-        return await self.send_command("drawing mul encode pic", args)
+        return await self.communicator.send_command("drawing mul encode pic", args)
 
     async def drawing_mul_encode_gif_play(self):
         """Instruct the device to start playing the animation that was previously sent (0x6b)."""
         self.logger.info("Drawing mul encode GIF play (0x6b)...")
-        return await self.send_command("drawing mul encode gif play")
+        return await self.communicator.send_command("drawing mul encode gif play")
 
     async def drawing_encode_movie_play(self, frame_id: int, data_length: int, data: list):
         """Instruct the device to play a single-screen movie or animation (0x6c)."""
@@ -502,7 +441,7 @@ class Light(DivoomBase):
         args += frame_id.to_bytes(2, byteorder='little')
         args += data_length.to_bytes(2, byteorder='little')
         args.extend(data)
-        return await self.send_command("drawing encode movie play", args)
+        return await self.communicator.send_command("drawing encode movie play", args)
 
     async def drawing_mul_encode_movie_play(self, screen_id: int, frame_id: int, data_length: int, data: list):
         """Instruct the device to play a single-screen movie or animation on multiple screens (0x6d)."""
@@ -513,7 +452,7 @@ class Light(DivoomBase):
         args += frame_id.to_bytes(2, byteorder='little')
         args += data_length.to_bytes(2, byteorder='little')
         args.extend(data)
-        return await self.send_command("drawing mul encode movie play", args)
+        return await self.communicator.send_command("drawing mul encode movie play", args)
 
     async def drawing_ctrl_movie_play(self, control_command: int):
         """Control the movie playback on the device (0x6e).
@@ -521,7 +460,7 @@ class Light(DivoomBase):
         self.logger.info(
             f"Drawing control movie play: command={control_command} (0x6e)...")
         args = [control_command]
-        return await self.send_command("drawing ctrl movie play", args)
+        return await self.communicator.send_command("drawing ctrl movie play", args)
 
     async def drawing_mul_pad_enter(self, r: int, g: int, b: int):
         """Enter the multiple screen mode drawing pad or perform a clear screen operation (0x6f)."""
@@ -531,7 +470,7 @@ class Light(DivoomBase):
         args += r.to_bytes(1, byteorder='big')
         args += g.to_bytes(1, byteorder='big')
         args += b.to_bytes(1, byteorder='big')
-        return await self.send_command("drawing mul pad enter", args)
+        return await self.communicator.send_command("drawing mul pad enter", args)
 
     async def sand_paint_ctrl(self, control: int, device_id: int = None, image_length: int = None, image_data: list = None):
         """Control command structure for managing sand painting (0x34).
@@ -553,7 +492,7 @@ class Light(DivoomBase):
             self.logger.warning(
                 f"Unknown control for sand_paint_ctrl: {control}")
             return False
-        return await self.send_command("sand paint ctrl", args)
+        return await self.communicator.send_command("sand paint ctrl", args)
 
     async def pic_scan_ctrl(self, control: int, mode: int = None, speed: int = None, total_length: int = None, pic_id: int = None, data: list = None):
         """Control command structure for implementing a multi-screen scrolling effect (0x35).
@@ -580,75 +519,4 @@ class Light(DivoomBase):
             self.logger.warning(
                 f"Unknown control for pic_scan_ctrl: {control}")
             return False
-        return await self.send_command("pic scan ctrl", args)
-
-    async def show_effects(self, number):
-        """Show effects on the Divoom device"""
-        if number == None:
-            return
-        if isinstance(number, str):
-            number = int(number)
-
-        args = [0x03]
-        args += number.to_bytes(1, byteorder='big')
-        return await self.send_command("set view", args)
-
-    async def show_image(self, file, time=None):
-        """Show image or animation on the Divoom device"""
-        frames, framesCount = self.process_image(file, time=time)
-
-        result = None
-        if framesCount > 1:
-            """Sending as Animation"""
-            frameParts = []
-            framePartsSize = 0
-
-            for pair in frames:
-                frameParts += pair[0]
-                framePartsSize += pair[1]
-
-            index = 0
-            for framePart in self.chunks(frameParts, self.chunksize):
-                frame = self.make_framepart(framePartsSize, index, framePart)
-                result = await self.send_command("set animation frame", frame)
-                index += 1
-
-        elif framesCount == 1:
-            """Sending as Image"""
-            pair = frames[-1]
-            frame = self.make_framepart(pair[1], -1, pair[0])
-            result = await self.send_command("set image", frame)
-        return result
-
-    async def show_light(self, color, brightness=None, power=None):
-        """Show light on the Divoom device in the color"""
-        if power == None:
-            power = True
-        if brightness == None:
-            brightness = 100
-        if isinstance(brightness, str):
-            brightness = int(brightness)
-
-        args = [0x01]
-        if color is None or len(color) < 3:
-            args += [0xFF, 0xFF, 0xFF]
-            args += brightness.to_bytes(1, byteorder='big')
-            args += [0x01]
-        else:
-            args += self.convert_color(color)
-            args += brightness.to_bytes(1, byteorder='big')
-            args += [0x00]
-        args += [0x01 if power == True or power ==
-                 1 else 0x00, 0x00, 0x00, 0x00]
-        return await self.send_command("set view", args)
-
-    async def show_visualization(self, number, color1, color2):
-        """Show visualization on the Divoom device"""
-        if number == None:
-            return
-        if isinstance(number, str):
-            number = int(number)
-
-        args = [0x04]
-        args += number.to_bytes(1, byteorder='big')
-        return await self.send_command("set view", args)
+        return await self.communicator.send_command("pic scan ctrl", args)
