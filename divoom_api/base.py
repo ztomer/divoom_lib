@@ -9,7 +9,6 @@ import asyncio
 from bleak import BleakClient
 
 from .constants import COMMANDS
-from .utils.discovery import discover_characteristics, discover_device_and_characteristics
 from .utils.converters import color_to_rgb_list, number2HexString, boolean2HexString, color2HexString
 from .utils.image_processing import make_framepart
 
@@ -47,6 +46,11 @@ class DivoomBase:
         else:
             self.logger = logger
 
+    @property
+    def is_connected(self) -> bool:
+        """Returns True if the BleakClient is connected, False otherwise."""
+        return self.client and self.client.is_connected
+
     def color2HexString(self, color_input) -> str:
         """
         Converts a color input to an hexadecimal string representation (RRGGBB).
@@ -77,18 +81,6 @@ class DivoomBase:
 
     async def connect(self):
         """Open a connection to the Divoom device using bleak."""
-        if not self.mac and self.device_name:
-            self.logger.info(f"MAC address not provided, attempting to discover device '{self.device_name}' and its characteristics.")
-            mac_address, write_uuid, notify_uuid, read_uuid = \
-                await discover_device_and_characteristics(self.device_name, self.logger)
-            if not mac_address:
-                self.logger.error(f"Failed to discover device '{self.device_name}' or its characteristics.")
-                raise Exception(f"Failed to discover device '{self.device_name}' or its characteristics.")
-            self.mac = mac_address
-            self.WRITE_CHARACTERISTIC_UUID = write_uuid
-            self.NOTIFY_CHARACTERISTIC_UUID = notify_uuid
-            self.READ_CHARACTERISTIC_UUID = read_uuid
-        
         if not self.mac:
             self.logger.error("No MAC address provided or discovered. Cannot connect.")
             raise Exception("No MAC address provided or discovered. Cannot connect.")
@@ -105,16 +97,8 @@ class DivoomBase:
                 raise
 
         if not all([self.WRITE_CHARACTERISTIC_UUID, self.NOTIFY_CHARACTERISTIC_UUID, self.READ_CHARACTERISTIC_UUID]):
-            self.logger.info("Characteristic UUIDs not fully set, attempting to discover them.")
-            write_uuid, notify_uuid, read_uuid = \
-                await discover_characteristics(self.mac, self.logger)
-            
-            if not all([write_uuid, notify_uuid, read_uuid]):
-                self.logger.error("Could not discover all required characteristics.")
-                raise Exception("Could not discover all required characteristics.")
-            self.WRITE_CHARACTERISTIC_UUID = write_uuid
-            self.NOTIFY_CHARACTERISTIC_UUID = notify_uuid
-            self.READ_CHARACTERISTIC_UUID = read_uuid
+            self.logger.error("Characteristic UUIDs not fully set. Cannot connect.")
+            raise Exception("Characteristic UUIDs not fully set. Cannot connect.")
 
         # Enable notifications for all characteristics that support it
         for service in self.client.services:
@@ -278,83 +262,113 @@ class DivoomBase:
             self.logger.error(f"Error calling send_payload for command {command_name}: {e}")
             return False
 
-    async def send_payload(self, payload_bytes):
+    async def send_payload(self, payload_bytes, max_retries=3, retry_delay=0.1):
         """Send raw payload to the Divoom device using the Timebox Evo protocol."""
-        self.logger.debug(f"send_payload: self.client.is_connected = {self.client.is_connected}")
-        if self.client is None or not self.client.is_connected:
-            self.logger.error("Not connected to a Divoom device.")
-            return
-
-        if self.use_ios_le_protocol:
-            full_message_hex = self._make_message_ios_le(payload_bytes)
-            # For iOS LE protocol, we don't split messages this way
-            message_bytes = bytes.fromhex(full_message_hex)
-            try:
-                self.logger.debug(f"{self.type} PAYLOAD OUT (iOS LE): {full_message_hex}")
-                self.logger.debug(f"Raw message bytes being sent (iOS LE): {message_bytes.hex()}")
-                await self.client.write_gatt_char(self.WRITE_CHARACTERISTIC_UUID, message_bytes)
-                return True
-            except Exception as e:
-                self.logger.error(f"Error sending iOS LE payload: {e}")
-                return False
-        else:
-            full_message_hex = self._make_message(payload_bytes)
-            
-            # Split message into chunks if it exceeds the chunksize
-            # Each byte is 2 hex characters, so chunksize * 2
-            chunk_length_hex = self.chunksize * 2
-            
-            if len(full_message_hex) > chunk_length_hex:
-                self.logger.debug(f"Message too long ({len(full_message_hex)} hex chars), splitting into chunks of {chunk_length_hex} hex chars.")
-                chunks = [full_message_hex[i:i + chunk_length_hex] for i in range(0, len(full_message_hex), chunk_length_hex)]
-                
-                for i, chunk_hex in enumerate(chunks):
+        for attempt in range(max_retries):
+            if self.client is None or not self.client.is_connected:
+                self.logger.warning(f"Attempt {attempt + 1}: Not connected to a Divoom device. Retrying in {retry_delay}s...")
+                await asyncio.sleep(retry_delay)
+                # Attempt to reconnect if not connected
+                if not self.client or not self.client.is_connected:
                     try:
-                        message_bytes = bytes.fromhex(chunk_hex)
-                        self.logger.debug(f"{self.type} PAYLOAD OUT (Chunk {i+1}/{len(chunks)}): {chunk_hex}")
-                        self.logger.debug(f"Raw message bytes being sent (Chunk {i+1}/{len(chunks)}): {message_bytes.hex()}")
-                        await self.client.write_gatt_char(self.WRITE_CHARACTERISTIC_UUID, message_bytes)
-                        await asyncio.sleep(0.05) # Small delay between chunks
+                        await self.connect()
+                        self.logger.info(f"Attempt {attempt + 1}: Reconnected to Divoom device at {self.mac}")
                     except Exception as e:
-                        self.logger.error(f"Error sending chunk {i+1}: {e}")
-                        return False
-                return True
-            else:
+                        self.logger.error(f"Attempt {attempt + 1}: Failed to reconnect: {e}")
+                        if attempt == max_retries - 1:
+                            self.logger.error("Max retries reached. Giving up.")
+                            return False
+                        continue
+            
+            self.logger.debug(f"send_payload: self.client.is_connected = {self.client.is_connected}")
+            if self.use_ios_le_protocol:
+                full_message_hex = self._make_message_ios_le(payload_bytes)
+                # For iOS LE protocol, we don't split messages this way
+                message_bytes = bytes.fromhex(full_message_hex)
                 try:
-                    # Convert hex string to bytes
-                    message_bytes = bytes.fromhex(full_message_hex)
-                    self.logger.debug(f"{self.type} PAYLOAD OUT: {full_message_hex}")
-                    self.logger.debug(f"Raw message bytes being sent: {message_bytes.hex()}")
-                    self.logger.debug(f"Attempting to write to characteristic: {self.WRITE_CHARACTERISTIC_UUID}")
+                    self.logger.debug(f"{self.type} PAYLOAD OUT (iOS LE): {full_message_hex}")
+                    self.logger.debug(f"Raw message bytes being sent (iOS LE): {message_bytes.hex()}")
                     await self.client.write_gatt_char(self.WRITE_CHARACTERISTIC_UUID, message_bytes)
                     return True
                 except Exception as e:
-                    self.logger.error(f"Error sending payload: {e}")
-                    return False
+                    self.logger.error(f"Error sending iOS LE payload: {e}")
+                    if attempt == max_retries - 1:
+                        return False
+                    await asyncio.sleep(retry_delay)
+            else:
+                full_message_hex = self._make_message(payload_bytes)
+                
+                # Split message into chunks if it exceeds the chunksize
+                # Each byte is 2 hex characters, so chunksize * 2
+                chunk_length_hex = self.chunksize * 2
+                
+                if len(full_message_hex) > chunk_length_hex:
+                    self.logger.debug(f"Message too long ({len(full_message_hex)} hex chars), splitting into chunks of {chunk_length_hex} hex chars.")
+                    chunks = [full_message_hex[i:i + chunk_length_hex] for i in range(0, len(full_message_hex), chunk_length_hex)]
+                    
+                    success = True
+                    for i, chunk_hex in enumerate(chunks):
+                        try:
+                            message_bytes = bytes.fromhex(chunk_hex)
+                            self.logger.debug(f"{self.type} PAYLOAD OUT (Chunk {i+1}/{len(chunks)}): {chunk_hex}")
+                            self.logger.debug(f"Raw message bytes being sent (Chunk {i+1}/{len(chunks)}): {message_bytes.hex()}")
+                            await self.client.write_gatt_char(self.WRITE_CHARACTERISTIC_UUID, message_bytes)
+                            await asyncio.sleep(0.05) # Small delay between chunks
+                        except Exception as e:
+                            self.logger.error(f"Error sending chunk {i+1}: {e}")
+                            success = False
+                            break
+                    if success:
+                        return True
+                    elif attempt == max_retries - 1:
+                        return False
+                    await asyncio.sleep(retry_delay)
+                else:
+                    try:
+                        # Convert hex string to bytes
+                        message_bytes = bytes.fromhex(full_message_hex)
+                        self.logger.debug(f"{self.type} PAYLOAD OUT: {full_message_hex}")
+                        self.logger.debug(f"Raw message bytes being sent: {message_bytes.hex()}")
+                        self.logger.debug(f"Attempting to write to characteristic: {self.WRITE_CHARACTERISTIC_UUID}")
+                        await self.client.write_gatt_char(self.WRITE_CHARACTERISTIC_UUID, message_bytes)
+                        return True
+                    except Exception as e:
+                        self.logger.error(f"Error sending payload: {e}")
+                        if attempt == max_retries - 1:
+                            return False
+                        await asyncio.sleep(retry_delay)
+        return False # Should not be reached if successful or max_retries reached
 
     def _int2hexlittle(self, value):
         byte1 = (value & 0xFF)
         byte2 = ((value >> 8) & 0xFF)
         return f"{byte1:02x}{byte2:02x}"
 
-    def _getCRC(self, hex_str):
-        sum_val = 0
-        for i in range(0, len(hex_str), 2):
-            sum_val += int(hex_str[i:i+2], 16)
+    def _getCRC(self, data_bytes: list):
+        """
+        Calculates the checksum for a list of byte values.
+        The checksum is the sum of all byte values, converted to a 2-byte little-endian hex string.
+        """
+        sum_val = sum(data_bytes)
         return self._int2hexlittle(sum_val)
 
     def _make_message(self, payload_bytes):
         """Make a complete message from the payload data using the Timebox Evo protocol."""
+        # Calculate LLLL (length of command_code + payload + checksum)
+        # payload_bytes already contains the command_code as its first element
+        # Checksum is 2 bytes
+        length_value = len(payload_bytes) + 2 # Length of (command + args) + 2 bytes for checksum
+
+        # Convert length_value to its 2-byte little-endian representation
+        length_bytes = list(length_value.to_bytes(2, byteorder='little'))
+        length_hex = "".join(f"{b:02x}" for b in length_bytes)
+
+        # Calculate checksum over length_bytes and payload_bytes
+        checksum_input_bytes = length_bytes + payload_bytes
+        checksum_hex = self._getCRC(checksum_input_bytes)
+
         # Convert payload_bytes (list of integers) to hex string
         payload_hex = "".join(f"{b:02x}" for b in payload_bytes)
-
-        # Calculate LLLL (length of payload_hex + CRC hex string length (4)) / 2
-        length_value = (len(payload_hex) + 4) // 2
-        length_hex = self._int2hexlittle(length_value)
-
-        # Combine length_hex and payload_hex for CRC calculation
-        crc_input_hex = length_hex + payload_hex
-        checksum_hex = self._getCRC(crc_input_hex)
 
         # Construct the full message hex string
         final_message_hex = f"01{length_hex}{payload_hex}{checksum_hex}02"

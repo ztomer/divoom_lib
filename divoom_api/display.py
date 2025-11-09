@@ -80,26 +80,36 @@ class Display:
 
     async def show_light(self, color, brightness=None, power=None):
         """Show light on the Divoom device in the color"""
-        if power == None:
+        if power is None:
             power = True
-        if brightness == None:
+        if brightness is None:
             brightness = 100
         if isinstance(brightness, str):
             brightness = int(brightness)
 
-        args = [0x01]
-        if color is None:
-            args += [0xFF, 0xFF, 0xFF]
-            args += brightness.to_bytes(1, byteorder='big')
-            args += [0x01]
-        else:
-            rgb_color = self.communicator.convert_color(color)
-            args.extend(rgb_color)
-            args += brightness.to_bytes(1, byteorder='big')
-            args += [0x00]
-        args += [0x01 if power == True or power ==
-                 1 else 0x00, 0x00, 0x00, 0x00]
-        return await self.communicator.send_command("set light mode", args)
+        # Channel number for Lightning is 0x01
+        channel_number = 0x01
+        
+        # Type of Lightning: 0x00 for Plain color
+        type_of_lightning = 0x00
+
+        # Power state: 0x01 for on, 0x00 for off
+        power_state = 0x01 if power else 0x00
+
+        rgb_color = self.communicator.convert_color(color)
+        
+        # The PROTOCOL.md indicates that 0x45 is the command for switching channels,
+        # and the channel number (0x01 for Lightning) is the first argument.
+        # The rest of the arguments are specific to the Lightning channel.
+        args = [
+            0x01, # Channel number for Lightning
+            rgb_color[0], rgb_color[1], rgb_color[2],
+            brightness,
+            type_of_lightning,
+            power_state,
+            0x00, 0x00, 0x00 # Fixed String 000000
+        ]
+        return await self.communicator.send_command("set channel light", args)
 
     async def show_visualization(self, number, color1, color2):
         """Show visualization on the Divoom device"""

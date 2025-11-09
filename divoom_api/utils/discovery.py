@@ -4,20 +4,31 @@ from typing import List, Tuple, Optional, Union
 from bleak import BleakScanner, BleakClient
 from bleak.backends.device import BLEDevice
 
-async def discover_divoom_devices(device_name_substring: str, logger: logging.Logger) -> List[BLEDevice]:
+async def discover_divoom_devices(device_name_substring: str = "", logger: logging.Logger = logging.getLogger(__name__)) -> List[BLEDevice]:
     """
-    Scans for Divoom devices whose name contains `device_name_substring` and returns a list of matching devices.
+    Scans for Divoom devices whose name contains `device_name_substring` and returns a list of matching BLEDevice objects.
     """
     logger.info(f"Scanning for Divoom device(s) containing '{device_name_substring}'...")
     devices = await BleakScanner.discover()
     
-    matching_devices = []
-    for device in devices:
-        if device.name and device_name_substring.lower() in device.name.lower():
-            logger.info(f"Found Divoom device: {device.name} ({device.address})")
-            matching_devices.append(device)
+    divoom_keywords = ["Ditoo", "Tivoo", "Pixoo", "Timoo", "Divoom"] # Add more keywords if needed
     
-    if not matching_devices:
+    found_divoom_devices = []
+    for device in devices:
+        # Check if device name contains any of the Divoom keywords
+        is_divoom_device = False
+        if device.name:
+            for keyword in divoom_keywords:
+                if keyword.lower() in device.name.lower():
+                    is_divoom_device = True
+                    break
+        
+        # If it's a Divoom device and matches the substring (if provided)
+        if is_divoom_device and (not device_name_substring or device_name_substring.lower() in device.name.lower()):
+            logger.info(f"Found Divoom device: {device.name} ({device.address})")
+            found_divoom_devices.append(device)
+    
+    if not found_divoom_devices:
         logger.warning(f"No Divoom device containing '{device_name_substring}' found.")
         if not devices:
             logger.info("No Bluetooth devices were discovered at all.")
@@ -25,7 +36,7 @@ async def discover_divoom_devices(device_name_substring: str, logger: logging.Lo
             logger.info("Discovered devices (no match found):")
             for device in devices:
                 logger.info(f"  - {device.name} ({device.address})")
-    return matching_devices
+    return found_divoom_devices
 
 async def discover_characteristics(mac_address: str, logger: logging.Logger) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
@@ -41,6 +52,7 @@ async def discover_characteristics(mac_address: str, logger: logging.Logger) -> 
     try:
         await temp_client.connect()
         logger.info(f"Connected to {mac_address} for characteristic discovery.")
+        await asyncio.sleep(0.1) # Add a small delay to allow services to be fully discovered
         for service in temp_client.services:
             for char in service.characteristics:
                 if "write" in char.properties or "write-without-response" in char.properties:
@@ -65,28 +77,3 @@ async def discover_characteristics(mac_address: str, logger: logging.Logger) -> 
         return None, None, None
     
     return write_uuid, notify_uuid, read_uuid
-
-async def discover_device_and_characteristics(device_name: str, logger: logging.Logger) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
-    """
-    Discovers a single Divoom device by name and then its communication characteristics.
-    Returns a tuple of (mac_address, write_uuid, notify_uuid, read_uuid).
-    """
-    logger.info(f"Attempting to discover Divoom device '{device_name}' and its characteristics...")
-    
-    device = await discover_divoom_devices(device_name_substring=device_name, logger=logger)
-    
-    if not device:
-        logger.error(f"Failed to find Divoom device named '{device_name}'.")
-        return None, None, None, None
-    
-    mac_address = device.address
-    logger.info(f"Found device '{device.name}' at MAC address: {mac_address}. Discovering characteristics...")
-    
-    write_uuid, notify_uuid, read_uuid = await discover_characteristics(mac_address, logger)
-    
-    if not all([write_uuid, notify_uuid, read_uuid]):
-        logger.error(f"Failed to discover all required characteristics for device '{device_name}'.")
-        return mac_address, None, None, None
-        
-    logger.info(f"Successfully discovered characteristics for '{device_name}'.")
-    return mac_address, write_uuid, notify_uuid, read_uuid
