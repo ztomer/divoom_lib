@@ -15,8 +15,8 @@ async def main():
     devices = await discover_divoom_devices(device_name_substring="light", logger=logger)
     if devices:
         print_ok("Found the following Divoom devices:")
-        for device in devices:
-            print(f"  - {device.name} ({device.address})")
+        for ble_device, _, _, _ in devices:
+            print(f"  - {ble_device.name} ({ble_device.address})")
     else:
         print_wrn("No Divoom devices found.")
 

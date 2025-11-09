@@ -18,3 +18,5 @@ from .commands.temp_weather import TempWeatherCommand
 from .commands.date_time import DateTimeCommand
 from .drawing.text import DisplayText
 from .drawing.drawing import DisplayAnimation
+from .divoom_protocol import Divoom
+from .utils.discovery import discover_divoom_devices, discover_characteristics

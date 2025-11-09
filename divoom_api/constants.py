@@ -25,6 +25,7 @@ COMMANDS = {
     "set alarm": 0x43,
     "set light pic": 0x44,
     "set light mode": 0x45,
+    "set channel light": 0x45,
     "get light mode": 0x46,
     "app need get music list": 0x47,
     "set light phone gif": 0x49,
