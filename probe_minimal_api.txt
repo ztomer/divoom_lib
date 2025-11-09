@@ -1,0 +1,115 @@
+Scanning for Bluetooth devices searching for name containing 'Timoo'...
+Found device: Timoo-light-4 (F90D2CC9-420E-65F9-9E06-F9554470FCED) — using this device.
+Started notify on 49535343-aca3-481c-91ec-d85e28a60318
+Started notify on 49535343-1e4d-4bd9-ba61-23c647249616
+[DIAG RAWWRITE] 2025-11-09T15:16:47.171059 -> char=49535343-aca3-481c-91ec-d85e28a60318 len=15 hex=feefaa550900450000000045029500 response=False
+[DIAG WRITE] 2025-11-09T15:16:47.171139 char=49535343-aca3-481c-91ec-d85e28a60318 response=False bytes=feefaa550900450000000045029500
+[DIAG WRITE DONE] 2025-11-09T15:16:47.171139 char=49535343-aca3-481c-91ec-d85e28a60318 len=15
+Attempting channel-switch sequence: set work mode, power-on channel, then switch to channel 0x02
+DEBUG:Ditoo:Sending command: 0x05 (0x05) with args: [9]
+DEBUG:Ditoo:Sending command: 0x05 (0x05) with args: [9]
+DEBUG:Ditoo:send_payload: self.client.is_connected = True
+DEBUG:Ditoo:send_payload: self.client.is_connected = True
+DEBUG:Ditoo:Ditoo PAYLOAD OUT (iOS LE): feefaa550900050000000005091c00
+DEBUG:Ditoo:Ditoo PAYLOAD OUT (iOS LE): feefaa550900050000000005091c00
+DEBUG:Ditoo:Raw message bytes being sent (iOS LE): feefaa550900050000000005091c00
+DEBUG:Ditoo:Raw message bytes being sent (iOS LE): feefaa550900050000000005091c00
+[DIAG WRITE] 2025-11-09T15:16:49.174167 char=49535343-aca3-481c-91ec-d85e28a60318 response=False bytes=feefaa550900050000000005091c00
+[DIAG WRITE DONE] 2025-11-09T15:16:49.174167 char=49535343-aca3-481c-91ec-d85e28a60318 len=15
+DEBUG:Ditoo:Sending command: 0x8a (0x8a) with args: [2]
+DEBUG:Ditoo:Sending command: 0x8a (0x8a) with args: [2]
+DEBUG:Ditoo:send_payload: self.client.is_connected = True
+DEBUG:Ditoo:send_payload: self.client.is_connected = True
+DEBUG:Ditoo:Ditoo PAYLOAD OUT (iOS LE): feefaa5509008a000000008a021f01
+DEBUG:Ditoo:Ditoo PAYLOAD OUT (iOS LE): feefaa5509008a000000008a021f01
+DEBUG:Ditoo:Raw message bytes being sent (iOS LE): feefaa5509008a000000008a021f01
+DEBUG:Ditoo:Raw message bytes being sent (iOS LE): feefaa5509008a000000008a021f01
+[DIAG WRITE] 2025-11-09T15:16:50.176726 char=49535343-aca3-481c-91ec-d85e28a60318 response=False bytes=feefaa5509008a000000008a021f01
+[DIAG WRITE DONE] 2025-11-09T15:16:50.176726 char=49535343-aca3-481c-91ec-d85e28a60318 len=15
+DEBUG:Ditoo:Entering _send_command_and_wait_for_response for command: 69
+DEBUG:Ditoo:Entering _send_command_and_wait_for_response for command: 69
+DEBUG:Ditoo:Event state before clear: False
+DEBUG:Ditoo:Event state before clear: False
+DEBUG:Ditoo:Event state after clear: False
+DEBUG:Ditoo:Event state after clear: False
+DEBUG:Ditoo:Sending command: 0x45 (0x45) with args: [2]
+DEBUG:Ditoo:Sending command: 0x45 (0x45) with args: [2]
+DEBUG:Ditoo:send_payload: self.client.is_connected = True
+DEBUG:Ditoo:send_payload: self.client.is_connected = True
+DEBUG:Ditoo:Ditoo PAYLOAD OUT: 010500450305520002
+DEBUG:Ditoo:Ditoo PAYLOAD OUT: 010500450305520002
+DEBUG:Ditoo:Raw message bytes being sent: 010500450305520002
+DEBUG:Ditoo:Raw message bytes being sent: 010500450305520002
+DEBUG:Ditoo:Attempting to write to characteristic: 49535343-aca3-481c-91ec-d85e28a60318
+DEBUG:Ditoo:Attempting to write to characteristic: 49535343-aca3-481c-91ec-d85e28a60318
+[DIAG WRITE] 2025-11-09T15:16:51.180903 char=49535343-aca3-481c-91ec-d85e28a60318 response=True bytes=010500450305520002
+[DIAG WRITE DONE] 2025-11-09T15:16:51.180903 char=49535343-aca3-481c-91ec-d85e28a60318 len=9
+DEBUG:Ditoo:Event state before wait: False
+DEBUG:Ditoo:Event state before wait: False
+WARNING:Ditoo:Timeout waiting for notification response to command: 69
+WARNING:Ditoo:Timeout waiting for notification response to command: 69
+INFO:Ditoo:Attempting to read from all readable characteristics as a fallback (for logging)...
+INFO:Ditoo:Attempting to read from all readable characteristics as a fallback (for logging)...
+INFO:Ditoo:Fallback Read data from 00002a29-0000-1000-8000-00805f9b34fb: 416e796b61 (ASCII: Anyka)
+INFO:Ditoo:Fallback Read data from 00002a29-0000-1000-8000-00805f9b34fb: 416e796b61 (ASCII: Anyka)
+INFO:Ditoo:Fallback Read data from 00002a24-0000-1000-8000-00805f9b34fb: 3130353244 (ASCII: 1052D)
+INFO:Ditoo:Fallback Read data from 00002a24-0000-1000-8000-00805f9b34fb: 3130353244 (ASCII: 1052D)
+INFO:Ditoo:Fallback Read data from 00002a25-0000-1000-8000-00805f9b34fb: 3132333435363738 (ASCII: 12345678)
+INFO:Ditoo:Fallback Read data from 00002a25-0000-1000-8000-00805f9b34fb: 3132333435363738 (ASCII: 12345678)
+INFO:Ditoo:Fallback Read data from 00002a27-0000-1000-8000-00805f9b34fb: 302e302e302e31 (ASCII: 0.0.0.1)
+INFO:Ditoo:Fallback Read data from 00002a27-0000-1000-8000-00805f9b34fb: 302e302e302e31 (ASCII: 0.0.0.1)
+INFO:Ditoo:Fallback Read data from 00002a26-0000-1000-8000-00805f9b34fb: 302e302e302e32 (ASCII: 0.0.0.2)
+INFO:Ditoo:Fallback Read data from 00002a26-0000-1000-8000-00805f9b34fb: 302e302e302e32 (ASCII: 0.0.0.2)
+INFO:Ditoo:Fallback Read data from 00002a28-0000-1000-8000-00805f9b34fb: 302e302e302e33 (ASCII: 0.0.0.3)
+INFO:Ditoo:Fallback Read data from 00002a28-0000-1000-8000-00805f9b34fb: 302e302e302e33 (ASCII: 0.0.0.3)
+INFO:Ditoo:Fallback Read data from 00002a23-0000-1000-8000-00805f9b34fb: 416b4f53 (ASCII: AkOS)
+INFO:Ditoo:Fallback Read data from 00002a23-0000-1000-8000-00805f9b34fb: 416b4f53 (ASCII: AkOS)
+INFO:Ditoo:Fallback Read data from 00002a2a-0000-1000-8000-00805f9b34fb:  (ASCII: )
+INFO:Ditoo:Fallback Read data from 00002a2a-0000-1000-8000-00805f9b34fb:  (ASCII: )
+INFO:Ditoo:Fallback Read data from 49535343-6daa-4d02-abf6-19569aca69fe: 535050 (ASCII: SPP)
+INFO:Ditoo:Fallback Read data from 49535343-6daa-4d02-abf6-19569aca69fe: 535050 (ASCII: SPP)
+No response for SPP channel switch; trying iOS-LE framing...
+DEBUG:Ditoo:Entering _send_command_and_wait_for_response for command: 69
+DEBUG:Ditoo:Entering _send_command_and_wait_for_response for command: 69
+DEBUG:Ditoo:Event state before clear: False
+DEBUG:Ditoo:Event state before clear: False
+DEBUG:Ditoo:Event state after clear: False
+DEBUG:Ditoo:Event state after clear: False
+DEBUG:Ditoo:Sending command: 0x45 (0x45) with args: [2]
+DEBUG:Ditoo:Sending command: 0x45 (0x45) with args: [2]
+DEBUG:Ditoo:send_payload: self.client.is_connected = True
+DEBUG:Ditoo:send_payload: self.client.is_connected = True
+DEBUG:Ditoo:Ditoo PAYLOAD OUT (iOS LE): feefaa550900450000000045029500
+DEBUG:Ditoo:Ditoo PAYLOAD OUT (iOS LE): feefaa550900450000000045029500
+DEBUG:Ditoo:Raw message bytes being sent (iOS LE): feefaa550900450000000045029500
+DEBUG:Ditoo:Raw message bytes being sent (iOS LE): feefaa550900450000000045029500
+[DIAG WRITE] 2025-11-09T15:16:55.081981 char=49535343-aca3-481c-91ec-d85e28a60318 response=True bytes=feefaa550900450000000045029500
+[DIAG WRITE DONE] 2025-11-09T15:16:55.081981 char=49535343-aca3-481c-91ec-d85e28a60318 len=15
+DEBUG:Ditoo:Event state before wait: False
+DEBUG:Ditoo:Event state before wait: False
+WARNING:Ditoo:Timeout waiting for notification response to command: 69
+WARNING:Ditoo:Timeout waiting for notification response to command: 69
+INFO:Ditoo:Attempting to read from all readable characteristics as a fallback (for logging)...
+INFO:Ditoo:Attempting to read from all readable characteristics as a fallback (for logging)...
+INFO:Ditoo:Fallback Read data from 00002a29-0000-1000-8000-00805f9b34fb: 416e796b61 (ASCII: Anyka)
+INFO:Ditoo:Fallback Read data from 00002a29-0000-1000-8000-00805f9b34fb: 416e796b61 (ASCII: Anyka)
+INFO:Ditoo:Fallback Read data from 00002a24-0000-1000-8000-00805f9b34fb: 3130353244 (ASCII: 1052D)
+INFO:Ditoo:Fallback Read data from 00002a24-0000-1000-8000-00805f9b34fb: 3130353244 (ASCII: 1052D)
+INFO:Ditoo:Fallback Read data from 00002a25-0000-1000-8000-00805f9b34fb: 3132333435363738 (ASCII: 12345678)
+INFO:Ditoo:Fallback Read data from 00002a25-0000-1000-8000-00805f9b34fb: 3132333435363738 (ASCII: 12345678)
+INFO:Ditoo:Fallback Read data from 00002a27-0000-1000-8000-00805f9b34fb: 302e302e302e31 (ASCII: 0.0.0.1)
+INFO:Ditoo:Fallback Read data from 00002a27-0000-1000-8000-00805f9b34fb: 302e302e302e31 (ASCII: 0.0.0.1)
+INFO:Ditoo:Fallback Read data from 00002a26-0000-1000-8000-00805f9b34fb: 302e302e302e32 (ASCII: 0.0.0.2)
+INFO:Ditoo:Fallback Read data from 00002a26-0000-1000-8000-00805f9b34fb: 302e302e302e32 (ASCII: 0.0.0.2)
+INFO:Ditoo:Fallback Read data from 00002a28-0000-1000-8000-00805f9b34fb: 302e302e302e33 (ASCII: 0.0.0.3)
+INFO:Ditoo:Fallback Read data from 00002a28-0000-1000-8000-00805f9b34fb: 302e302e302e33 (ASCII: 0.0.0.3)
+INFO:Ditoo:Fallback Read data from 00002a23-0000-1000-8000-00805f9b34fb: 416b4f53 (ASCII: AkOS)
+INFO:Ditoo:Fallback Read data from 00002a23-0000-1000-8000-00805f9b34fb: 416b4f53 (ASCII: AkOS)
+INFO:Ditoo:Fallback Read data from 00002a2a-0000-1000-8000-00805f9b34fb:  (ASCII: )
+INFO:Ditoo:Fallback Read data from 00002a2a-0000-1000-8000-00805f9b34fb:  (ASCII: )
+INFO:Ditoo:Fallback Read data from 49535343-6daa-4d02-abf6-19569aca69fe: 535050 (ASCII: SPP)
+INFO:Ditoo:Fallback Read data from 49535343-6daa-4d02-abf6-19569aca69fe: 535050 (ASCII: SPP)
+Channel switch did not produce a response with either framing.
+Saved device mapping to cache for F90D2CC9-420E-65F9-9E06-F9554470FCED
+INFO:Ditoo:Disconnected from Divoom device at F90D2CC9-420E-65F9-9E06-F9554470FCED
+INFO:Ditoo:Disconnected from Divoom device at F90D2CC9-420E-65F9-9E06-F9554470FCED

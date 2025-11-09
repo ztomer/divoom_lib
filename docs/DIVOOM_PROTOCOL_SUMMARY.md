@@ -74,3 +74,80 @@ Files you may want to open next:
 - `references/node-divoom-timebox-evo/PROTOCOL.md` — detailed image/bit packing rules.
 
 If you want, I'll implement option (1) above (a Python packet-builder + unit tests and a small README) next. If so, confirm whether to target RFCOMM (classic Bluetooth) or BLE/LE framing first.
+
+## BLE / macOS (Bleak) findings — probe results (2025-11-09)
+
+Recent experimentation using `minimal_bleak.py` (Bleak + CoreBluetooth on macOS) produced a few important, practical findings that do not appear prominently in the older RFCOMM-focused docs. These are written so you can re-use the same approach on other Divoom devices.
+
+- Common service namespace: many Divoom devices expose a service UUID in the `49535343-xxxx-...` family (for example `49535343-fe7d-4ae5-8fa9-9fafd205e455`). That service typically contains a small set of characteristics including at least one writeable and one notifiable characteristic.
+
+- Characteristic discovery heuristics (how to find the right chars):
+  - Scan and list all characteristics for the device's services. Prefer characteristics that expose `write` or `write-without-response` properties for sending commands. Prefer characteristics with `notify` for ACKs/responses.
+  - In practice the following UUIDs were seen on a Timoo device during probe:
+    - writeable candidates: `49535343-8841-43f4-a8d4-ecbe34729bb3` (['write-without-response','write']), `49535343-aca3-481c-91ec-d85e28a60318` (['write','notify'])
+    - notify candidate (ACKs observed): `49535343-1e4d-4bd9-ba61-23c647249616` (['write-without-response','notify'])
+  - Matching strategy: prefer an exact UUID saved from a prior run; if none, prefer a characteristic that belongs to the `49535343-` service and exposes `write` privileges; subscribe to all `notify` characteristics and watch for ACK patterns.
+
+- iOS-LE outer framing (observed in the wild):
+  - Header: 0xFE 0xEF 0xAA 0x55
+  - Length: 2 bytes, little-endian (counts the remainder as implemented in the examples below)
+  - Outer command ID (1 byte) — often 0x45 for light/channel-related operations
+  - 4-byte packet number (little-endian)
+  - Inner data bytes (application-specific payload)
+  - 2-byte checksum (little-endian) computed as a simple sum over the bytes used by the device implementation (length bytes + command + packet number + data in our helper)
+
+- Legacy inner 0x45 variant (critical finding):
+  - Some devices accept a nested/legacy format where the iOS-LE outer command is 0x45 and the inner payload begins with 0x45 again, followed by a longer / legacy parameter block. In our probe the exact working inner payload was:
+
+    [0x45, 0x01, 0xFF, 0xFF, 0xFF, 0x64, 0x00, 0x01, 0x00, 0x00, 0x00]
+
+    - Interpretation (likely): outer/inner 0x45 = light/channel family, `0x01` = DIVOOM_DISP_LIGHT_MODE, `0xFF,0xFF,0xFF` = RGB (white), `0x64` = brightness 100, then a series of flags/ids (0x00,0x01,0x00,0x00,0x00) that the firmware expects in the legacy handler.
+    - Outer (raw) iOS-LE packet we sent (hex):
+
+      fe ef aa 55 12 00 45 00 00 00 00 45 01 ff ff ff 64 00 01 00 00 00 ff 03
+
+    - In short: devices may silently ignore short/canonical 7-byte variants and only accept this longer legacy form for some light-mode operations.
+
+- ACK detection pattern (useful when subscribing to notifications):
+  - Two useful patterns emerged in notifications:
+    - Compact/older pattern: a 3-byte fragment [0x04, <cmd>, 0x55] appears within some responses. This is a reliable marker for an ACK for `<cmd>` when seen.
+    - iOS-LE style: notifications may contain the `FE EF AA 55` header followed by data; you need to search inside that payload for the same [0x04, <cmd>, 0x55] or directly for the command id bytes (e.g., 0x45).
+  - In the test logs an ACK notification looked like: `01 06 00 04 45 55 01 a5 00 02` (the bytes around the 0x45 indicate an ACK was received). The helper in `minimal_bleak.py` looks for both forms.
+
+- Practical testing workflow (recommended for other devices):
+  1. Scan for device with a recognizable name (e.g., contains "Timoo" / "Divoom").
+
+ 2. Connect and enumerate services & characteristics.
+ 3. Subscribe to all characteristics with `notify` so you can receive ACKs.
+ 4. For each write-capable char discovered (prefer those in the `49535343-` service):
+     - Try replaying any saved successful payload for that characteristic first (persisted payloads must be stored per-character). If it ACKs, persist the mapping and stop.
+     - If no saved payload, try the canonical short/light payloads (7-byte) both as SPP-style framed packets and as iOS-LE framed packets.
+     - If canonical attempts fail, try the legacy long inner 0x45 variant wrapped in iOS-LE (the probe found this to succeed).
+ 5. If you discover a working variant, save the exact inner bytes (not an outer wrapper) along with the characteristic UUID and the framing flag (use iOS-LE or not).
+
+- Persistence & automation guidelines
+  - Save: write characteristic UUID, notify/ack characteristic UUID, service UUID, characteristic properties, and a human-friendly description.
+  - Also save: the exact last_successful_payload as a hex list, a boolean `last_successful_use_ios_le`, and the `last_successful_write_characteristic` so future runs attempt the correct payload on the correct char before probing.
+  - Prefer per-character payload mapping (i.e., allow multiple saved payloads keyed by characteristic UUID). Device firmware variants and mobile OS BLE stacks sometimes require the same command to be issued on a specific characteristic.
+
+- Implementation notes (what to implement in helpers):
+  - construct_ios_le_packet(cmd, payload, pktnum=0): build outer header, compute length properly, include packet number, and compute checksum as the sum over length bytes + cmd + pktnum + data bytes, packaged as 2 bytes LSB-first.
+  - construct_spp_packet(cmd, payload): build START(0x01) + len + escaped payload + CRC + END(0x02) as in RFCOMM/SPP-style references.
+  - notification handler: search notifications for both the 3-byte [0x04, cmd, 0x55] pattern and for the `FE EF AA 55` header then scan inside.
+
+## Troubleshooting & tips
+
+- Timing: some devices need a short delay after subscribing to notifications before accepting writes. Add a configurable `post_connect_delay_ms` (100–500 ms) if you see flakiness.
+- Escaping: when building SPP packets ensure you escape 0x01/0x02/0x03 inside payloads using the documented escape sequences to avoid corrupting framing bytes.
+- MTU/chunking: firmware that accepts `0x8B` (animation upload) expects fixed-size chunks (e.g., 200 or 256 bytes) — follow the Rust/node examples for chunking and start/stop control words.
+
+## Recommended next docs/tasks (I can implement any of these)
+
+- Add a short `BLE-quickstart.md` describing the exact discover → subscribe → replay → persist workflow with terminal commands and minimal example outputs.
+- Add examples in `docs/` showing:
+  - The exact working legacy packet hex and how to build it from helper functions.
+  - How to inspect `.divoom_last_working_char.json` and interpret saved payload entries.
+  - How to use the new CLI flags in `minimal_bleak.py` such as `--replay-legacy` and `--skip-channel-switch`.
+- Add verbose logging and a `--test-saved-only` mode for quick CI checks.
+
+If you want, I'll add `BLE-quickstart.md` and update `DIVOOM_PROTOCOL_SUMMARY.md` further with step-by-step commands and copyable examples. Which two artifacts should I produce next? (suggestion: `BLE-quickstart.md` + `docs/EXAMPLES.md` with the constructed packet examples)
