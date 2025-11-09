@@ -71,14 +71,23 @@ async def send_light_effect_command(client: BleakClient, effect_type: int, color
     await client.write_gatt_char(WRITE_CHARACTERISTIC_UUID, packet_to_send, response=False)
     print(f"Light effect command (Type: {effect_type}) sent.")
 
-async def send_brightness_command(client: BleakClient, brightness_level: int):
-    command_code = 0x74 # Command for setting brightness
-    payload = [brightness_level]
+async def send_work_mode_command(client: BleakClient, mode: int):
+    command_code = 0x05 # Command for Set Play Mode (Work Mode)
+    payload = [mode]
     packet_to_send = construct_packet(command_code, payload)
 
-    print(f"Sending brightness packet (level {brightness_level}, escaped: {ENABLE_PAYLOAD_ESCAPING}): {packet_to_send.hex()}")
+    print(f"Sending work mode packet (Mode: {mode}, escaped: {ENABLE_PAYLOAD_ESCAPING}): {packet_to_send.hex()}")
     await client.write_gatt_char(WRITE_CHARACTERISTIC_UUID, packet_to_send, response=False)
-    print(f"Brightness command (level {brightness_level}) sent.")
+    print(f"Work mode command (Mode: {mode}) sent.")
+
+async def send_poweron_channel_command(client: BleakClient, channel: int):
+    command_code = 0x8a # Command for Set Power On Channel
+    payload = [channel]
+    packet_to_send = construct_packet(command_code, payload)
+
+    print(f"Sending poweron channel packet (Channel: {channel}, escaped: {ENABLE_PAYLOAD_ESCAPING}): {packet_to_send.hex()}")
+    await client.write_gatt_char(WRITE_CHARACTERISTIC_UUID, packet_to_send, response=False)
+    print(f"Poweron channel command (Channel: {channel}) sent.")
 
 async def find_and_connect_timoo():
     print("Scanning for Bluetooth devices...")
@@ -98,6 +107,14 @@ async def find_and_connect_timoo():
                 if client.is_connected:
                     print(f"Successfully connected to {timoo_device.name}!")
                     
+                    # Try setting work mode to Divoom Show (0x09)
+                    await send_work_mode_command(client, 0x09)
+                    await asyncio.sleep(2)
+
+                    # Try setting poweron channel to Light Effect (0x02)
+                    await send_poweron_channel_command(client, 0x02)
+                    await asyncio.sleep(2)
+
                     # Test different light effect types
                     # Plain Color (Red)
                     await send_light_effect_command(client, LIGHT_EFFECT_TYPE_PLAIN_COLOR, [0xFF, 0x00, 0x00], 0x32, 0x01)
@@ -109,12 +126,6 @@ async def find_and_connect_timoo():
 
                     # Rainbow (Blue - color might not be used for rainbow effect, but sending it anyway)
                     await send_light_effect_command(client, LIGHT_EFFECT_TYPE_RAINBOW, [0x00, 0x00, 0xFF], 0x64, 0x01)
-                    await asyncio.sleep(2)
-
-                    # Test brightness control
-                    await send_brightness_command(client, 0x10) # Set brightness to a low level (e.g., 16)
-                    await asyncio.sleep(2)
-                    await send_brightness_command(client, 0x64) # Set brightness to max level (100)
                     await asyncio.sleep(5) 
                     print(f"Disconnected from {timoo_device.name}.")
                 else:
