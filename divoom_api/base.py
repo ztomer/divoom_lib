@@ -37,6 +37,8 @@ class DivoomBase:
         # New attribute to store the expected command ID
         self._expected_response_command = None
         self.message_buf = []
+        self.max_reconnect_attempts = 5  # Increased from default
+        self.reconnect_delay = 0.5  # Increased from default
 
         if logger is None:
             self.logger = logging.getLogger(self.type)
