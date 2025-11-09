@@ -1,7 +1,8 @@
 import asyncio
 import logging
 from bleak import BleakScanner
-from divoom import Divoom
+from divoom_api.divoom_protocol import Divoom
+from divoom_api.utils.discovery import discover_divoom_devices
 
 def print_info(message):
     """Prints an informational message."""
@@ -23,21 +24,9 @@ def print_ok(message):
     print(f"[ Ok  ] {message}")
 
 
-async def discover_divoom_devices():
-    """Scans for Bluetooth devices and returns a list of Divoom devices."""
-    print_info("Scanning for Divoom devices...")
-    devices = await BleakScanner.discover()
-    divoom_devices = []
-    divoom_keywords = ["Timoo", "Tivoo", "Pixoo", "Ditoo"]
-    for device in devices:
-        if device.name and any(keyword in device.name for keyword in divoom_keywords):
-            divoom_devices.append(device)
-    return divoom_devices
-
-
 async def main():
     """Main function to test the Divoom device discovery and connection."""
-    devices = await discover_divoom_devices()
+    devices = await discover_divoom_devices("Divoom", logging.getLogger(__name__)) # Pass a logger instance
     if devices:
         print_ok("Found the following Divoom devices:")
         for device in devices:
@@ -61,7 +50,7 @@ async def main():
                     f"Successfully connected to {timoo_device.name} ({timoo_device.address}).")
 
                 print_info("Setting hot pick channel...")
-                await divoom_device.show_clock(hot=True)
+                await divoom_device.display.show_clock(hot=True) # Corrected call
                 print_ok("Hot pick channel set.")
 
             except Exception as e:
