@@ -1,0 +1,70 @@
+# divoom_api/utils/converters.py
+import logging
+
+logger = logging.getLogger(__name__)
+
+def color_to_rgb_list(color_input) -> list:
+    """
+    Converts a color input (e.g., "RRGGBB" hex string, or (R, G, B) tuple/list)
+    to a list of three integers [R, G, B].
+    """
+    if isinstance(color_input, str) and len(color_input) == 6 and all(c in '0123456789abcdefABCDEF' for c in color_input.lower()):
+        # Hex string "RRGGBB"
+        r = int(color_input[0:2], 16)
+        g = int(color_input[2:4], 16)
+        b = int(color_input[4:6], 16)
+        return [r, g, b]
+    elif isinstance(color_input, (tuple, list)) and len(color_input) == 3:
+        # (R, G, B) tuple or list
+        if all(0 <= c <= 255 for c in color_input):
+            return list(color_input)
+        else:
+            logger.warning(f"RGB values out of range (0-255): {color_input}. Defaulting to [255, 255, 255].")
+            return [255, 255, 255]
+    else:
+        logger.warning(f"Unsupported color input format: {color_input}. Defaulting to [255, 255, 255].")
+        return [255, 255, 255]
+
+def color2HexString(color_input) -> str:
+    """
+    Converts a color input (e.g., "RRGGBB", hex, or named color) to an
+    hexadecimal string representation (RRGGBB).
+    This function would typically use a color parsing library if more complex
+    inputs are expected. For now, it assumes a valid hex string input.
+    """
+    # For simplicity, assuming color_input is already a 6-digit hex string "RRGGBB"
+    # or can be directly converted. If more robust parsing is needed (e.g., named colors,
+    # RGB tuples), a library like 'webcolors' or custom logic would be integrated.
+    if isinstance(color_input, str) and len(color_input) == 6 and all(c in '0123456789abcdefABCDEF' for c in color_input):
+        return color_input
+    elif isinstance(color_input, tuple) and len(color_input) == 3: # (R, G, B) tuple
+        return f"{color_input[0]:02x}{color_input[1]:02x}{color_input[2]:02x}"
+    # Add more robust color parsing here if necessary
+    logger.warning(f"Unsupported color input format: {color_input}. Defaulting to 'FFFFFF'.")
+    return "FFFFFF"
+
+def number2HexString(byte_value: int) -> str:
+    """
+    Converts an integer (0-255) to its two-character hexadecimal string representation.
+    """
+    if not 0 <= byte_value <= 255:
+        raise ValueError("number2HexString works only with numbers between 0 and 255")
+    return f"{int(byte_value):02x}"
+
+def boolean2HexString(boolean_value: bool) -> str:
+    """
+    Convert a boolean to "01" (true) or "00" (false) hexadecimal string.
+    """
+    return "01" if boolean_value else "00"
+
+def parse_frequency(frequency: int | None) -> list[int]:
+    """
+    Parses a frequency value into a 2-byte list (little-endian).
+    If frequency is None, returns [0x00, 0x00].
+    """
+    if frequency is None:
+        return [0x00, 0x00]
+    if not isinstance(frequency, int):
+        logger.warning(f"Invalid frequency type: {type(frequency)}. Expected int. Defaulting to 0.")
+        frequency = 0
+    return list(frequency.to_bytes(2, byteorder='little'))

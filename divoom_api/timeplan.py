@@ -1,12 +1,15 @@
+
 """
 Divoom Timeplan Commands
 """
 
-from .base import DivoomBase
-
 class Timeplan:
     SET_TIME_MANAGE_INFO = 0x56
     SET_TIME_MANAGE_CTRL = 0x57
+
+    def __init__(self, communicator):
+        self.communicator = communicator
+        self.logger = communicator.logger
 
     async def set_time_manage_info(self, total_records: int, record_id: int, start_hour: int, start_min: int, end_hour: int, end_min: int, total_time: int, voice_alarm_on_off: int, display_mode: int, cycle_mode: int, pic_len: int, pic_data: list):
         """Set time management information (0x56)."""
@@ -24,10 +27,10 @@ class Timeplan:
         args += cycle_mode.to_bytes(1, byteorder='big')
         args += pic_len.to_bytes(2, byteorder='little')
         args.extend(pic_data)
-        return await self.send_command("set time manage info", args)
+        return await self.communicator.send_command("set time manage info", args)
 
     async def set_time_manage_control(self, control: int):
         """Control time management (0x57)."""
         self.logger.info(f"Setting time manage control to {control} (0x57)...")
         args = [control]
-        return await self.send_command("set time manage ctrl", args)
+        return await self.communicator.send_command("set time manage ctrl", args)

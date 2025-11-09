@@ -27,4 +27,3 @@ tmp/
 # Ignore Gemini-specific files that are not part of the project's core codebase
 .gemini/
 progress.md
-set_hot_pick.py

@@ -10,16 +10,12 @@ from bleak import BleakClient
 
 from .constants import COMMANDS
 from .utils.discovery import discover_characteristics, discover_device_and_characteristics
+from .utils.converters import color_to_rgb_list, number2HexString, boolean2HexString, color2HexString
+from .utils.image_processing import make_framepart
 
 
 class DivoomBase:
     """Base class for Divoom Bluetooth communication."""
-
-    # Identified as containing "SPP"
-    SPP_CHARACTERISTIC_UUID = "49535343-6daa-4d02-abf6-19569aca69fe"
-    WRITE_CHARACTERISTIC_UUID = None
-    NOTIFY_CHARACTERISTIC_UUID = None
-    READ_CHARACTERISTIC_UUID = None
 
     def __init__(self, mac=None, logger=None, write_characteristic_uuid=None, notify_characteristic_uuid=None, read_characteristic_uuid=None, spp_characteristic_uuid=None, escapePayload=False, use_ios_le_protocol=False, device_name=None):
         self.type = "Ditoo"  # Default to Ditoo
@@ -31,7 +27,7 @@ class DivoomBase:
         self.WRITE_CHARACTERISTIC_UUID = write_characteristic_uuid
         self.NOTIFY_CHARACTERISTIC_UUID = notify_characteristic_uuid
         self.READ_CHARACTERISTIC_UUID = read_characteristic_uuid
-        self.SPP_CHARACTERISTIC_UUID = spp_characteristic_uuid if spp_characteristic_uuid else DivoomBase.SPP_CHARACTERISTIC_UUID
+        self.SPP_CHARACTERISTIC_UUID = spp_characteristic_uuid if spp_characteristic_uuid else "49535343-6daa-4d02-abf6-19569aca69fe"
         self.escapePayload = escapePayload
         self.client = BleakClient(self.mac) if self.mac else None  # Initialize client internally only if mac is provided
         self.use_ios_le_protocol = use_ios_le_protocol if use_ios_le_protocol is not None else False
@@ -41,15 +37,57 @@ class DivoomBase:
         self.message_buf = []
 
         if logger is None:
-            logger = logging.getLogger(self.type)
-            logger.setLevel(logging.DEBUG)
-            # Add a StreamHandler if none exist to ensure output to console
-            if not logger.handlers:
+            self.logger = logging.getLogger(self.type)
+            self.logger.setLevel(logging.DEBUG)
+            if not self.logger.handlers:
                 handler = logging.StreamHandler()
                 formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
                 handler.setFormatter(formatter)
-                logger.addHandler(handler)
-        self.logger = logger
+                self.logger.addHandler(handler)
+        else:
+            self.logger = logger
+
+    def color2HexString(self, color_input) -> str:
+        """
+        Converts a color input to an hexadecimal string representation (RRGGBB).
+        Wraps divoom_api.utils.converters.color2HexString.
+        """
+        return color2HexString(color_input)
+
+    def number2HexString(self, byte_value: int) -> str:
+        """
+        Converts an integer (0-255) to its two-character hexadecimal string representation.
+        Wraps divoom_api.utils.converters.number2HexString.
+        """
+        return number2HexString(byte_value)
+
+    def number2HexString(self, byte_value: int) -> str:
+        """
+        Converts an integer (0-255) to its two-character hexadecimal string representation.
+        Wraps divoom_api.utils.converters.number2HexString.
+        """
+        return number2HexString(byte_value)
+
+    def boolean2HexString(self, boolean_value: bool) -> str:
+        """
+        Convert a boolean to "01" (true) or "00" (false) hexadecimal string.
+        Wraps divoom_api.utils.converters.boolean2HexString.
+        """
+        return boolean2HexString(boolean_value)
+
+    def boolean2HexString(self, boolean_value: bool) -> str:
+        """
+        Convert a boolean to "01" (true) or "00" (false) hexadecimal string.
+        Wraps divoom_api.utils.converters.boolean2HexString.
+        """
+        return boolean2HexString(boolean_value)
+
+    def convert_color(self, color_input) -> list:
+        """
+        Converts a color input to a list of three integers [R, G, B].
+        Wraps divoom_api.utils.converters.color_to_rgb_list.
+        """
+        return color_to_rgb_list(color_input)
 
     async def connect(self):
         """Open a connection to the Divoom device using bleak."""
@@ -366,45 +404,3 @@ class DivoomBase:
             [command_identifier] + packet_number_bytes + data_bytes + checksum_bytes
 
         return "".join(f"{b:02x}" for b in final_message_bytes)
-
-    def convert_color(self, color_input) -> list:
-        """
-        Converts a color input (e.g., "RRGGBB", hex, or named color) to an
-        RGB list [R, G, B].
-        """
-        if isinstance(color_input, str):
-            if len(color_input) == 6 and all(c in '0123456789abcdefABCDEF' for c in color_input.lower()):
-                return [int(color_input[i:i+2], 16) for i in (0, 2, 4)]
-            # Add more robust color parsing here if necessary (e.g., named colors)
-        elif isinstance(color_input, tuple) and len(color_input) == 3:  # (R, G, B) tuple
-            return list(color_input)
-        elif isinstance(color_input, list) and len(color_input) == 3:  # [R, G, B] list
-            return color_input
-        self.logger.warning(f"Unsupported color input format: {color_input}. Defaulting to [255, 255, 255].")
-        return [255, 255, 255]
-
-    def make_framepart(self, total_size, frame_id, data):
-        """
-        Constructs a frame part for image/animation transmission.
-        total_size: Total size of the image/animation data.
-        frame_id: Identifier for the current frame (-1 for static image, 0 for first animation frame, etc.).
-        data: List of bytes for the current frame part.
-        """
-        frame = []
-        frame += total_size.to_bytes(2, byteorder='little')
-        frame += frame_id.to_bytes(1, byteorder='big', signed=True)
-        frame += len(data).to_bytes(2, byteorder='little')
-        frame.extend(data)
-        return frame
-
-    def number2HexString(self, byte_value: int) -> str:
-        """
-        Converts an integer (0-255) to its two-character hexadecimal string representation.
-        """
-        if not 0 <= byte_value <= 255:
-            raise ValueError("number2HexString works only with numbers between 0 and 255")
-        return f"{int(byte_value):02x}"
-
-    def boolean2HexString(self, boolean_value: bool) -> str:
-        """Convert a boolean to "01" (true) or "00" (false) hexadecimal string."""
-        return "01" if boolean_value else "00"

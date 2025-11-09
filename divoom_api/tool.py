@@ -1,13 +1,18 @@
 """
 Divoom Tool Commands
 """
+from .base import DivoomBase
 
 class Tool:
+    def __init__(self, communicator):
+        self.communicator = communicator
+        self.logger = communicator.logger
+
     async def get_tool_info(self, tool_type: int):
         """Get information about the tools available in the device (0x71)."""
         self.logger.info(f"Getting tool info for type {tool_type} (0x71)...")
         args = [tool_type]
-        response = await self._send_command_and_wait_for_response("get tool info", args)
+        response = await self.communicator.send_command_and_wait_for_response("get tool info", args)
         if response:
             if tool_type == 0:  # DIVOOM_DISP_WATCH_MODE (Timer)
                 if len(response) >= 1:
@@ -82,4 +87,4 @@ class Tool:
             self.logger.warning(f"Unknown game_mode_index: {game_mode_index}")
             return False
 
-        return await self.send_command("set tool", args)
+        return await self.communicator.send_command("set tool", args)
