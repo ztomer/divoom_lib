@@ -1,8 +1,8 @@
 import asyncio
 import logging
-from divoom_api.divoom_protocol import Divoom
-from divoom_api.utils.discovery import discover_divoom_devices
-from divoom_api.utils.logger_utils import print_info, print_wrn, print_err, print_ok
+from divoom_lib.divoom_protocol import Divoom
+from divoom_lib.utils.discovery import discover_divoom_devices
+from divoom_lib.utils.logger_utils import print_info, print_wrn, print_err, print_ok
 
 async def main():
     """Main function to test the Divoom device discovery and connection."""

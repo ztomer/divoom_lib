@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from divoom_protocol import Divoom
-from divoom_api.constants import TimeDisplayType, LightningType, VJEffectType
+from divoom_lib.constants import TimeDisplayType, LightningType, VJEffectType
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

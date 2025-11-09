@@ -7,8 +7,8 @@ import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-from divoom_api.divoom_protocol import Divoom
-from divoom_api.utils.discovery import discover_divoom_devices
+from divoom_lib.divoom_protocol import Divoom
+from divoom_lib.utils.discovery import discover_divoom_devices
 
 
 # Configure logging
