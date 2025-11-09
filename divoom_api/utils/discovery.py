@@ -101,16 +101,41 @@ async def discover_characteristics(client: BleakClient) -> tuple[list, list, lis
 
 def pick_char_uuid(preferred_uuid: str | None, candidates: list, prefix_hint: str | None = '49535343') -> str | None:
     """
-    Helper to pick a matching characteristic UUID from discovered list.
+    Helper to pick a matching characteristic UUID from discovered list,
+    prioritizing characteristics with both write and notify properties.
     """
+    # 1. If a preferred_uuid is provided, try to match it exactly
     if preferred_uuid:
         for c in candidates:
             if c.uuid == preferred_uuid:
                 return c.uuid
-    # prefer ones that match prefix_hint
+
+    # 2. Prioritize characteristics with both 'write' and 'notify' properties
+    #    and matching the prefix hint
+    write_notify_candidates_with_hint = []
+    write_notify_candidates_no_hint = []
+
+    for c in candidates:
+        props = set(c.properties or [])
+        is_writeable = 'write' in props or 'write-without-response' in props
+        is_notifiable = 'notify' in props
+
+        if is_writeable and is_notifiable:
+            if prefix_hint and c.uuid.lower().startswith(prefix_hint.lower()):
+                write_notify_candidates_with_hint.append(c.uuid)
+            else:
+                write_notify_candidates_no_hint.append(c.uuid)
+    
+    if write_notify_candidates_with_hint:
+        return write_notify_candidates_with_hint[0]
+    if write_notify_candidates_no_hint:
+        return write_notify_candidates_no_hint[0]
+
+    # 3. Fallback to existing logic: prefer ones that match prefix_hint (write-only or notify-only)
     if prefix_hint:
         for c in candidates:
             if c.uuid.lower().startswith(prefix_hint.lower()):
                 return c.uuid
-    # fallback to first candidate
+    
+    # 4. Final fallback: return the first candidate if any
     return candidates[0].uuid if candidates else None

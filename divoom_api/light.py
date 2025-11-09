@@ -521,10 +521,11 @@ class Light:
             return False
         return await self.communicator.send_command("pic scan ctrl", args)
 
-    async def set_canonical_light(self, cache_dir: str, device_id: str, cache: dict | None = None):
+    async def set_canonical_light(self, cache_dir: str, device_id: str, cache: dict | None = None, rgb: list | None = None):
         # Build canonical 7-byte payload: [mode(1), R,G,B, brightness, effect_mode, on_off]
         mode = 0x01
-        rgb = [0xFF, 0xFF, 0xFF]
+        if rgb is None:
+            rgb = [0xFF, 0xFF, 0xFF] # Default to white
         brightness = 100
         effect_mode = 0x00
         power_state = 0x01
