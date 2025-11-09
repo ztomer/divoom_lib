@@ -5,8 +5,8 @@ import logging
 
 # Add the project root to sys.path to allow importing divoom_api
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from divoom_api.utils.discovery import discover_divoom_devices
-from divoom_api.utils.logger_utils import print_ok, print_wrn
+from divoom_lib.utils.discovery import discover_divoom_devices
+from divoom_lib.utils.logger_utils import print_ok, print_wrn
 
 logger = logging.getLogger(__name__)
 

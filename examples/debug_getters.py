@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger("bleak").setLevel(logging.INFO) # Reduce bleak verbosity for cleaner output
 
 async def debug_divoom_getters(device_name: str):
-    from divoom_api.utils.discovery import discover_device_and_characteristics
+    from divoom_lib.utils.discovery import discover_device_and_characteristics
 
     mac_address, write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid = \
         await discover_device_and_characteristics(device_name, logger)

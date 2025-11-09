@@ -20,8 +20,8 @@ import datetime
 from bleak import BleakScanner
 from bleak.exc import BleakError
 
-from divoom_api.divoom_protocol import Divoom
-from divoom_api.base import DivoomBase
+from divoom_lib.divoom_protocol import Divoom
+from divoom_lib.base import DivoomBase
 from bleak import BleakClient
 
 DEFAULT_CACHE_DIR = os.path.join(

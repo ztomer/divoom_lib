@@ -8,10 +8,10 @@ from PIL import Image
 # Add the project root to sys.path to allow importing divoom_api
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from divoom_api.divoom_protocol import Divoom
-from divoom_api.utils.discovery import discover_divoom_devices, discover_characteristics
-from divoom_api.utils.logger_utils import print_ok, print_wrn, print_err, print_info
-from divoom_api.constants import DIVOOM_DISP_LIGHT_MODE
+from divoom_lib.divoom_protocol import Divoom
+from divoom_lib.utils.discovery import discover_divoom_devices, discover_characteristics
+from divoom_lib.utils.logger_utils import print_ok, print_wrn, print_err, print_info
+from divoom_lib.constants import DIVOOM_DISP_LIGHT_MODE
 
 logger = logging.getLogger(__name__)
 

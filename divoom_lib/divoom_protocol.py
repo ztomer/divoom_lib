@@ -1,24 +1,4 @@
-from divoom_api.base import DivoomBase
-from divoom_api.system import System
-from divoom_api.alarm import Alarm
-from divoom_api.game import Game
-from divoom_api.light import Light
-from divoom_api.music import Music
-from divoom_api.sleep import Sleep
-from divoom_api.timeplan import Timeplan
-from divoom_api.tool import Tool
-from divoom_api.display import Display # Added Display import
-from divoom_api.channels.time import TimeChannel
-from divoom_api.channels.lightning import LightningChannel
-from divoom_api.channels.vjeffect import VJEffectChannel
-from divoom_api.channels.scoreboard import ScoreBoardChannel
-from divoom_api.channels.cloud import CloudChannel
-from divoom_api.channels.custom import CustomChannel
-from divoom_api.commands.brightness import BrightnessCommand
-from divoom_api.commands.temp_weather import TempWeatherCommand
-from divoom_api.commands.date_time import DateTimeCommand
-from divoom_api.drawing.text import DisplayText
-from divoom_api.drawing.drawing import DisplayAnimation
+from divoom_lib.base import DivoomBase
 
 import asyncio
 import json
@@ -29,13 +9,13 @@ import datetime
 from bleak import BleakScanner, BleakClient
 from bleak.exc import BleakError
 
-from divoom_api.utils import cache
-from divoom_api.utils import discovery
+from divoom_lib.utils import cache
+from divoom_lib.utils import discovery
 
 
 class Divoom(DivoomBase):
     """Class Divoom encapsulates the Divoom Bluetooth communication."""
-    def __init__(self, mac=None, logger=None, write_characteristic_uuid=None, notify_characteristic_uuid=None, read_characteristic_uuid=None, spp_characteristic_uuid=None, escapePayload=False, use_ios_le_protocol=False, device_name=None):
+    def __init__(self, mac=None, logger=None, write_characteristic_uuid="49535343-8841-43f4-a8d4-ecbe34729bb3", notify_characteristic_uuid="49535343-1e4d-4bd9-ba61-23c647249616", read_characteristic_uuid=None, spp_characteristic_uuid=None, escapePayload=False, use_ios_le_protocol=True, device_name=None):
         super().__init__(mac, logger, write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid, spp_characteristic_uuid, escapePayload, use_ios_le_protocol, device_name=device_name)
         self.logger.debug("Divoom.__init__ called. super().__init__ completed.")
         self.logger.debug(f"Divoom MRO: {Divoom.__mro__}")
@@ -48,26 +28,7 @@ class Divoom(DivoomBase):
             self.logger.debug("Divoom instance HAS 'send_command_and_wait_for_response' attribute.")
         else:
             self.logger.error("Divoom instance DOES NOT HAVE 'send_command_and_wait_for_response' attribute.")
-        self.system = System(self)
-        self.alarm = Alarm(self)
-        self.game = Game(self)
-        self.light = Light(self)
-        self.music = Music(self)
-        self.sleep = Sleep(self)
-        self.timeplan = Timeplan(self)
-        self.tool = Tool(self)
-        self.display = Display(self) # Added Display instantiation
-        self.time_channel = TimeChannel(self)
-        self.lightning_channel = LightningChannel(self)
-        self.vj_effect_channel = VJEffectChannel(self)
-        self.scoreboard_channel = ScoreBoardChannel(self)
-        self.cloud_channel = CloudChannel(self)
-        self.custom_channel = CustomChannel(self)
-        self.brightness_command = BrightnessCommand(self)
-        self.temp_weather_command = TempWeatherCommand(self)
-        self.date_time_command = DateTimeCommand(self)
-        self.display_text = DisplayText(self)
-        self.display_animation = DisplayAnimation(self)
+
 
     async def probe_write_characteristics_and_try_channel_switch(self, write_chars: list, notify_chars: list, read_chars: list, cache: dict, cache_dir: str, device_id: str, args) -> str | None:
         """
@@ -269,123 +230,3 @@ class Divoom(DivoomBase):
             self.logger.info("Saved payload did not elicit a response (timeout or no notify)")
 
 
-    async def probe_write_characteristics_and_try_channel_switch(self, write_chars: list, notify_chars: list, read_chars: list, cache: dict, cache_dir: str, device_id: str, args) -> str | None:
-        """
-        Probes discovered write characteristics to find one that elicits responses.
-        Will send distinct colors per characteristic.
-        """
-        if not write_chars:
-            self.logger.info("No writeable characteristics to probe.")
-            return None
-
-        colors = [
-            (0xFF, 0x00, 0x00),
-            (0x00, 0xFF, 0x00),
-            (0x00, 0x00, 0xFF),
-            (0xFF, 0xFF, 0x00),
-            (0xFF, 0x00, 0xFF),
-            (0x00, 0xFF, 0xFF),
-        ]
-
-        for idx, ch in enumerate(write_chars):
-            uuid = ch.uuid
-            self.logger.info(
-                f"Probing write characteristic {uuid} ({idx+1}/{len(write_chars)})")
-            # Temporarily set div instance to use this write characteristic
-            prev_write = getattr(self, "WRITE_CHARACTERISTIC_UUID", None)
-            self.WRITE_CHARACTERISTIC_UUID = uuid
-
-            # 1) If cache has a saved payload, try that first on this characteristic
-            if cache and cache.get("last_successful_payload"):
-                payload_hex = cache.get("last_successful_payload")
-                try:
-                    payload = [int(x, 16) for x in payload_hex]
-                except Exception:
-                    payload = None
-                if payload:
-                    # Use stored framing preference for this attempt
-                    prev_use_ios = self.use_ios_le_protocol
-                    prev_escape = getattr(self, "escapePayload", False)
-                    self.use_ios_le_protocol = bool(
-                        cache.get("last_successful_use_ios_le", self.use_ios_le_protocol))
-                    self.escapePayload = bool(
-                        cache.get("escapePayload", self.escapePayload))
-                    self.logger.info(
-                        f"Trying saved payload on {uuid}: {[hex(x) for x in payload]} (use_ios={self.use_ios_le_protocol} escape={self.escapePayload})")
-                    resp = await self.send_command_and_wait_for_response(0x45, payload, timeout=3)
-                    # restore framing prefs
-                    self.use_ios_le_protocol = prev_use_ios
-                    self.escapePayload = prev_escape
-                    if resp is not None:
-                        self.logger.info(
-                            f"Saved payload produced a response on {uuid}: {resp}")
-                        # persist mapping and payload
-                        existing = cache or {}
-                        existing.update({
-                            "write_characteristic_uuid": uuid,
-                            "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
-                            "last_successful_payload": [f"{b:02x}" for b in payload],
-                            "last_successful_use_ios_le": self.use_ios_le_protocol,
-                            "escapePayload": self.escapePayload,
-                        })
-                        cache.save_device_cache(
-                            cache_dir, device_id, existing)
-                        return uuid
-
-            # 2) Send a distinguishing color payload for this characteristic
-            r, g, b = colors[idx % len(colors)]
-            args_payload = [0x01, r, g, b, 100, 0x00, 0x01]
-            self.logger.info(
-                f"Sending diagnostic color payload to {uuid}: R={r} G={g} B={b}")
-
-            # Try SPP first (escaped), then iOS-LE fallback
-            prev_escape = getattr(self, "escapePayload", False)
-            prev_use_ios = self.use_ios_le_protocol
-
-            # SPP attempt
-            self.escapePayload = True
-            self.use_ios_le_protocol = False
-            resp_spp = await self.send_command_and_wait_for_response(0x45, args_payload, timeout=3)
-            if resp_spp is not None:
-                self.logger.info(
-                    f"Response to SPP diagnostic payload on {uuid}: {resp_spp}")
-                existing = cache or {}
-                existing.update({
-                    "write_characteristic_uuid": uuid,
-                    "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
-                    "last_successful_payload": [f"{b:02x}" for b in args_payload],
-                    "last_successful_use_ios_le": False,
-                    "escapePayload": self.escapePayload,
-                })
-                cache.save_device_cache(cache_dir, device_id, existing)
-                # restore prefs
-                self.escapePayload = prev_escape
-                self.use_ios_le_protocol = prev_use_ios
-                return uuid
-
-            # iOS-LE attempt
-            self.escapePayload = prev_escape
-            self.use_ios_le_protocol = True
-            resp_ios = await self.send_command_and_wait_for_response(0x45, args_payload, timeout=3)
-            # restore prefs
-            self.escapePayload = prev_escape
-            self.use_ios_le_protocol = prev_use_ios
-            if resp_ios is not None:
-                self.logger.info(
-                    f"Response to iOS-LE diagnostic payload on {uuid}: {resp_ios}")
-                existing = cache or {}
-                existing.update({
-                    "write_characteristic_uuid": uuid,
-                    "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
-                    "last_successful_payload": [f"{b:02x}" for b in args_payload],
-                    "last_successful_use_ios_le": True,
-                    "escapePayload": self.escapePayload,
-                })
-                cache.save_device_cache(cache_dir, device_id, existing)
-                return uuid
-
-            # restore previous write char if none succeeded for this char
-            self.WRITE_CHARACTERISTIC_UUID = prev_write
-
-        # Nothing produced a response
-        return None

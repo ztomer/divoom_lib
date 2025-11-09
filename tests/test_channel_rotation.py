@@ -7,8 +7,8 @@ import logging
 # Add the project root to sys.path to allow importing divoom_api
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from divoom_api.divoom_protocol import Divoom
-from divoom_api.utils.discovery import discover_divoom_devices, discover_characteristics, discover_device_and_characteristics
+from divoom_lib.divoom_protocol import Divoom
+from divoom_lib.utils.discovery import discover_divoom_devices, discover_characteristics, discover_device_and_characteristics
 
 # Configure logging for the test
 logging.basicConfig(level=logging.INFO)
