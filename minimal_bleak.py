@@ -14,8 +14,6 @@ logging.getLogger("bleak.backends.windows").setLevel(
 # Divoom protocol constants
 START_BYTE = 0x01
 END_BYTE = 0x02
-# Identified working characteristic
-WRITE_CHARACTERISTIC_UUID = "49535343-aca3-481c-91ec-d85e28a60318"
 
 # Global flag for payload escaping
 ENABLE_PAYLOAD_ESCAPING = True  # Set to True to enable escaping, False to disable
@@ -60,34 +58,43 @@ def construct_packet(command_code: int, payload: list) -> bytes:
         bytes(full_payload) + checksum + bytes([END_BYTE])
     return packet
 
-async def send_light_effect_command(client: BleakClient, effect_type: int, color: list, brightness: int, power_on: int):
+async def discover_write_characteristics(client: BleakClient) -> list:
+    write_characteristics = []
+    for service in client.services:
+        for char in service.characteristics:
+            if "write" in char.properties or "write_without_response" in char.properties:
+                write_characteristics.append(char.uuid)
+                print(f"Discovered writeable characteristic: {char.uuid} (Properties: {char.properties})")
+    return write_characteristics
+
+async def send_light_effect_command(client: BleakClient, write_characteristic_uuid: str, effect_type: int, color: list, brightness: int, power_on: int):
     command_code = 0x45 # Command for Set Channel
     mode = 0x02 # Mode for Light Effect
     # Payload: [Mode, Type, R, G, B, Brightness, Power]
     payload = [mode, effect_type] + color + [brightness, power_on]
     packet_to_send = construct_packet(command_code, payload)
     
-    print(f"Sending light effect packet (Type: {effect_type}, escaped: {ENABLE_PAYLOAD_ESCAPING}): {packet_to_send.hex()}")
-    await client.write_gatt_char(WRITE_CHARACTERISTIC_UUID, packet_to_send, response=False)
-    print(f"Light effect command (Type: {effect_type}) sent.")
+    print(f"Sending light effect packet (Type: {effect_type}, escaped: {ENABLE_PAYLOAD_ESCAPING}) to {write_characteristic_uuid}: {packet_to_send.hex()}")
+    await client.write_gatt_char(write_characteristic_uuid, packet_to_send, response=False)
+    print(f"Light effect command (Type: {effect_type}) sent to {write_characteristic_uuid}.")
 
-async def send_work_mode_command(client: BleakClient, mode: int):
+async def send_work_mode_command(client: BleakClient, write_characteristic_uuid: str, mode: int):
     command_code = 0x05 # Command for Set Play Mode (Work Mode)
     payload = [mode]
     packet_to_send = construct_packet(command_code, payload)
 
-    print(f"Sending work mode packet (Mode: {mode}, escaped: {ENABLE_PAYLOAD_ESCAPING}): {packet_to_send.hex()}")
-    await client.write_gatt_char(WRITE_CHARACTERISTIC_UUID, packet_to_send, response=False)
-    print(f"Work mode command (Mode: {mode}) sent.")
+    print(f"Sending work mode packet (Mode: {mode}, escaped: {ENABLE_PAYLOAD_ESCAPING}) to {write_characteristic_uuid}: {packet_to_send.hex()}")
+    await client.write_gatt_char(write_characteristic_uuid, packet_to_send, response=False)
+    print(f"Work mode command (Mode: {mode}) sent to {write_characteristic_uuid}.")
 
-async def send_poweron_channel_command(client: BleakClient, channel: int):
+async def send_poweron_channel_command(client: BleakClient, write_characteristic_uuid: str, channel: int):
     command_code = 0x8a # Command for Set Power On Channel
     payload = [channel]
     packet_to_send = construct_packet(command_code, payload)
 
-    print(f"Sending poweron channel packet (Channel: {channel}, escaped: {ENABLE_PAYLOAD_ESCAPING}): {packet_to_send.hex()}")
-    await client.write_gatt_char(WRITE_CHARACTERISTIC_UUID, packet_to_send, response=False)
-    print(f"Poweron channel command (Channel: {channel}) sent.")
+    print(f"Sending poweron channel packet (Channel: {channel}, escaped: {ENABLE_PAYLOAD_ESCAPING}) to {write_characteristic_uuid}: {packet_to_send.hex()}")
+    await client.write_gatt_char(write_characteristic_uuid, packet_to_send, response=False)
+    print(f"Poweron channel command (Channel: {channel}) sent to {write_characteristic_uuid}.")
 
 async def find_and_connect_timoo():
     print("Scanning for Bluetooth devices...")
@@ -106,27 +113,39 @@ async def find_and_connect_timoo():
             async with BleakClient(timoo_device.address) as client:
                 if client.is_connected:
                     print(f"Successfully connected to {timoo_device.name}!")
+
+                    write_characteristics = await discover_write_characteristics(client)
+
+                    if not write_characteristics:
+                        print("No writeable characteristics found. Cannot send commands.")
+                        return
                     
-                    # Try setting work mode to Divoom Show (0x09)
-                    await send_work_mode_command(client, 0x09)
-                    await asyncio.sleep(2)
+                    for char_uuid in write_characteristics:
+                        print(f"\n--- Testing characteristic: {char_uuid} ---")
+                        try:
+                            # Try setting work mode to Divoom Show (0x09)
+                            await send_work_mode_command(client, char_uuid, 0x09)
+                            await asyncio.sleep(1)
 
-                    # Try setting poweron channel to Light Effect (0x02)
-                    await send_poweron_channel_command(client, 0x02)
-                    await asyncio.sleep(2)
+                            # Try setting poweron channel to Light Effect (0x02)
+                            await send_poweron_channel_command(client, char_uuid, 0x02)
+                            await asyncio.sleep(1)
 
-                    # Test different light effect types
-                    # Plain Color (Red)
-                    await send_light_effect_command(client, LIGHT_EFFECT_TYPE_PLAIN_COLOR, [0xFF, 0x00, 0x00], 0x32, 0x01)
-                    await asyncio.sleep(2)
+                            # Test different light effect types
+                            # Plain Color (Red)
+                            await send_light_effect_command(client, char_uuid, LIGHT_EFFECT_TYPE_PLAIN_COLOR, [0xFF, 0x00, 0x00], 0x32, 0x01)
+                            await asyncio.sleep(1)
 
-                    # Flashing (Green)
-                    await send_light_effect_command(client, LIGHT_EFFECT_TYPE_FLASHING, [0x00, 0xFF, 0x00], 0x46, 0x01)
-                    await asyncio.sleep(2)
+                            # Flashing (Green)
+                            await send_light_effect_command(client, char_uuid, LIGHT_EFFECT_TYPE_FLASHING, [0x00, 0xFF, 0x00], 0x46, 0x01)
+                            await asyncio.sleep(1)
 
-                    # Rainbow (Blue - color might not be used for rainbow effect, but sending it anyway)
-                    await send_light_effect_command(client, LIGHT_EFFECT_TYPE_RAINBOW, [0x00, 0x00, 0xFF], 0x64, 0x01)
-                    await asyncio.sleep(5) 
+                            # Rainbow (Blue - color might not be used for rainbow effect, but sending it anyway)
+                            await send_light_effect_command(client, char_uuid, LIGHT_EFFECT_TYPE_RAINBOW, [0x00, 0x00, 0xFF], 0x64, 0x01)
+                            await asyncio.sleep(2)
+                        except Exception as write_e:
+                            print(f"Error writing to {char_uuid}: {write_e}")
+                    
                     print(f"Disconnected from {timoo_device.name}.")
                 else:
                     print(f"Failed to connect to {timoo_device.name}.")
