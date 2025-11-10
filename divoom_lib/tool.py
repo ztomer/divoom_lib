@@ -1,90 +1,112 @@
 """
 Divoom Tool Commands
 """
-from .base import DivoomBase
+from .constants import (
+    COMMANDS,
+    TOOL_TYPE_TIMER, TOOL_TYPE_SCORE, TOOL_TYPE_NOISE, TOOL_TYPE_COUNTDOWN, TOOL_TYPE_NOT_IN_GAME_MODE,
+    GTI_TIMER_STATUS, GTI_SCORE_ON_OFF, GTI_SCORE_RED_SCORE_START, GTI_SCORE_RED_SCORE_LENGTH,
+    GTI_SCORE_BLUE_SCORE_START, GTI_SCORE_BLUE_SCORE_LENGTH, GTI_NOISE_STATUS,
+    GTI_COUNTDOWN_STATUS, GTI_COUNTDOWN_MINUTES, GTI_COUNTDOWN_SECONDS,
+    STI_CTRL_FLAG_TIMER_PAUSED, STI_CTRL_FLAG_TIMER_STARTED, STI_CTRL_FLAG_TIMER_RESET,
+    STI_CTRL_FLAG_TIMER_ENTERING_STOPWATCH, STI_CTRL_FLAG_NOISE_START, STI_CTRL_FLAG_NOISE_STOP,
+    STI_CTRL_FLAG_COUNTDOWN_START, STI_CTRL_FLAG_COUNTDOWN_CANCEL, STI_SCORE_OFF, STI_SCORE_ON
+)
 
 class Tool:
     def __init__(self, communicator):
         self.communicator = communicator
         self.logger = communicator.logger
 
-    async def get_tool_info(self, tool_type: int):
+    async def get_tool_info(self, tool_type: int) -> dict | None:
         """Get information about the tools available in the device (0x71)."""
         self.logger.info(f"Getting tool info for type {tool_type} (0x71)...")
         args = [tool_type]
-        response = await self.communicator.send_command_and_wait_for_response("get tool info", args)
+        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get tool info"], args)
         if response:
-            if tool_type == 0:  # DIVOOM_DISP_WATCH_MODE (Timer)
-                if len(response) >= 1:
-                    # 0: paused, 1: started, 2: reset, 3: entering stopwatch
-                    return {"status": response[0]}
-            elif tool_type == 1:  # DIVOOM_DISP_SCORE_MODE (Score)
-                if len(response) >= 5:
-                    return {
-                        "on_off": response[0],
-                        "red_score": int.from_bytes(response[1:3], byteorder='little'),
-                        "blue_score": int.from_bytes(response[3:5], byteorder='little'),
-                    }
-            elif tool_type == 2:  # DIVOOM_DISP_NOISE_MODE (Noise)
-                if len(response) >= 1:
-                    return {"status": response[0]}  # 1: start, 2: stop
-            elif tool_type == 3:  # DIVOOM_DISP_COUNT_TIME_DOWN (Countdown)
-                if len(response) >= 3:
-                    return {
-                        "status": response[0],  # 0: start, 1: cancel
-                        "minutes": response[1],
-                        "seconds": response[2],
-                    }
-            elif tool_type == 0xFF:  # Not in any game mode
-                return {"status": "not in game mode"}
+            return self._parse_tool_info_response(tool_type, response)
         return None
 
-    async def set_tool_info(self, game_mode_index: int, **kwargs):
+    def _parse_tool_info_response(self, tool_type: int, response: list) -> dict | None:
+        """Parses the response from get_tool_info based on the tool_type."""
+        if tool_type == TOOL_TYPE_TIMER:  # DIVOOM_DISP_WATCH_MODE (Timer)
+            if len(response) >= 1:
+                return {"status": response[GTI_TIMER_STATUS]}
+        elif tool_type == TOOL_TYPE_SCORE:  # DIVOOM_DISP_SCORE_MODE (Score)
+            if len(response) >= 5:
+                return {
+                    "on_off": response[GTI_SCORE_ON_OFF],
+                    "red_score": int.from_bytes(response[GTI_SCORE_RED_SCORE_START:GTI_SCORE_RED_SCORE_START + GTI_SCORE_RED_SCORE_LENGTH], byteorder='little'),
+                    "blue_score": int.from_bytes(response[GTI_SCORE_BLUE_SCORE_START:GTI_SCORE_BLUE_SCORE_START + GTI_SCORE_BLUE_SCORE_LENGTH], byteorder='little'),
+                }
+        elif tool_type == TOOL_TYPE_NOISE:  # DIVOOM_DISP_NOISE_MODE (Noise)
+            if len(response) >= 1:
+                return {"status": response[GTI_NOISE_STATUS]}
+        elif tool_type == TOOL_TYPE_COUNTDOWN:  # DIVOOM_DISP_COUNT_TIME_DOWN (Countdown)
+            if len(response) >= 3:
+                return {
+                    "status": response[GTI_COUNTDOWN_STATUS],
+                    "minutes": response[GTI_COUNTDOWN_MINUTES],
+                    "seconds": response[GTI_COUNTDOWN_SECONDS],
+                }
+        elif tool_type == TOOL_TYPE_NOT_IN_GAME_MODE:  # Not in any game mode
+            return {"status": "not in game mode"}
+        return None
+
+    def _set_timer_tool(self, **kwargs) -> list:
+        ctrl_flag = kwargs.get("ctrl_flag")
+        if ctrl_flag is None:
+            raise ValueError("Missing 'ctrl_flag' for Timer mode.")
+        return [ctrl_flag]
+
+    def _set_score_tool(self, **kwargs) -> list:
+        on_off = kwargs.get("on_off")
+        red_score = kwargs.get("red_score", 0)
+        blue_score = kwargs.get("blue_score", 0)
+        if on_off is None:
+            raise ValueError("Missing 'on_off' for Score mode.")
+        args = [on_off]
+        args.extend(red_score.to_bytes(2, byteorder='little'))
+        args.extend(blue_score.to_bytes(2, byteorder='little'))
+        return args
+
+    def _set_noise_tool(self, **kwargs) -> list:
+        ctrl_flag = kwargs.get("ctrl_flag")
+        if ctrl_flag is None:
+            raise ValueError("Missing 'ctrl_flag' for Noise mode.")
+        return [ctrl_flag]
+
+    def _set_countdown_tool(self, **kwargs) -> list:
+        ctrl_flag = kwargs.get("ctrl_flag")
+        minutes = kwargs.get("minutes")
+        seconds = kwargs.get("seconds")
+        if not all(v is not None for v in [ctrl_flag, minutes, seconds]):
+            raise ValueError(
+                "Missing 'ctrl_flag', 'minutes', or 'seconds' for Countdown mode.")
+        return [ctrl_flag, minutes.to_bytes(1, byteorder='big'), seconds.to_bytes(1, byteorder='big')]
+
+    async def set_tool_info(self, game_mode_index: int, **kwargs) -> bool:
         """Set information for the tools (games) available in the device (0x72).
         Handles different data structures based on game_mode_index."""
         self.logger.info(
             f"Setting tool info for game mode {game_mode_index} (0x72)...")
-        args = [game_mode_index]
 
-        if game_mode_index == 0:  # DIVOOM_DISP_WATCH_MODE (Timer)
-            ctrl_flag = kwargs.get("ctrl_flag")
-            if ctrl_flag is not None:
-                args.append(ctrl_flag)
-            else:
-                self.logger.error("Missing 'ctrl_flag' for Timer mode.")
-                return False
-        elif game_mode_index == 1:  # DIVOOM_DISP_SCORE_MODE (Score)
-            on_off = kwargs.get("on_off")
-            red_score = kwargs.get("red_score", 0)
-            blue_score = kwargs.get("blue_score", 0)
-            if on_off is not None:
-                args.append(on_off)
-                args += red_score.to_bytes(2, byteorder='little')
-                args += blue_score.to_bytes(2, byteorder='little')
-            else:
-                self.logger.error("Missing 'on_off' for Score mode.")
-                return False
-        elif game_mode_index == 2:  # DIVOOM_DISP_NOISE_MODE (Noise)
-            ctrl_flag = kwargs.get("ctrl_flag")
-            if ctrl_flag is not None:
-                args.append(ctrl_flag)
-            else:
-                self.logger.error("Missing 'ctrl_flag' for Noise mode.")
-                return False
-        elif game_mode_index == 3:  # DIVOOM_DISP_COUNT_TIME_DOWN (Countdown)
-            ctrl_flag = kwargs.get("ctrl_flag")
-            minutes = kwargs.get("minutes")
-            seconds = kwargs.get("seconds")
-            if all(v is not None for v in [ctrl_flag, minutes, seconds]):
-                args.append(ctrl_flag)
-                args.append(minutes)
-                args.append(seconds)
-            else:
-                self.logger.error(
-                    "Missing 'ctrl_flag', 'minutes', or 'seconds' for Countdown mode.")
-                return False
-        else:
+        _set_tool_handlers = {
+            TOOL_TYPE_TIMER: self._set_timer_tool,
+            TOOL_TYPE_SCORE: self._set_score_tool,
+            TOOL_TYPE_NOISE: self._set_noise_tool,
+            TOOL_TYPE_COUNTDOWN: self._set_countdown_tool,
+        }
+
+        handler = _set_tool_handlers.get(game_mode_index)
+        if not handler:
             self.logger.warning(f"Unknown game_mode_index: {game_mode_index}")
             return False
 
-        return await self.communicator.send_command("set tool", args)
+        try:
+            args = [game_mode_index]
+            args.extend(handler(**kwargs))
+        except ValueError as e:
+            self.logger.error(f"Error setting tool info: {e}")
+            return False
+
+        return await self.communicator.send_command(COMMANDS["set tool"], args)

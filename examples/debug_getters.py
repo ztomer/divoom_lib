@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from divoom_protocol import Divoom
-# from bleak import BleakScanner, BleakClient # No longer needed, using discovery.py
+from divoom_lib import Divoom
+from divoom_lib.utils.discovery import discover_divoom_devices
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -9,24 +9,13 @@ logger = logging.getLogger(__name__)
 logging.getLogger("bleak").setLevel(logging.INFO) # Reduce bleak verbosity for cleaner output
 
 async def debug_divoom_getters(device_name: str):
-    from divoom_lib.utils.discovery import discover_device_and_characteristics
-
-    mac_address, write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid = \
-        await discover_device_and_characteristics(device_name, logger)
-
-    if not all([mac_address, write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid]):
-        logger.error(f"Failed to discover device '{device_name}' or its characteristics.")
+    devices = await discover_divoom_devices(device_name=device_name, logger=logger)
+    if not devices:
+        logger.error(f"No Divoom devices found with name '{device_name}'.")
         return
 
-    # Instantiate Divoom protocol handler with discovered characteristics
-    divoom = Divoom(
-        mac=mac_address,
-        logger=logger,
-        write_characteristic_uuid=write_characteristic_uuid,
-        notify_characteristic_uuid=notify_characteristic_uuid,
-        read_characteristic_uuid=read_characteristic_uuid,
-        use_ios_le_protocol=True
-    )
+    mac_address = devices[0].address
+    divoom = Divoom(mac=mac_address, logger=logger)
 
     try:
         await divoom.connect()

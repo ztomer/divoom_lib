@@ -1,0 +1,71 @@
+import argparse
+import asyncio
+import logging
+import os
+import sys
+
+# Add the project root to sys.path to allow importing divoom_api
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from divoom_lib import Divoom
+from divoom_lib.utils.discovery import discover_device
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(levelname)s:%(name)s:%(message)s')
+logger = logging.getLogger("minimal_api_test")
+
+async def main():
+    """
+    Connects to a Divoom device and sends a command to set the device's light to blue.
+    """
+    parser = argparse.ArgumentParser(description="Divoom Minimal API Test Script")
+    parser.add_argument(
+        "--address", help="BLE address / identifier of the target device")
+    parser.add_argument("--name", default="Timoo",
+                        help="Device name substring to search for (e.g., 'Timoo')")
+    args = parser.parse_args()
+
+    divoom = None
+    try:
+        if args.address:
+            divoom = Divoom(mac=args.address, logger=logger)
+        else:
+            ble_device, device_id = await discover_device(name_substring=args.name, address=None)
+            if not ble_device:
+                logger.error(
+                    f"No Bluetooth device found with name containing '{args.name}'. Exiting.")
+                return
+            divoom = Divoom(mac=device_id, logger=logger)
+
+        await divoom.connect()
+        logger.info(f"Successfully connected to {divoom.mac}!")
+
+        logger.info("Sending blue light command...")
+        await divoom.display.show_light(color="0000FF", brightness=100)
+        logger.info("Command sent successfully.")
+
+    except Exception as e:
+        logger.error(f"Error: {e}")
+    finally:
+        if divoom and divoom.is_connected:
+            await divoom.disconnect()
+            logger.info("Disconnected from Divoom device.")
+
+if __name__ == "__main__":
+    import traceback
+    import sys
+
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
+        try:
+            sys.exit(0)
+        except SystemExit:
+            pass
+    except Exception as e:
+        logger.error("Unhandled exception in minimal_api_test: printing traceback:")
+        traceback.print_exc()
+        logger.error(f"Exception: {e}")
+        sys.exit(1)

@@ -3,6 +3,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def bool_to_byte(value: bool | int) -> int:
+    """Converts a boolean or 0/1 integer to 0x01 or 0x00."""
+    if value is True or value == 1:
+        return 0x01
+    return 0x00
+
+def to_int_if_str(value: str | int) -> int:
+    """Converts a value to an integer if it's a string."""
+    if isinstance(value, str):
+        return int(value)
+    return value
+
 def color_to_rgb_list(color_input) -> list:
     """
     Converts a color input (e.g., "RRGGBB" hex string, or (R, G, B) tuple/list)
