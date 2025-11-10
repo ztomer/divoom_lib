@@ -176,12 +176,26 @@ class DivoomBase:
                     f"Parsed potential response: cmd=0x{cmd:02x} at offset {i}")
                 self.logger.debug(f"Evaluating match: received cmd=0x{cmd:02x}, expected cmd=0x{self._expected_response_command:02x if self._expected_response_command else 'None'}")
                 self.logger.debug(f"Constants: get light mode=0x{constants.COMMANDS['get light mode']:02x}, set light mode=0x{constants.COMMANDS['set light mode']:02x}")
+                self.logger.debug(f"Types: cmd={type(cmd)}, expected_cmd={type(self._expected_response_command)}")
+                
+                # Temporary debug: Force event set for specific command-response pair
                 if cmd == constants.COMMANDS["get light mode"] and self._expected_response_command == constants.COMMANDS["set light mode"]:
-                    self.logger.debug(f"Matched expected command 0x{self._expected_response_command:02x} with received 0x{cmd:02x}. Setting response event.")
+                    print(f"DEBUG: FORCING EVENT SET: cmd=0x{cmd:02x}, expected_cmd=0x{self._expected_response_command:02x}")
                     self._response_data = b
                     self._response_event.set()
                     self._expected_response_command = None
                     return True
+                
+                # Original logic (now commented out for testing)
+                # if self._expected_response_command is not None and \
+                #    (cmd == self._expected_response_command or \
+                #     (cmd == 0x33 and self._expected_response_command in constants.GENERIC_ACK_COMMANDS) or \
+                #     (cmd == constants.COMMANDS["get light mode"] and self._expected_response_command == constants.COMMANDS["set light mode"])):
+                #     self.logger.debug(f"Matched expected command 0x{self._expected_response_command:02x} with received 0x{cmd:02x}. Setting response event.")
+                #     self._response_data = b
+                #     self._response_event.set()
+                #     self._expected_response_command = None
+                #     return True
 
         # If the simple scan didn't find anything, fall back to the older
         # Basic Protocol parsing (head/tail + explicit offsets). Keep this
@@ -227,6 +241,8 @@ class DivoomBase:
 
     def notification_handler(self, sender: int, data: bytearray) -> None:
         """Handler for GATT notifications, attempting to parse Basic Protocol responses."""
+        expected_cmd_str = f"0x{self._expected_response_command:02x}" if self._expected_response_command is not None else "None"
+        self.logger.debug(f"Notification Handler: Current expected command: {expected_cmd_str}")
         self.logger.debug("THIS IS MY NOTIFICATION HANDLER")
         self.logger.debug(f"ALL INCOMING NOTIFICATION DATA: {data.hex()}")
         self.logger.debug(f"Notification received from {sender}: {data.hex()}")
