@@ -7,7 +7,7 @@ import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-from divoom_lib.divoom_protocol import Divoom
+from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_divoom_devices
 
 
@@ -25,29 +25,22 @@ async def set_tivoom_light(device_name: str = "Tivoo", color: str = "FF0000", br
     try:
         logger.info(f"Attempting to discover Divoom device '{device_name}'...")
 
-        # Discover the device and its characteristics
-        # discover_divoom_devices now returns a list of (BLEDevice, write_uuid, notify_uuid, read_uuid)
-        found_devices = await discover_divoom_devices(device_name_substring=device_name, logger=logger)
+        # Discover the device
+        devices = await discover_divoom_devices(device_name=device_name, logger=logger)
 
-        if not found_devices:
+        if not devices:
             logger.error(
                 f"Failed to find Divoom device containing '{device_name}'. Exiting.")
             return
 
         # For set_tivoom_light, we expect to find only one device matching the name, or pick the first one
-        device, write_uuid, notify_uuid, read_uuid = found_devices[0]
+        device = devices[0]
 
         logger.info(
             f"Found device '{device.name}' at MAC address: {device.address}.")
 
         # Initialize Divoom instance
-        divoom_instance = Divoom(
-            mac=device.address,
-            logger=logger,
-            write_characteristic_uuid=write_uuid,
-            notify_characteristic_uuid=notify_uuid,
-            read_characteristic_uuid=read_uuid
-        )
+        divoom_instance = Divoom(mac=device.address, logger=logger)
 
         logger.info(f"Connecting to Divoom device at {device.address}...")
         await divoom_instance.connect()

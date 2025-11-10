@@ -1,12 +1,12 @@
 import asyncio
 import logging
-from divoom_lib.divoom_protocol import Divoom
+from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_divoom_devices
 from divoom_lib.utils.logger_utils import print_info, print_wrn, print_err, print_ok
 
 async def main():
     """Main function to test the Divoom device discovery and connection."""
-    devices = await discover_divoom_devices("Divoom", logging.getLogger(__name__)) # Pass a logger instance
+    devices = await discover_divoom_devices(device_name="Divoom", logger=logging.getLogger(__name__)) # Pass a logger instance
     if devices:
         print_ok("Found the following Divoom devices:")
         for device in devices:

@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from divoom_protocol import Divoom
-from divoom_lib.constants import TimeDisplayType, LightningType, VJEffectType
+from divoom_lib import Divoom
+from divoom_lib.constants import CHANNEL_ID_TIME, CHANNEL_ID_LIGHTNING, CHANNEL_ID_CLOUD, CHANNEL_ID_VJ_EFFECTS, CHANNEL_ID_VISUALIZATION, CHANNEL_ID_ANIMATION, CHANNEL_ID_SCOREBOARD
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,35 +19,18 @@ async def rotate_channels(mac_address: str):
         logger.info("Connected to Divoom device.")
 
         channels = [
-            ("Time Channel", divoom.time_channel),
-            ("Lightning Channel", divoom.lightning_channel),
-            ("VJ Effect Channel", divoom.vj_effect_channel),
-            ("Scoreboard Channel", divoom.scoreboard_channel),
-            ("Cloud Channel", divoom.cloud_channel),
-            ("Custom Channel", divoom.custom_channel),
+            ("Time Channel", CHANNEL_ID_TIME),
+            ("Lightning Channel", CHANNEL_ID_LIGHTNING),
+            ("Cloud Channel", CHANNEL_ID_CLOUD),
+            ("VJ Effects Channel", CHANNEL_ID_VJ_EFFECTS),
+            ("Visualization Channel", CHANNEL_ID_VISUALIZATION),
+            ("Animation Channel", CHANNEL_ID_ANIMATION),
+            ("Scoreboard Channel", CHANNEL_ID_SCOREBOARD),
         ]
 
-        for name, channel_obj in channels:
+        for name, channel_id in channels:
             logger.info(f"Activating {name}...")
-            # For channels that require specific parameters, set them before activation
-            if name == "Time Channel":
-                channel_obj.type = TimeDisplayType.Rainbow
-                channel_obj.show_time = True
-                channel_obj.color = "00FF00" # Green
-            elif name == "Lightning Channel":
-                channel_obj.type = LightningType.Love
-                channel_obj.brightness = 75
-                channel_obj.color = "FF00FF" # Magenta
-                channel_obj.power = True
-            elif name == "VJ Effect Channel":
-                channel_obj.type = VJEffectType.Fire
-            elif name == "Scoreboard Channel":
-                channel_obj.red = 10
-                channel_obj.blue = 5
-            # Cloud and Custom channels don't have specific setters in their __init__
-            # Their activation is handled by their __init__ calling _update_message
-
-            # Give some time for the command to be sent and processed
+            await divoom.system.set_channel(channel_id)
             await asyncio.sleep(5) 
 
     except Exception as e:

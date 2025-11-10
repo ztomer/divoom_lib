@@ -6,7 +6,7 @@ import logging
 # Add the project root to sys.path to allow importing divoom_api
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from divoom_lib.divoom_protocol import Divoom
+from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_divoom_devices
 from divoom_lib.utils.logger_utils import print_ok, print_wrn, print_err, print_info
 
@@ -22,26 +22,20 @@ async def debug_light_command(color: str = "FF0000", brightness: int = 75):
     try:
         print_info("Scanning for Divoom devices...")
         
-        # Discover the device and its characteristics
-        found_devices = await discover_divoom_devices(device_name_substring="", logger=logger)
+        # Discover the device
+        devices = await discover_divoom_devices(logger=logger)
 
-        if not found_devices:
-            print_err("No Divoom devices found with all required characteristics. Exiting.")
+        if not devices:
+            print_err("No Divoom devices found. Exiting.")
             return
         
         # Pick the first found device
-        device, write_uuid, notify_uuid, read_uuid = found_devices[0]
+        device = devices[0]
 
         print_ok(f"Found device '{device.name}' at MAC address: {device.address}.")
 
         # Initialize Divoom instance
-        divoom_instance = Divoom(
-            mac=device.address,
-            logger=logger,
-            write_characteristic_uuid=write_uuid,
-            notify_characteristic_uuid=notify_uuid,
-            read_characteristic_uuid=read_uuid
-        )
+        divoom_instance = Divoom(mac=device.address, logger=logger)
 
         print_info(f"Connecting to Divoom device at {device.address}...")
         await divoom_instance.connect()
