@@ -14,8 +14,8 @@ async def discover_device(name_substring: str | None = None, address: str | None
     device_id = None
 
     if not address:
-        logger.info(f"Scanning for Bluetooth devices searching for name containing '{name_substring}'...")
-        devices = await BleakScanner.discover()
+        logger.info(f"Scanning for Bluetooth devices searching for name containing '{name_substring}' (timeout=10.0s)...")
+        devices = await BleakScanner.discover(timeout=10.0)
         found = None
         for d in devices:
             if d.name and name_substring and name_substring.lower() in d.name.lower():
