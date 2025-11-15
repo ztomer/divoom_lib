@@ -29,7 +29,7 @@ class Divoom(DivoomBase):
     This class provides methods to connect to a Divoom device, send commands,
     and control its various features like display, channels, and system settings.
     """
-    def __init__(self, mac: str | None = None, logger: logging.Logger | None = None, write_characteristic_uuid: str = "49535343-8841-43f4-a8d4-ecbe34729bb3", notify_characteristic_uuid: str = "49535343-1e4d-4bd9-ba61-23c647249616", read_characteristic_uuid: str = "49535343-1e4d-4bd9-ba61-23c647249616", spp_characteristic_uuid: str | None = None, escapePayload: bool = False, use_ios_le_protocol: bool = True, device_name: str | None = None, client: BleakClient | None = None) -> None:
+    def __init__(self, mac: str | None = None, logger: logging.Logger | None = None, write_characteristic_uuid: str = "49535343-8841-43f4-a8d4-ecbe34729bb3", notify_characteristic_uuid: str = "49535343-1e4d-4bd9-ba61-23c647249616", read_characteristic_uuid: str = "49535343-1e4d-4bd9-ba61-23c647249616", spp_characteristic_uuid: str | None = None, escapePayload: bool = False, use_ios_le_protocol: bool = False, device_name: str | None = None, client: BleakClient | None = None) -> None:
         """
         Initializes the Divoom device controller.
 

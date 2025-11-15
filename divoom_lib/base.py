@@ -159,88 +159,33 @@ class DivoomBase:
 
     def _handle_basic_protocol_notification(self, data: bytes) -> bool:
         """Handles notifications for the Basic Protocol."""
-        # First, try the lightweight scan for ACK-like patterns used by the
-        # canonical harness: look for occurrences of [0x04, CMD, 0x55] anywhere
-        # in the notification payload. This is robust to small framing
-        # differences and matches what minimal_bleak.py does.
         try:
             b = bytes(data)
         except Exception:
             b = data
 
-        # Find occurrences of [0x04, cmd, 0x55]
+        # Look for occurrences of [0x04, CMD, 0x55] anywhere in the notification payload.
         for i in range(0, len(b) - 2):
             if b[i] == constants.ACK_PATTERN_BYTE_1 and b[i + 2] == constants.ACK_PATTERN_BYTE_3:
                 cmd = b[i + 1]
-                self.logger.info(
-                    f"Parsed potential response: cmd=0x{cmd:02x} at offset {i}")
-                self.logger.debug(f"Evaluating match: received cmd=0x{cmd:02x}, expected cmd=0x{self._expected_response_command:02x if self._expected_response_command else 'None'}")
-                self.logger.debug(f"Constants: get light mode=0x{constants.COMMANDS['get light mode']:02x}, set light mode=0x{constants.COMMANDS['set light mode']:02x}")
-                self.logger.debug(f"Types: cmd={type(cmd)}, expected_cmd={type(self._expected_response_command)}")
+                self.logger.debug(f"DEBUG: Basic Protocol - Found pattern [0x04, {cmd:02x}, 0x55] at offset {i}. Expected command: {self._expected_response_command}")
+                self.logger.debug(f"Evaluating simplified condition: {self._expected_response_command is not None} and ({cmd == 0x33})")
                 
-                # Temporary debug: Force event set for specific command-response pair
-                if cmd == constants.COMMANDS["get light mode"] and self._expected_response_command == constants.COMMANDS["set light mode"]:
-                    print(f"DEBUG: FORCING EVENT SET: cmd=0x{cmd:02x}, expected_cmd=0x{self._expected_response_command:02x}")
+                if self._expected_response_command is not None and cmd == 0x33:
+                    self.logger.debug(f"Matched expected command 0x{self._expected_response_command:02x} with received 0x{cmd:02x}. Setting response event.")
                     self._response_data = b
                     self._response_event.set()
+                    self.logger.debug("DEBUG: _response_event.set() was called.")
                     self._expected_response_command = None
                     return True
-                
-                # Original logic (now commented out for testing)
-                # if self._expected_response_command is not None and \
-                #    (cmd == self._expected_response_command or \
-                #     (cmd == 0x33 and self._expected_response_command in constants.GENERIC_ACK_COMMANDS) or \
-                #     (cmd == constants.COMMANDS["get light mode"] and self._expected_response_command == constants.COMMANDS["set light mode"])):
-                #     self.logger.debug(f"Matched expected command 0x{self._expected_response_command:02x} with received 0x{cmd:02x}. Setting response event.")
-                #     self._response_data = b
-                #     self._response_event.set()
-                #     self._expected_response_command = None
-                #     return True
-
-        # If the simple scan didn't find anything, fall back to the older
-        # Basic Protocol parsing (head/tail + explicit offsets). Keep this
-        # for completeness but prefer the pattern scan above.
-        if len(data) >= constants.BASIC_PROTOCOL_MIN_DATA_LENGTH and data[0] == constants.BASIC_PROTOCOL_START_BYTE and data[-1] == constants.BASIC_PROTOCOL_END_BYTE:
-            self.logger.info(
-                f"Basic Protocol response found. Full data: {data.hex()}")
-
-            # Extract length (2 bytes, little-endian)
-            response_len = int.from_bytes(data[constants.BASIC_PROTOCOL_LENGTH_START:constants.BASIC_PROTOCOL_LENGTH_END], byteorder='little')
-            # response payload lives between the outer header and checksum
-            response_payload = data[constants.BASIC_PROTOCOL_PAYLOAD_OFFSET:constants.BASIC_PROTOCOL_CHECKSUM_OFFSET]
-            # The inner command may be at payload[0] or payload[1] depending on framing; try to be defensive
-            response_cmd_in_payload = None
-            if len(response_payload) >= 2:
-                # If payload starts with 0x04 pattern, inner cmd is at index 1
-                if response_payload[0] == constants.ACK_PATTERN_BYTE_1 and len(response_payload) >= 3 and response_payload[2] == constants.ACK_PATTERN_BYTE_3:
-                    response_cmd_in_payload = response_payload[1]
-                else:
-                    # Otherwise, assume the first byte is the inner command
-                    response_cmd_in_payload = response_payload[0]
-
-            response_checksum = int.from_bytes(
-                data[constants.BASIC_PROTOCOL_CHECKSUM_OFFSET:constants.BASIC_PROTOCOL_CHECKSUM_OFFSET + constants.BASIC_PROTOCOL_CHECKSUM_LENGTH], byteorder='little')
-
-            self.logger.info(
-                f"Parsed response: Len: {response_len}, Cmd in Payload: {response_cmd_in_payload if response_cmd_in_payload is not None else 'None'}, Data: {response_payload.hex()}, Checksum: 0x{response_checksum:04x}")
-
-            if self._expected_response_command is not None and \
-               (response_cmd_in_payload == self._expected_response_command or \
-                (response_cmd_in_payload == 0x33 and self._expected_response_command in constants.GENERIC_ACK_COMMANDS)):
-                self._response_data = response_payload
-                self._response_event.set()
-                self._expected_response_command = None
-                return True
-            else:
-                self.logger.warning(
-                    f"Response command in payload {response_cmd_in_payload} does not match expected {self._expected_response_command}.")
-        else:
-            self.logger.warning(
-                f"Unrecognized notification data (not Basic Protocol format): {data.hex()}")
+        
+        self.logger.warning(
+            f"Unrecognized notification data (not Basic Protocol format or no matching ACK pattern): {data.hex()}")
         return False
 
     def notification_handler(self, sender: int, data: bytearray) -> None:
         """Handler for GATT notifications, attempting to parse Basic Protocol responses."""
+        self.logger.debug(f"Notification Handler: self.use_ios_le_protocol = {self.use_ios_le_protocol}")
         expected_cmd_str = f"0x{self._expected_response_command:02x}" if self._expected_response_command is not None else "None"
         self.logger.debug(f"Notification Handler: Current expected command: {expected_cmd_str}")
         self.logger.debug("THIS IS MY NOTIFICATION HANDLER")

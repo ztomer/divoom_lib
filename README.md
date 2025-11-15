@@ -4,38 +4,34 @@ This Python library provides a high-level API to interact with Divoom devices ov
 
 ## Features
 
-*   **Device Discovery:** Discover Divoom devices on your network.
-*   **Display Control:**
-    *   Show images and animations.
-    *   Display text with different fonts and colors.
-    *   Clear the display.
-*   **Channel Control:**
-    *   Switch between different channels (Clock, Cloud, VJ Effect, etc.).
-    *   Get the current channel.
-*   **System Control:**
-    *   Set brightness.
-    *   Get device time.
-    *   Set device time.
-*   **Extensible:** The library is designed to be extensible with new commands and features.
+* **Device Discovery:** Discover Divoom devices on your network.
+* **Display Control:**
+  * Show images and animations.
+  * Display text with different fonts and colors.
+  * Clear the display.
+* **Channel Control:**
+  * Switch between different channels (Clock, Cloud, VJ Effect, etc.).
+  * Get the current channel.
+* **System Control:**
+  * Set brightness.
+  * Get device time.
+  * Set device time.
+* **Extensible:** The library is designed to be extensible with new commands and features.
 
 ## Requirements
 
-*   Python 3.7+
-*   `bleak` library
+* Python 3.7+
+* `bleak` library
 
 ## Installation
 
-Currently, the library is not published on PyPI. To use it, you need to clone the repository and install the dependencies.
-
 ```bash
-git clone https://github.com/ztomer/divoom_lib.git
-cd divoom_lib
 pip install bleak
 ```
 
 ## Smoke Test
 
-To perform a basic connectivity test with a Divoom device, run the following command from the project root:
+To perform a basic connectivity test with a Divoom device (specifically, Timoo), run the following command from the project root:
 
 ```bash
 python3 -m tests.api_test
@@ -99,36 +95,36 @@ python examples/discover_devices.py
 
 The library is organized into the following modules:
 
-*   `divoom_lib/`: The main library code.
-    *   `__init__.py`: Exports the main `Divoom` class.
-    *   `divoom_protocol.py`: The core `Divoom` class for device communication.
-    *   `constants.py`: Divoom protocol constants.
-    *   `alarm.py`: Alarm related commands.
-    *   `base.py`: Base class for all Divoom commands.
-    *   `display.py`: Display related commands.
-    *   `game.py`: Game related commands.
-    *   `light.py`: Light related commands.
-    *   `music.py`: Music related commands.
-    *   `sleep.py`: Sleep related commands.
-    *   `system.py`: System related commands.
-    *   `timeplan.py`: Time plan related commands.
-    *   `tool.py`: Tool related commands.
-    *   `channels/`: Modules for different channels.
-    *   `commands/`: Modules for different commands.
-    *   `drawing/`: Modules for drawing and text rendering.
-    *   `utils/`: Utility functions for discovery, image processing, etc.
-*   `examples/`: Example scripts.
-*   `docs/`: Documentation files.
+* `divoom_lib/`: The main library code.
+  * `__init__.py`: Exports the main `Divoom` class.
+  * `divoom_protocol.py`: The core `Divoom` class for device communication.
+  * `constants.py`: Divoom protocol constants.
+  * `alarm.py`: Alarm related commands.
+  * `base.py`: Base class for all Divoom commands.
+  * `display.py`: Display related commands.
+  * `game.py`: Game related commands.
+  * `light.py`: Light related commands.
+  * `music.py`: Music related commands.
+  * `sleep.py`: Sleep related commands.
+  * `system.py`: System related commands.
+  * `timeplan.py`: Time plan related commands.
+  * `tool.py`: Tool related commands.
+  * `channels/`: Modules for different channels.
+  * `commands/`: Modules for different commands.
+  * `drawing/`: Modules for drawing and text rendering.
+  * `utils/`: Utility functions for discovery, image processing, etc.
+* `examples/`: Example scripts.
+* `docs/`: Documentation files.
 
 ## Contributing
 
 Contributions are welcome! If you want to contribute to the project, please follow these steps:
 
-1.  Fork the repository.
-2.  Create a new branch for your feature or bug fix.
-3.  Make your changes and commit them.
-4.  Push your changes to your fork.
-5.  Create a pull request.
+1. Fork the repository.
+2. Create a new branch for your feature or bug fix.
+3. Make your changes and commit them.
+4. Push your changes to your fork.
+5. Create a pull request.
 
 ## Disclaimer
 
