@@ -1,11 +1,10 @@
-# divoom_api/base.py
+import asyncio
 import datetime
 import itertools
 import logging
 import math
 import os
 import time
-import asyncio
 from bleak import BleakClient
 from bleak.exc import BleakError
 
@@ -32,8 +31,7 @@ class DivoomBase:
         # Initialize client internally only if mac is provided, or use provided client
         self.client = client if client else (BleakClient(self.mac) if self.mac else None)
         self.use_ios_le_protocol = bool(use_ios_le_protocol)
-        self._response_event = asyncio.Event()
-        self._response_data = None
+        self.notification_queue = asyncio.Queue()
         # New attribute to store the expected command ID
         self._expected_response_command = None
         self.message_buf = []
@@ -55,12 +53,6 @@ class DivoomBase:
     def is_connected(self) -> bool:
         """Returns True if the BleakClient is connected, False otherwise."""
         return self.client and self.client.is_connected
-
-
-
-
-
-
 
     def convert_color(self, color_input: str | tuple | list) -> list:
         """
@@ -95,25 +87,23 @@ class DivoomBase:
                 self.logger.error(f"Failed to connect to {self.mac}: {e}")
                 raise ConnectionError(f"Failed to connect to {self.mac}: {e}")
 
-        # Enable notifications for all characteristics that support it
-        for service in self.client.services:
-            for characteristic in service.characteristics:
-                if "notify" in characteristic.properties:
-                    await self.client.start_notify(characteristic.uuid, self.notification_handler)
-                    self.logger.info(
-                        f"Enabled notifications for {characteristic.uuid}")
+        # Enable notifications only for the designated notify characteristic
+        if self.NOTIFY_CHARACTERISTIC_UUID:
+            def bleak_callback_handler(sender, data):
+                # This closure ensures `self` is captured correctly.
+                self.notification_handler(sender, data)
+
+            await self.client.start_notify(self.NOTIFY_CHARACTERISTIC_UUID, bleak_callback_handler)
+            self.logger.info(f"Enabled notifications for {self.NOTIFY_CHARACTERISTIC_UUID}")
+        else:
+            self.logger.warning("No notify characteristic UUID set. Cannot enable notifications.")
+        
         await asyncio.sleep(1.0)
 
     async def disconnect(self) -> None:
         """Closes the connection to the Divoom device."""
         if self.client and self.client.is_connected:
             try:
-                # Rely on the Bleak backend to clean up notifications on
-                # disconnect (this is what `minimal_bleak.py` does). Calling
-                # stop_notify explicitly can raise backend-specific errors
-                # like "Characteristic notification never started" on macOS
-                # CoreBluetooth. To match the working reference behavior, skip
-                # explicit stop_notify and simply disconnect.
                 await self.client.disconnect()
                 self.logger.info(
                     "Disconnected from Divoom device at %s", self.mac)
@@ -123,7 +113,6 @@ class DivoomBase:
 
     def _handle_ios_le_notification(self, data: bytes) -> bool:
         """Handles notifications for the iOS LE Protocol."""
-        # Attempt to parse iOS LE Protocol response: Header (4) + Data Length (2) + Command Identifier (1) + Packet Number (4) + Data + Checksum (2)
         if len(data) >= constants.IOS_LE_MIN_DATA_LENGTH and data[0:4] == bytes(constants.IOS_LE_HEADER):
             self.logger.info(
                 f"iOS LE Protocol response found. Full data: {data.hex()}")
@@ -131,7 +120,6 @@ class DivoomBase:
             data_length = int.from_bytes(data[constants.IOS_LE_DATA_LENGTH_START:constants.IOS_LE_DATA_LENGTH_END], byteorder='little')
             command_identifier = data[constants.IOS_LE_COMMAND_IDENTIFIER]
             packet_number = int.from_bytes(data[constants.IOS_LE_PACKET_NUMBER_START:constants.IOS_LE_PACKET_NUMBER_END], byteorder='little')
-            # Data part is between Packet Number and Checksum
             response_data = data[constants.IOS_LE_DATA_OFFSET:-constants.IOS_LE_CHECKSUM_LENGTH]
             checksum = int.from_bytes(data[-constants.IOS_LE_CHECKSUM_LENGTH:], byteorder='little')
 
@@ -141,16 +129,19 @@ class DivoomBase:
             self.logger.debug(
                 f"Notification Handler: Expected command: 0x{self._expected_response_command:02x if self._expected_response_command else 'None'}, Received command: 0x{command_identifier:02x}")
 
-            if self._expected_response_command is not None and \
-               (command_identifier == self._expected_response_command or \
-                (command_identifier == 0x33 and self._expected_response_command in constants.GENERIC_ACK_COMMANDS)):
-                self._response_data = response_data
-                self._response_event.set()
-                self._expected_response_command = None  # Reset after matching
+            response_payload = {'command_id': command_identifier, 'payload': response_data}
+            expected_cmd = self._expected_response_command
+
+            is_expected_response = expected_cmd is not None and command_identifier == expected_cmd
+            is_generic_ack = expected_cmd is not None and command_identifier == 0x33 and expected_cmd in constants.GENERIC_ACK_COMMANDS
+
+            if is_expected_response or is_generic_ack:
+                self.notification_queue.put_nowait(response_payload)
+                self._expected_response_command = None
                 return True
             else:
                 self.logger.warning(
-                    f"Response command 0x{command_identifier:02x} does not match expected command 0x{self._expected_response_command:02x if self._expected_response_command else 'None'}.")
+                    f"Response command 0x{command_identifier:02x} does not match expected command 0x{expected_cmd:02x if expected_cmd else 'None'}.")
 
         else:
             self.logger.warning(
@@ -158,29 +149,83 @@ class DivoomBase:
         return False
 
     def _handle_basic_protocol_notification(self, data: bytes) -> bool:
-        """Handles notifications for the Basic Protocol."""
-        try:
-            b = bytes(data)
-        except Exception:
-            b = data
-
-        # Look for occurrences of [0x04, CMD, 0x55] anywhere in the notification payload.
-        for i in range(0, len(b) - 2):
-            if b[i] == constants.ACK_PATTERN_BYTE_1 and b[i + 2] == constants.ACK_PATTERN_BYTE_3:
-                cmd = b[i + 1]
-                self.logger.debug(f"DEBUG: Basic Protocol - Found pattern [0x04, {cmd:02x}, 0x55] at offset {i}. Expected command: {self._expected_response_command}")
-                self.logger.debug(f"Evaluating simplified condition: {self._expected_response_command is not None} and ({cmd == 0x33})")
-                
-                if self._expected_response_command is not None and cmd == 0x33:
-                    self.logger.debug(f"Matched expected command 0x{self._expected_response_command:02x} with received 0x{cmd:02x}. Setting response event.")
-                    self._response_data = b
-                    self._response_event.set()
-                    self.logger.debug("DEBUG: _response_event.set() was called.")
-                    self._expected_response_command = None
-                    return True
+        """Handles notifications for the Basic Protocol by parsing framed messages."""
+        self.message_buf.extend(data)
         
-        self.logger.warning(
-            f"Unrecognized notification data (not Basic Protocol format or no matching ACK pattern): {data.hex()}")
+        while len(self.message_buf) >= 7: # Minimum length for a valid message
+            start_index = -1
+            try:
+                start_index = self.message_buf.index(constants.MESSAGE_START_BYTE)
+            except ValueError:
+                self.logger.debug("No start byte found in buffer, clearing.")
+                self.message_buf.clear()
+                return False
+
+            if start_index > 0:
+                self.logger.warning(f"Discarding {start_index} bytes of junk data from start of buffer.")
+                self.message_buf = self.message_buf[start_index:]
+
+            if len(self.message_buf) < 4: # Need at least START, LEN_L, LEN_H, CMD
+                self.logger.debug("Buffer too short for a full header.")
+                return False
+
+            length = int.from_bytes(bytes(self.message_buf[1:3]), byteorder='little')
+            
+            # Total message length is START(1) + LEN(2) + payload/checksum(length) + END(1) = length + 4
+            total_message_len = 4 + length
+
+            if len(self.message_buf) < total_message_len:
+                self.logger.debug(f"Incomplete message. Have {len(self.message_buf)}, need {total_message_len}.")
+                return False
+
+            # We have a full message
+            message = self.message_buf[:total_message_len]
+            self.message_buf = self.message_buf[total_message_len:] # Consume message from buffer
+
+            if message[-1] != constants.MESSAGE_END_BYTE:
+                self.logger.warning(f"Message missing END byte. Discarding: {bytes(message).hex()}")
+                continue # Look for the next message
+
+            # According to protocol docs, responses are framed with 0x04 <CMD> 0x55
+            # The command we are waiting for is at index 4, not 3.
+            if len(message) > 5 and message[3] == 0x04 and message[5] == 0x55:
+                command_id = message[4]
+                payload = message[6:-2] # Payload starts after the 0x55 byte
+                self.logger.info(f"Parsed Divoom Response. Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()}")
+            else:
+                # This is not a standard response, maybe a different kind of notification
+                # For now, we'll parse it with the old logic for backward compatibility
+                command_id = message[3]
+                payload = message[4:-2]
+                self.logger.info(f"Parsed Non-Standard Notification. Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()}")
+
+            # Validate checksum
+            checksum_input = message[1:-3]
+            calculated_checksum = sum(checksum_input)
+            received_checksum = int.from_bytes(bytes(message[-3:-1]), byteorder='little')
+            if received_checksum != calculated_checksum:
+                self.logger.warning(f"Checksum mismatch! Rcv: {received_checksum}, Calc: {calculated_checksum}. Msg: {bytes(message).hex()}")
+                continue
+
+            response_payload = {'command_id': command_id, 'payload': payload}
+            expected_cmd = self._expected_response_command
+            
+            is_expected_response = expected_cmd is not None and command_id == expected_cmd
+            is_generic_ack = expected_cmd is not None and command_id == 0x33 and expected_cmd in constants.GENERIC_ACK_COMMANDS
+
+            if is_expected_response:
+                self.notification_queue.put_nowait(response_payload)
+                self._expected_response_command = None # Clear expectation only on direct match
+                return True
+            elif is_generic_ack:
+                # It's an ack, but not the final data. Don't clear the expected command.
+                # We can choose to queue it or ignore it. For now, let's log and ignore.
+                self.logger.debug(f"Received generic ACK (0x33) for command 0x{expected_cmd:02x}. Awaiting final data response.")
+                return True # Handled, but not finished
+            else:
+                expected_cmd_str = f"0x{expected_cmd:02x}" if expected_cmd is not None else "None"
+                self.logger.warning(f"Response command 0x{command_id:02x} does not match expected {expected_cmd_str}")
+        
         return False
 
     def notification_handler(self, sender: int, data: bytearray) -> None:
@@ -191,9 +236,8 @@ class DivoomBase:
         self.logger.debug("THIS IS MY NOTIFICATION HANDLER")
         self.logger.debug(f"ALL INCOMING NOTIFICATION DATA: {data.hex()}")
         self.logger.debug(f"Notification received from {sender}: {data.hex()}")
-        self.message_buf.append(data)  # Keep this for general debugging
+        self.message_buf.append(data)
 
-        # For now, just log the raw data to see if anything is coming back
         self.logger.info(f"Raw notification data: {data.hex()}")
 
         if self.use_ios_le_protocol:
@@ -201,45 +245,53 @@ class DivoomBase:
         else:
             self._handle_basic_protocol_notification(data)
 
+    async def wait_for_response(self, command_id: int, timeout: int = 10) -> bytes | None:
+        """Waits for a specific command response from the notification queue."""
+        self.logger.debug(f"Polling for response to command ID 0x{command_id:02x} for {timeout}s...")
+        end_time = asyncio.get_running_loop().time() + timeout
+        while asyncio.get_running_loop().time() < end_time:
+            try:
+                # Check the queue for a response without blocking
+                response = self.notification_queue.get_nowait()
+                response_cmd_id = response.get('command_id')
+
+                is_expected_response = response_cmd_id == command_id
+                is_generic_ack = response_cmd_id == 0x33 and command_id in constants.GENERIC_ACK_COMMANDS
+
+                if is_expected_response or is_generic_ack:
+                    self.logger.debug(f"Got matching response for command ID 0x{command_id:02x} (Received 0x{response_cmd_id:02x})")
+                    return response.get('payload')
+                else:
+                    self.logger.warning(f"Got unexpected response. Expected 0x{command_id:02x}, got 0x{response_cmd_id:02x}. Re-queueing.")
+                    # This is not the response we were looking for, put it back.
+                    self.notification_queue.put_nowait(response) # Re-queue and wait
+            except asyncio.QueueEmpty:
+                # Queue is empty, sleep for a short duration to yield control to the event loop
+                await asyncio.sleep(0.1)
+        
+        self.logger.warning(
+            f"Timeout polling for notification response to command ID: 0x{command_id:02x}")
+        return None
+
     async def send_command_and_wait_for_response(self, command: int | str, args: list | None = None, timeout: int = 10) -> bytes | None:
         self.logger.debug(
-            f"Entering _send_command_and_wait_for_response for command: {command}")
+            f"Entering send_command_and_wait_for_response for command: {command}")
         if self.client is None or not self.client.is_connected:
             self.logger.error(
                 f"Cannot send command '{command}': Not connected to a Divoom device.")
             return None
-        self._response_data = None
-        self._expected_response_command = command  # Store the command ID
-        self._response_event.clear()
 
-        # When waiting for a notification response, perform the GATT write with
-        # a request for a write-with-response (response=True) so the peripheral
-        # processes the write more deterministically (matches minimal_bleak.py behavior).
+        command_id = constants.COMMANDS.get(command, command) if isinstance(command, str) else command
+
+        while not self.notification_queue.empty():
+            self.notification_queue.get_nowait()
+            self.logger.debug("Cleared a stale notification from the queue.")
+
+        self._expected_response_command = command_id
+
         await self.send_command(command, args, write_with_response=True)
-
-        self.logger.debug(
-            f"Event state before wait: {self._response_event.is_set()}")
-        try:
-            await asyncio.wait_for(self._response_event.wait(), timeout=timeout)
-            return self._response_data
-        except asyncio.TimeoutError:
-            self.logger.warning(
-                f"Timeout waiting for notification response to command: {command}")
-            # Original fallback: try to read all readable characteristics (for logging purposes)
-            if self.client and self.client.is_connected:
-                self.logger.info(
-                    "Attempting to read from all readable characteristics as a fallback (for logging)...")
-                for service in self.client.services:
-                    for characteristic in service.characteristics:
-                        if "read" in characteristic.properties:
-                            try:
-                                read_data = await self.client.read_gatt_char(characteristic.uuid)
-                                self.logger.info(
-                                    f"Fallback Read data from {characteristic.uuid}: {read_data.hex()} (ASCII: {read_data.decode('ascii', errors='ignore')})")
-                            except Exception as e:
-                                self.logger.error(
-                                    f"Error reading from {characteristic.uuid} during fallback: {e}")
-            return None
+        
+        return await self.wait_for_response(command_id, timeout)
 
     async def send_command(self, command: int | str, args: list | None = None, write_with_response: bool = False) -> bool:
         """Send command with optional arguments"""
@@ -254,7 +306,6 @@ class DivoomBase:
         self.logger.debug(
             f"Sending command: {command_name} (0x{command:02x}) with args: {args}")
 
-        # Construct payload as a list of bytes
         payload_bytes = [command] + args
 
         try:
@@ -283,8 +334,6 @@ class DivoomBase:
         """Sends a payload using the Basic Protocol."""
         full_message_hex = self._make_message(payload_bytes)
 
-        # Split message into chunks if it exceeds the chunksize
-        # Each byte is 2 hex characters, so chunksize * 2
         chunk_length_hex = self.chunksize * 2
 
         if len(full_message_hex) > chunk_length_hex:
@@ -301,11 +350,9 @@ class DivoomBase:
                         f"{self.type} PAYLOAD OUT (Chunk {i+1}/{len(chunks)}): {chunk_hex}")
                     self.logger.debug(
                         f"Raw message bytes being sent (Chunk {i+1}/{len(chunks)}): {message_bytes.hex()}")
-                    # If caller requested write-with-response, only request it on the final chunk
                     chunk_response = write_with_response and (
                         i == len(chunks) - 1)
                     await self.client.write_gatt_char(self.WRITE_CHARACTERISTIC_UUID, message_bytes, response=chunk_response)
-                    # Small delay between chunks
                     await asyncio.sleep(0.05)
                 except Exception as e:
                     self.logger.error(
@@ -315,7 +362,6 @@ class DivoomBase:
             return success
         else:
             try:
-                # Convert hex string to bytes
                 message_bytes = bytes.fromhex(full_message_hex)
                 self.logger.debug(
                     f"{self.type} PAYLOAD OUT: {full_message_hex}")
@@ -336,7 +382,6 @@ class DivoomBase:
                 self.logger.warning(
                     f"Attempt {attempt + 1}: Not connected to a Divoom device. Retrying in {retry_delay}s...")
                 await asyncio.sleep(retry_delay)
-                # Attempt to reconnect if not connected
                 if not self.client or not self.client.is_connected:
                     try:
                         await self.connect()
@@ -365,7 +410,7 @@ class DivoomBase:
                 elif attempt == max_retries - 1:
                     return False
                 await asyncio.sleep(retry_delay)
-        return False  # Should not be reached if successful or max_retries reached
+        return False
 
     def _int2hexlittle(self, value: int) -> str:
         byte1 = (value & 0xFF)
@@ -375,12 +420,6 @@ class DivoomBase:
     def _escape_payload(self, payload_bytes: list) -> list:
         """
         Escape payload bytes for SPP/basic framing.
-        Replaces:
-          0x01 -> [0x03, 0x04]
-          0x02 -> [0x03, 0x05]
-          0x03 -> [0x03, 0x06]
-        This mirrors the behavior used by the minimal BLE test harness so saved
-        payloads and automatic replays behave the same across both code paths.
         """
         escaped = []
         for b in payload_bytes:
@@ -397,70 +436,45 @@ class DivoomBase:
     def _getCRC(self, data_bytes: list) -> str:
         """
         Calculates the checksum for a list of byte values.
-        The checksum is the sum of all byte values, converted to a 2-byte little-endian hex string.
         """
         sum_val = sum(data_bytes)
         return self._int2hexlittle(sum_val)
 
     def _make_message(self, payload_bytes: list) -> str:
         """Make a complete message from the payload data using the Timebox Evo protocol."""
-        # Optionally escape payload bytes for SPP/basic framing
         working_payload = payload_bytes
         if getattr(self, "escapePayload", False):
             working_payload = self._escape_payload(payload_bytes)
 
-        # Calculate LLLL (length of command_code + payload + checksum)
-        # payload_bytes already contains the command_code as its first element
-        # Checksum is 2 bytes
-        # Length of (command + args) + 2 bytes for checksum
         length_value = len(working_payload) + constants.MESSAGE_CHECKSUM_LENGTH
 
-        # Convert length_value to its 2-byte little-endian representation
         length_bytes = list(length_value.to_bytes(2, byteorder='little'))
         length_hex = "".join(f"{b:02x}" for b in length_bytes)
 
-        # Calculate checksum over length_bytes and (escaped) payload
         checksum_input_bytes = length_bytes + working_payload
         checksum_hex = self._getCRC(checksum_input_bytes)
 
-        # Convert payload_bytes (list of integers) to hex string (use escaped payload)
         payload_hex = "".join(f"{b:02x}" for b in working_payload)
 
-        # Construct the full message hex string
         final_message_hex = f"{constants.MESSAGE_START_BYTE:02x}{length_hex}{payload_hex}{checksum_hex}{constants.MESSAGE_END_BYTE:02x}"
 
         return final_message_hex
 
     def _make_message_ios_le(self, payload_bytes: list, packet_number: int = 0x00000000) -> str:
         """Make a complete message from the payload data using the iOS LE protocol."""
-        # iOS LE Header
         header = constants.IOS_LE_MESSAGE_HEADER
-
-        # The actual command is the first byte of payload_bytes
         command_identifier = payload_bytes[0]
-
-        # Data (command + args)
         data_bytes = payload_bytes
-
-        # Packet Number (4 bytes, little-endian)
         packet_number_bytes = list(
             packet_number.to_bytes(constants.IOS_LE_MESSAGE_PACKET_NUM_LENGTH, byteorder='little'))
-
-        # First, calculate the data_length_value assuming a 2-byte checksum
-        # 1 (Cmd ID) + 4 (Packet Num) + len(Data) + 2 (Checksum)
         data_length_value = constants.IOS_LE_MESSAGE_CMD_ID_LENGTH + constants.IOS_LE_MESSAGE_PACKET_NUM_LENGTH + len(data_bytes) + constants.IOS_LE_MESSAGE_CHECKSUM_LENGTH
         data_length_bytes = list(
             data_length_value.to_bytes(2, byteorder='little'))
-
-        # Now, calculate the checksum over data_length_bytes, command_identifier, packet_number_bytes, and data_bytes
         checksum_input = data_length_bytes + \
             [command_identifier] + packet_number_bytes + data_bytes
         checksum_value = sum(checksum_input)
         checksum_bytes = list(checksum_value.to_bytes(constants.IOS_LE_MESSAGE_CHECKSUM_LENGTH, byteorder='little'))
-
-        # Construct the full iOS LE message
         final_message_bytes = header + data_length_bytes + \
             [command_identifier] + packet_number_bytes + \
             data_bytes + checksum_bytes
-
         return "".join(f"{b:02x}" for b in final_message_bytes)
