@@ -148,9 +148,9 @@ class DivoomBase:
                 f"Unrecognized notification data (not iOS LE Protocol format): {data.hex()}")
         return False
 
-    def _handle_basic_protocol_notification(self, data: bytes) -> bool:
+    def _handle_basic_protocol_notification(self, new_data: bytearray) -> bool:
         """Handles notifications for the Basic Protocol by parsing framed messages."""
-        self.message_buf.extend(data)
+        self.message_buf.extend(new_data)
         
         while len(self.message_buf) >= 7: # Minimum length for a valid message
             start_index = -1
@@ -181,22 +181,30 @@ class DivoomBase:
             # We have a full message
             message = self.message_buf[:total_message_len]
             self.message_buf = self.message_buf[total_message_len:] # Consume message from buffer
+            self.logger.debug(f"DEBUG: Basic Protocol - Message consumed. Remaining buffer length: {len(self.message_buf)}")
 
             if message[-1] != constants.MESSAGE_END_BYTE:
                 self.logger.warning(f"Message missing END byte. Discarding: {bytes(message).hex()}")
                 continue # Look for the next message
 
+            self.logger.debug(f"DEBUG: Basic Protocol - Full message: {bytes(message).hex()}")
+            self.logger.debug(f"DEBUG: Basic Protocol - message[3]: 0x{message[3]:02x}, message[4]: 0x{message[4]:02x}, message[5]: 0x{message[5]:02x}")
+
             # According to protocol docs, responses are framed with 0x04 <CMD> 0x55
             # The command we are waiting for is at index 4, not 3.
             if len(message) > 5 and message[3] == 0x04 and message[5] == 0x55:
+                self.logger.debug("DEBUG: Basic Protocol - Parsing as Standard Response.")
                 command_id = message[4]
                 payload = message[6:-2] # Payload starts after the 0x55 byte
+                self.logger.debug(f"DEBUG: Basic Protocol - Extracted Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()} (Standard Response)")
                 self.logger.info(f"Parsed Divoom Response. Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()}")
             else:
+                self.logger.debug("DEBUG: Basic Protocol - Parsing as Non-Standard Notification.")
                 # This is not a standard response, maybe a different kind of notification
                 # For now, we'll parse it with the old logic for backward compatibility
                 command_id = message[3]
                 payload = message[4:-2]
+                self.logger.debug(f"DEBUG: Basic Protocol - Extracted Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()} (Non-Standard Notification)")
                 self.logger.info(f"Parsed Non-Standard Notification. Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()}")
 
             # Validate checksum
@@ -208,25 +216,9 @@ class DivoomBase:
                 continue
 
             response_payload = {'command_id': command_id, 'payload': payload}
-            expected_cmd = self._expected_response_command
-            
-            is_expected_response = expected_cmd is not None and command_id == expected_cmd
-            is_generic_ack = expected_cmd is not None and command_id == 0x33 and expected_cmd in constants.GENERIC_ACK_COMMANDS
-
-            if is_expected_response:
-                self.notification_queue.put_nowait(response_payload)
-                self._expected_response_command = None # Clear expectation only on direct match
-                return True
-            elif is_generic_ack:
-                # It's an ack, but not the final data. Don't clear the expected command.
-                # We can choose to queue it or ignore it. For now, let's log and ignore.
-                self.logger.debug(f"Received generic ACK (0x33) for command 0x{expected_cmd:02x}. Awaiting final data response.")
-                return True # Handled, but not finished
-            else:
-                expected_cmd_str = f"0x{expected_cmd:02x}" if expected_cmd is not None else "None"
-                self.logger.warning(f"Response command 0x{command_id:02x} does not match expected {expected_cmd_str}")
-        
-        return False
+            self.notification_queue.put_nowait(response_payload)
+            # Removed: return True here, as the loop continues for other messages
+        return True # Return outside the while loop after processing all messages
 
     def notification_handler(self, sender: int, data: bytearray) -> None:
         """Handler for GATT notifications, attempting to parse Basic Protocol responses."""
@@ -236,7 +228,6 @@ class DivoomBase:
         self.logger.debug("THIS IS MY NOTIFICATION HANDLER")
         self.logger.debug(f"ALL INCOMING NOTIFICATION DATA: {data.hex()}")
         self.logger.debug(f"Notification received from {sender}: {data.hex()}")
-        self.message_buf.append(data)
 
         self.logger.info(f"Raw notification data: {data.hex()}")
 
@@ -258,13 +249,17 @@ class DivoomBase:
                 is_expected_response = response_cmd_id == command_id
                 is_generic_ack = response_cmd_id == 0x33 and command_id in constants.GENERIC_ACK_COMMANDS
 
-                if is_expected_response or is_generic_ack:
+                if is_expected_response:
                     self.logger.debug(f"Got matching response for command ID 0x{command_id:02x} (Received 0x{response_cmd_id:02x})")
+                    self._expected_response_command = None # Clear expectation on final match
                     return response.get('payload')
+                elif is_generic_ack:
+                    self.logger.debug(f"Received generic ACK (0x33) for command 0x{command_id:02x}. Continuing to wait for final data response.")
+                    # Don't return, continue waiting for the actual data response
                 else:
-                    self.logger.warning(f"Got unexpected response. Expected 0x{command_id:02x}, got 0x{response_cmd_id:02x}. Re-queueing.")
-                    # This is not the response we were looking for, put it back.
-                    self.notification_queue.put_nowait(response) # Re-queue and wait
+                    self.logger.warning(f"Got unexpected response. Expected 0x{command_id:02x}, got 0x{response_cmd_id:02x}. Discarding.")
+                    # This is not the response we were looking for, discard it.
+                    # Do not re-queue, as it might be an unsolicited message.
             except asyncio.QueueEmpty:
                 # Queue is empty, sleep for a short duration to yield control to the event loop
                 await asyncio.sleep(0.1)
@@ -272,7 +267,6 @@ class DivoomBase:
         self.logger.warning(
             f"Timeout polling for notification response to command ID: 0x{command_id:02x}")
         return None
-
     async def send_command_and_wait_for_response(self, command: int | str, args: list | None = None, timeout: int = 10) -> bytes | None:
         self.logger.debug(
             f"Entering send_command_and_wait_for_response for command: {command}")
@@ -288,10 +282,13 @@ class DivoomBase:
             self.logger.debug("Cleared a stale notification from the queue.")
 
         self._expected_response_command = command_id
+        self.logger.debug(f"Set _expected_response_command to 0x{self._expected_response_command:02x}")
 
         await self.send_command(command, args, write_with_response=True)
         
-        return await self.wait_for_response(command_id, timeout)
+        response_payload = await self.wait_for_response(command_id, timeout)
+        self.logger.debug(f"send_command_and_wait_for_response returning with payload: {response_payload}")
+        return response_payload
 
     async def send_command(self, command: int | str, args: list | None = None, write_with_response: bool = False) -> bool:
         """Send command with optional arguments"""

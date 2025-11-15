@@ -13,7 +13,7 @@ from divoom_lib.utils.discovery import discover_device
 
 # --- Configuration ---
 DEVICE_NAME_SUBSTRING = "Timoo"
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 
 # Setup basic logging
 logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

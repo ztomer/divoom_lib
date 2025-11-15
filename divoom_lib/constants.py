@@ -99,7 +99,8 @@ COMMANDS = {
     "set sd last next": 0x12,
     "send sd list over": 0x14,
     "send sd status": 0x15,
-    "get work mode": 0x06,
+    "get sd play name": 0x06,
+    "get work mode": 0x13,
 }
 
 # PAYLOAD VALUES
@@ -120,6 +121,7 @@ GENERIC_ACK_COMMANDS = [
     COMMANDS["set work mode"],
     COMMANDS["set poweron channel"],
     COMMANDS["get light mode"], # Device responds with 0x46 to 0x45 commands
+    COMMANDS["get alarm time"],
 ]
 
 # WORK MODES (from display.py)
