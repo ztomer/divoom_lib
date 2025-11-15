@@ -127,7 +127,7 @@ class DivoomBase:
                 f"Parsed iOS LE response: Cmd ID: 0x{command_identifier:02x}, Packet Num: {packet_number}, Data: {response_data.hex()}, Checksum: 0x{checksum:04x}")
 
             self.logger.debug(
-                f"Notification Handler: Expected command: 0x{self._expected_response_command:02x if self._expected_response_command else 'None'}, Received command: 0x{command_identifier:02x}")
+                f"Notification Handler: Expected command: {f'0x{self._expected_response_command:02x}' if self._expected_response_command is not None else 'None'}, Received command: 0x{command_identifier:02x}")
 
             response_payload = {'command_id': command_identifier, 'payload': response_data}
             expected_cmd = self._expected_response_command

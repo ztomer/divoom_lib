@@ -77,8 +77,8 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         self.mock_divoom_instance._try_send_command_with_framing.assert_called_once()
         call_args = self.mock_divoom_instance._try_send_command_with_framing.call_args
         self.assertEqual(call_args.args[0], constants.COMMANDS["set light mode"])
-        self.assertEqual(call_args.args[3], False) # use_ios=False
-        self.assertEqual(call_args.args[4], self.mock_divoom_instance.escapePayload) # escape=True (default for SPP)
+        self.assertEqual(call_args.args[4], False) # use_ios=False (index adjusted)
+        self.assertEqual(call_args.args[5], self.mock_divoom_instance.escapePayload) # escape=True (default for SPP)
 
         # Verify cache was updated
         self.mock_save_device_cache.assert_called_once()
@@ -107,8 +107,8 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         # Verify second call was for iOS-LE
         call_args = self.mock_divoom_instance._try_send_command_with_framing.call_args
         self.assertEqual(call_args.args[0], constants.COMMANDS["set light mode"])
-        self.assertEqual(call_args.args[3], True) # use_ios=True
-        self.assertEqual(call_args.args[4], self.mock_divoom_instance.escapePayload)
+        self.assertEqual(call_args.args[4], True) # use_ios=True (index adjusted)
+        self.assertEqual(call_args.args[5], self.mock_divoom_instance.escapePayload)
 
         # Verify cache was updated for iOS-LE
         self.mock_save_device_cache.assert_called_once()
@@ -152,7 +152,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         self.mock_divoom_instance._try_send_command_with_framing.return_value = b"cached_response"
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], cache_util, self.cache_dir, self.device_id, []
+            write_chars, [], [], {}, self.cache_dir, self.device_id, [], cache_util
         )
         self.assertEqual(result_uuid, mock_char_uuid)
         
@@ -179,7 +179,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         ]
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], cache_util, self.cache_dir, self.device_id, []
+            write_chars, [], [], {}, self.cache_dir, self.device_id, [], cache_util
         )
         self.assertEqual(result_uuid, mock_char_uuid)
         
@@ -206,7 +206,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         ]
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], cache_util, self.cache_dir, self.device_id, []
+            write_chars, [], [], {}, self.cache_dir, self.device_id, [], cache_util
         )
         self.assertEqual(result_uuid, mock_char_uuid)
         
@@ -235,7 +235,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         ]
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], cache_util, self.cache_dir, self.device_id, []
+            write_chars, [], [], {}, self.cache_dir, self.device_id, [], cache_util
         )
         self.assertIsNone(result_uuid) # Fallback returns None
         
@@ -262,7 +262,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         ]
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], cache_util, self.cache_dir, self.device_id, []
+            write_chars, [], [], {}, self.cache_dir, self.device_id, [], cache_util
         )
         self.assertIsNone(result_uuid) # Fallback returns None
         
@@ -289,7 +289,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         ]
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], cache_util, self.cache_dir, self.device_id, []
+            write_chars, [], [], {}, self.cache_dir, self.device_id, [], cache_util
         )
         self.assertIsNone(result_uuid)
         

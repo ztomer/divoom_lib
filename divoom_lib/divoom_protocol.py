@@ -83,7 +83,7 @@ class Divoom(DivoomBase):
             resp = await self.send_command_and_wait_for_response(command_id, payload, timeout=timeout)
         return resp
 
-    async def _send_diagnostic_payload(self, uuid: str, args_payload: list, cache: dict, cache_dir: str, device_id: str) -> bool:
+    async def _send_diagnostic_payload(self, uuid: str, args_payload: list, device_cache: dict, cache_dir: str, device_id: str, cache_util) -> bool:
         """
         Sends a diagnostic color payload with SPP and iOS-LE framing and updates cache.
         Returns True if a response is received, False otherwise.
@@ -100,7 +100,7 @@ class Divoom(DivoomBase):
         )
         if resp_spp is not None:
             self.logger.info(f"Response to SPP diagnostic payload on {uuid}: {resp_spp}")
-            existing = cache or {}
+            existing = device_cache or {}
             existing.update({
                 "write_characteristic_uuid": uuid,
                 "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
@@ -108,7 +108,7 @@ class Divoom(DivoomBase):
                 "last_successful_use_ios_le": False,
                 "escapePayload": True,
             })
-            cache.save_device_cache(cache_dir, device_id, existing)
+            cache_util.save_device_cache(cache_dir, device_id, existing)
             return True
 
         # iOS-LE attempt
@@ -121,7 +121,7 @@ class Divoom(DivoomBase):
         )
         if resp_ios is not None:
             self.logger.info(f"Response to iOS-LE diagnostic payload on {uuid}: {resp_ios}")
-            existing = cache or {}
+            existing = device_cache or {}
             existing.update({
                 "write_characteristic_uuid": uuid,
                 "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
@@ -129,17 +129,17 @@ class Divoom(DivoomBase):
                 "last_successful_use_ios_le": True,
                 "escapePayload": getattr(self, "escapePayload", False),
             })
-            cache.save_device_cache(cache_dir, device_id, existing)
+            cache_util.save_device_cache(cache_dir, device_id, existing)
             return True
         return False
 
-    async def _handle_cached_payload(self, uuid: str, cache: dict, cache_dir: str, device_id: str) -> bool:
+    async def _handle_cached_payload(self, uuid: str, device_cache: dict, cache_dir: str, device_id: str, cache_util) -> bool:
         """
         Attempts to send a cached payload and updates the cache if successful.
         Returns True if a response is received, False otherwise.
         """
-        if cache and cache.get("last_successful_payload"):
-            payload_hex = cache.get("last_successful_payload")
+        if device_cache and device_cache.get("last_successful_payload"):
+            payload_hex = device_cache.get("last_successful_payload")
             try:
                 payload = [int(x, 16) for x in payload_hex]
             except Exception:
@@ -150,13 +150,13 @@ class Divoom(DivoomBase):
                     constants.COMMANDS["set light mode"],
                     payload,
                     timeout=3,
-                    use_ios=bool(cache.get("last_successful_use_ios_le", self.use_ios_le_protocol)),
-                    escape=bool(cache.get("escapePayload", self.escapePayload))
+                    use_ios=bool(device_cache.get("last_successful_use_ios_le", self.use_ios_le_protocol)),
+                    escape=bool(device_cache.get("escapePayload", self.escapePayload))
                 )
                 if resp is not None:
                     self.logger.info(f"Saved payload produced a response on {uuid}: {resp}")
                     # persist mapping and payload
-                    existing = cache or {}
+                    existing = device_cache or {}
                     existing.update({
                         "write_characteristic_uuid": uuid,
                         "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
@@ -164,11 +164,11 @@ class Divoom(DivoomBase):
                         "last_successful_use_ios_le": self.use_ios_le_protocol,
                         "escapePayload": self.escapePayload,
                     })
-                    cache.save_device_cache(cache_dir, device_id, existing)
+                    cache_util.save_device_cache(cache_dir, device_id, existing)
                     return True
         return False
 
-    async def probe_write_characteristics_and_try_channel_switch(self, write_chars: list, notify_chars: list, read_chars: list, cache: dict, cache_dir: str, device_id: str, args: list) -> str | None:
+    async def probe_write_characteristics_and_try_channel_switch(self, write_chars: list, notify_chars: list, read_chars: list, device_cache: dict, cache_dir: str, device_id: str, args: list, cache_util) -> str | None:
         """
         Probes write characteristics to find a working one and tries to switch channels.
 
@@ -181,10 +181,11 @@ class Divoom(DivoomBase):
             write_chars (list): A list of write characteristics to probe.
             notify_chars (list): A list of notify characteristics.
             read_chars (list): A list of read characteristics.
-            cache (dict): A dictionary containing cached device information.
+            device_cache (dict): A dictionary containing cached device information.
             cache_dir (str): The directory where the cache is stored.
             device_id (str): The ID of the device.
             args (list): A list of arguments for the command.
+            cache_util: The cache utility object.
 
         Returns:
             str | None: The UUID of the working write characteristic, or None if none was found.
@@ -205,13 +206,13 @@ class Divoom(DivoomBase):
             self.WRITE_CHARACTERISTIC_UUID = uuid
 
             # 1) If cache has a saved payload, try that first on this characteristic
-            if await self._handle_cached_payload(uuid, cache, cache_dir, device_id):
+            if await self._handle_cached_payload(uuid, device_cache, cache_dir, device_id, cache_util):
                 return uuid
 
             # 2) Send a distinguishing color payload for this characteristic
             r, g, b = colors[idx % len(colors)]
             args_payload = [constants.PAYLOAD_START_BYTE_COLOR_MODE, r, g, b, 100, constants.PAYLOAD_COLOR_MODE_UNKNOWN_BYTE_1, constants.PAYLOAD_COLOR_MODE_UNKNOWN_BYTE_2]
-            if await self._send_diagnostic_payload(uuid, args_payload, cache, cache_dir, device_id):
+            if await self._send_diagnostic_payload(uuid, args_payload, device_cache, cache_dir, device_id, cache_util):
                 return uuid
 
             # restore previous write char if none succeeded for this char
