@@ -34,6 +34,38 @@ class System:
         args = [brightness]
         return await self.communicator.send_command(COMMANDS["set brightness"], args)
 
+    async def get_brightness(self) -> int | None:
+        """Get the screen brightness by querying the light mode (0x46)."""
+        self.logger.info("Getting brightness via get light mode (0x46)...")
+        
+        command_id = COMMANDS["get light mode"]
+        
+        # Set the command we are waiting for a response to.
+        self.communicator._expected_response_command = command_id
+        
+        # The device requires sending this command with iOS framing,
+        # but the notification response is in the Basic protocol format.
+        # We use the framing context to temporarily switch protocols for the send operation.
+        async with self.communicator._framing_context(use_ios=True, escape=False):
+            await self.communicator.send_command(command_id, [])
+
+        # After sending with the correct protocol, we wait for the response.
+        # The notification handler will use the object's default protocol (Basic) to parse the response.
+        response_payload = await self.communicator.wait_for_response(command_id)
+
+        if response_payload and len(response_payload) >= 7:
+            try:
+                brightness = response_payload[6]
+                self.logger.info(f"Successfully parsed brightness: {brightness}")
+                return brightness
+            except IndexError:
+                self.logger.warning("Failed to parse brightness from response, payload is too short.")
+                return None
+        else:
+            self.logger.warning(f"Did not receive a valid or sufficiently long payload for get_brightness command.")
+            return None
+
+
     async def get_work_mode(self) -> int | None:
         """Get the current system working mode (0x06)."""
         self.logger.info("Getting work mode (0x06)...")
