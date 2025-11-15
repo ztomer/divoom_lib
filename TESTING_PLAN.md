@@ -47,7 +47,12 @@ For commands that trigger an asynchronous notification from the device, the test
 
 ## 3. Implementation Plan
 
-1.  **Proof of Concept (PoC):** Start by expanding the existing `tests/api_test.py` to fully test a single, simple feature like brightness control, implementing the "Set-Then-Get" pattern. This will validate the overall testing methodology.
+1.  **Proof of Concept (PoC):** **(COMPLETED)** - Start by expanding the existing `tests/api_test.py` to fully test a single, simple feature like brightness control, implementing the "Set-Then-Get" pattern. This will validate the overall testing methodology.
+    -   **Outcome:** This PoC was highly successful. It not only validated the "Set-Then-Get" approach but also uncovered several critical bugs in the underlying communication library (`divoom_lib/base.py`) related to protocol handling, packet parsing, and acknowledgment logic. Fixing these bugs was essential for any reliable getter-style command. A full summary of this investigation can be found in `docs/brightness_investigation.md`.
+
 2.  **Refactor into Test Suite:** Once the PoC is successful, refactor the test into a dedicated file (e.g., `tests/test_system.py` for brightness).
+    -   **Outcome:** **(COMPLETED)** - A permanent, async-native test file `tests/test_system_functions.py` was created using `unittest.IsolatedAsyncioTestCase`.
+
 3.  **Expand Coverage:** Incrementally create new test files and test cases for each category of the API (Light, Display, Time, etc.), following the strategies outlined above.
+
 4.  **Develop Test Runner:** Implement `tests/test_runner.py` to automate the execution of the entire test suite.
