@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_device
+from divoom_lib.utils import cache
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG,
@@ -27,19 +28,39 @@ async def main():
     args = parser.parse_args()
 
     divoom = None
+    cache_dir = cache.DEFAULT_CACHE_DIR
+    device_id = None
     try:
         if args.address:
-            divoom = Divoom(mac=args.address, logger=logger)
+            device_id = args.address
+            device_cache = cache.load_device_cache(cache_dir, device_id) or {}
+            divoom = Divoom(mac=args.address, logger=logger,
+                            use_ios_le_protocol=False, # Force Basic Protocol for initial probing
+                            escapePayload=device_cache.get("escapePayload", False))
         else:
             ble_device, device_id = await discover_device(name_substring=args.name, address=None)
             if not ble_device:
                 logger.error(
                     f"No Bluetooth device found with name containing '{args.name}'. Exiting.")
                 return
-            divoom = Divoom(mac=device_id, logger=logger)
+            
+            device_cache = cache.load_device_cache(cache_dir, device_id) or {}
+            divoom = Divoom(mac=device_id, logger=logger,
+                            use_ios_le_protocol=False, # Force Basic Protocol for initial probing
+                            escapePayload=device_cache.get("escapePayload", False))
 
         await divoom.connect()
         logger.info(f"Successfully connected to {divoom.mac}!")
+
+        # Load existing cache for the device
+        # cache_dir and device_cache are already defined above
+        # device_cache = cache.load_device_cache(cache_dir, device_id) or {}
+
+        if device_cache.get("write_characteristic_uuid"):
+            divoom.WRITE_CHARACTERISTIC_UUID = device_cache["write_characteristic_uuid"]
+            logger.info(f"Using cached write characteristic: {divoom.WRITE_CHARACTERISTIC_UUID}")
+        else:
+            logger.info("No cached write characteristic found. Probing...")
 
         # Get characteristics for probing
         write_chars = []
@@ -56,7 +77,7 @@ async def main():
 
         logger.info("Probing write characteristics to find a working one...")
         working_char_uuid = await divoom.probe_write_characteristics_and_try_channel_switch(
-            write_chars, notify_chars, read_chars, {}, "", divoom.mac, []
+            write_chars, notify_chars, read_chars, device_cache, cache_dir, device_id, []
         )
 
         if working_char_uuid:
