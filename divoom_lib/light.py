@@ -53,7 +53,17 @@ class Light:
                          or None if the command fails.
         """
         self.logger.info("Getting light mode (0x46)...")
-        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get light mode"])
+        
+        command_id = COMMANDS["get light mode"]
+        
+        # Set the command we are waiting for and send it with the correct protocol
+        self.communicator._expected_response_command = command_id
+        async with self.communicator._framing_context(use_ios=True, escape=False):
+            await self.communicator.send_command(command_id, [])
+
+        # Wait for the response using the default (Basic) protocol
+        response = await self.communicator.wait_for_response(command_id)
+        
         # Based on documentation, response has 20 bytes
         if response and len(response) >= 20:
             return {

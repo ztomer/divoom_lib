@@ -38,11 +38,12 @@ class Display:
         sub_command_args = None
         if number is not None:  # additionally change design tab
             number = to_int_if_str(number)
-            sub_command_args = [constants.SUB_COMMAND_SET_DESIGN, number.to_bytes(1, byteorder='big')]
+            sub_command_args = [constants.SUB_COMMAND_SET_DESIGN, number]
         return await self._set_work_mode(constants.WORK_MODE_DESIGN, sub_command_args)
 
     async def show_effects(self, number: int) -> bool:
-        return await self._set_work_mode(constants.WORK_MODE_EFFECTS, [number.to_bytes(1, byteorder='big')])
+        """Show VJ effects on the Divoom device"""
+        return await self._set_work_mode(constants.WORK_MODE_EFFECTS, [number])
 
     async def show_image(self, file: str, time: int | None = None) -> bool:
         """Show image or animation on the Divoom device"""
@@ -90,9 +91,6 @@ class Display:
 
         rgb_color = self.communicator.convert_color(color)
         
-        # The PROTOCOL.md indicates that 0x45 is the command for switching channels,
-        # and the channel number (0x01 for Lightning) is the first argument.
-        # The rest of the arguments are specific to the Lightning channel.
         args = [
             constants.LIGHTNING_CHANNEL_NUMBER, # Channel number for Lightning
             rgb_color[0], rgb_color[1], rgb_color[2],
@@ -105,10 +103,7 @@ class Display:
 
     async def show_visualization(self, number: int | None = None) -> bool:
         """Show visualization on the Divoom device"""
-        if number == None:
-            return
+        if number is None:
+            return False
         number = to_int_if_str(number)
-
-        args = [constants.WORK_MODE_VISUALIZATION]
-        args += number.to_bytes(1, byteorder='big')
-        return await self.communicator.send_command("set view", args)
+        return await self._set_work_mode(constants.WORK_MODE_VISUALIZATION, [number])

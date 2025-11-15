@@ -20,8 +20,18 @@ class Tool:
     async def get_tool_info(self, tool_type: int) -> dict | None:
         """Get information about the tools available in the device (0x71)."""
         self.logger.info(f"Getting tool info for type {tool_type} (0x71)...")
+        
+        command_id = COMMANDS["get tool info"]
         args = [tool_type]
-        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get tool info"], args)
+        
+        # Set the command we are waiting for and send it with the correct protocol
+        self.communicator._expected_response_command = command_id
+        async with self.communicator._framing_context(use_ios=True, escape=False):
+            await self.communicator.send_command(command_id, args)
+
+        # Wait for the response using the default (Basic) protocol
+        response = await self.communicator.wait_for_response(command_id)
+        
         if response:
             return self._parse_tool_info_response(tool_type, response)
         return None
@@ -82,7 +92,7 @@ class Tool:
         if not all(v is not None for v in [ctrl_flag, minutes, seconds]):
             raise ValueError(
                 "Missing 'ctrl_flag', 'minutes', or 'seconds' for Countdown mode.")
-        return [ctrl_flag, minutes.to_bytes(1, byteorder='big'), seconds.to_bytes(1, byteorder='big')]
+        return [ctrl_flag, minutes, seconds]
 
     async def set_tool_info(self, game_mode_index: int, **kwargs) -> bool:
         """Set information for the tools (games) available in the device (0x72).
