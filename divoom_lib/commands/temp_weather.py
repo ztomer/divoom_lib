@@ -18,7 +18,12 @@ class TempWeatherCommand:
         }
         if opts:
             self._opts.update(opts)
-        asyncio.create_task(self._update_message())
+
+    async def update_temp_weather(self):
+        """
+        Manually triggers an update to set the temperature and weather on the Divoom device.
+        """
+        await self._update_message()
 
     async def _update_message(self):
         """
@@ -48,7 +53,6 @@ class TempWeatherCommand:
     @temperature.setter
     def temperature(self, value: int):
         self._opts["temperature"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def weather(self) -> int:
@@ -57,4 +61,3 @@ class TempWeatherCommand:
     @weather.setter
     def weather(self, value: int):
         self._opts["weather"] = value
-        asyncio.create_task(self._update_message())

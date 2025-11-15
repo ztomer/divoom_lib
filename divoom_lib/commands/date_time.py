@@ -17,7 +17,12 @@ class DateTimeCommand:
         }
         if opts:
             self._opts.update(opts)
-        asyncio.create_task(self._update_message())
+
+    async def update_date_time(self):
+        """
+        Manually triggers an update to set the date and time on the Divoom device.
+        """
+        await self._update_message()
 
     async def _update_message(self):
         """
@@ -58,4 +63,3 @@ class DateTimeCommand:
     @date.setter
     def date(self, value: datetime.datetime):
         self._opts["date"] = value
-        asyncio.create_task(self._update_message())

@@ -21,7 +21,12 @@ class DisplayText:
         }
         if opts:
             self._opts.update(opts)
-        asyncio.create_task(self._update_message())
+
+    async def update_display(self):
+        """
+        Manually triggers an update to the Divoom display based on current settings.
+        """
+        await self._update_message()
 
     def PALETTE_TEXT_ON_BACKGROUND(self, text_color: str = "FFFFFF", background_color: str = "000000") -> List[str]:
         """
@@ -120,7 +125,8 @@ class DisplayText:
         encoded_bytes = [0x86, 0x01]
         encoded_bytes.append(len(text))
         for char in text:
-            encoded_bytes.extend(list(self._divoom_instance._int2hexlittle(ord(char)).encode())) # Convert char to its ASCII value, then to little-endian hex bytes
+            hex_str = self._divoom_instance._int2hexlittle(ord(char))
+            encoded_bytes.extend([int(hex_str[i:i+2], 16) for i in range(0, len(hex_str), 2)])
         return encoded_bytes
 
     async def _update_message(self):
@@ -196,7 +202,6 @@ class DisplayText:
         if not callable(value):
             raise ValueError('paletteFn is not a function')
         self._opts["paletteFn"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def color_palette(self) -> List[str]:
@@ -218,7 +223,6 @@ class DisplayText:
         if not callable(value):
             raise ValueError('animFn is not a function')
         self._opts["animFn"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def pixels(self) -> List[int]:
@@ -235,4 +239,3 @@ class DisplayText:
     @text.setter
     def text(self, value: str):
         self._opts["text"] = value
-        asyncio.create_task(self._update_message())

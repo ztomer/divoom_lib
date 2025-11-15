@@ -45,6 +45,34 @@ class Alarm:
         args.extend(data)
         return await self.communicator.send_command(constants.COMMANDS[command_key], args)
 
+    async def set_alarm(self, alarm_index: int, status: int, hour: int, minute: int, week: int, mode: int, trigger_mode: int, fm_freq: int = 0, volume: int = 0) -> bool:
+        """
+        Set the extended alarm time information in the device (0x43).
+        
+        Args:
+            alarm_index (int): Which alarm to set, starting from 0.
+            status (int): 1 (alarm on), 0 (alarm off).
+            hour (int): Hour to set for the alarm.
+            minute (int): Minute to set for the alarm.
+            week (int): Bits 0 to 6 represent Sunday to Saturday, respectively. Set to 1 if the alarm should repeat on that day.
+            mode (int): Alarm mode (ALARM_MUSIC=0, and others: 1, 2, 3, 4).
+            trigger_mode (int): Alarm trigger mode (ALARM_TRIGGER_MUSIC=1, ALARM_TRIGGER_GIF=4).
+            fm_freq (int): If trigger_mode is ALARM_TRIGGER_MUSIC, these 2 bytes represent the frequency point.
+            volume (int): Volume level for the alarm, ranging from 0 to 100.
+        """
+        self.logger.info(f"Setting alarm {alarm_index} (0x43)...")
+        args = []
+        args.append(alarm_index)
+        args.append(status)
+        args.append(hour)
+        args.append(minute)
+        args.append(week)
+        args.append(mode)
+        args.append(trigger_mode)
+        args += fm_freq.to_bytes(2, byteorder='little')
+        args.append(volume)
+        return await self.communicator.send_command(constants.COMMANDS["set alarm"], args)
+
     async def set_alarm_gif(self, alarm_index: int, total_length: int, gif_id: int, data: list) -> bool:
         """Set the alarm animation for a specific alarm (0x51)."""
         return await self._set_animation_gif("set alarm gif", alarm_index, total_length, gif_id, data)

@@ -7,6 +7,8 @@ from divoom_lib.music import Music
 from divoom_lib.alarm import Alarm
 from divoom_lib.tool import Tool
 from divoom_lib.sleep import Sleep
+from divoom_lib.game import Game
+from divoom_lib.timeplan import Timeplan
 
 import asyncio
 import json
@@ -52,6 +54,8 @@ class Divoom(DivoomBase):
         self.alarm = Alarm(self)
         self.tool = Tool(self)
         self.sleep = Sleep(self)
+        self.game = Game(self)
+        self.timeplan = Timeplan(self)
         self.logger.debug("Divoom.__init__ called. super().__init__ completed.")
 
     @asynccontextmanager
