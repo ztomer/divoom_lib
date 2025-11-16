@@ -7,8 +7,8 @@ import sys
 # Add the project root to sys.path to allow importing divoom_api
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from divoom_lib import Divoom
-from divoom_lib.utils.discovery import discover_device
+from divoom_lib.divoom import Divoom
+from divoom_lib.utils import discovery
 from divoom_lib.utils import cache
 
 # Configure logging
@@ -28,72 +28,29 @@ async def main():
     args = parser.parse_args()
 
     divoom = None
-    cache_dir = cache.DEFAULT_CACHE_DIR
-    device_id = None
     try:
         if args.address:
-            device_id = args.address
-            device_cache = cache.load_device_cache(cache_dir, device_id) or {}
-            divoom = Divoom(mac=args.address, logger=logger,
-                            use_ios_le_protocol=False, # Force Basic Protocol for initial probing
-                            escapePayload=device_cache.get("escapePayload", False))
+            divoom = Divoom(mac=args.address, logger=logger)
         else:
-            ble_device, device_id = await discover_device(name_substring=args.name, address=None)
+            ble_device, device_id = await discovery.discover_device(name_substring=args.name, address=None)
             if not ble_device:
                 logger.error(
                     f"No Bluetooth device found with name containing '{args.name}'. Exiting.")
                 return
-            
-            device_cache = cache.load_device_cache(cache_dir, device_id) or {}
-            divoom = Divoom(mac=device_id, logger=logger,
-                            use_ios_le_protocol=False, # Force Basic Protocol for initial probing
-                            escapePayload=device_cache.get("escapePayload", False))
+            divoom = Divoom(mac=device_id, logger=logger)
 
-        await divoom.connect()
-        logger.info(f"Successfully connected to {divoom.mac}!")
+        await divoom.protocol.connect()
+        logger.info(f"Successfully connected to {divoom.protocol.mac}!")
 
-        # Load existing cache for the device
-        # cache_dir and device_cache are already defined above
-        # device_cache = cache.load_device_cache(cache_dir, device_id) or {}
-
-        if device_cache.get("write_characteristic_uuid"):
-            divoom.WRITE_CHARACTERISTIC_UUID = device_cache["write_characteristic_uuid"]
-            logger.info(f"Using cached write characteristic: {divoom.WRITE_CHARACTERISTIC_UUID}")
-        else:
-            logger.info("No cached write characteristic found. Probing...")
-
-        # Get characteristics for probing
-        write_chars = []
-        notify_chars = []
-        read_chars = []
-        for service in divoom.client.services:
-            for char in service.characteristics:
-                if "write" in char.properties or "write_without_response" in char.properties:
-                    write_chars.append(char)
-                if "notify" in char.properties:
-                    notify_chars.append(char)
-                if "read" in char.properties:
-                    read_chars.append(char)
-
-        logger.info("Probing write characteristics to find a working one...")
-        working_char_uuid = await divoom.probe_write_characteristics_and_try_channel_switch(
-            write_chars, notify_chars, read_chars, device_cache, cache_dir, device_id, []
-        )
-
-        if working_char_uuid:
-            logger.info(f"Successfully identified working characteristic: {working_char_uuid}")
-        else:
-            logger.warning("Could not identify a working characteristic. Proceeding with default.")
-
-        logger.info("Sending blue light command...")
-        await divoom.display.show_light(color="0000FF", brightness=100)
+        logger.info("Sending green light command...")
+        await divoom.light.show_light(color="00FF00", brightness=100)
         logger.info("Command sent successfully.")
 
     except Exception as e:
         logger.error(f"Error: {e}")
     finally:
-        if divoom and divoom.is_connected:
-            await divoom.disconnect()
+        if divoom and divoom.protocol.is_connected:
+            await divoom.protocol.disconnect()
             logger.info("Disconnected from Divoom device.")
 
 if __name__ == "__main__":

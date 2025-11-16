@@ -1,4 +1,4 @@
-# divoom_api/constants.py
+# divoom_api/models.py
 
 # COMMAND CODES
 COMMANDS = {

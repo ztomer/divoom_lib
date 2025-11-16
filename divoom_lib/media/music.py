@@ -1,7 +1,5 @@
-"""
-Divoom Music Play Commands
-"""
-from .constants import (
+
+from ..models import (
     COMMANDS,
     GSPN_NAME_LENGTH_START, GSPN_NAME_BYTES_START,
     GSML_MUSIC_ID_LENGTH, GSML_NAME_LENGTH_LENGTH,

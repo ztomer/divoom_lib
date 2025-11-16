@@ -1,18 +1,14 @@
-"""
-Divoom System Commands
-"""
+
 import datetime
 import logging
-from .constants import (
+from ..models import (
     COMMANDS,
     CHANNEL_ID_MIN, CHANNEL_ID_MAX,
     SD_STATUS_REMOVAL, SD_STATUS_INSERTION,
     BOOT_GIF_OFF, BOOT_GIF_ON,
     TEMP_FORMAT_CELSIUS, TEMP_FORMAT_FAHRENHEIT,
     LOW_POWER_SWITCH_OFF, LOW_POWER_SWITCH_ON,
-    HOUR_TYPE_12, HOUR_TYPE_24, HOUR_TYPE_QUERY,
     SONG_DISPLAY_OFF, SONG_DISPLAY_ON, SONG_DISPLAY_QUERY,
-    BT_PASSWORD_CANCEL, BT_PASSWORD_SET, BT_PASSWORD_GET_STATUS,
     POVVC_GET, POVVC_SET,
     POCC_GET, POCC_SET, POCC_CHANNEL_MIN, POCC_CHANNEL_MAX,
     SOUND_CONTROL_DISABLE, SOUND_CONTROL_ENABLE,
@@ -20,9 +16,9 @@ from .constants import (
     GNTD_DISPLAY_MODES_START, GNTD_TIME_MINUTES_START,
     GDN_NAME_LENGTH, GDN_NAME_BYTES_START
 )
-from .utils.converters import bool_to_byte
+from ..utils.converters import bool_to_byte
 
-class System:
+class Device:
     def __init__(self, communicator) -> None:
         self.communicator = communicator
         self.logger = communicator.logger
@@ -210,13 +206,6 @@ class System:
             return response[0]  # 1: on, 0: off
         return None
 
-    async def set_hour_type(self, hour_type: int) -> bool:
-        """Set the hour format (0x2c).
-        hour_type: 0 for 12-hour, 1 for 24-hour, 0xFF to query."""
-        self.logger.info(f"Setting hour type to {hour_type} (0x2c)...")
-        args = [hour_type]
-        return await self.communicator.send_command(COMMANDS["set time type"], args)
-
     async def set_song_display_control(self, control: int) -> bool:
         """Set the song name display switch (0x83).
         control: 0 to turn off, 1 to turn on, 0xFF to query."""
@@ -224,46 +213,6 @@ class System:
             f"Setting song display control to {control} (0x83)...")
         args = [control]
         return await self.communicator.send_command(COMMANDS["set song dis ctrl"], args)
-
-    def _handle_bt_password_set(self, kwargs: dict) -> list | None:
-        password = kwargs.get("password")
-        if password:
-            if len(password) != 4 or not password.isdigit():
-                self.logger.error("Password must be a 4-digit string.")
-                return None
-            return [int(digit) for digit in password]
-        self.logger.error("Missing 'password' for Set Bluetooth Password control.")
-        return None
-
-    def _handle_bt_password_cancel_or_get_status(self, kwargs: dict) -> list | None:
-        return [] # No additional data
-
-    _bt_password_handlers = {
-        BT_PASSWORD_SET: _handle_bt_password_set,
-        BT_PASSWORD_CANCEL: _handle_bt_password_cancel_or_get_status,
-        BT_PASSWORD_GET_STATUS: _handle_bt_password_cancel_or_get_status,
-    }
-
-    async def set_bluetooth_password(self, control: int, **kwargs) -> bool:
-        """Set the password for user's Bluetooth connection (0x27).
-        control: 1 to set, 0 to cancel, 2 to get status.
-        password: 4-digit password (only for control=1)."""
-        self.logger.info(
-            f"Setting Bluetooth password (0x27) with control {control}...")
-        args = [control]
-
-        handler = self._bt_password_handlers.get(control)
-        if handler:
-            control_args = handler(self, kwargs)
-            if control_args is not None:
-                args.extend(control_args)
-            else:
-                return False
-        else:
-            self.logger.warning(
-                f"Unknown control for set_bluetooth_password: {control}")
-            return False
-        return await self.communicator.send_command(COMMANDS["set blue password"], args)
 
     def _handle_povvc_set(self, kwargs: dict) -> list | None:
         volume = kwargs.get("volume")
