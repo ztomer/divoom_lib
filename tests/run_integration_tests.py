@@ -6,8 +6,8 @@ import sys
 # Add the project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from divoom_lib.divoom_protocol import Divoom
-from divoom_lib.utils.discovery import discover_device
+from divoom_lib.divoom import Divoom
+from divoom_lib.utils import discovery
 from divoom_lib.utils import cache
 
 # Configure logging
@@ -32,53 +32,21 @@ async def test_set_and_get_brightness():
     original_brightness = None
     try:
         # Discover and connect
-        ble_device, device_id = await discover_device(name_substring="Timoo")
+        ble_device, device_id = await discovery.discover_device(name_substring="Timoo")
         if not ble_device:
             raise ConnectionError("No Divoom device found.")
         
         logger.info(f"Found device: {device_id}")
         divoom = Divoom(mac=device_id, logger=logger)
-        await divoom.connect()
-        logger.info(f"Successfully connected to {divoom.mac}!")
-
-        # CRITICAL STEP: Probe for the correct characteristics
-        logger.info("Probing for working characteristics...")
-        write_chars = []
-        notify_chars = []
-        read_chars = []
-        for service in divoom.client.services:
-            for char in service.characteristics:
-                if "write" in char.properties or "write_without_response" in char.properties:
-                    write_chars.append(char)
-                if "notify" in char.properties:
-                    notify_chars.append(char)
-                if "read" in char.properties:
-                    read_chars.append(char)
-        
-        device_cache = cache.load_device_cache(cache.DEFAULT_CACHE_DIR, device_id) or {}
-        working_char_uuid = await divoom.probe_write_characteristics_and_try_channel_switch(
-            write_chars, notify_chars, read_chars, device_cache, cache.DEFAULT_CACHE_DIR, device_id, []
-        )
-
-        if not working_char_uuid and not divoom.WRITE_CHARACTERISTIC_UUID:
-             raise ConnectionError("Failed to find a working write characteristic.")
-        logger.info(f"Probing complete. Using write characteristic: {divoom.WRITE_CHARACTERISTIC_UUID}")
-
-        # HYPOTHESIS: Send a "setter" command to wake the device before sending a "getter".
-        logger.info("Sending a 'show_light' command to wake the device...")
-        await divoom.display.show_light(color="0000FF", brightness=100)
-        await asyncio.sleep(2) # Give the device a moment to process.
-        logger.info("Wake-up command sent.")
+        await divoom.protocol.connect()
+        logger.info(f"Successfully connected to {divoom.protocol.mac}!")
 
         # 1. Get initial brightness
         logger.info("Getting initial brightness...")
-        initial_settings = await divoom.light.get_light_mode()
-        if initial_settings is None:
-            raise AssertionError("Failed to get initial light settings.")
-        
-        original_brightness = initial_settings.get("system_brightness")
-        if original_brightness is None:
-            raise AssertionError("Failed to get initial system_brightness.")
+        initial_brightness = await divoom.device.get_brightness()
+        if initial_brightness is None:
+            raise AssertionError("Failed to get initial brightness.")
+        original_brightness = initial_brightness
         logger.info(f"Initial brightness is: {original_brightness}")
 
         # 2. Set new brightness
@@ -87,20 +55,16 @@ async def test_set_and_get_brightness():
             new_brightness = 75
         
         logger.info(f"Setting brightness to {new_brightness}...")
-        await divoom.system.set_brightness(new_brightness)
+        await divoom.device.set_brightness(new_brightness)
         logger.info("Set brightness command sent.")
         
         await asyncio.sleep(3)
 
         # 3. Get brightness again and verify
         logger.info("Getting brightness again to verify...")
-        new_settings = await divoom.light.get_light_mode()
-        if new_settings is None:
-            raise AssertionError("Failed to get new light settings.")
-        
-        current_brightness = new_settings.get("system_brightness")
+        current_brightness = await divoom.device.get_brightness()
         if current_brightness is None:
-            raise AssertionError("Failed to get current system_brightness.")
+            raise AssertionError("Failed to get current brightness.")
         logger.info(f"Current brightness is: {current_brightness}")
         
         assert current_brightness == new_brightness, f"Brightness was not set correctly. Expected {new_brightness}, got {current_brightness}."
@@ -112,11 +76,11 @@ async def test_set_and_get_brightness():
         return False, str(e)
     finally:
         # 4. Restore original brightness and disconnect
-        if divoom and divoom.is_connected:
+        if divoom and divoom.protocol.is_connected:
             if original_brightness is not None:
                 logger.info(f"Restoring original brightness to {original_brightness}...")
-                await divoom.system.set_brightness(original_brightness)
-            await divoom.disconnect()
+                await divoom.device.set_brightness(original_brightness)
+            await divoom.protocol.disconnect()
             logger.info("Disconnected from Divoom device.")
 
 async def main():

@@ -1,9 +1,15 @@
-"""
-Divoom Alarm and Memorial Commands
-"""
+
 import datetime
-from . import constants
-from .utils.converters import bool_to_byte
+from ..models import (
+    COMMANDS,
+    ALARM_COUNT, GAT_ALARM_INFO_LENGTH,
+    GAT_STATUS, GAT_HOUR, GAT_MINUTE, GAT_WEEK, GAT_MODE, GAT_TRIGGER_MODE,
+    GAT_FM_FREQ_START, GAT_VOLUME,
+    MEMORIAL_COUNT, GMT_MEMORIAL_INFO_LENGTH,
+    GMT_DIALY_ID, GMT_ON_OFF, GMT_MONTH, GMT_DAY, GMT_HOUR, GMT_MINUTE,
+    GMT_HAVE_FLAG, GMT_TITLE_NAME_START, GMT_TITLE_NAME_END
+)
+from ..utils.converters import bool_to_byte
 
 class Alarm:
     def __init__(self, communicator):
@@ -12,24 +18,24 @@ class Alarm:
     async def get_alarm_time(self):
         """Get alarm time (0x42)."""
         self.communicator.logger.info("Getting alarm time (0x42)...")
-        response = await self.communicator.send_command_and_wait_for_response(constants.COMMANDS["get alarm time"])
-        if response and len(response) >= constants.ALARM_COUNT * constants.GAT_ALARM_INFO_LENGTH:  # 10 sets of alarm info
+        response = await self.communicator.send_command_and_wait_for_response(models.COMMANDS["get alarm time"])
+        if response and len(response) >= models.ALARM_COUNT * models.GAT_ALARM_INFO_LENGTH:  # 10 sets of alarm info
             alarms = []
-            for i in range(constants.ALARM_COUNT):
+            for i in range(models.ALARM_COUNT):
                 # Assuming data format is similar to set alarm time (excluding animation data)
                 # Uint8 alarm_index, status, hour, minute, week, mode, trigger_mode, Fm[2], volume
                 # Each alarm is 9 bytes (excluding index)
-                alarm_data = response[i*constants.GAT_ALARM_INFO_LENGTH:(i+1)*constants.GAT_ALARM_INFO_LENGTH]
-                if len(alarm_data) == constants.GAT_ALARM_INFO_LENGTH:
+                alarm_data = response[i*models.GAT_ALARM_INFO_LENGTH:(i+1)*models.GAT_ALARM_INFO_LENGTH]
+                if len(alarm_data) == models.GAT_ALARM_INFO_LENGTH:
                     alarms.append({
-                        "status": alarm_data[constants.GAT_STATUS],
-                        "hour": alarm_data[constants.GAT_HOUR],
-                        "minute": alarm_data[constants.GAT_MINUTE],
-                        "week": alarm_data[constants.GAT_WEEK],
-                        "mode": alarm_data[constants.GAT_MODE],
-                        "trigger_mode": alarm_data[constants.GAT_TRIGGER_MODE],
-                        "fm_freq": int.from_bytes(alarm_data[constants.GAT_FM_FREQ_START:constants.GAT_FM_FREQ_START + 2], byteorder='little'),
-                        "volume": alarm_data[constants.GAT_VOLUME],
+                        "status": alarm_data[models.GAT_STATUS],
+                        "hour": alarm_data[models.GAT_HOUR],
+                        "minute": alarm_data[models.GAT_MINUTE],
+                        "week": alarm_data[models.GAT_WEEK],
+                        "mode": alarm_data[models.GAT_MODE],
+                        "trigger_mode": alarm_data[models.GAT_TRIGGER_MODE],
+                        "fm_freq": int.from_bytes(alarm_data[models.GAT_FM_FREQ_START:models.GAT_FM_FREQ_START + 2], byteorder='little'),
+                        "volume": alarm_data[models.GAT_VOLUME],
                     })
             return alarms
         return None
@@ -37,13 +43,13 @@ class Alarm:
     async def _set_animation_gif(self, command_key: str, index: int, total_length: int, gif_id: int, data: list) -> bool:
         """Helper method to set animation GIF for alarm or memorial."""
         self.logger.info(
-            f"Setting animation GIF for {command_key} with index {index} (0x{constants.COMMANDS[command_key]:02x})...")
+            f"Setting animation GIF for {command_key} with index {index} (0x{models.COMMANDS[command_key]:02x})...")
         args = []
         args += index.to_bytes(1, byteorder='big')
         args += total_length.to_bytes(2, byteorder='little')
         args += gif_id.to_bytes(1, byteorder='big')
         args.extend(data)
-        return await self.communicator.send_command(constants.COMMANDS[command_key], args)
+        return await self.communicator.send_command(models.COMMANDS[command_key], args)
 
     async def set_alarm(self, alarm_index: int, status: int, hour: int, minute: int, week: int, mode: int, trigger_mode: int, fm_freq: int = 0, volume: int = 0) -> bool:
         """
@@ -71,7 +77,7 @@ class Alarm:
         args.append(trigger_mode)
         args += fm_freq.to_bytes(2, byteorder='little')
         args.append(volume)
-        return await self.communicator.send_command(constants.COMMANDS["set alarm"], args)
+        return await self.communicator.send_command(models.COMMANDS["set alarm"], args)
 
     async def set_alarm_gif(self, alarm_index: int, total_length: int, gif_id: int, data: list) -> bool:
         """Set the alarm animation for a specific alarm (0x51)."""
@@ -80,21 +86,21 @@ class Alarm:
     async def get_memorial_time(self):
         """Get memorial time (0x53)."""
         self.logger.info("Getting memorial time (0x53)...")
-        response = await self.communicator.send_command_and_wait_for_response(constants.COMMANDS["get memorial time"])
-        if response and len(response) >= constants.MEMORIAL_COUNT * constants.GMT_MEMORIAL_INFO_LENGTH:  # 10 records, each 39 bytes
+        response = await self.communicator.send_command_and_wait_for_response(models.COMMANDS["get memorial time"])
+        if response and len(response) >= models.MEMORIAL_COUNT * models.GMT_MEMORIAL_INFO_LENGTH:  # 10 records, each 39 bytes
             memorials = []
-            for i in range(constants.MEMORIAL_COUNT):
-                memorial_data = response[i*constants.GMT_MEMORIAL_INFO_LENGTH:(i+1)*constants.GMT_MEMORIAL_INFO_LENGTH]
-                if len(memorial_data) == constants.GMT_MEMORIAL_INFO_LENGTH:
+            for i in range(models.MEMORIAL_COUNT):
+                memorial_data = response[i*models.GMT_MEMORIAL_INFO_LENGTH:(i+1)*models.GMT_MEMORIAL_INFO_LENGTH]
+                if len(memorial_data) == models.GMT_MEMORIAL_INFO_LENGTH:
                     memorials.append({
-                        "dialy_id": memorial_data[constants.GMT_DIALY_ID],
-                        "on_off": memorial_data[constants.GMT_ON_OFF],
-                        "month": memorial_data[constants.GMT_MONTH],
-                        "day": memorial_data[constants.GMT_DAY],
-                        "hour": memorial_data[constants.GMT_HOUR],
-                        "minute": memorial_data[constants.GMT_MINUTE],
-                        "have_flag": memorial_data[constants.GMT_HAVE_FLAG],
-                        "title_name": bytes(memorial_data[constants.GMT_TITLE_NAME_START:constants.GMT_TITLE_NAME_END]).decode('utf-8').strip('\x00')
+                        "dialy_id": memorial_data[models.GMT_DIALY_ID],
+                        "on_off": memorial_data[models.GMT_ON_OFF],
+                        "month": memorial_data[models.GMT_MONTH],
+                        "day": memorial_data[models.GMT_DAY],
+                        "hour": memorial_data[models.GMT_HOUR],
+                        "minute": memorial_data[models.GMT_MINUTE],
+                        "have_flag": memorial_data[models.GMT_HAVE_FLAG],
+                        "title_name": bytes(memorial_data[models.GMT_TITLE_NAME_START:models.GMT_TITLE_NAME_END]).decode('utf-8').strip('\x00')
                     })
             return memorials
         return None
@@ -121,7 +127,7 @@ class Alarm:
         # Pad with null bytes to 32 bytes
         args.extend([0] * (32 - len(title_bytes)))
 
-        return await self.communicator.send_command(constants.COMMANDS["set memorial"], args)
+        return await self.communicator.send_command(models.COMMANDS["set memorial"], args)
 
     async def set_memorial_gif(self, memorial_index: int, total_length: int, gif_id: int, data: list) -> bool:
         """Set the memorial animation for a specific memorial (0x55)."""
@@ -135,13 +141,13 @@ class Alarm:
         args.append(bool_to_byte(on_off))
         args += mode.to_bytes(1, byteorder='big')
         args += volume.to_bytes(1, byteorder='big')
-        return await self.communicator.send_command(constants.COMMANDS["set alarm listen"], args)
+        return await self.communicator.send_command(models.COMMANDS["set alarm listen"], args)
 
     async def set_alarm_volume(self, volume: int) -> bool:
         """Set the volume level for the alarm audition feature (0xa6)."""
         self.logger.info(f"Setting alarm volume to {volume} (0xa6)...")
         args = [volume]
-        return await self.communicator.send_command(constants.COMMANDS["set alarm vol"], args)
+        return await self.communicator.send_command(models.COMMANDS["set alarm vol"], args)
 
     async def set_alarm_volume_control(self, control: int, index: int):
         """Control the voice alarm feature (0x82)."""
@@ -150,4 +156,4 @@ class Alarm:
         args = []
         args += control.to_bytes(1, byteorder='big')
         args += index.to_bytes(1, byteorder='big')
-        return await self.communicator.send_command(constants.COMMANDS["set alarm vol ctrl"], args)
+        return await self.communicator.send_command(models.COMMANDS["set alarm vol ctrl"], args)

@@ -1,3 +1,4 @@
+
 import asyncio
 import datetime
 import itertools
@@ -8,25 +9,25 @@ import time
 from bleak import BleakClient
 from bleak.exc import BleakError
 
-from . import constants
+from . import models
 from .utils.converters import color_to_rgb_list, number2HexString, boolean2HexString, color2HexString
 from .utils.image_processing import make_framepart
 
 
-class DivoomBase:
+class DivoomProtocol:
     """Base class for Divoom Bluetooth communication."""
 
     def __init__(self, mac: str | None = None, logger: logging.Logger | None = None, write_characteristic_uuid: str | None = None, notify_characteristic_uuid: str | None = None, read_characteristic_uuid: str | None = None, spp_characteristic_uuid: str | None = None, escapePayload: bool = False, use_ios_le_protocol: bool = False, device_name: str | None = None, client: BleakClient | None = None) -> None:
-        self.type = constants.DEFAULT_DEVICE_TYPE  # Default to Ditoo
-        self.screensize = constants.DEFAULT_SCREEN_SIZE
-        self.chunksize = constants.DEFAULT_CHUNK_SIZE
+        self.type = models.DEFAULT_DEVICE_TYPE  # Default to Ditoo
+        self.screensize = models.DEFAULT_SCREEN_SIZE
+        self.chunksize = models.DEFAULT_CHUNK_SIZE
         self.colorpalette = None
         self.mac = mac
         self.device_name = device_name  # Store device name
         self.WRITE_CHARACTERISTIC_UUID = write_characteristic_uuid
         self.NOTIFY_CHARACTERISTIC_UUID = notify_characteristic_uuid
         self.READ_CHARACTERISTIC_UUID = read_characteristic_uuid
-        self.SPP_CHARACTERISTIC_UUID = spp_characteristic_uuid if spp_characteristic_uuid else constants.DEFAULT_SPP_CHARACTERISTIC_UUID
+        self.SPP_CHARACTERISTIC_UUID = spp_characteristic_uuid if spp_characteristic_uuid else models.DEFAULT_SPP_CHARACTERISTIC_UUID
         self.escapePayload = escapePayload
         # Initialize client internally only if mac is provided, or use provided client
         self.client = client if client else (BleakClient(self.mac) if self.mac else None)
@@ -35,8 +36,8 @@ class DivoomBase:
         # New attribute to store the expected command ID
         self._expected_response_command = None
         self.message_buf = []
-        self.max_reconnect_attempts = constants.DEFAULT_MAX_RECONNECT_ATTEMPTS  # Increased from default
-        self.reconnect_delay = constants.DEFAULT_RECONNECT_DELAY  # Increased from default
+        self.max_reconnect_attempts = models.DEFAULT_MAX_RECONNECT_ATTEMPTS  # Increased from default
+        self.reconnect_delay = models.DEFAULT_RECONNECT_DELAY  # Increased from default
 
         if logger is None:
             logger = logging.getLogger(self.type)
@@ -48,6 +49,23 @@ class DivoomBase:
                 handler.setFormatter(formatter)
                 logger.addHandler(handler)
         self.logger = logger
+
+    @asynccontextmanager
+    async def _framing_context(self, use_ios: bool, escape: bool):
+        """
+        An async context manager to temporarily set framing preferences.
+        Ensures original preferences are restored afterwards.
+        """
+        prev_use_ios = self.use_ios_le_protocol
+        prev_escape = getattr(self, "escapePayload", False)
+
+        self.use_ios_le_protocol = use_ios
+        self.escapePayload = escape
+        try:
+            yield
+        finally:
+            self.use_ios_le_protocol = prev_use_ios
+            self.escapePayload = prev_escape
 
     @property
     def is_connected(self) -> bool:
@@ -113,15 +131,15 @@ class DivoomBase:
 
     def _handle_ios_le_notification(self, data: bytes) -> bool:
         """Handles notifications for the iOS LE Protocol."""
-        if len(data) >= constants.IOS_LE_MIN_DATA_LENGTH and data[0:4] == bytes(constants.IOS_LE_HEADER):
+        if len(data) >= models.IOS_LE_MIN_DATA_LENGTH and data[0:4] == bytes(models.IOS_LE_HEADER):
             self.logger.info(
                 f"iOS LE Protocol response found. Full data: {data.hex()}")
 
-            data_length = int.from_bytes(data[constants.IOS_LE_DATA_LENGTH_START:constants.IOS_LE_DATA_LENGTH_END], byteorder='little')
-            command_identifier = data[constants.IOS_LE_COMMAND_IDENTIFIER]
-            packet_number = int.from_bytes(data[constants.IOS_LE_PACKET_NUMBER_START:constants.IOS_LE_PACKET_NUMBER_END], byteorder='little')
-            response_data = data[constants.IOS_LE_DATA_OFFSET:-constants.IOS_LE_CHECKSUM_LENGTH]
-            checksum = int.from_bytes(data[-constants.IOS_LE_CHECKSUM_LENGTH:], byteorder='little')
+            data_length = int.from_bytes(data[models.IOS_LE_DATA_LENGTH_START:models.IOS_LE_DATA_LENGTH_END], byteorder='little')
+            command_identifier = data[models.IOS_LE_COMMAND_IDENTIFIER]
+            packet_number = int.from_bytes(data[models.IOS_LE_PACKET_NUMBER_START:models.IOS_LE_PACKET_NUMBER_END], byteorder='little')
+            response_data = data[models.IOS_LE_DATA_OFFSET:-models.IOS_LE_CHECKSUM_LENGTH]
+            checksum = int.from_bytes(data[-models.IOS_LE_CHECKSUM_LENGTH:], byteorder='little')
 
             self.logger.info(
                 f"Parsed iOS LE response: Cmd ID: 0x{command_identifier:02x}, Packet Num: {packet_number}, Data: {response_data.hex()}, Checksum: 0x{checksum:04x}")
@@ -133,7 +151,7 @@ class DivoomBase:
             expected_cmd = self._expected_response_command
 
             is_expected_response = expected_cmd is not None and command_identifier == expected_cmd
-            is_generic_ack = expected_cmd is not None and command_identifier == 0x33 and expected_cmd in constants.GENERIC_ACK_COMMANDS
+            is_generic_ack = expected_cmd is not None and command_identifier == 0x33 and expected_cmd in models.GENERIC_ACK_COMMANDS
 
             if is_expected_response or is_generic_ack:
                 self.notification_queue.put_nowait(response_payload)
@@ -155,7 +173,7 @@ class DivoomBase:
         while len(self.message_buf) >= 7: # Minimum length for a valid message
             start_index = -1
             try:
-                start_index = self.message_buf.index(constants.MESSAGE_START_BYTE)
+                start_index = self.message_buf.index(models.MESSAGE_START_BYTE)
             except ValueError:
                 self.logger.debug("No start byte found in buffer, clearing.")
                 self.message_buf.clear()
@@ -183,7 +201,7 @@ class DivoomBase:
             self.message_buf = self.message_buf[total_message_len:] # Consume message from buffer
             self.logger.debug(f"DEBUG: Basic Protocol - Message consumed. Remaining buffer length: {len(self.message_buf)}")
 
-            if message[-1] != constants.MESSAGE_END_BYTE:
+            if message[-1] != models.MESSAGE_END_BYTE:
                 self.logger.warning(f"Message missing END byte. Discarding: {bytes(message).hex()}")
                 continue # Look for the next message
 
@@ -247,7 +265,7 @@ class DivoomBase:
                 response_cmd_id = response.get('command_id')
 
                 is_expected_response = response_cmd_id == command_id
-                is_generic_ack = response_cmd_id == 0x33 and command_id in constants.GENERIC_ACK_COMMANDS
+                is_generic_ack = response_cmd_id == 0x33 and command_id in models.GENERIC_ACK_COMMANDS
 
                 if is_expected_response:
                     self.logger.debug(f"Got matching response for command ID 0x{command_id:02x} (Received 0x{response_cmd_id:02x})")
@@ -275,7 +293,7 @@ class DivoomBase:
                 f"Cannot send command '{command}': Not connected to a Divoom device.")
             return None
 
-        command_id = constants.COMMANDS.get(command, command) if isinstance(command, str) else command
+        command_id = models.COMMANDS.get(command, command) if isinstance(command, str) else command
 
         while not self.notification_queue.empty():
             self.notification_queue.get_nowait()
@@ -296,7 +314,7 @@ class DivoomBase:
             args = []
         if isinstance(command, str):
             command_name = command
-            command = constants.COMMANDS[command]
+            command = models.COMMANDS[command]
         else:
             command_name = f"0x{command:02x}"
 
@@ -420,12 +438,12 @@ class DivoomBase:
         """
         escaped = []
         for b in payload_bytes:
-            if b == constants.ESCAPE_BYTE_1:
-                escaped.extend(constants.ESCAPE_SEQUENCE_1)
-            elif b == constants.ESCAPE_BYTE_2:
-                escaped.extend(constants.ESCAPE_SEQUENCE_2)
-            elif b == constants.ESCAPE_BYTE_3:
-                escaped.extend(constants.ESCAPE_SEQUENCE_3)
+            if b == models.ESCAPE_BYTE_1:
+                escaped.extend(models.ESCAPE_SEQUENCE_1)
+            elif b == models.ESCAPE_BYTE_2:
+                escaped.extend(models.ESCAPE_SEQUENCE_2)
+            elif b == models.ESCAPE_BYTE_3:
+                escaped.extend(models.ESCAPE_SEQUENCE_3)
             else:
                 escaped.append(b)
         return escaped
@@ -443,7 +461,7 @@ class DivoomBase:
         if getattr(self, "escapePayload", False):
             working_payload = self._escape_payload(payload_bytes)
 
-        length_value = len(working_payload) + constants.MESSAGE_CHECKSUM_LENGTH
+        length_value = len(working_payload) + models.MESSAGE_CHECKSUM_LENGTH
 
         length_bytes = list(length_value.to_bytes(2, byteorder='little'))
         length_hex = "".join(f"{b:02x}" for b in length_bytes)
@@ -453,24 +471,24 @@ class DivoomBase:
 
         payload_hex = "".join(f"{b:02x}" for b in working_payload)
 
-        final_message_hex = f"{constants.MESSAGE_START_BYTE:02x}{length_hex}{payload_hex}{checksum_hex}{constants.MESSAGE_END_BYTE:02x}"
+        final_message_hex = f"{models.MESSAGE_START_BYTE:02x}{length_hex}{payload_hex}{checksum_hex}{models.MESSAGE_END_BYTE:02x}"
 
         return final_message_hex
 
     def _make_message_ios_le(self, payload_bytes: list, packet_number: int = 0x00000000) -> str:
         """Make a complete message from the payload data using the iOS LE protocol."""
-        header = constants.IOS_LE_MESSAGE_HEADER
+        header = models.IOS_LE_MESSAGE_HEADER
         command_identifier = payload_bytes[0]
         data_bytes = payload_bytes
         packet_number_bytes = list(
-            packet_number.to_bytes(constants.IOS_LE_MESSAGE_PACKET_NUM_LENGTH, byteorder='little'))
-        data_length_value = constants.IOS_LE_MESSAGE_CMD_ID_LENGTH + constants.IOS_LE_MESSAGE_PACKET_NUM_LENGTH + len(data_bytes) + constants.IOS_LE_MESSAGE_CHECKSUM_LENGTH
+            packet_number.to_bytes(models.IOS_LE_MESSAGE_PACKET_NUM_LENGTH, byteorder='little'))
+        data_length_value = models.IOS_LE_MESSAGE_CMD_ID_LENGTH + models.IOS_LE_MESSAGE_PACKET_NUM_LENGTH + len(data_bytes) + models.IOS_LE_MESSAGE_CHECKSUM_LENGTH
         data_length_bytes = list(
             data_length_value.to_bytes(2, byteorder='little'))
         checksum_input = data_length_bytes + \
             [command_identifier] + packet_number_bytes + data_bytes
         checksum_value = sum(checksum_input)
-        checksum_bytes = list(checksum_value.to_bytes(constants.IOS_LE_MESSAGE_CHECKSUM_LENGTH, byteorder='little'))
+        checksum_bytes = list(checksum_value.to_bytes(models.IOS_LE_MESSAGE_CHECKSUM_LENGTH, byteorder='little'))
         final_message_bytes = header + data_length_bytes + \
             [command_identifier] + packet_number_bytes + \
             data_bytes + checksum_bytes

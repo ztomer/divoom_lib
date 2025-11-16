@@ -7,8 +7,8 @@ import sys
 # Add the project root to sys.path to allow importing divoom_api
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from divoom_lib import Divoom
-from divoom_lib.utils.discovery import discover_device
+from divoom_lib.divoom import Divoom
+from divoom_lib.utils import discovery
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -31,25 +31,25 @@ async def main():
         if args.address:
             divoom = Divoom(mac=args.address, logger=logger)
         else:
-            ble_device, device_id = await discover_device(name_substring=args.name, address=None)
+            ble_device, device_id = await discovery.discover_device(name_substring=args.name, address=None)
             if not ble_device:
                 logger.error(
                     f"No Bluetooth device found with name containing '{args.name}'. Exiting.")
                 return
             divoom = Divoom(mac=device_id, logger=logger)
 
-        await divoom.connect()
-        logger.info(f"Successfully connected to {divoom.mac}!")
+        await divoom.protocol.connect()
+        logger.info(f"Successfully connected to {divoom.protocol.mac}!")
 
-        logger.info("Sending blue light command...")
-        await divoom.display.show_light(color="0000FF", brightness=100)
+        logger.info("Sending green light command...")
+        await divoom.light.show_light(color="00FF00", brightness=100)
         logger.info("Command sent successfully.")
 
     except Exception as e:
         logger.error(f"Error: {e}")
     finally:
-        if divoom and divoom.is_connected:
-            await divoom.disconnect()
+        if divoom and divoom.protocol.is_connected:
+            await divoom.protocol.disconnect()
             logger.info("Disconnected from Divoom device.")
 
 if __name__ == "__main__":

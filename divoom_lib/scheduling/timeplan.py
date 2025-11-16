@@ -1,8 +1,5 @@
 
-"""
-Divoom Timeplan Commands
-"""
-from .constants import (
+from ..models import (
     COMMANDS,
     STMI_STATUS, STMI_HOUR, STMI_MINUTE, STMI_WEEK, STMI_MODE, STMI_TRIGGER_MODE,
     STMI_FM_FREQ_START, STMI_FM_FREQ_LENGTH, STMI_VOLUME, STMI_TYPE,

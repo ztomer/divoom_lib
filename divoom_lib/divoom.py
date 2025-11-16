@@ -1,30 +1,29 @@
-from divoom_lib.base import DivoomBase
-from divoom_lib import constants
-from divoom_lib.display import Display
-from divoom_lib.system import System
-from divoom_lib.light import Light
-from divoom_lib.music import Music
-from divoom_lib.alarm import Alarm
-from divoom_lib.tool import Tool
-from divoom_lib.sleep import Sleep
-from divoom_lib.game import Game
-from divoom_lib.timeplan import Timeplan
+
+from .protocol import DivoomProtocol
+from . import models
+from .display.light import Light
+from .display.animation import Animation
+from .display.drawing import Drawing
+from .display.text import Text
+from .system.device import Device
+from .system.time import Time
+from .system.bluetooth import Bluetooth
+from .media.music import Music
+from .media.radio import Radio
+from .scheduling.alarm import Alarm
+from .scheduling.sleep import Sleep
+from .scheduling.timeplan import Timeplan
+from .tools.scoreboard import Scoreboard
+from .tools.timer import Timer
+from .tools.countdown import Countdown
+from .tools.noise import Noise
 
 import asyncio
-import json
-import os
-from pathlib import Path
 import logging
-import datetime
-from bleak import BleakScanner, BleakClient
+from bleak import BleakClient
 from bleak.exc import BleakError
-from contextlib import asynccontextmanager
 
-from divoom_lib.utils import cache
-from divoom_lib.utils import discovery
-
-
-class Divoom(DivoomBase):
+class Divoom:
     """
     A class to interact with a Divoom device over Bluetooth Low Energy (BLE).
 
@@ -46,41 +45,38 @@ class Divoom(DivoomBase):
             use_ios_le_protocol (bool): Whether to use the iOS LE protocol.
             device_name (str | None): The name of the Divoom device.
         """
-        super().__init__(mac, logger, write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid, spp_characteristic_uuid, escapePayload, use_ios_le_protocol, device_name=device_name, client=client)
-        self.display = Display(self)
-        self.system = System(self)
-        self.light = Light(self)
-        self.music = Music(self)
-        self.alarm = Alarm(self)
-        self.tool = Tool(self)
-        self.sleep = Sleep(self)
-        self.game = Game(self)
-        self.timeplan = Timeplan(self)
-        self.logger.debug("Divoom.__init__ called. super().__init__ completed.")
+        self.protocol = DivoomProtocol(mac, logger, write_characteristic_uuid, notify_characteristic_uuid, read_characteristic_uuid, spp_characteristic_uuid, escapePayload, use_ios_le_protocol, device_name=device_name, client=client)
+        
+        self.light = Light(self.protocol)
+        self.animation = Animation(self.protocol)
+        self.drawing = Drawing(self.protocol)
+        self.text = Text(self.protocol)
+        
+        self.device = Device(self.protocol)
+        self.time = Time(self.protocol)
+        self.bluetooth = Bluetooth(self.protocol)
 
-    @asynccontextmanager
-    async def _framing_context(self, use_ios: bool, escape: bool):
-        """
-        An async context manager to temporarily set framing preferences.
-        Ensures original preferences are restored afterwards.
-        """
-        prev_use_ios = self.use_ios_le_protocol
-        prev_escape = getattr(self, "escapePayload", False)
+        self.music = Music(self.protocol)
+        self.radio = Radio(self.protocol)
 
-        self.use_ios_le_protocol = use_ios
-        self.escapePayload = escape
-        try:
-            yield
-        finally:
-            self.use_ios_le_protocol = prev_use_ios
-            self.escapePayload = prev_escape
+        self.alarm = Alarm(self.protocol)
+        self.sleep = Sleep(self.protocol)
+        self.timeplan = Timeplan(self.protocol)
+
+        self.scoreboard = Scoreboard(self.protocol)
+        self.timer = Timer(self.protocol)
+        self.countdown = Countdown(self.protocol)
+        self.noise = Noise(self.protocol)
+
+        self.logger = self.protocol.logger
+        self.logger.debug("Divoom.__init__ called. protocol and modules initialized.")
 
     async def _try_send_command_with_framing(self, command_id: int, payload: list, timeout: int, use_ios: bool, escape: bool) -> bytes | None:
         """
         Helper function to send a command with specified framing options and return the response.
         """
-        async with self._framing_context(use_ios, escape):
-            resp = await self.send_command_and_wait_for_response(command_id, payload, timeout=timeout)
+        async with self.protocol._framing_context(use_ios, escape):
+            resp = await self.protocol.send_command_and_wait_for_response(command_id, payload, timeout=timeout)
         return resp
 
     async def _send_diagnostic_payload(self, uuid: str, args_payload: list, device_cache: dict, cache_dir: str, device_id: str, cache_util) -> bool:
@@ -92,7 +88,7 @@ class Divoom(DivoomBase):
 
         # SPP attempt
         resp_spp = await self._try_send_command_with_framing(
-            constants.COMMANDS["set light mode"],
+            models.COMMANDS["set light mode"],
             args_payload,
             timeout=3,
             use_ios=False,
@@ -103,7 +99,7 @@ class Divoom(DivoomBase):
             existing = device_cache or {}
             existing.update({
                 "write_characteristic_uuid": uuid,
-                "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
+                "ack_characteristic_uuid": self.protocol.NOTIFY_CHARACTERISTIC_UUID,
                 "last_successful_payload": [f"{b:02x}" for b in args_payload],
                 "last_successful_use_ios_le": False,
                 "escapePayload": True,
@@ -113,21 +109,21 @@ class Divoom(DivoomBase):
 
         # iOS-LE attempt
         resp_ios = await self._try_send_command_with_framing(
-            constants.COMMANDS["set light mode"],
+            models.COMMANDS["set light mode"],
             args_payload,
             timeout=3,
             use_ios=True,
-            escape=getattr(self, "escapePayload", False) # Use current escapePayload setting
+            escape=getattr(self.protocol, "escapePayload", False) # Use current escapePayload setting
         )
         if resp_ios is not None:
             self.logger.info(f"Response to iOS-LE diagnostic payload on {uuid}: {resp_ios}")
             existing = device_cache or {}
             existing.update({
                 "write_characteristic_uuid": uuid,
-                "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
+                "ack_characteristic_uuid": self.protocol.NOTIFY_CHARACTERISTIC_UUID,
                 "last_successful_payload": [f"{b:02x}" for b in args_payload],
                 "last_successful_use_ios_le": True,
-                "escapePayload": getattr(self, "escapePayload", False),
+                "escapePayload": getattr(self.protocol, "escapePayload", False),
             })
             cache_util.save_device_cache(cache_dir, device_id, existing)
             return True
@@ -147,11 +143,11 @@ class Divoom(DivoomBase):
 
             if payload:
                 resp = await self._try_send_command_with_framing(
-                    constants.COMMANDS["set light mode"],
+                    models.COMMANDS["set light mode"],
                     payload,
                     timeout=3,
-                    use_ios=bool(device_cache.get("last_successful_use_ios_le", self.use_ios_le_protocol)),
-                    escape=bool(device_cache.get("escapePayload", self.escapePayload))
+                    use_ios=bool(device_cache.get("last_successful_use_ios_le", self.protocol.use_ios_le_protocol)),
+                    escape=bool(device_cache.get("escapePayload", self.protocol.escapePayload))
                 )
                 if resp is not None:
                     self.logger.info(f"Saved payload produced a response on {uuid}: {resp}")
@@ -159,10 +155,10 @@ class Divoom(DivoomBase):
                     existing = device_cache or {}
                     existing.update({
                         "write_characteristic_uuid": uuid,
-                        "ack_characteristic_uuid": self.NOTIFY_CHARACTERISTIC_UUID,
+                        "ack_characteristic_uuid": self.protocol.NOTIFY_CHARACTERISTIC_UUID,
                         "last_successful_payload": [f"{b:02x}" for b in payload],
-                        "last_successful_use_ios_le": self.use_ios_le_protocol,
-                        "escapePayload": self.escapePayload,
+                        "last_successful_use_ios_le": self.protocol.use_ios_le_protocol,
+                        "escapePayload": self.protocol.escapePayload,
                     })
                     cache_util.save_device_cache(cache_dir, device_id, existing)
                     return True
@@ -202,8 +198,8 @@ class Divoom(DivoomBase):
         for idx, ch in enumerate(write_chars):
             uuid = ch.uuid
             self.logger.info(f"Probing write characteristic {uuid} ({idx+1}/{len(write_chars)})")
-            prev_write = getattr(self, "WRITE_CHARACTERISTIC_UUID", None)
-            self.WRITE_CHARACTERISTIC_UUID = uuid
+            prev_write = getattr(self.protocol, "WRITE_CHARACTERISTIC_UUID", None)
+            self.protocol.WRITE_CHARACTERISTIC_UUID = uuid
 
             # 1) If cache has a saved payload, try that first on this characteristic
             if await self._handle_cached_payload(uuid, device_cache, cache_dir, device_id, cache_util):
@@ -211,25 +207,25 @@ class Divoom(DivoomBase):
 
             # 2) Send a distinguishing color payload for this characteristic
             r, g, b = colors[idx % len(colors)]
-            args_payload = [constants.PAYLOAD_START_BYTE_COLOR_MODE, r, g, b, 100, constants.PAYLOAD_COLOR_MODE_UNKNOWN_BYTE_1, constants.PAYLOAD_COLOR_MODE_UNKNOWN_BYTE_2]
+            args_payload = [models.PAYLOAD_START_BYTE_COLOR_MODE, r, g, b, 100, models.PAYLOAD_COLOR_MODE_UNKNOWN_BYTE_1, models.PAYLOAD_COLOR_MODE_UNKNOWN_BYTE_2]
             if await self._send_diagnostic_payload(uuid, args_payload, device_cache, cache_dir, device_id, cache_util):
                 return uuid
 
             # restore previous write char if none succeeded for this char
-            self.WRITE_CHARACTERISTIC_UUID = prev_write
+            self.protocol.WRITE_CHARACTERISTIC_UUID = prev_write
 
         # Nothing produced a response during probing. Attempt fallback channel switch.
         self.logger.info("No write characteristic produced a response during probe. Falling back to single-character channel-switch attempt.")
         try:
             self.logger.info("Attempting channel-switch sequence: set work mode, power-on channel, then switch to channel 0x02")
-            await self.send_command(constants.COMMANDS["set work mode"], [constants.WORK_MODE_CHANNEL_9])
+            await self.protocol.send_command(models.COMMANDS["set work mode"], [models.WORK_MODE_CHANNEL_9])
             await asyncio.sleep(1.0)
-            await self.send_command(constants.COMMANDS["set poweron channel"], [constants.CHANNEL_ID_2])
+            await self.protocol.send_command(models.COMMANDS["set poweron channel"], [models.CHANNEL_ID_2])
             await asyncio.sleep(1.0)
 
             # Try SPP first, then iOS-LE fallback for channel switch
             res = await self._try_send_command_with_framing(
-                constants.COMMANDS["set light mode"], [constants.CHANNEL_ID_2], timeout=3, use_ios=False, escape=True
+                models.COMMANDS["set light mode"], [models.CHANNEL_ID_2], timeout=3, use_ios=False, escape=True
             )
             if res is not None:
                 self.logger.info(f"Channel switch (SPP) succeeded: response={res}")
@@ -237,7 +233,7 @@ class Divoom(DivoomBase):
             else:
                 self.logger.info("No response for SPP channel switch; trying iOS-LE framing...")
                 res2 = await self._try_send_command_with_framing(
-                    constants.COMMANDS["set light mode"], [constants.CHANNEL_ID_2], timeout=3, use_ios=True, escape=getattr(self, "escapePayload", False)
+                    models.COMMANDS["set light mode"], [models.CHANNEL_ID_2], timeout=3, use_ios=True, escape=getattr(self.protocol, "escapePayload", False)
                 )
                 if res2 is not None:
                     self.logger.info(f"Channel switch (iOS-LE) succeeded: response={res2}")
@@ -279,11 +275,11 @@ class Divoom(DivoomBase):
         self.logger.info(
             f"Attempting canonical Light Mode payload: {[hex(x) for x in args]} (SPP)")
         ok = await self._try_send_command_with_framing(
-            constants.COMMANDS["set light mode"],
+            models.COMMANDS["set light mode"],
             args,
             timeout=3,
             use_ios=False,
-            escape=self.escapePayload
+            escape=self.protocol.escapePayload
         )
         if ok is not None:
             self.logger.info(f"Canonical (SPP) response: {ok}")
@@ -293,7 +289,7 @@ class Divoom(DivoomBase):
                 existing.update({
                     "last_successful_payload": [f"{b:02x}" for b in args],
                     "last_successful_use_ios_le": False,
-                    "escapePayload": self.escapePayload,
+                    "escapePayload": self.protocol.escapePayload,
                 })
                 cache_util.save_device_cache(cache_dir, device_id, existing)
                 self.logger.info(f"Persisted canonical SPP payload to cache for {device_id}")
@@ -303,11 +299,11 @@ class Divoom(DivoomBase):
 
         self.logger.info("No response for canonical (SPP). Trying iOS-LE framing...")
         ok2 = await self._try_send_command_with_framing(
-            constants.COMMANDS["set light mode"],
+            models.COMMANDS["set light mode"],
             args,
             timeout=3,
             use_ios=True,
-            escape=self.escapePayload
+            escape=self.protocol.escapePayload
         )
         if ok2 is not None:
             self.logger.info(f"Canonical (iOS-LE) response: {ok2}")
@@ -316,7 +312,7 @@ class Divoom(DivoomBase):
                 existing.update({
                     "last_successful_payload": [f"{b:02x}" for b in args],
                     "last_successful_use_ios_le": True,
-                    "escapePayload": self.escapePayload,
+                    "escapePayload": self.protocol.escapePayload,
                 })
                 cache_util.save_device_cache(cache_dir, device_id, existing)
                 self.logger.info(
