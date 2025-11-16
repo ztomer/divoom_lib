@@ -98,6 +98,20 @@ class Music:
             return response[GV_VOLUME]  # 0-15
         return None
 
+    async def set_volume(self, volume: int) -> bool:
+        """
+        Set the volume level.
+
+        Args:
+            volume (int): The volume level (0-15).
+
+        Returns:
+            bool: True if the command was sent successfully, False otherwise.
+        """
+        self.logger.info(f"Setting volume to {volume} (0x08)...")
+        args = [volume]
+        return await self.communicator.send_command(COMMANDS["set volume"], args)
+
     async def get_play_status(self):
         """
         Get the current playback status.
@@ -110,6 +124,20 @@ class Music:
         if response and len(response) >= 1:
             return response[GPS_STATUS]  # 0: Pause, 1: Play
         return None
+
+    async def set_play_status(self, status: int) -> bool:
+        """
+        Set the current playback status.
+
+        Args:
+            status (int): 0 for pause, 1 for play.
+
+        Returns:
+            bool: True if the command was sent successfully, False otherwise.
+        """
+        self.logger.info(f"Setting play status to {status} (0x0a)...")
+        args = [status]
+        return await self.communicator.send_command(COMMANDS["set playstate"], args)
 
     async def set_sd_play_music_id(self, music_id: int) -> bool:
         """

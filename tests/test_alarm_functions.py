@@ -98,5 +98,55 @@ class TestAlarmFunctions(unittest.IsolatedAsyncioTestCase):
 
         # In a real scenario, you'd get the alarm settings back and assert enabled=False
 
+    async def test_get_memorial_time(self):
+        logger.info("--- Running test_get_memorial_time ---")
+        memorial_settings = await self.divoom.alarm.get_memorial_time()
+        self.assertIsNotNone(memorial_settings, "Failed to retrieve memorial settings.")
+        logger.info(f"Retrieved memorial settings: {memorial_settings}")
+        self.assertIsInstance(memorial_settings, list)
+        if len(memorial_settings) > 0:
+            self.assertIsInstance(memorial_settings[0], dict)
+            self.assertIn("dialy_id", memorial_settings[0])
+            self.assertIn("on_off", memorial_settings[0])
+            self.assertIn("month", memorial_settings[0])
+            self.assertIn("day", memorial_settings[0])
+            self.assertIn("hour", memorial_settings[0])
+            self.assertIn("minute", memorial_settings[0])
+            self.assertIn("have_flag", memorial_settings[0])
+            self.assertIn("title_name", memorial_settings[0])
+
+    async def test_set_alarm_listen(self):
+        logger.info("--- Running test_set_alarm_listen ---")
+        
+        # Enable alarm listen
+        logger.info("Enabling alarm listen...")
+        result = await self.divoom.alarm.set_alarm_listen(on_off=1, mode=0, volume=10)
+        self.assertTrue(result)
+        await asyncio.sleep(1.0)
+
+        # Disable alarm listen
+        logger.info("Disabling alarm listen...")
+        result = await self.divoom.alarm.set_alarm_listen(on_off=0, mode=0, volume=10)
+        self.assertTrue(result)
+        logger.info("Successfully enabled and disabled alarm listen.")
+
+    async def test_set_alarm_volume(self):
+        logger.info("--- Running test_set_alarm_volume ---")
+        
+        # Set alarm volume
+        logger.info("Setting alarm volume to 5...")
+        result = await self.divoom.alarm.set_alarm_volume(volume=5)
+        self.assertTrue(result)
+        logger.info("Successfully set alarm volume.")
+
+    async def test_set_alarm_volume_control(self):
+        logger.info("--- Running test_set_alarm_volume_control ---")
+        
+        # Set alarm volume control
+        logger.info("Setting alarm volume control...")
+        result = await self.divoom.alarm.set_alarm_volume_control(control=0, index=0)
+        self.assertTrue(result)
+        logger.info("Successfully set alarm volume control.")
+
 if __name__ == '__main__':
     unittest.main()

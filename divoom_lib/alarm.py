@@ -99,6 +99,30 @@ class Alarm:
             return memorials
         return None
 
+    async def set_memorial_time(self, dialy_id: int, on_off: int, month: int, day: int, hour: int, minute: int, have_flag: int, title_name: str) -> bool:
+        """Set memorial time (0x54)."""
+        self.logger.info(f"Setting memorial time for id {dialy_id} (0x54)...")
+        args = []
+        args.append(dialy_id)
+        args.append(on_off)
+        args.append(month)
+        args.append(day)
+        args.append(hour)
+        args.append(minute)
+        args.append(have_flag)
+        
+        title_bytes = title_name.encode('utf-8')
+        if len(title_bytes) > 32:
+            self.logger.warning("Title name too long, truncating to 32 bytes.")
+            title_bytes = title_bytes[:32]
+        
+        args.extend(list(title_bytes))
+        
+        # Pad with null bytes to 32 bytes
+        args.extend([0] * (32 - len(title_bytes)))
+
+        return await self.communicator.send_command(constants.COMMANDS["set memorial"], args)
+
     async def set_memorial_gif(self, memorial_index: int, total_length: int, gif_id: int, data: list) -> bool:
         """Set the memorial animation for a specific memorial (0x55)."""
         return await self._set_animation_gif("set memorial gif", memorial_index, total_length, gif_id, data)
