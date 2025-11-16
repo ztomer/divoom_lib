@@ -83,6 +83,106 @@ class TestLightFunctions(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result)
         logger.info(f"Successfully sent set_gif_speed command with speed {test_speed}ms.")
 
+    async def test_set_light_phone_word_attr_color(self):
+        """Test setting the text color attribute."""
+        logger.info("--- Running test_set_light_phone_word_attr_color ---")
+        
+        # Set text color to red for text box 0
+        result = await self.divoom.light.set_light_phone_word_attr(
+            control=constants.LPWA_CONTROL_COLOR,
+            color=[255, 0, 0],
+            text_box_id=0
+        )
+        self.assertTrue(result)
+        logger.info("Successfully sent set_light_phone_word_attr command for color.")
+
+    async def test_set_light_phone_word_attr_speed(self):
+        """Test setting the text speed attribute."""
+        logger.info("--- Running test_set_light_phone_word_attr_speed ---")
+        
+        # Set text speed to 100ms for text box 0
+        result = await self.divoom.light.set_light_phone_word_attr(
+            control=constants.LPWA_CONTROL_SPEED,
+            speed=100,
+            text_box_id=0
+        )
+        self.assertTrue(result)
+        logger.info("Successfully sent set_light_phone_word_attr command for speed.")
+
+    async def test_set_light_phone_word_attr_content(self):
+        """Test setting the text content attribute."""
+        logger.info("--- Running test_set_light_phone_word_attr_content ---")
+        
+        # Set text content for text box 0
+        result = await self.divoom.light.set_light_phone_word_attr(
+            control=constants.LPWA_CONTROL_CONTENT,
+            text_content="Hello",
+            text_box_id=0
+        )
+        self.assertTrue(result)
+        logger.info("Successfully sent set_light_phone_word_attr command for content.")
+
+    async def test_app_new_send_gif_cmd(self):
+        """Test sending a new GIF command."""
+        logger.info("--- Running test_app_new_send_gif_cmd ---")
+        
+        fake_gif_data = [0x01, 0x02, 0x03, 0x04]
+        file_size = len(fake_gif_data)
+
+        # Start sending
+        logger.info("Starting GIF send...")
+        result = await self.divoom.light.app_new_send_gif_cmd(
+            control_word=constants.ANSGC_CONTROL_START_SENDING,
+            file_size=file_size
+        )
+        self.assertTrue(result)
+        await asyncio.sleep(1.0)
+
+        # Send data
+        logger.info("Sending GIF data...")
+        result = await self.divoom.light.app_new_send_gif_cmd(
+            control_word=constants.ANSGC_CONTROL_SENDING_DATA,
+            file_size=file_size,
+            file_offset_id=0,
+            file_data=fake_gif_data
+        )
+        self.assertTrue(result)
+        await asyncio.sleep(1.0)
+
+        # Terminate sending
+        logger.info("Terminating GIF send...")
+        result = await self.divoom.light.app_new_send_gif_cmd(
+            control_word=constants.ANSGC_CONTROL_TERMINATE_SENDING
+        )
+        self.assertTrue(result)
+        logger.info("Successfully sent app_new_send_gif_cmd commands.")
+
+    async def test_modify_user_gif_items(self):
+        """Test modifying user GIF items."""
+        logger.info("--- Running test_modify_user_gif_items ---")
+
+        # Get number of user GIFs
+        logger.info("Getting number of user GIFs...")
+        num_gifs = await self.divoom.light.modify_user_gif_items(constants.MUGI_DATA_GET_COUNT)
+        self.assertIsNotNone(num_gifs)
+        self.assertIsInstance(num_gifs, int)
+        logger.info(f"Number of user GIFs: {num_gifs}")
+
+        # Deleting a GIF is a destructive operation, so we will not test it
+        # in an automated test without a way to restore it.
+        # We will just check that the command can be sent.
+        logger.info("Testing deletion command (without actual deletion)...")
+        # To avoid actual deletion, we can't really test this.
+        # We'll assume if get count works, delete would send a valid command.
+        pass
+
+    async def test_drawing_pad_exit(self):
+        """Test exiting the drawing pad."""
+        logger.info("--- Running test_drawing_pad_exit ---")
+        result = await self.divoom.light.drawing_pad_exit()
+        self.assertTrue(result)
+        logger.info("Successfully sent drawing_pad_exit command.")
+
 
 if __name__ == '__main__':
     unittest.main()

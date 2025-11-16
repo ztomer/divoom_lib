@@ -373,3 +373,20 @@ class System:
         if response and len(response) >= 1:
             return response[0]  # 1: enabled, 0: disabled
         return None
+
+    async def send_current_temp(self, temp: int, weather: int) -> bool:
+        """Send current temperature and weather (0x5f).
+        temp: Temperature value.
+        weather: Weather type."""
+        self.logger.info(f"Sending current temp: {temp}, weather: {weather} (0x5f)...")
+        args = []
+        args += temp.to_bytes(1, byteorder='big', signed=True)
+        args += weather.to_bytes(1, byteorder='big')
+        return await self.communicator.send_command(COMMANDS["send current temp"], args)
+
+    async def set_temp_type(self, temp_type: int) -> bool:
+        """Set the temperature format (0x2b).
+        temp_type: 0 for Celsius, 1 for Fahrenheit."""
+        self.logger.info(f"Setting temp type to {temp_type} (0x2b)...")
+        args = [temp_type]
+        return await self.communicator.send_command(COMMANDS["set temp type"], args)

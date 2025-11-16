@@ -45,6 +45,7 @@ COMMANDS = {
     "send net temp": 0x5d,
     "send net temp disp": 0x5e,
     "set temp": 0x5f,
+    "send current temp": 0x5f,
     "set radio frequency": 0x61,
     "drawing mul encode gif play": 0x6b,
     "drawing encode movie play": 0x6c,

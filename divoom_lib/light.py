@@ -97,6 +97,38 @@ class Light:
         args = speed.to_bytes(2, byteorder='little')
         return await self.communicator.send_command(COMMANDS["set gif speed"], list(args))
 
+    async def set_light_pic(self, pic_data: list) -> bool:
+        """
+        Display user-drawn pictures on the device (0x44).
+        
+        Args:
+            pic_data (list): The encoded picture data.
+        
+        Returns:
+            bool: True if the command was sent successfully, False otherwise.
+        """
+        self.logger.info(f"Setting light pic (0x44)...")
+        return await self.communicator.send_command(COMMANDS["set light pic"], pic_data)
+
+    async def set_light_phone_gif(self, total_len: int, gif_id: int, gif_data: list) -> bool:
+        """
+        Display user-drawn animations on the device (0x49).
+
+        Args:
+            total_len (int): Total length of the data.
+            gif_id (int): Sequential number of the sent data.
+            gif_data (list): The encoded animation data.
+
+        Returns:
+            bool: True if the command was sent successfully, False otherwise.
+        """
+        self.logger.info(f"Setting light phone gif (0x49)...")
+        args = []
+        args += total_len.to_bytes(2, byteorder='little')
+        args += gif_id.to_bytes(1, byteorder='big')
+        args.extend(gif_data)
+        return await self.communicator.send_command(COMMANDS["set light phone gif"], args)
+
     def _handle_lpwa_speed(self, kwargs: dict) -> list | None:
         speed = kwargs.get("speed")
         text_box_id = kwargs.get("text_box_id")

@@ -58,6 +58,30 @@ class TestTimeplanFunctions(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result, "Failed to set time manage info (Type 1).")
         logger.info("Successfully set time manage info (Type 1).")
 
+    async def test_set_time_manage_info_type0(self):
+        logger.info("--- Running test_set_time_manage_info_type0 ---")
+        # Set a time management info of type 0 (Animation)
+        fake_anim_data = [0x01, 0x02, 0x03, 0x04]
+        result = await self.divoom.timeplan.set_time_manage_info(
+            status=1, # On
+            hour=13,
+            minute=0,
+            week=127, # All days
+            mode=0,
+            trigger_mode=4, # Animation
+            fm_freq=0,
+            volume=50,
+            type=0, # Animation
+            animation_id=1,
+            animation_speed=100,
+            animation_direction=0,
+            animation_frame_count=1,
+            animation_frame_delay=100,
+            animation_frame_data=fake_anim_data
+        )
+        self.assertTrue(result, "Failed to set time manage info (Type 0).")
+        logger.info("Successfully set time manage info (Type 0).")
+
     async def test_set_time_manage_ctrl(self):
         logger.info("--- Running test_set_time_manage_ctrl ---")
         # Enable time management function at index 0

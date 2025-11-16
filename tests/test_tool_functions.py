@@ -128,5 +128,84 @@ class TestToolFunctions(unittest.IsolatedAsyncioTestCase):
             seconds=0
         )
 
+    async def test_timer(self):
+        """Test setting and getting the timer tool."""
+        logger.info("--- Running test_timer ---")
+
+        # Switch to a mode where tools are accessible
+        await self.divoom.system.set_channel(constants.CHANNEL_ID_TIME)
+        await asyncio.sleep(2)
+
+        # Start the timer
+        logger.info("Starting timer...")
+        result = await self.divoom.tool.set_tool_info(
+            constants.TOOL_TYPE_TIMER,
+            ctrl_flag=constants.STI_CTRL_FLAG_TIMER_STARTED
+        )
+        self.assertTrue(result)
+        await asyncio.sleep(2)
+
+        # Get state and verify it's running
+        new_state = await self.divoom.tool.get_tool_info(constants.TOOL_TYPE_TIMER)
+        self.assertIsNotNone(new_state)
+        self.assertEqual(new_state['status'], constants.STI_CTRL_FLAG_TIMER_STARTED)
+        logger.info("Timer is running as expected.")
+
+        # Pause the timer
+        logger.info("Pausing timer...")
+        result = await self.divoom.tool.set_tool_info(
+            constants.TOOL_TYPE_TIMER,
+            ctrl_flag=constants.STI_CTRL_FLAG_TIMER_PAUSED
+        )
+        self.assertTrue(result)
+        await asyncio.sleep(2)
+        
+        # Get state and verify it's paused
+        new_state = await self.divoom.tool.get_tool_info(constants.TOOL_TYPE_TIMER)
+        self.assertIsNotNone(new_state)
+        self.assertEqual(new_state['status'], constants.STI_CTRL_FLAG_TIMER_PAUSED)
+        logger.info("Timer is paused as expected.")
+
+        # Reset the timer
+        logger.info("Resetting timer...")
+        result = await self.divoom.tool.set_tool_info(
+            constants.TOOL_TYPE_TIMER,
+            ctrl_flag=constants.STI_CTRL_FLAG_TIMER_RESET
+        )
+        self.assertTrue(result)
+        logger.info("Timer reset.")
+
+    async def test_noise(self):
+        """Test setting and getting the noise tool."""
+        logger.info("--- Running test_noise ---")
+
+        # Switch to a mode where tools are accessible
+        await self.divoom.system.set_channel(constants.CHANNEL_ID_TIME)
+        await asyncio.sleep(2)
+
+        # Start the noise meter
+        logger.info("Starting noise meter...")
+        result = await self.divoom.tool.set_tool_info(
+            constants.TOOL_TYPE_NOISE,
+            ctrl_flag=constants.STI_CTRL_FLAG_NOISE_START
+        )
+        self.assertTrue(result)
+        await asyncio.sleep(2)
+
+        # Get state and verify it's running
+        new_state = await self.divoom.tool.get_tool_info(constants.TOOL_TYPE_NOISE)
+        self.assertIsNotNone(new_state)
+        self.assertEqual(new_state['status'], constants.STI_CTRL_FLAG_NOISE_START)
+        logger.info("Noise meter is running as expected.")
+
+        # Stop the noise meter
+        logger.info("Stopping noise meter...")
+        result = await self.divoom.tool.set_tool_info(
+            constants.TOOL_TYPE_NOISE,
+            ctrl_flag=constants.STI_CTRL_FLAG_NOISE_STOP
+        )
+        self.assertTrue(result)
+        logger.info("Noise meter stopped.")
+
 if __name__ == '__main__':
     unittest.main()
