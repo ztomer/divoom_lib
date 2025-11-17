@@ -8,6 +8,26 @@ from divoom_lib.models import (
 class Drawing:
     """
     Provides functionality to control the drawing features of a Divoom device.
+
+    Usage::
+
+        import asyncio
+        from divoom_lib.divoom import Divoom
+
+        async def main():
+            device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+            divoom = Divoom(mac=device_address)
+            
+            try:
+                await divoom.protocol.connect()
+                # This is a low-level command. Consider using a higher-level library for image processing.
+                # await divoom.drawing.set_light_pic(pic_data=[...])
+            finally:
+                if divoom.protocol.is_connected:
+                    await divoom.protocol.disconnect()
+
+        if __name__ == "__main__":
+            asyncio.run(main())
     """
     def __init__(self, communicator):
         """
@@ -28,6 +48,11 @@ class Drawing:
         
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command. Consider using a higher-level library for image processing.
+            # await divoom.drawing.set_light_pic(pic_data=[...])
         """
         self.logger.info(f"Setting light pic (0x44)...")
         return await self.communicator.send_command(COMMANDS["set light pic"], pic_data)
@@ -46,6 +71,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.drawing.drawing_mul_pad_ctrl(screen_id=0, r=255, g=0, b=0, num_points=1, offset_list=[0])
         """
         self.logger.info(
             f"Drawing mul pad control: screen_id={screen_id}, color=({r},{g},{b}), num_points={num_points} (0x3a)...")
@@ -73,6 +103,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.drawing.drawing_big_pad_ctrl(canvas_width=32, screen_id=0, r=255, g=0, b=0, num_points=1, offset_list=[0])
         """
         self.logger.info(
             f"Drawing big pad control: canvas_width={canvas_width}, screen_id={screen_id}, color=({r},{g},{b}), num_points={num_points} (0x3b)...")
@@ -99,6 +134,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.drawing.drawing_pad_ctrl(r=255, g=0, b=0, num_points=1, offset_list=[0])
         """
         self.logger.info(
             f"Drawing pad control: color=({r},{g},{b}), num_points={num_points} (0x58)...")
@@ -116,6 +156,10 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            await divoom.drawing.drawing_pad_exit()
         """
         self.logger.info("Drawing pad exit (0x5a)...")
         return await self.communicator.send_command(COMMANDS["drawing pad exit"])
@@ -131,6 +175,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.drawing.drawing_mul_encode_single_pic(screen_id=0, data_length=100, data=[...])
         """
         self.logger.info(
             f"Drawing mul encode single pic: screen_id={screen_id}, data_length={data_length} (0x5b)...")
@@ -152,6 +201,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.drawing.drawing_mul_encode_pic(screen_id=0, total_length=100, pic_id=1, pic_data=[...])
         """
         self.logger.info(
             f"Drawing mul encode pic: screen_id={screen_id}, total_length={total_length}, pic_id={pic_id} (0x5c)...")
@@ -168,6 +222,10 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            await divoom.drawing.drawing_mul_encode_gif_play()
         """
         self.logger.info("Drawing mul encode GIF play (0x6b)...")
         return await self.communicator.send_command(COMMANDS["drawing mul encode gif play"])
@@ -183,6 +241,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.drawing.drawing_encode_movie_play(frame_id=1, data_length=100, data=[...])
         """
         self.logger.info(
             f"Drawing encode movie play: frame_id={frame_id}, data_length={data_length} (0x6c)...")
@@ -204,6 +267,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.drawing.drawing_mul_encode_movie_play(screen_id=0, frame_id=1, data_length=100, data=[...])
         """
         self.logger.info(
             f"Drawing mul encode movie play: screen_id={screen_id}, frame_id={frame_id}, data_length={data_length} (0x6d)...")
@@ -223,6 +291,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Start movie playback
+            await divoom.drawing.drawing_ctrl_movie_play(1)
         """
         self.logger.info(
             f"Drawing control movie play: command={control_command} (0x6e)...")
@@ -240,6 +313,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Clear the screen with black
+            await divoom.drawing.drawing_mul_pad_enter(0, 0, 0)
         """
         self.logger.info(
             f"Drawing mul pad enter: color=({r},{g},{b}) (0x6f)...")
@@ -278,6 +356,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Reset the sand painting
+            await divoom.drawing.sand_paint_ctrl(1)
         """
         self.logger.info(f"Sand paint control: control={control} (0x34)...")
         args = [control]
@@ -330,6 +413,11 @@ class Drawing:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Set scrolling mode and speed
+            await divoom.drawing.pic_scan_ctrl(0, mode=1, speed=100)
         """
         self.logger.info(f"Picture scan control: control={control} (0x35)...")
         args = [control]
