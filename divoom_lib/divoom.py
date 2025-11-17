@@ -29,6 +29,25 @@ class Divoom:
 
     This class provides methods to connect to a Divoom device, send commands,
     and control its various features like display, channels, and system settings.
+
+    Usage::
+
+        import asyncio
+        from divoom_lib.divoom import Divoom
+
+        async def main():
+            device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+            divoom = Divoom(mac=device_address)
+            
+            try:
+                await divoom.protocol.connect()
+                await divoom.light.show_light(color=(255, 0, 0))
+            finally:
+                if divoom.protocol.is_connected:
+                    await divoom.protocol.disconnect()
+
+        if __name__ == "__main__":
+            asyncio.run(main())
     """
     def __init__(self, mac: str | None = None, logger: logging.Logger | None = None, write_characteristic_uuid: str = "49535343-8841-43f4-a8d4-ecbe34729bb3", notify_characteristic_uuid: str = "49535343-1e4d-4bd9-ba61-23c647249616", read_characteristic_uuid: str = "49535343-1e4d-4bd9-ba61-23c647249616", spp_characteristic_uuid: str | None = None, escapePayload: bool = False, use_ios_le_protocol: bool = False, device_name: str | None = None, client: BleakClient | None = None) -> None:
         """

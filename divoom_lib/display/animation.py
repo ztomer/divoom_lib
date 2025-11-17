@@ -14,6 +14,25 @@ from divoom_lib.models import (
 class Animation:
     """
     Provides functionality to control the animation features of a Divoom device.
+
+    Usage::
+
+        import asyncio
+        from divoom_lib.divoom import Divoom
+
+        async def main():
+            device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+            divoom = Divoom(mac=device_address)
+            
+            try:
+                await divoom.protocol.connect()
+                await divoom.animation.set_gif_speed(100)
+            finally:
+                if divoom.protocol.is_connected:
+                    await divoom.protocol.disconnect()
+
+        if __name__ == "__main__":
+            asyncio.run(main())
     """
     def __init__(self, communicator):
         """
@@ -34,6 +53,11 @@ class Animation:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+
+            # Set the GIF speed to 100ms
+            await divoom.animation.set_gif_speed(100)
         """
         self.logger.info(f"Setting GIF speed to {speed}ms (0x16)...")
         args = speed.to_bytes(2, byteorder='little')
@@ -50,6 +74,11 @@ class Animation:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command. Consider using a higher-level library for GIF processing.
+            # await divoom.animation.set_light_phone_gif(total_len=100, gif_id=1, gif_data=[...])
         """
         self.logger.info(f"Setting light phone gif (0x49)...")
         args = []
@@ -99,6 +128,11 @@ class Animation:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command. Consider using a higher-level library for GIF processing.
+            # await divoom.animation.app_new_send_gif_cmd(control_word=0, file_size=100)
         """
         self.logger.info(
             f"App new send GIF command with control word {control_word} (0x8b)...")
@@ -181,6 +215,11 @@ class Animation:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command. Consider using a higher-level library for GIF processing.
+            # await divoom.animation.set_user_gif(control_word=0, data=[...])
         """
         self.logger.info(
             f"Setting user GIF with control word {control_word} (0xb1)...")
@@ -210,6 +249,13 @@ class Animation:
 
         Returns:
             int | None: The number of items if `data` is 0xff, or None.
+        
+        Usage::
+            
+            # Get the number of user GIFs
+            num_gifs = await divoom.animation.modify_user_gif_items(0xff)
+            if num_gifs is not None:
+                print(f"Number of user GIFs: {num_gifs}")
         """
         self.logger.info(
             f"Modifying user GIF items with data {data} (0xb6)...")
@@ -260,6 +306,11 @@ class Animation:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command. Consider using a higher-level library for image processing.
+            # await divoom.animation.app_new_user_define(control_word=0, file_size=100, index=1)
         """
         self.logger.info(
             f"App new user define with control word {control_word} (0x8c)...")
@@ -342,6 +393,11 @@ class Animation:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command. Consider using a higher-level library for image processing.
+            # await divoom.animation.app_big64_user_define(control_word=0, file_size=100, index=1, file_id=123)
         """
         self.logger.info(
             f"App big64 user define with control word {control_word} (0x8d)...")
@@ -371,6 +427,12 @@ class Animation:
         Returns:
             dict | None: A dictionary containing information about the image,
                          or None if the command fails.
+        
+        Usage::
+            
+            user_define_info = await divoom.animation.app_get_user_define_info(0)
+            if user_define_info:
+                print(f"User define info: {user_define_info}")
         """
         self.logger.info(
             f"App get user define info for index {user_index} (0x8e)...")
@@ -418,6 +480,11 @@ class Animation:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command. Consider using a higher-level library for GIF processing.
+            # await divoom.animation.set_rhythm_gif(pos=0, total_length=100, gif_id=1, data=[...])
         """
         self.logger.info(
             f"Setting rhythm GIF: pos={pos}, total_length={total_length}, gif_id={gif_id} (0xb7)...")
@@ -440,6 +507,11 @@ class Animation:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command. Consider using a higher-level library for GIF processing.
+            # await divoom.animation.app_send_eq_gif(pos=0, total_length=100, gif_id=1, data=[...])
         """
         self.logger.info(
             f"App sending EQ GIF: pos={pos}, total_length={total_length}, gif_id={gif_id} (0x1b)...")

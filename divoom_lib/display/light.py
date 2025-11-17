@@ -11,6 +11,26 @@ from divoom_lib.models import (
 class Light:
     """
     Provides functionality to control the light of a Divoom device.
+
+    Usage::
+
+        import asyncio
+        from divoom_lib.divoom import Divoom
+
+        async def main():
+            device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+            divoom = Divoom(mac=device_address)
+            
+            try:
+                await divoom.protocol.connect()
+                light_mode = await divoom.light.get_light_mode()
+                print(f"Current light mode: {light_mode}")
+            finally:
+                if divoom.protocol.is_connected:
+                    await divoom.protocol.disconnect()
+
+        if __name__ == "__main__":
+            asyncio.run(main())
     """
     def __init__(self, communicator):
         """
@@ -32,6 +52,12 @@ class Light:
         Returns:
             dict | None: A dictionary containing the light mode settings,
                          or None if the command fails.
+        
+        Usage::
+            
+            light_mode = await divoom.light.get_light_mode()
+            if light_mode:
+                print(f"Brightness: {light_mode['brightness_level']}")
         """
         self.logger.info("Getting light mode (0x46)...")
         
@@ -63,3 +89,22 @@ class Light:
                 "time_checkbox_modes": [response[GLM_TIME_CHECKBOX_MODES_START], response[GLM_TIME_CHECKBOX_MODES_START + 1], response[GLM_TIME_CHECKBOX_MODES_START + 2], response[GLM_TIME_CHECKBOX_MODES_START + 3]],
             }
         return None
+
+    async def show_light(self, color, brightness, power):
+        """
+        Sets a solid color light.
+
+        Args:
+            color (tuple | list | str): The color to display. Can be a tuple or list of (R, G, B) values, or a hex string.
+            brightness (int): The brightness of the light (0-100).
+            power (bool): Whether to turn the light on or off.
+
+        Usage::
+
+            # Set the light to red at 50% brightness
+            await divoom.light.show_light(color=(255, 0, 0), brightness=50, power=True)
+        """
+        from ..utils.converters import color_to_rgb_list
+        rgb = color_to_rgb_list(color)
+        payload = [0x01] + rgb + [brightness, 0x00, 0x01 if power else 0x00]
+        await self.communicator.send_command("set light mode", payload)

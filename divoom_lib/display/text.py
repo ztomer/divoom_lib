@@ -8,6 +8,25 @@ from divoom_lib.models import (
 class Text:
     """
     Provides functionality to control the text display of a Divoom device.
+
+    Usage::
+
+        import asyncio
+        from divoom_lib.divoom import Divoom
+
+        async def main():
+            device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+            divoom = Divoom(mac=device_address)
+            
+            try:
+                await divoom.protocol.connect()
+                await divoom.text.set_text_content("Hello", text_box_id=1)
+            finally:
+                if divoom.protocol.is_connected:
+                    await divoom.protocol.disconnect()
+
+        if __name__ == "__main__":
+            asyncio.run(main())
     """
     def __init__(self, communicator):
         """
@@ -61,7 +80,8 @@ class Text:
         color = kwargs.get("color")
         text_box_id = kwargs.get("text_box_id")
         if color is not None and text_box_id is not None:
-            rgb_color = self.communicator.convert_color(color)
+            from ..utils.converters import color_to_rgb_list
+            rgb_color = color_to_rgb_list(color)
             return rgb_color + list(text_box_id.to_bytes(1, byteorder='big'))
         self.logger.error("Missing 'color' (RGB list) or 'text_box_id' for Text Color control.")
         return None
@@ -109,6 +129,11 @@ class Text:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Set the text color to red
+            await divoom.text.set_light_phone_word_attr(5, color=(255, 0, 0), text_box_id=1)
         """
         self.logger.info(
             f"Setting light phone word attribute with control {control} (0x87)...")
@@ -127,3 +152,21 @@ class Text:
             return False
 
         return await self.communicator.send_command(COMMANDS["set light phone word attr"], args)
+
+    async def set_text_content(self, text: str, **kwargs):
+        """
+        Set the text content of a text box.
+
+        Args:
+            text (str): The text to display.
+            **kwargs: Additional arguments for the text box.
+
+        Returns:
+            bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Set the text content to "Hello"
+            await divoom.text.set_text_content("Hello", text_box_id=1)
+        """
+        return await self.set_light_phone_word_attr(LPWA_CONTROL_CONTENT, text_content=text, **kwargs)

@@ -26,69 +26,98 @@ This Python library provides a high-level API to interact with Divoom devices ov
 ## Installation
 
 ```bash
-pip install bleak
-```
-
-## Smoke Test
-
-To perform a basic connectivity test with a Divoom device (specifically, Timoo), run the following command from the project root:
-
-```bash
-python3 -m tests.api_test
-```
-
-This test attempts to discover a Divoom device, connect to it, send a blue light command, and then disconnect.
-
-Example output:
-
-```
-INFO:divoom_lib.utils.discovery:Scanning for Bluetooth devices searching for name containing 'Timoo'...
-INFO:divoom_lib.utils.discovery:Found device: Timoo-light-4 (F90D2CC9-420E-65F9-9E06-F9554470FCED) — using this device.
-INFO:api_test:Connected to Divoom device at F90D2CC9-420E-65F9-9E06-F9554470FCED
-INFO:api_test:Enabled notifications for 49535343-aca3-481c-91ec-d85e28a60318
-INFO:api_test:Enabled notifications for 49535343-1e4d-4bd9-ba61-23c647249616
-INFO:api_test:Successfully connected to F90D2CC9-420E-65F9-9E06-F9554470FCED!
-INFO:api_test:Sending blue light command...
-INFO:api_test:Command sent successfully.
-INFO:api_test:Disconnected from Divoom device at F90D2CC9-420E-65F9-9E06-F9554470FCED
-INFO:api_test:Disconnected from Divoom device.
+pip install bleak divoom-lib
 ```
 
 ## Usage
 
-The `examples` directory contains several scripts that demonstrate how to use the library. Here's a simple example of how to connect to a device and show an image:
+The `examples` directory contains several scripts that demonstrate how to use the library. Here are a few examples:
+
+### Discovering Devices
+
+To discover Divoom devices on your network, you can use the `discover_device` function from the `divoom_lib.utils.discovery` module.
 
 ```python
 import asyncio
-from divoom_lib import Divoom
-from divoom_lib.utils.discovery import discover_divoom_devices
+from divoom_lib.utils.discovery import discover_device
 
 async def main():
-    # Discover devices
-    devices = await discover_divoom_devices()
-    if not devices:
-        print("No Divoom devices found.")
-        return
-
-    # Connect to the first device found
-    device_address = devices[0].address
-    divoom = Divoom(device_address)
-    await divoom.connect()
-
-    # Show an image
-    await divoom.show_image("/path/to/your/image.png")
-
-    # Disconnect
-    await divoom.disconnect()
+    device, device_id = await discover_device()
+    if device:
+        print(f"Found device: {device.name} ({device.address})")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-To run the examples, navigate to the `examples` directory and run the desired script:
+### Connecting to a Device
 
-```bash
-python examples/discover_devices.py
+To connect to a Divoom device, you need its MAC address. You can get the MAC address from the discovery process.
+
+```python
+import asyncio
+from divoom_lib.divoom import Divoom
+
+async def main():
+    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+    divoom = Divoom(mac=device_address)
+    
+    try:
+        await divoom.protocol.connect()
+        print("Connected!")
+    finally:
+        if divoom.protocol.is_connected:
+            await divoom.protocol.disconnect()
+            print("Disconnected.")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Setting the Brightness
+
+To set the brightness of the device, you can use the `set_brightness` method from the `divoom.device` object.
+
+```python
+import asyncio
+from divoom_lib.divoom import Divoom
+
+async def main():
+    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+    divoom = Divoom(mac=device_address)
+    
+    try:
+        await divoom.protocol.connect()
+        await divoom.device.set_brightness(50)
+    finally:
+        if divoom.protocol.is_connected:
+            await divoom.protocol.disconnect()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Showing a Light
+
+To show a solid color light, you can use the `show_light` method from the `divoom.light` object.
+
+```python
+import asyncio
+from divoom_lib.divoom import Divoom
+
+async def main():
+    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+    divoom = Divoom(mac=device_address)
+    
+    try:
+        await divoom.protocol.connect()
+        await divoom.light.show_light(color=(255, 0, 0))
+    finally:
+        if divoom.protocol.is_connected:
+            await divoom.protocol.disconnect()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Library Structure
@@ -96,22 +125,30 @@ python examples/discover_devices.py
 The library is organized into the following modules:
 
 * `divoom_lib/`: The main library code.
-  * `__init__.py`: Exports the main `Divoom` class.
-  * `divoom_protocol.py`: The core `Divoom` class for device communication.
-  * `constants.py`: Divoom protocol constants.
-  * `alarm.py`: Alarm related commands.
-  * `base.py`: Base class for all Divoom commands.
-  * `display.py`: Display related commands.
-  * `game.py`: Game related commands.
-  * `light.py`: Light related commands.
-  * `music.py`: Music related commands.
-  * `sleep.py`: Sleep related commands.
-  * `system.py`: System related commands.
-  * `timeplan.py`: Time plan related commands.
-  * `tool.py`: Tool related commands.
-  * `channels/`: Modules for different channels.
-  * `commands/`: Modules for different commands.
-  * `drawing/`: Modules for drawing and text rendering.
+  * `divoom.py`: The main `Divoom` class.
+  * `protocol.py`: The `DivoomProtocol` class for low-level communication.
+  * `models.py`: Divoom protocol constants and data models.
+  * `display/`: Modules for controlling the display.
+    * `light.py`: Light related commands.
+    * `animation.py`: Animation related commands.
+    * `drawing.py`: Drawing related commands.
+    * `text.py`: Text related commands.
+  * `media/`: Modules for controlling media playback.
+    * `music.py`: Music related commands.
+    * `radio.py`: Radio related commands.
+  * `scheduling/`: Modules for scheduling events.
+    * `alarm.py`: Alarm related commands.
+    * `sleep.py`: Sleep related commands.
+    * `timeplan.py`: Time plan related commands.
+  * `system/`: Modules for controlling system settings.
+    * `device.py`: General device settings.
+    * `time.py`: Time related functions.
+    * `bluetooth.py`: Bluetooth settings.
+  * `tools/`: Modules for controlling tools.
+    * `scoreboard.py`: Scoreboard tool.
+    * `timer.py`: Timer tool.
+    * `countdown.py`: Countdown tool.
+    * `noise.py`: Noise tool.
   * `utils/`: Utility functions for discovery, image processing, etc.
 * `examples/`: Example scripts.
 * `docs/`: Documentation files.
