@@ -1,5 +1,5 @@
 
-from ..models import (
+from divoom_lib.models import (
     COMMANDS,
     SHOW_SLEEP_DEFAULT_SLEEPTIME, SHOW_SLEEP_DEFAULT_SLEEPMODE,
     SHOW_SLEEP_DEFAULT_VOLUME, SHOW_SLEEP_DEFAULT_BRIGHTNESS,
@@ -8,7 +8,7 @@ from ..models import (
     GSS_VOLUME, GSS_COLOR_R, GSS_COLOR_G, GSS_COLOR_B, GSS_LIGHT,
     SET_SLEEP_COLOR_RGB_LENGTH
 )
-from ..utils.converters import parse_frequency, to_int_if_str, bool_to_byte
+from divoom_lib.utils.converters import parse_frequency, to_int_if_str, bool_to_byte
 
 class Sleep:
     """

@@ -1,50 +1,41 @@
 import asyncio
 import logging
-from divoom_lib import Divoom
-from divoom_lib.utils.discovery import discover_divoom_devices
+import argparse
+from divoom_lib.divoom import Divoom
+from divoom_lib.utils.discovery import discover_device
 from divoom_lib.utils.logger_utils import print_info, print_wrn, print_err, print_ok
 
 async def main():
     """Main function to test the Divoom device discovery and connection."""
-    devices = await discover_divoom_devices(device_name="Divoom", logger=logging.getLogger(__name__)) # Pass a logger instance
-    if devices:
-        print_ok("Found the following Divoom devices:")
-        for device in devices:
-            print(f"  - {device.name} ({device.address})")
+    parser = argparse.ArgumentParser(description="Divoom Control Script")
+    parser.add_argument("--device_name", default="Timoo-light-4", help="Device name to connect to")
+    args = parser.parse_args()
 
-        timoo_device = None
-        for d in devices:
-            if "Timoo-light-4" in d.name:
-                timoo_device = d
-                break
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
-        if timoo_device:
-            print_info(
-                f"Attempting to connect to {timoo_device.name} ({timoo_device.address})...")
+    device, device_id = await discover_device(name_substring=args.device_name, logger=logger)
+    if device:
+        print_ok(f"Found Divoom device: {device.name} ({device.address})")
 
-            divoom_device = Divoom(mac=timoo_device.address)
+        divoom_device = Divoom(mac=device.address, logger=logger)
 
-            try:
-                await divoom_device.connect()
-                print_ok(
-                    f"Successfully connected to {timoo_device.name} ({timoo_device.address}).")
+        try:
+            await divoom_device.protocol.connect()
+            print_ok(f"Successfully connected to {device.name} ({device.address}).")
 
-                print_info("Setting hot pick channel...")
-                await divoom_device.display.show_clock(hot=True) # Corrected call
-                print_ok("Hot pick channel set.")
+            print_info("Setting brightness to 100...")
+            await divoom_device.device.set_brightness(100)
+            print_ok("Brightness set to 100.")
 
-            except Exception as e:
-                print_err(
-                    f"Error communicating with {timoo_device.name} ({timoo_device.address}): {e}")
-            finally:
-                await divoom_device.disconnect()
-                print_info(f"Disconnected from {timoo_device.name} ({timoo_device.address}).")
-        else:
-            print_wrn("Timoo-light-4 device not found.")
-
-
+        except Exception as e:
+            print_err(f"Error communicating with {device.name} ({device.address}): {e}")
+        finally:
+            if divoom_device.protocol.is_connected:
+                await divoom_device.protocol.disconnect()
+                print_info(f"Disconnected from {device.name} ({device.address}).")
     else:
-        print_wrn("No Divoom devices found.")
+        print_wrn(f"No Divoom device found with name containing '{args.device_name}'.")
 
 if __name__ == "__main__":
     asyncio.run(main())

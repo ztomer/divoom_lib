@@ -6,9 +6,6 @@ import os
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
-# Add project root to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from divoom_lib.commands.temp_weather import TempWeatherCommand
 from divoom_lib.base import DivoomBase # Import DivoomBase for type hinting and mocking
 from divoom_lib.constants import WeatherType, COMMANDS

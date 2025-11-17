@@ -10,14 +10,35 @@ The library is structured into several modules, each responsible for a specific 
 
 This is the main class for interacting with a Divoom device.
 
-**`Divoom(address, logger=None)`**
+**`Divoom(mac, logger=None, **kwargs)`**
 
-*   **`address`**: The Bluetooth address of the Divoom device.
+*   **`mac`**: The Bluetooth MAC address of the Divoom device.
 *   **`logger`**: An optional logger instance.
+*   **`**kwargs`**: Additional keyword arguments for the `DivoomProtocol` class.
 
 **Attributes:**
 
-*   **`display`**: An instance of `divoom_lib.display.Display` for controlling the device's screen.
+*   **`protocol`**: An instance of `divoom_lib.protocol.DivoomProtocol` for low-level communication.
+*   **`light`**: An instance of `divoom_lib.display.light.Light` for controlling the device's light.
+*   **`animation`**: An instance of `divoom_lib.display.animation.Animation` for managing animations.
+*   **`drawing`**: An instance of `divoom_lib.display.drawing.Drawing` for drawing on the screen.
+*   **`text`**: An instance of `divoom_lib.display.text.Text` for displaying text.
+*   **`device`**: An instance of `divoom_lib.system.device.Device` for general device settings.
+*   **`time`**: An instance of `divoom_lib.system.time.Time` for time-related functions.
+*   **`bluetooth`**: An instance of `divoom_lib.system.bluetooth.Bluetooth` for Bluetooth settings.
+*   **`music`**: An instance of `divoom_lib.media.music.Music` for music playback.
+*   **`radio`**: An instance of `divoom_lib.media.radio.Radio` for FM radio.
+*   **`alarm`**: An instance of `divoom_lib.scheduling.alarm.Alarm` for managing alarms.
+*   **`sleep`**: An instance of `divoom_lib.scheduling.sleep.Sleep` for sleep mode.
+*   **`timeplan`**: An instance of `divoom_lib.scheduling.timeplan.Timeplan` for time plans.
+*   **`scoreboard`**: An instance of `divoom_lib.tools.scoreboard.Scoreboard` for the scoreboard tool.
+*   **`timer`**: An instance of `divoom_lib.tools.timer.Timer` for the timer tool.
+*   **`countdown`**: An instance of `divoom_lib.tools.countdown.Countdown` for the countdown tool.
+*   **`noise`**: An instance of `divoom_lib.tools.noise.Noise` for the noise tool.
+
+### `divoom_lib.protocol.DivoomProtocol`
+
+This class handles the low-level communication with the Divoom device.
 
 **Methods:**
 
@@ -26,62 +47,17 @@ This is the main class for interacting with a Divoom device.
 *   **`is_connected`**: Property to check if the device is connected.
 *   **`async send_command(command, args)`**: Sends a command to the device.
 *   **`async send_command_and_wait_for_response(command, args)`**: Sends a command and waits for a response.
-*   **`async set_brightness(brightness)`**: Sets the device brightness.
-*   **`async set_time(dt=None)`**: Sets the device time.
-*   **`async get_time()`**: Gets the device time.
-*   **`async set_channel(channel)`**: Switches to a specific channel.
-*   **`async get_channel()`**: Gets the current channel.
-
-### `divoom_lib.display.Display`
-
-This class provides methods for controlling the device's display. It is accessed through the `display` attribute of a `Divoom` object.
-
-**Methods:**
-
-*   **`async show_clock(clock, twentyfour, weather, temp, calendar, color, hot)`**: Shows the clock.
-*   **`async show_design(number)`**: Shows a design from the gallery.
-*   **`async show_effects(number)`**: Shows a special effect.
-*   **`async show_image(file, time)`**: Displays a static image or GIF animation.
-*   **`async show_light(color, brightness, power)`**: Sets a solid color light.
-*   **`async show_visualization(number)`**: Shows a music visualizer.
 
 ### `divoom_lib.utils.discovery`
 
 This module provides functions for discovering Divoom devices.
 
-**`async discover_divoom_devices(device_name="Divoom", logger=None)`**
+**`async discover_device(name_substring="Divoom", address=None, logger=None)`**
 
-*   **`device_name`**: The name to look for in the device's Bluetooth name (case-insensitive).
+*   **`name_substring`**: The name to look for in the device's Bluetooth name (case-insensitive).
+*   **`address`**: The Bluetooth address of the device to connect to directly.
 *   **`logger`**: An optional logger instance.
-*   **Returns**: A list of `bleak.backends.device.BLEDevice` objects.
-
-### `divoom_lib.channels`
-
-This package contains modules for each display channel.
-
-*   **`TimeChannel`**: Displays the time with various options.
-*   **`LightningChannel`**: Controls lightning effects.
-*   **`VJEffectChannel`**: Displays VJ effects.
-*   **`ScoreboardChannel`**: Displays a scoreboard.
-*   **`CloudChannel`**: Activates the cloud channel.
-*   **`CustomChannel`**: Activates the custom channel.
-
-Each channel class has options to customize its appearance and behavior.
-
-### `divoom_lib.commands`
-
-This package contains modules for specific device commands.
-
-*   **`BrightnessCommand`**: Sets the device brightness.
-*   **`DateTimeCommand`**: Sets the device date and time.
-*   **`TempWeatherCommand`**: Sets the temperature and weather icon.
-
-### `divoom_lib.drawing`
-
-This package provides tools for creating and displaying custom content.
-
-*   **`DisplayText`**: Displays text with custom fonts and colors.
-*   **`DisplayAnimation`**: Processes and displays images and animations.
+*   **Returns**: A tuple of (`bleak.backends.device.BLEDevice`, `device_id`).
 
 ## Example Usage
 
@@ -93,21 +69,22 @@ For instance, to discover devices:
 python3 examples/discover_devices.py
 ```
 
-To control a device, you will typically need its Bluetooth address. You can modify the example scripts to use your device's address.
+To control a device, you will typically need its Bluetooth MAC address. You can modify the example scripts to use your device's address.
 
 ```python
 import asyncio
-from divoom_lib import Divoom
+from divoom_lib.divoom import Divoom
 
 async def main():
     device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
-    divoom = Divoom(device_address)
+    divoom = Divoom(mac=device_address)
     
     try:
-        await divoom.connect()
-        await divoom.display.show_light(color=(255, 0, 0))
+        await divoom.protocol.connect()
+        await divoom.light.show_light(color=(255, 0, 0))
     finally:
-        await divoom.disconnect()
+        if divoom.protocol.is_connected:
+            await divoom.protocol.disconnect()
 
 if __name__ == "__main__":
     asyncio.run(main())
