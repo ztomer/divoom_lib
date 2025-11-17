@@ -7,9 +7,6 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import List
 
-# Add project root to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from divoom_lib.drawing.text import DisplayText
 from divoom_lib.base import DivoomBase # Import DivoomBase for type hinting and mocking
 from divoom_lib import constants

@@ -4,9 +4,6 @@ import logging
 import os
 import sys
 
-# Add the project root to sys.path to allow importing divoom_api
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from divoom_lib.divoom import Divoom
 from divoom_lib.utils import discovery
 
@@ -42,7 +39,7 @@ async def main():
         logger.info(f"Successfully connected to {divoom.protocol.mac}!")
 
         logger.info("Sending green light command...")
-        await divoom.light.show_light(color="00FF00", brightness=100)
+        await divoom.display.light.show_light(color="00FF00", brightness=100)
         logger.info("Command sent successfully.")
 
     except Exception as e:

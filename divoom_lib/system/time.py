@@ -1,5 +1,5 @@
 
-from ..models import (
+from divoom_lib.models import (
     COMMANDS,
     HOUR_TYPE_12, HOUR_TYPE_24, HOUR_TYPE_QUERY
 )

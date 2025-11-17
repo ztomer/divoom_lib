@@ -1,5 +1,5 @@
 
-from ..models import (
+from divoom_lib.models import (
     COMMANDS,
     SPC_CONTROL_INITIALIZE, SPC_CONTROL_RESET,
     PSC_CONTROL_SET_SCROLLING_MODE_SPEED, PSC_CONTROL_SENDING_IMAGE_DATA

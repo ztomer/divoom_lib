@@ -3,9 +3,6 @@ import logging
 import os
 import sys
 
-# Add the project root to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from divoom_lib.divoom import Divoom
 from divoom_lib.utils import discovery
 from divoom_lib.utils import cache
@@ -43,7 +40,7 @@ async def test_set_and_get_brightness():
 
         # 1. Get initial brightness
         logger.info("Getting initial brightness...")
-        initial_brightness = await divoom.device.get_brightness()
+        initial_brightness = await divoom.system.get_brightness()
         if initial_brightness is None:
             raise AssertionError("Failed to get initial brightness.")
         original_brightness = initial_brightness
@@ -55,14 +52,14 @@ async def test_set_and_get_brightness():
             new_brightness = 75
         
         logger.info(f"Setting brightness to {new_brightness}...")
-        await divoom.device.set_brightness(new_brightness)
+        await divoom.system.set_brightness(new_brightness)
         logger.info("Set brightness command sent.")
         
         await asyncio.sleep(3)
 
         # 3. Get brightness again and verify
         logger.info("Getting brightness again to verify...")
-        current_brightness = await divoom.device.get_brightness()
+        current_brightness = await divoom.system.get_brightness()
         if current_brightness is None:
             raise AssertionError("Failed to get current brightness.")
         logger.info(f"Current brightness is: {current_brightness}")

@@ -4,9 +4,6 @@ import logging
 import os
 import sys
 
-# Add the project root to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from bleak import BleakClient
 from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_device

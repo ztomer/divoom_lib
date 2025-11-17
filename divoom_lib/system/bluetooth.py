@@ -1,5 +1,5 @@
 
-from ..models import (
+from divoom_lib.models import (
     COMMANDS,
     BT_PASSWORD_CANCEL, BT_PASSWORD_SET, BT_PASSWORD_GET_STATUS
 )

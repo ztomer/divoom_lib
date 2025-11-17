@@ -1,5 +1,5 @@
 
-from ..models import (
+from divoom_lib.models import (
     COMMANDS
 )
 

@@ -1,7 +1,7 @@
 
 import datetime
 import logging
-from ..models import (
+from divoom_lib.models import (
     COMMANDS,
     CHANNEL_ID_MIN, CHANNEL_ID_MAX,
     SD_STATUS_REMOVAL, SD_STATUS_INSERTION,
@@ -16,7 +16,7 @@ from ..models import (
     GNTD_DISPLAY_MODES_START, GNTD_TIME_MINUTES_START,
     GDN_NAME_LENGTH, GDN_NAME_BYTES_START
 )
-from ..utils.converters import bool_to_byte
+from divoom_lib.utils.converters import bool_to_byte
 
 class Device:
     def __init__(self, communicator) -> None:

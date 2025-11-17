@@ -9,8 +9,9 @@ from PIL import Image
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from divoom_lib import Divoom
-from divoom_lib.utils.discovery import discover_divoom_devices
-from divoom_lib.utils.logger_utils import print_ok, print_wrn, print_err, print_info
+from divoom_lib.utils import discovery
+from divoom_lib.utils import logger_utils
+from divoom_lib.utils import converters
 from divoom_lib.constants import DIVOOM_DISP_LIGHT_MODE
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ async def debug_light_settings(device_name_substring: str = "Tivoo"):
     print_info(f"Scanning for Divoom device(s) containing '{device_name_substring}'...")
     
     # Use the simplified discover_divoom_devices
-    found_devices = await discover_divoom_devices(device_name=device_name_substring, logger=logger)
+    found_devices = await discovery.discover_divoom_devices(device_name=device_name_substring, logger=logger)
 
     if not found_devices:
         print_wrn(f"No Divoom device containing '{device_name_substring}' found. Exiting.")
@@ -63,7 +64,7 @@ async def debug_light_settings(device_name_substring: str = "Tivoo"):
 
         # --- Method 4: Direct send_command with set light mode (Yellow) ---
         print_info(f"Testing Method 4: Direct send_command with set light mode (Yellow - FFFF00)")
-        rgb_color = divoom_instance.convert_color("FFFF00") # Yellow
+        rgb_color = converters.color_to_rgb_list("FFFF00") # Yellow
         brightness = 75
         power_state = 0x01 # On
         type_of_lightning = 0x00 # Plain color

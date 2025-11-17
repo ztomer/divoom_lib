@@ -1,5 +1,5 @@
 
-from .protocol import DivoomProtocol
+from divoom_lib.protocol import DivoomProtocol
 from . import models
 from .display.light import Light
 from .display.animation import Animation

@@ -1,5 +1,5 @@
 
-from ..models import (
+from divoom_lib.models import (
     COMMANDS,
     TOOL_TYPE_COUNTDOWN,
     GTI_COUNTDOWN_STATUS, GTI_COUNTDOWN_MINUTES, GTI_COUNTDOWN_SECONDS,

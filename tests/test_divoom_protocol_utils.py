@@ -9,9 +9,6 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.characteristic import BleakGATTCharacteristic
 
-# Add project root to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from divoom_lib.divoom_protocol import Divoom
 from divoom_lib.base import DivoomBase
 from divoom_lib import constants

@@ -1,6 +1,6 @@
 
 import datetime
-from ..models import (
+from divoom_lib.models import (
     COMMANDS,
     ALARM_COUNT, GAT_ALARM_INFO_LENGTH,
     GAT_STATUS, GAT_HOUR, GAT_MINUTE, GAT_WEEK, GAT_MODE, GAT_TRIGGER_MODE,
@@ -9,7 +9,7 @@ from ..models import (
     GMT_DIALY_ID, GMT_ON_OFF, GMT_MONTH, GMT_DAY, GMT_HOUR, GMT_MINUTE,
     GMT_HAVE_FLAG, GMT_TITLE_NAME_START, GMT_TITLE_NAME_END
 )
-from ..utils.converters import bool_to_byte
+from divoom_lib.utils.converters import bool_to_byte
 
 class Alarm:
     def __init__(self, communicator):
