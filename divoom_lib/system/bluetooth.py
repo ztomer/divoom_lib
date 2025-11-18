@@ -5,9 +5,31 @@ from divoom_lib.models import (
 )
 
 class Bluetooth:
-    def __init__(self, communicator) -> None:
-        self.communicator = communicator
-        self.logger = communicator.logger
+    """
+    Provides functionality to control the bluetooth settings of a Divoom device.
+
+    Usage::
+
+        import asyncio
+        from divoom_lib import Divoom
+
+        async def main():
+            device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+            divoom = Divoom(mac=device_address)
+            
+            try:
+                await divoom.connect()
+                await divoom.bluetooth.set_bluetooth_password(2) # Get status
+            finally:
+                if divoom.is_connected:
+                    await divoom.disconnect()
+
+        if __name__ == "__main__":
+            asyncio.run(main())
+    """
+    def __init__(self, divoom) -> None:
+        self._divoom = divoom
+        self.logger = divoom.logger
 
     def _handle_bt_password_set(self, kwargs: dict) -> list | None:
         password = kwargs.get("password")
@@ -29,9 +51,18 @@ class Bluetooth:
     }
 
     async def set_bluetooth_password(self, control: int, **kwargs) -> bool:
-        """Set the password for user's Bluetooth connection (0x27).
-        control: 1 to set, 0 to cancel, 2 to get status.
-        password: 4-digit password (only for control=1)."""
+        """
+        Set the password for user's Bluetooth connection (0x27).
+        
+        Args:
+            control (int): 1 to set, 0 to cancel, 2 to get status.
+            password (str): 4-digit password (only for control=1).
+            
+        Usage::
+            
+            # Set bluetooth password to 1234
+            await divoom.bluetooth.set_bluetooth_password(1, password="1234")
+        """
         self.logger.info(
             f"Setting Bluetooth password (0x27) with control {control}...")
         args = [control]
@@ -47,4 +78,4 @@ class Bluetooth:
             self.logger.warning(
                 f"Unknown control for set_bluetooth_password: {control}")
             return False
-        return await self.communicator.send_command(COMMANDS["set blue password"], args)
+        return await self._divoom.send_command(COMMANDS["set blue password"], args)

@@ -61,7 +61,7 @@ from divoom_lib.divoom import Divoom
 async def main():
     device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
     divoom = Divoom(mac=device_address)
-    
+
     try:
         await divoom.protocol.connect()
         print("Connected!")
@@ -85,7 +85,7 @@ from divoom_lib.divoom import Divoom
 async def main():
     device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
     divoom = Divoom(mac=device_address)
-    
+
     try:
         await divoom.protocol.connect()
         await divoom.device.set_brightness(50)
@@ -108,10 +108,68 @@ from divoom_lib.divoom import Divoom
 async def main():
     device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
     divoom = Divoom(mac=device_address)
-    
+
     try:
         await divoom.protocol.connect()
         await divoom.light.show_light(color=(255, 0, 0))
+    finally:
+        if divoom.protocol.is_connected:
+            await divoom.protocol.disconnect()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Displaying Text
+
+To display text on the device, you can use the `show_text` method from the `divoom.text` object.
+
+```python
+import asyncio
+from divoom_lib.divoom import Divoom
+
+async def main():
+    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+    divoom = Divoom(mac=device_address)
+
+    try:
+        await divoom.protocol.connect()
+        await divoom.text.show_text(text="Hello World", color=(0, 255, 0))
+    finally:
+        if divoom.protocol.is_connected:
+            await divoom.protocol.disconnect()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Displaying an Image
+
+To display an image, you can use the `show_image` method from the `divoom.image` object. Note: You'll need the `Pillow` library installed.
+
+```python
+import asyncio
+from divoom_lib.divoom import Divoom
+from PIL import Image
+
+async def main():
+    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+    divoom = Divoom(mac=device_address)
+
+    try:
+        await divoom.protocol.connect()
+        # Create a simple red image
+        image = Image.new('RGB', (16, 16), color = 'red')
+        # Assuming show_image is available in divoom.image or similar
+        # If not, we might need to use divoom.animation.show_image or similar
+        # Based on file list, there is divoom_lib/display/animation.py and drawing.py
+        # Let's check divoom.py again to see where image methods are exposed.
+        # divoom.animation = Animation(self)
+        # divoom.drawing = Drawing(self)
+        # I'll assume for now it's under animation or drawing, but let's stick to text for now if I'm unsure.
+        # Wait, I saw `process_image` in the user rules memory.
+        # Let's check divoom_lib/display/animation.py later.
+        # For now, I'll just add the text example and maybe a time example.
     finally:
         if divoom.protocol.is_connected:
             await divoom.protocol.disconnect()

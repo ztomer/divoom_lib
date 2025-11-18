@@ -12,31 +12,31 @@ class Text:
     Usage::
 
         import asyncio
-        from divoom_lib.divoom import Divoom
+        from divoom_lib import Divoom
 
         async def main():
             device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
             divoom = Divoom(mac=device_address)
             
             try:
-                await divoom.protocol.connect()
+                await divoom.connect()
                 await divoom.text.set_text_content("Hello", text_box_id=1)
             finally:
-                if divoom.protocol.is_connected:
-                    await divoom.protocol.disconnect()
+                if divoom.is_connected:
+                    await divoom.disconnect()
 
         if __name__ == "__main__":
             asyncio.run(main())
     """
-    def __init__(self, communicator):
+    def __init__(self, divoom):
         """
         Initializes the Text controller.
 
         Args:
-            communicator: The communicator object to send commands to the device.
+            divoom: The Divoom object to send commands to the device.
         """
-        self.communicator = communicator
-        self.logger = communicator.logger
+        self._divoom = divoom
+        self.logger = divoom.logger
 
     def _handle_lpwa_speed(self, kwargs: dict) -> list | None:
         speed = kwargs.get("speed")

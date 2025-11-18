@@ -25,25 +25,25 @@ class Device:
     Usage::
 
         import asyncio
-        from divoom_lib.divoom import Divoom
+        from divoom_lib import Divoom
 
         async def main():
             device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
             divoom = Divoom(mac=device_address)
             
             try:
-                await divoom.protocol.connect()
+                await divoom.connect()
                 await divoom.device.set_brightness(50)
             finally:
-                if divoom.protocol.is_connected:
-                    await divoom.protocol.disconnect()
+                if divoom.is_connected:
+                    await divoom.disconnect()
 
         if __name__ == "__main__":
             asyncio.run(main())
     """
-    def __init__(self, communicator) -> None:
-        self.communicator = communicator
-        self.logger = communicator.logger
+    def __init__(self, divoom) -> None:
+        self._divoom = divoom
+        self.logger = divoom.logger
 
     async def set_brightness(self, brightness: int) -> bool:
         """

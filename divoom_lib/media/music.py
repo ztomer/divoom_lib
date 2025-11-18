@@ -15,16 +15,37 @@ from divoom_lib.models import (
 class Music:
     """
     Provides functionality to control music playback from an SD card on a Divoom device.
+
+    Usage::
+
+        import asyncio
+        from divoom_lib import Divoom
+
+        async def main():
+            device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+            divoom = Divoom(mac=device_address)
+            
+            try:
+                await divoom.connect()
+                volume = await divoom.music.get_volume()
+                if volume is not None:
+                    print(f"Current volume: {volume}")
+            finally:
+                if divoom.is_connected:
+                    await divoom.disconnect()
+
+        if __name__ == "__main__":
+            asyncio.run(main())
     """
-    def __init__(self, communicator):
+    def __init__(self, divoom):
         """
         Initializes the Music controller.
 
         Args:
-            communicator: The communicator object to send commands to the device.
+            divoom: The Divoom object to send commands to the device.
         """
-        self.communicator = communicator
-        self.logger = communicator.logger
+        self._divoom = divoom
+        self.logger = divoom.logger
 
     async def get_sd_play_name(self):
         """
@@ -32,9 +53,15 @@ class Music:
 
         Returns:
             str | None: The name of the music, or None if the command fails.
+        
+        Usage::
+            
+            play_name = await divoom.music.get_sd_play_name()
+            if play_name:
+                print(f"Currently playing: {play_name}")
         """
         self.logger.info("Getting SD play name (0x06)...")
-        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get sd play name"])
+        response = await self._divoom.send_command_and_wait_for_response(COMMANDS["get sd play name"])
         if response and len(response) >= 2:
             name_len = int.from_bytes(response[GSPN_NAME_LENGTH_START:GSPN_NAME_LENGTH_START + 2], byteorder='little')
             if len(response) >= GSPN_NAME_BYTES_START + name_len:
@@ -53,13 +80,19 @@ class Music:
         Returns:
             list: A list of dictionaries, where each dictionary represents a music track
                   and contains 'id' and 'name' keys.
+        
+        Usage::
+            
+            music_list = await divoom.music.get_sd_music_list(0, 10)
+            for music in music_list:
+                print(f"ID: {music['id']}, Name: {music['name']}")
         """
         self.logger.info(
             f"Getting SD music list from {start_id} to {end_id} (0x07)...")
         args = []
         args += start_id.to_bytes(2, byteorder='little')
         args += end_id.to_bytes(2, byteorder='little')
-        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get sd music list"], args)
+        response = await self._divoom.send_command_and_wait_for_response(COMMANDS["get sd music list"], args)
 
         music_list = []
         if response and len(response) >= 4:
@@ -89,9 +122,15 @@ class Music:
 
         Returns:
             int | None: The volume level (0-15), or None if the command fails.
+        
+        Usage::
+            
+            volume = await divoom.music.get_volume()
+            if volume is not None:
+                print(f"Current volume: {volume}")
         """
         self.logger.info("Getting volume (0x09)...")
-        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get volume"])
+        response = await self._divoom.send_command_and_wait_for_response(COMMANDS["get volume"])
         if response and len(response) >= 1:
             return response[GV_VOLUME]  # 0-15
         return None
@@ -105,10 +144,14 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            await divoom.music.set_volume(10)
         """
         self.logger.info(f"Setting volume to {volume} (0x08)...")
         args = [volume]
-        return await self.communicator.send_command(COMMANDS["set volume"], args)
+        return await self._divoom.send_command(COMMANDS["set volume"], args)
 
     async def get_play_status(self):
         """
@@ -116,9 +159,15 @@ class Music:
 
         Returns:
             int | None: 0 for pause, 1 for play, or None if the command fails.
+        
+        Usage::
+            
+            play_status = await divoom.music.get_play_status()
+            if play_status is not None:
+                print(f"Playback status: {'Playing' if play_status else 'Paused'}")
         """
         self.logger.info("Getting play status (0x0b)...")
-        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get play status"])
+        response = await self._divoom.send_command_and_wait_for_response(COMMANDS["get play status"])
         if response and len(response) >= 1:
             return response[GPS_STATUS]  # 0: Pause, 1: Play
         return None
@@ -132,10 +181,15 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Play music
+            await divoom.music.set_play_status(1)
         """
         self.logger.info(f"Setting play status to {status} (0x0a)...")
         args = [status]
-        return await self.communicator.send_command(COMMANDS["set playstate"], args)
+        return await self._divoom.send_command(COMMANDS["set playstate"], args)
 
     async def set_sd_play_music_id(self, music_id: int) -> bool:
         """
@@ -146,10 +200,14 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            await divoom.music.set_sd_play_music_id(1)
         """
         self.logger.info(f"Setting SD play music ID to {music_id} (0x11)...")
         args = list(music_id.to_bytes(2, byteorder='little'))
-        return await self.communicator.send_command(COMMANDS["set sd play music id"], args)
+        return await self._divoom.send_command(COMMANDS["set sd play music id"], args)
 
     async def set_sd_last_next(self, action: int):
         """
@@ -160,11 +218,16 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Play next track
+            await divoom.music.set_sd_last_next(1)
         """
         self.logger.info(
             f"Setting SD last/next track action: {action} (0x12)...")
         args = [action]
-        return await self.communicator.send_command(COMMANDS["set sd last next"], args)
+        return await self._divoom.send_command(COMMANDS["set sd last next"], args)
 
     async def send_sd_list_over(self):
         """
@@ -172,9 +235,13 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            await divoom.music.send_sd_list_over()
         """
         self.logger.info("Sending SD list over notification (0x14)...")
-        return await self.communicator.send_command(COMMANDS["send sd list over"])
+        return await self._divoom.send_command(COMMANDS["send sd list over"])
 
     async def get_sd_music_list_total_num(self):
         """
@@ -182,9 +249,15 @@ class Music:
 
         Returns:
             int | None: The total number of tracks, or None if the command fails.
+        
+        Usage::
+            
+            total_tracks = await divoom.music.get_sd_music_list_total_num()
+            if total_tracks is not None:
+                print(f"Total tracks on SD card: {total_tracks}")
         """
         self.logger.info("Getting SD music list total number (0x7d)...")
-        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get sd music list total num"])
+        response = await self._divoom.send_command_and_wait_for_response(COMMANDS["get sd music list total num"])
         if response and len(response) >= 2:
             return int.from_bytes(response[GSMLTN_TOTAL_NUM_START:GSMLTN_TOTAL_NUM_START + 2], byteorder='little')
         return None
@@ -195,9 +268,15 @@ class Music:
 
         Returns:
             dict | None: A dictionary containing music information, or None if the command fails.
+        
+        Usage::
+            
+            music_info = await divoom.music.get_sd_music_info()
+            if music_info:
+                print(f"Music info: {music_info}")
         """
         self.logger.info("Getting SD music info (0xb4)...")
-        response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get sd music info"])
+        response = await self._divoom.send_command_and_wait_for_response(COMMANDS["get sd music info"])
         if response and len(response) >= 9:
             # {uint16_t cur_time; uint16_t total_time; uint16_t music_id; uint8_t status; uint8_t vol; uint8_t play_mode;}
             cur_time = int.from_bytes(response[GSMI_CURRENT_TIME_START:GSMI_CURRENT_TIME_START + 2], byteorder='little')
@@ -229,6 +308,11 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.music.set_sd_music_info(current_time=60, music_id=1, volume=10, status=1, play_mode=1)
         """
         self.logger.info(f"Setting SD music info (0xb5)...")
         args = []
@@ -237,7 +321,7 @@ class Music:
         args += volume.to_bytes(1, byteorder='big')
         args += status.to_bytes(1, byteorder='big')
         args += play_mode.to_bytes(1, byteorder='big')
-        return await self.communicator.send_command(COMMANDS["set sd music info"], args)
+        return await self._divoom.send_command(COMMANDS["set sd music info"], args)
 
     async def set_sd_music_position(self, position: int) -> bool:
         """
@@ -248,10 +332,14 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            await divoom.music.set_sd_music_position(60)
         """
         self.logger.info(f"Setting SD music position to {position}s (0xb8)...")
         args = list(position.to_bytes(2, byteorder='little'))
-        return await self.communicator.send_command(COMMANDS["set sd music position"], args)
+        return await self._divoom.send_command(COMMANDS["set sd music position"], args)
 
     async def set_sd_music_play_mode(self, play_mode: int):
         """
@@ -262,11 +350,16 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            # Set to random play
+            await divoom.music.set_sd_music_play_mode(3)
         """
         self.logger.info(
             f"Setting SD music play mode to {play_mode} (0xb9)...")
         args = [play_mode]
-        return await self.communicator.send_command(COMMANDS["set sd music play mode"], args)
+        return await self._divoom.send_command(COMMANDS["set sd music play mode"], args)
 
     async def app_need_get_music_list(self):
         """
@@ -274,6 +367,10 @@ class Music:
 
         Returns:
             bool: True if the command was sent successfully, False otherwise.
+        
+        Usage::
+            
+            await divoom.music.app_need_get_music_list()
         """
         self.logger.info("App needs to get music list (0x47)...")
-        return await self.communicator.send_command(COMMANDS["app need get music list"])
+        return await self._divoom.send_command(COMMANDS["app need get music list"])
