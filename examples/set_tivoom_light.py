@@ -37,11 +37,13 @@ async def set_tivoom_light(device_name: str, color: str, brightness: int, durati
         logger.info(
             f"Found device '{device.name}' at MAC address: {device.address}.")
 
-        # Initialize Divoom instance
-        divoom_instance = Divoom(mac=device.address, logger=logger)
+        # Create a DivoomConfig object with the device's MAC address
+        from divoom_lib.models import DivoomConfig
+        config = DivoomConfig(mac=device.address, logger=logger)
+        divoom_instance = Divoom(config)
 
         logger.info(f"Connecting to Divoom device at {device.address}...")
-        await divoom_instance.protocol.connect()
+        await divoom_instance.connect()
         logger.info("Successfully connected to the Divoom device.")
 
         logger.info(
@@ -54,9 +56,9 @@ async def set_tivoom_light(device_name: str, color: str, brightness: int, durati
     except Exception as e:
         logger.error(f"An error occurred: {e}")
     finally:
-        if divoom_instance and divoom_instance.protocol.is_connected:
+        if divoom_instance and divoom_instance.is_connected:
             logger.info("Disconnecting from the Divoom device.")
-            await divoom_instance.protocol.disconnect()
+            await divoom_instance.disconnect()
         elif divoom_instance:
             logger.info(
                 "Divoom device was not connected or already disconnected.")

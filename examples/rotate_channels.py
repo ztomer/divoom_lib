@@ -12,11 +12,14 @@ async def rotate_channels(mac_address: str):
     """
     Connects to a Divoom device and rotates through its display channels.
     """
-    divoom = Divoom(mac=mac_address, logger=logger)
+    # Create a DivoomConfig object with the device's MAC address
+    from divoom_lib.models import DivoomConfig
+    config = DivoomConfig(mac=mac_address, logger=logger)
+    divoom = Divoom(config)
 
     try:
         logger.info(f"Connecting to Divoom device at {mac_address}...")
-        await divoom.protocol.connect()
+        await divoom.connect()
         logger.info("Connected to Divoom device.")
 
         channels = [
@@ -37,9 +40,9 @@ async def rotate_channels(mac_address: str):
     except Exception as e:
         logger.error(f"An error occurred: {e}")
     finally:
-        if divoom.protocol.is_connected:
+        if divoom.is_connected:
             logger.info("Disconnecting from Divoom device...")
-            await divoom.protocol.disconnect()
+            await divoom.disconnect()
             logger.info("Disconnected.")
 
 if __name__ == "__main__":

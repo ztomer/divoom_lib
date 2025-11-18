@@ -9,8 +9,8 @@ from bleak.exc import BleakError
 from bleak.backends.device import BLEDevice
 from bleak.backends.characteristic import BleakGATTCharacteristic
 
-from ..base import DivoomBase
-from divoom_lib import constants
+
+from divoom_lib import models
 from divoom_lib.utils import cache
 from divoom_lib.utils import discovery
 
@@ -81,7 +81,17 @@ class DivoomProtocol:
         return color_to_rgb_list(color_input)
 
     async def connect(self) -> None:
-        """Open a connection to the Divoom device using bleak."""
+        """
+        Open a connection to the Divoom device using bleak.
+
+        This method establishes a Bluetooth Low Energy (BLE) connection to the device
+        specified by the MAC address. It also starts notifications on the notify
+        characteristic to receive responses from the device.
+
+        Raises:
+            ValueError: If the MAC address is not provided or if characteristic UUIDs are missing.
+            ConnectionError: If the connection to the device fails.
+        """
         if not self.mac:
             self.logger.error("No MAC address provided or discovered. Cannot connect.")
             raise ValueError("No MAC address provided or discovered. Cannot connect.")
@@ -116,11 +126,17 @@ class DivoomProtocol:
             self.logger.info(f"Enabled notifications for {self.NOTIFY_CHARACTERISTIC_UUID}")
         else:
             self.logger.warning("No notify characteristic UUID set. Cannot enable notifications.")
-        
+
         await asyncio.sleep(1.0)
 
     async def disconnect(self) -> None:
-        """Closes the connection to the Divoom device."""
+        """
+        Closes the connection to the Divoom device.
+
+        This method disconnects the BLE client if it is currently connected.
+        It logs the disconnection event and handles any exceptions that might occur
+        during the disconnection process.
+        """
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
@@ -152,7 +168,7 @@ class DivoomProtocol:
             expected_cmd = self._expected_response_command
 
             is_expected_response = expected_cmd is not None and command_identifier == expected_cmd
-            is_generic_ack = expected_cmd is not None and command_identifier == 0x33 and expected_cmd in models.GENERIC_ACK_COMMANDS
+            is_generic_ack = expected_cmd is not None and command_identifier == models.GENERIC_ACK_COMMAND_ID and expected_cmd in models.GENERIC_ACK_COMMANDS
 
             if is_expected_response or is_generic_ack:
                 self.notification_queue.put_nowait(response_payload)
@@ -170,7 +186,7 @@ class DivoomProtocol:
     def _handle_basic_protocol_notification(self, new_data: bytearray) -> bool:
         """Handles notifications for the Basic Protocol by parsing framed messages."""
         self.message_buf.extend(new_data)
-        
+
         while len(self.message_buf) >= 7: # Minimum length for a valid message
             start_index = -1
             try:
@@ -189,7 +205,7 @@ class DivoomProtocol:
                 return False
 
             length = int.from_bytes(bytes(self.message_buf[1:3]), byteorder='little')
-            
+
             # Total message length is START(1) + LEN(2) + payload/checksum(length) + END(1) = length + 4
             total_message_len = 4 + length
 
@@ -211,10 +227,10 @@ class DivoomProtocol:
 
             # According to protocol docs, responses are framed with 0x04 <CMD> 0x55
             # The command we are waiting for is at index 4, not 3.
-            if len(message) > 5 and message[3] == 0x04 and message[5] == 0x55:
+            if len(message) > 5 and message[3] == models.ACK_PATTERN_BYTE_1 and message[5] == models.ACK_PATTERN_BYTE_3:
                 self.logger.debug("DEBUG: Basic Protocol - Parsing as Standard Response.")
                 command_id = message[4]
-                payload = message[6:-2] # Payload starts after the 0x55 byte
+                payload = message[6:-3] # Payload starts after the 0x55 byte and ends before checksum
                 self.logger.debug(f"DEBUG: Basic Protocol - Extracted Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()} (Standard Response)")
                 self.logger.info(f"Parsed Divoom Response. Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()}")
             else:
@@ -222,7 +238,7 @@ class DivoomProtocol:
                 # This is not a standard response, maybe a different kind of notification
                 # For now, we'll parse it with the old logic for backward compatibility
                 command_id = message[3]
-                payload = message[4:-2]
+                payload = message[4:-3]
                 self.logger.debug(f"DEBUG: Basic Protocol - Extracted Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()} (Non-Standard Notification)")
                 self.logger.info(f"Parsed Non-Standard Notification. Cmd: 0x{command_id:02x}, Payload: {bytes(payload).hex()}")
 
@@ -234,7 +250,7 @@ class DivoomProtocol:
                 self.logger.warning(f"Checksum mismatch! Rcv: {received_checksum}, Calc: {calculated_checksum}. Msg: {bytes(message).hex()}")
                 continue
 
-            response_payload = {'command_id': command_id, 'payload': payload}
+            response_payload = {'command_id': command_id, 'payload': bytes(payload)}
             self.notification_queue.put_nowait(response_payload)
             # Removed: return True here, as the loop continues for other messages
         return True # Return outside the while loop after processing all messages
@@ -266,14 +282,14 @@ class DivoomProtocol:
                 response_cmd_id = response.get('command_id')
 
                 is_expected_response = response_cmd_id == command_id
-                is_generic_ack = response_cmd_id == 0x33 and command_id in models.GENERIC_ACK_COMMANDS
+                is_generic_ack = response_cmd_id == models.GENERIC_ACK_COMMAND_ID and command_id in models.GENERIC_ACK_COMMANDS
 
                 if is_expected_response:
                     self.logger.debug(f"Got matching response for command ID 0x{command_id:02x} (Received 0x{response_cmd_id:02x})")
                     self._expected_response_command = None # Clear expectation on final match
                     return response.get('payload')
                 elif is_generic_ack:
-                    self.logger.debug(f"Received generic ACK (0x33) for command 0x{command_id:02x}. Continuing to wait for final data response.")
+                    self.logger.debug(f"Received generic ACK (0x{models.GENERIC_ACK_COMMAND_ID:02x}) for command 0x{command_id:02x}. Continuing to wait for final data response.")
                     # Don't return, continue waiting for the actual data response
                 else:
                     self.logger.warning(f"Got unexpected response. Expected 0x{command_id:02x}, got 0x{response_cmd_id:02x}. Discarding.")
@@ -282,11 +298,26 @@ class DivoomProtocol:
             except asyncio.QueueEmpty:
                 # Queue is empty, sleep for a short duration to yield control to the event loop
                 await asyncio.sleep(0.1)
-        
+
         self.logger.warning(
             f"Timeout polling for notification response to command ID: 0x{command_id:02x}")
         return None
     async def send_command_and_wait_for_response(self, command: int | str, args: list | None = None, timeout: int = 10) -> bytes | None:
+        """
+        Sends a command to the device and waits for a response.
+
+        This method sends a command to the Divoom device and waits for a matching response
+        from the notification queue. It handles the command ID resolution (string to int)
+        and manages the expected response command logic.
+
+        Args:
+            command (int | str): The command to send. Can be a command ID (int) or a command name (str).
+            args (list | None): A list of arguments to include in the command payload. Defaults to None.
+            timeout (int): The maximum time to wait for a response in seconds. Defaults to 10.
+
+        Returns:
+            bytes | None: The payload of the response if received within the timeout, or None if timed out.
+        """
         self.logger.debug(
             f"Entering send_command_and_wait_for_response for command: {command}")
         if self.client is None or not self.client.is_connected:
@@ -304,13 +335,26 @@ class DivoomProtocol:
         self.logger.debug(f"Set _expected_response_command to 0x{self._expected_response_command:02x}")
 
         await self.send_command(command, args, write_with_response=True)
-        
+
         response_payload = await self.wait_for_response(command_id, timeout)
         self.logger.debug(f"send_command_and_wait_for_response returning with payload: {response_payload}")
         return response_payload
 
     async def send_command(self, command: int | str, args: list | None = None, write_with_response: bool = False) -> bool:
-        """Send command with optional arguments"""
+        """
+        Send command with optional arguments.
+
+        This method sends a command to the Divoom device. It resolves the command name to
+        its ID if a string is provided.
+
+        Args:
+            command (int | str): The command to send. Can be a command ID (int) or a command name (str).
+            args (list | None): A list of arguments to include in the command payload. Defaults to None.
+            write_with_response (bool): Whether to request a response from the BLE characteristic. Defaults to False.
+
+        Returns:
+            bool: True if the command was sent successfully, False otherwise.
+        """
         if args is None:
             args = []
         if isinstance(command, str):
@@ -392,7 +436,22 @@ class DivoomProtocol:
                 return False
 
     async def send_payload(self, payload_bytes: list, max_retries: int = 3, retry_delay: float = 0.1, write_with_response: bool = False) -> bool:
-        """Send raw payload to the Divoom device using the Timebox Evo protocol."""
+        """
+        Send raw payload to the Divoom device using the configured protocol.
+
+        This method sends a raw payload of bytes to the Divoom device. It handles
+        reconnection attempts if the client is disconnected and supports both
+        Basic and iOS LE protocols.
+
+        Args:
+            payload_bytes (list): The list of bytes to send as the payload.
+            max_retries (int): The maximum number of retries if sending fails. Defaults to 3.
+            retry_delay (float): The delay in seconds between retries. Defaults to 0.1.
+            write_with_response (bool): Whether to request a response from the BLE characteristic. Defaults to False.
+
+        Returns:
+            bool: True if the payload was sent successfully, False otherwise.
+        """
         for attempt in range(max_retries):
             if self.client is None or not self.client.is_connected:
                 self.logger.warning(

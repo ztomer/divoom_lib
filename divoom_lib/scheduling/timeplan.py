@@ -10,13 +10,43 @@ from divoom_lib.models import (
 )
 
 class Timeplan:
+    """
+    Provides functionality to control the time plans of a Divoom device.
 
-    def __init__(self, communicator):
-        self.communicator = communicator
-        self.logger = communicator.logger
+    Usage::
+
+        import asyncio
+        from divoom_lib import Divoom
+
+        async def main():
+            device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
+            divoom = Divoom(mac=device_address)
+            
+            try:
+                await divoom.connect()
+                # This is a low-level command.
+                # await divoom.timeplan.set_time_manage_info(...)
+            finally:
+                if divoom.is_connected:
+                    await divoom.disconnect()
+
+        if __name__ == "__main__":
+            asyncio.run(main())
+    """
+
+    def __init__(self, divoom):
+        self._divoom = divoom
+        self.logger = divoom.logger
 
     async def set_time_manage_info(self, status: int, hour: int, minute: int, week: int, mode: int, trigger_mode: int, fm_freq: int, volume: int, type: int, animation_id: int = None, animation_speed: int = None, animation_direction: int = None, animation_frame_count: int = None, animation_frame_delay: int = None, animation_frame_data: list = None) -> bool:
-        """Set the time management information (0x56)."""
+        """
+        Set the time management information (0x56).
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.timeplan.set_time_manage_info(...)
+        """
         self.logger.info(f"Setting time manage info (0x56)...")
         args = []
 
@@ -63,13 +93,20 @@ class Timeplan:
             self.logger.warning(f"Unknown type for set_time_manage_info: {type}")
             return False
 
-        return await self.communicator.send_command(COMMANDS["set time manage info"], args)
+        return await self._divoom.send_command(COMMANDS["set time manage info"], args)
 
     async def set_time_manage_ctrl(self, status: int, index: int):
-        """Control the time management function (0x57)."""
+        """
+        Control the time management function (0x57).
+        
+        Usage::
+            
+            # This is a low-level command.
+            # await divoom.timeplan.set_time_manage_ctrl(1, 0)
+        """
         self.logger.info(
             f"Setting time manage control: status={status}, index={index} (0x57)...")
         args = []
         args += status.to_bytes(1, byteorder='big')
         args += index.to_bytes(1, byteorder='big')
-        return await self.communicator.send_command(COMMANDS["set time manage ctrl"], args)
+        return await self._divoom.send_command(COMMANDS["set time manage ctrl"], args)

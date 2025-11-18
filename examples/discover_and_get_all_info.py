@@ -170,17 +170,20 @@ async def discover_and_get_info():
 
     print_info(f"\nConnecting to {device.name} ({device.address})...")
 
-    divoom = Divoom(mac=device.address, logger=logger)
+    # Create a DivoomConfig object with the device's MAC address
+    from divoom_lib.models import DivoomConfig
+    config = DivoomConfig(mac=device.address, logger=logger)
+    divoom = Divoom(config)
     
     try:
-        await divoom.protocol.connect()
+        await divoom.connect()
         print_ok(f"Connected to {device.name}.")
         await get_all_divoom_info_logic(divoom)
     except Exception as e:
         logger.error(f"An error occurred: {e}")
     finally:
-        if divoom.protocol.is_connected:
-            await divoom.protocol.disconnect()
+        if divoom.is_connected:
+            await divoom.disconnect()
             print_info(f"Disconnected from {device.name}.")
 
 if __name__ == "__main__":

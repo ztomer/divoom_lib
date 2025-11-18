@@ -18,10 +18,13 @@ async def main():
     if device:
         print_ok(f"Found Divoom device: {device.name} ({device.address})")
 
-        divoom_device = Divoom(mac=device.address, logger=logger)
+        # Create a DivoomConfig object with the device's MAC address
+        from divoom_lib.models import DivoomConfig
+        config = DivoomConfig(mac=device.address, logger=logger)
+        divoom_device = Divoom(config)
 
         try:
-            await divoom_device.protocol.connect()
+            await divoom_device.connect()
             print_ok(f"Successfully connected to {device.name} ({device.address}).")
 
             print_info("Setting brightness to 100...")
@@ -31,8 +34,8 @@ async def main():
         except Exception as e:
             print_err(f"Error communicating with {device.name} ({device.address}): {e}")
         finally:
-            if divoom_device.protocol.is_connected:
-                await divoom_device.protocol.disconnect()
+            if divoom_device.is_connected:
+                await divoom_device.disconnect()
                 print_info(f"Disconnected from {device.name} ({device.address}).")
     else:
         print_wrn(f"No Divoom device found with name containing '{args.device_name}'.")

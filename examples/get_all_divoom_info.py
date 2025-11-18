@@ -11,10 +11,13 @@ async def get_all_divoom_info(mac_address: str):
     """
     Connects to the Divoom device and fetches all available information.
     """
-    divoom = Divoom(mac=mac_address, logger=logger)
+    # Create a DivoomConfig object with the device's MAC address
+    from divoom_lib.models import DivoomConfig
+    config = DivoomConfig(mac=mac_address, logger=logger)
+    divoom = Divoom(config)
     
     try:
-        await divoom.protocol.connect()
+        await divoom.connect()
         logger.info("Connected to Divoom device. Fetching information...")
 
         # --- System Settings ---
@@ -165,8 +168,8 @@ async def get_all_divoom_info(mac_address: str):
     except Exception as e:
         logger.error(f"An error occurred: {e}")
     finally:
-        if divoom.protocol.is_connected:
-            await divoom.protocol.disconnect()
+        if divoom.is_connected:
+            await divoom.disconnect()
 
 async def main():
     parser = argparse.ArgumentParser(description="Get all information from a Divoom device.")

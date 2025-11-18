@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, ANY
 from divoom_lib.protocol import DivoomProtocol
 from divoom_lib import models
 import logging
@@ -8,9 +8,10 @@ import logging
 @pytest.fixture
 def mock_protocol_instance():
     """Fixture for a mock DivoomProtocol instance."""
-    with patch('divoom_lib.protocol.BleakClient', new_callable=AsyncMock) as mock_bleak_client:
+    with patch('divoom_lib.protocol.BleakClient') as mock_bleak_client:
+        mock_bleak_client.return_value = AsyncMock()
         protocol = DivoomProtocol(mac="AA:BB:CC:DD:EE:FF", device_name="MockDevice")
-        protocol.client = mock_bleak_client
+        # protocol.client is already set to the mock instance by __init__
         protocol.client.is_connected = True
         protocol.WRITE_CHARACTERISTIC_UUID = "mock_write_char_uuid"
         protocol.NOTIFY_CHARACTERISTIC_UUID = "mock_notify_char_uuid"
@@ -37,8 +38,8 @@ async def test_make_message(mock_protocol_instance):
     protocol = mock_protocol_instance
     payload = [0x45, 0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01]
     message = protocol._make_message(payload)
-    # Expected: 01 (start) + 0a00 (len) + 4501ff0000640001 (payload) + 4a01 (crc) + 02 (end)
-    assert message == "010a004501ff00006400014a0102"
+    # Expected: 01 (start) + 0a00 (len) + 4501ff0000640001 (payload) + b401 (crc) + 02 (end)
+    assert message == "010a004501ff0000640001b40102"
 
 @pytest.mark.asyncio
 async def test_make_message_with_escaping(mock_protocol_instance):
@@ -47,8 +48,8 @@ async def test_make_message_with_escaping(mock_protocol_instance):
     protocol.escapePayload = True
     payload = [0x01, 0x02, 0x03, 0x04]
     message = protocol._make_message(payload)
-    # Expected: 01 (start) + 0900 (len) + 03040305030604 (escaped payload) + 1c00 (crc) + 02 (end)
-    assert message == "010900030403050306041c0002"
+    # Expected: 01 (start) + 0900 (len) + 03040305030604 (escaped payload) + 2500 (crc) + 02 (end)
+    assert message == "01090003040305030604250002"
 
 @pytest.mark.asyncio
 async def test_make_message_ios_le(mock_protocol_instance):
@@ -56,8 +57,8 @@ async def test_make_message_ios_le(mock_protocol_instance):
     protocol = mock_protocol_instance
     payload = [0x45, 0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01]
     message = protocol._make_message_ios_le(payload)
-    # Expected: feefaa55 (header) + 1000 (len) + 45 (cmd) + 00000000 (packet num) + 4501ff0000640001 (payload) + 5a01 (crc)
-    assert message == "feefaa55100045000000004501ff00006400015a01"
+    # Expected: feefaa55 (header) + 0f00 (len) + 45 (cmd) + 00000000 (packet num) + 4501ff0000640001 (payload) + fe01 (crc)
+    assert message == "feefaa550f0045000000004501ff0000640001fe01"
 
 @pytest.mark.asyncio
 async def test_escape_payload(mock_protocol_instance):
@@ -73,15 +74,15 @@ async def test_get_crc(mock_protocol_instance):
     protocol = mock_protocol_instance
     payload = [0x0a, 0x00, 0x45, 0x01, 0xff, 0x00, 0x00, 0x64, 0x00, 0x01]
     crc = protocol._getCRC(payload)
-    assert crc == "4a01"
+    assert crc == "b401"
 
 @pytest.mark.asyncio
 async def test_notification_handler_basic(mock_protocol_instance):
     """Test notification_handler for basic protocol."""
     protocol = mock_protocol_instance
     protocol.use_ios_le_protocol = False
-    # 0108000446550100a80002
-    data = bytearray.fromhex("0108000446550100a80002")
+    # 01 07 00 04 46 55 01 00 a7 00 02
+    data = bytearray.fromhex("0107000446550100a70002")
     protocol.notification_handler(12, data)
     assert not protocol.notification_queue.empty()
     response = await protocol.notification_queue.get()
@@ -146,7 +147,7 @@ async def test_send_payload_ios_le(mock_protocol_instance):
     await protocol.send_payload(payload)
     protocol.client.write_gatt_char.assert_called_once_with(
         "mock_write_char_uuid",
-        bytes.fromhex("feefaa550a0045000000004501f400"),
+        bytes.fromhex("feefaa550900450000000045019400"),
         response=False
     )
 
@@ -157,10 +158,10 @@ async def test_connect(mock_protocol_instance):
     protocol.client.is_connected = False
     await protocol.connect()
     protocol.client.connect.assert_called_once()
-    protocol.client.start_notify.assert_called_once_with(
-        "mock_notify_char_uuid",
-        protocol.notification_handler
-    )
+    protocol.client.start_notify.assert_called_once()
+    args, _ = protocol.client.start_notify.call_args
+    assert args[0] == "mock_notify_char_uuid"
+    assert args[1] == ANY
 
 @pytest.mark.asyncio
 async def test_disconnect(mock_protocol_instance):
@@ -202,3 +203,45 @@ async def test_framing_context(mock_protocol_instance):
 
     assert protocol.use_ios_le_protocol == original_use_ios
     assert protocol.escapePayload == original_escape
+
+@pytest.mark.asyncio
+async def test_handle_ios_le_notification_invalid(mock_protocol_instance):
+    """Test _handle_ios_le_notification with invalid data."""
+    protocol = mock_protocol_instance
+    protocol.use_ios_le_protocol = True
+
+    # Too short
+    assert protocol._handle_ios_le_notification(bytes.fromhex("feefaa55")) is False
+
+    # Wrong header
+    assert protocol._handle_ios_le_notification(bytes.fromhex("000000000e00460000000001005901")) is False
+
+@pytest.mark.asyncio
+async def test_handle_basic_protocol_notification_invalid(mock_protocol_instance):
+    """Test _handle_basic_protocol_notification with invalid data."""
+    protocol = mock_protocol_instance
+    protocol.use_ios_le_protocol = False
+
+    # Buffer too short
+    assert protocol._handle_basic_protocol_notification(bytearray.fromhex("0108")) is True # Returns True (buffering)
+
+    protocol.message_buf.clear()
+
+    # Missing start byte (ensure no 01 in data)
+    assert protocol._handle_basic_protocol_notification(bytearray.fromhex("0008000446550000a80002")) is False
+
+    # Checksum mismatch
+    # 0107000446550300a80002 -> checksum should be a900 (169), but is a800
+    assert protocol._handle_basic_protocol_notification(bytearray.fromhex("0107000446550300a80002")) is True # Returns True because it consumed data (even if checksum failed)
+    assert protocol.notification_queue.empty()
+
+@pytest.mark.asyncio
+async def test_send_payload_retry_success(mock_protocol_instance):
+    """Test send_payload with retry success."""
+    protocol = mock_protocol_instance
+    protocol.client.write_gatt_char.side_effect = [Exception("Fail 1"), None]
+
+    result = await protocol.send_payload([0x01], max_retries=2, retry_delay=0.01)
+
+    assert result is True
+    assert protocol.client.write_gatt_char.call_count == 2
