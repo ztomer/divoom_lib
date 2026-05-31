@@ -224,6 +224,32 @@ await wall.show_image("artwork.gif")
 
 ---
 
+## Architectural Evolution & Code Quality Standards
+
+This library has undergone a rigorous, dual-persona code review and comprehensive refactoring inspired by **Linus Torvalds** (performance, memory allocations, low-level I/O efficiency) and **Robert C. Martin ("Uncle Bob")** (SOLID principles, clean decoupling, single responsibility, clean APIs).
+
+### 1. Linus & Uncle Bob Code Review Remediations
+All findings from the deep-dive code review have been fully addressed and verified with a 100% green test suite:
+*   **Zero-Copy Byte Native Parsing (Linus)**: The receive buffer `message_buf` was migrated from a fragmented list of integer objects to an optimized `bytearray`. Redundant array reallocations and slices were eliminated using in-place deletion (`del buf[:n]`).
+*   **Direct Binary Builders (Linus)**: Round-trip hex-string formatting on active BLE send paths (`"".join(f"{b:02x}")` to `bytes.fromhex`) was replaced with direct binary construction, reducing execution latency and garbage collection churn during heavy animation streaming.
+*   **Non-Blocking Async Cache I/O (Linus)**: Synchronous disk reads/writes in the device configurations were offloaded to worker threads via `asyncio.to_thread` to prevent disk flush stalls from blocking incoming BLE notifications.
+*   **Dependency Inversion Principle (Uncle Bob)**: Circular references between the main `Divoom` orchestrator and its sub-modules (such as `Light`, `Animation`, `Alarm`) were broken. All modules are now loosely coupled and type-hinted against a narrow `CommandSender` abstract Protocol.
+*   **Domain Exception Hierarchy (Uncle Bob)**: Stringly-typed standard exceptions were replaced with custom, domain-specific exceptions (e.g., `DeviceConnectionError`, `DeviceAddressMissingError`) subclassing their original built-ins for backwards compatibility.
+*   **Code Duplication Elimination**: Redundant duplicate logic between `Divoom` and `DivoomProtocol` was resolved. `DivoomProtocol` now inherits from `Divoom`, delegating low-level framing and escape operations to a shared, pure-functional `framing.py` module.
+
+### 2. Strict Coding Standards: The 500 LOC Limit
+To ensure maximum readability, strict modularity, and rapid semantic searchability for both human developers and AI coding agents:
+*   **Hard Limit**: No single Python, JavaScript, or CSS source file in the library may exceed **500 Lines of Code (LOC)**.
+*   **Enforcement**: Any file growing beyond 500 LOC must be partitioned into logically encapsulated sub-modules or helper packages (e.g. separating the core connection, packet framing, and display utilities).
+
+### 3. Developer & AI Agent Experience Reflections
+To make working with this codebase significantly easier, faster, and more robust in future iterations, we recommend prioritizing:
+*   **Unified Declarative Command Registry**: Constructing a central declarative command registry (e.g., JSON schema or typed Python dataclasses) mapping command IDs to byte packing schemas. This would allow contributors (and AI agents) to add new reverse-engineered features instantly without tracing circular methods.
+*   **High-Fidelity BLE Loopback Simulator**: Expanding `MockBleakClient` into a comprehensive loopback socket server that returns authentic Divoom response packets for channels, clocks, and custom visuals, letting tests run at memory-speed without real hardware.
+*   **Modular Decoupling of God Objects**: Further migrating high-level sub-modules to use a lightweight connection proxy delegate rather than interacting with the parent orchestrator object, enabling total isolation in imports and testing.
+
+---
+
 ## Library Structure
 
 The library is organized into the following modules:

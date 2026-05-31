@@ -30,8 +30,26 @@ If you would like to contribute code to Divoom Control, please follow these step
 1.  Fork the repository on GitHub.
 2.  Create a new branch for your feature or bug fix.
 3.  Write your code, including tests to cover your changes.
-4.  Ensure that your code follows the project's coding style.
+4.  Ensure that your code follows the project's coding style and strict architectural standards.
 5.  Submit a pull request to the `main` branch of the Divoom Control repository.
+
+### Coding Standards & Architectural Constraints
+
+To keep the codebase reliable, performant, and clean, all contributions must strictly adhere to the following standards:
+
+1.  **Strict 500 Lines of Code (LOC) Ceiling**:
+    *   No single source file (`.py`, `.js`, or `.css`) in the core library may exceed **500 Lines of Code (LOC)**.
+    *   If your additions push a file beyond 500 LOC, you **must** refactor and split it into modular sub-modules, pure utility files, or decoupled classes.
+
+2.  **Performance & Memory Efficiency (Torvalds Rules)**:
+    *   **Byte-Native Operations**: Always use `bytearray` or `bytes` for protocol payloads and buffers. Never represent packet buffers as lists of integer objects or formatted hex strings.
+    *   **Lazy Hot-Path Logs**: Ensure that all logging in high-frequency loops (like animation frame rendering or notifications) avoids eager evaluations (e.g., formatting raw bytes to `.hex()`) unless wrapped inside `logger.isEnabledFor(logging.DEBUG)` or passed as lazy `%`-arguments.
+    *   **Async Event Loop Integrity**: Never perform blocking I/O (such as synchronous file reads, writes, or JSON caches) directly inside an async loop. Always delegate blocking routines to executor threads using `await asyncio.to_thread()`.
+
+3.  **SOLID Architecture & Loose Coupling (Uncle Bob Rules)**:
+    *   **Dependency Inversion (DIP)**: Core functional packages (`display/`, `system/`, `media/`, `scheduling/`, etc.) must not depend on the concrete `Divoom` client. They must be type-hinted and decoupled against the abstract `CommandSender` Protocol interface defined in `divoom_lib/sender_protocol.py`. This ensures they can be tested in isolation with fake senders.
+    *   **Single Responsibility Principle (SRP)**: Avoid building multi-purpose "God Objects". High-level coordination should reside in dedicated controllers (e.g. `DivoomWall`), while low-level byte packing and escaping resides in pure helper modules like `framing.py`.
+    *   **Custom Domain Exceptions**: Raise semantic, domain-specific subclasses (e.g., `DeviceConnectionError`, `CharacteristicDiscoveryError` in `divoom_lib/exceptions.py`) rather than generic `ValueError` or `ConnectionError` with raw text messages.
 
 ### Setting up a Development Environment
 

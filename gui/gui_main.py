@@ -69,7 +69,10 @@ class DivoomGuiAPI:
     def close_window(self) -> None:
         logger.info("GUI Action: Closing window...")
         if self.window:
-            self.window.destroy()
+            def _destroy():
+                time.sleep(0.1)
+                self.window.destroy()
+            threading.Thread(target=_destroy, daemon=True).start()
 
     # ── Device Scanner Core (asyncio.run Thread-Safe) ──────────────────────────────
 
@@ -115,9 +118,8 @@ class DivoomGuiAPI:
                                 })
                                 logger.info(f"Scanner: Found Divoom device: {device.name} ({device.address})")
                 
-                scanner = BleakScanner(detection_callback=detection_callback)
-                
                 async def run_scan():
+                    scanner = BleakScanner(detection_callback=detection_callback)
                     await scanner.start()
                     elapsed = 0.0
                     while elapsed < timeout and len(discovered) < limit:
@@ -378,13 +380,15 @@ class DivoomGuiAPI:
                 else:
                     return False
                     
-                sync_tasks = []
-                for divoom in targets:
-                    from monthly_best_daemon import stream_raw_bin_payload
-                    sync_tasks.append(stream_raw_bin_payload(divoom, file_bytes))
+                async def run_sync():
+                    sync_tasks = []
+                    for divoom in targets:
+                        from monthly_best_daemon import stream_raw_bin_payload
+                        sync_tasks.append(stream_raw_bin_payload(divoom, file_bytes))
+                    results = await asyncio.gather(*sync_tasks, return_exceptions=True)
+                    return all(res is True for res in results)
                     
-                results = asyncio.run(asyncio.gather(*sync_tasks, return_exceptions=True))
-                return all(res is True for res in results)
+                return asyncio.run(run_sync())
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
             return False

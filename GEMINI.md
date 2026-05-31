@@ -37,3 +37,23 @@ The project has recently undergone a significant refactoring to improve its stru
 *   **Documentation:** The documentation has been updated to reflect the new library structure and API.
 
 This refactoring provides a solid foundation for further development and makes it easier to add new features and support for more Divoom devices.
+
+### Core Coding Standards & Guidelines
+
+To maintain clean architecture, peak performance, and high readability for both human developers and AI assistants, the codebase enforces the following:
+
+1.  **Strict File Length Limit**: No source file (Python, JS, CSS) in the library may exceed **500 Lines of Code (LOC)**. Any file growing larger must be split into decoupled helper sub-packages or pure modules.
+2.  **Linus Torvalds Performance Principles**:
+    *   Enforce `bytearray` or `bytes` instead of list representation for protocol data.
+    *   Avoid string hex formatting (`.hex()`) in loop notification logs unless lazy or debug-guarded.
+    *   Offload synchronous disk operations in async loops to thread executors via `asyncio.to_thread`.
+3.  **Uncle Bob SOLID Principles**:
+    *   Apply Dependency Inversion: Sub-modules must depend on the abstract `CommandSender` Protocol interface, not the concrete `Divoom` class.
+    *   Utilize creational factories (`Divoom.from_mac`, `Divoom.from_config`) instead of overloaded constructors.
+    *   Use custom domain exceptions (e.g. `DeviceConnectionError`) instead of generic strings.
+
+### Future Developer Experience (DevEx) Recommendations
+*   **Declarative Schema Registry**: Transition to a central JSON/Python schema repository mapping command IDs to byte packing models, enabling new features to be added instantly.
+*   **BLE Mock Socket Simulator**: Expand the test suites to run fully offline at CPU speeds using a loopback simulation server that returns mock responses.
+*   **God Object Partitioning**: Decouple sub-modules entirely by moving communication interfaces to dedicated lightweight proxy objects.
+
