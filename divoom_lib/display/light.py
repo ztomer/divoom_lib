@@ -40,7 +40,7 @@ class Light:
         Args:
             divoom: The Divoom object to send commands to the device.
         """
-        self._divoom = divoom
+        self.communicator = divoom
         self.logger = divoom.logger
 
     async def get_light_mode(self):

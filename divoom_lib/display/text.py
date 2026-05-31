@@ -36,7 +36,7 @@ class Text:
         Args:
             divoom: The Divoom object to send commands to the device.
         """
-        self._divoom = divoom
+        self.communicator = divoom
         self.logger = divoom.logger
 
     def _handle_lpwa_speed(self, kwargs: dict) -> list | None:

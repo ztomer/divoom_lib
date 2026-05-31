@@ -17,25 +17,38 @@ def to_int_if_str(value: str | int) -> int:
 
 def color_to_rgb_list(color_input) -> list:
     """
-    Converts a color input (e.g., "RRGGBB" hex string, or (R, G, B) tuple/list)
+    Converts a color input (e.g., "RRGGBB" or "#RRGGBB" hex string, named color, or (R, G, B) tuple/list)
     to a list of three integers [R, G, B].
     """
-    if isinstance(color_input, str) and len(color_input) == 6 and all(c in '0123456789abcdefABCDEF' for c in color_input.lower()):
-        # Hex string "RRGGBB"
-        r = int(color_input[0:2], 16)
-        g = int(color_input[2:4], 16)
-        b = int(color_input[4:6], 16)
-        return [r, g, b]
+    if isinstance(color_input, str):
+        color_str = color_input.strip()
+        if color_str.startswith('#'):
+            color_str = color_str[1:]
+        
+        named_colors = {
+            "red": [255, 0, 0],
+            "green": [0, 255, 0],
+            "blue": [0, 0, 255],
+            "white": [255, 255, 255],
+            "black": [0, 0, 0],
+            "yellow": [255, 255, 0],
+            "cyan": [0, 255, 255],
+            "magenta": [255, 0, 255],
+        }
+        if color_str.lower() in named_colors:
+            return named_colors[color_str.lower()]
+            
+        if len(color_str) == 6 and all(c in '0123456789abcdefABCDEF' for c in color_str):
+            r = int(color_str[0:2], 16)
+            g = int(color_str[2:4], 16)
+            b = int(color_str[4:6], 16)
+            return [r, g, b]
     elif isinstance(color_input, (tuple, list)) and len(color_input) == 3:
-        # (R, G, B) tuple or list
         if all(0 <= c <= 255 for c in color_input):
             return list(color_input)
-        else:
-            logger.warning(f"RGB values out of range (0-255): {color_input}. Defaulting to [255, 255, 255].")
-            return [255, 255, 255]
-    else:
-        logger.warning(f"Unsupported color input format: {color_input}. Defaulting to [255, 255, 255].")
-        return [255, 255, 255]
+            
+    logger.warning(f"Unsupported color input format: {color_input}. Defaulting to [255, 255, 255].")
+    return [255, 255, 255]
 
 def color2HexString(color_input) -> str:
     """

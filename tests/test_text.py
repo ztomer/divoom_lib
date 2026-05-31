@@ -19,4 +19,4 @@ async def test_set_text_content(divoom_device):
     content_bytes = text.encode('utf-8')
     expected_payload = [LPWA_CONTROL_CONTENT] + list(len(content_bytes).to_bytes(2, byteorder='little')) + list(content_bytes) + [text_box_id]
     
-    divoom_device.send_command.assert_called_once_with("set light phone word attr", expected_payload)
+    divoom_device.send_command.assert_called_once_with(0x87, expected_payload)

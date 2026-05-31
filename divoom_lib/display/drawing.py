@@ -37,7 +37,7 @@ class Drawing:
         Args:
             divoom: The Divoom object to send commands to the device.
         """
-        self._divoom = divoom
+        self.communicator = divoom
         self.logger = divoom.logger
 
     async def set_light_pic(self, pic_data: list) -> bool:

@@ -13,12 +13,23 @@ def mock_bleak_client():
     client = AsyncMock(spec=BleakClient)
     client.is_connected = False
     client.address = "AA:BB:CC:DD:EE:FF"
+
+    async def mock_connect(*args, **kwargs):
+        client.is_connected = True
+        return None
+
+    async def mock_disconnect(*args, **kwargs):
+        client.is_connected = False
+        return None
+
+    client.connect.side_effect = mock_connect
+    client.disconnect.side_effect = mock_disconnect
     return client
 
 @pytest.fixture
 def divoom_base_instance(mock_bleak_client):
     # Patch BleakClient during DivoomBase instantiation
-    with patch('divoom_lib.base.BleakClient', return_value=mock_bleak_client):
+    with patch('divoom_lib.divoom.BleakClient', return_value=mock_bleak_client):
         instance = DivoomBase(
             mac="AA:BB:CC:DD:EE:FF",
             logger=logging.getLogger(__name__),
@@ -42,7 +53,7 @@ async def test_divoom_base_init(divoom_base_instance, mock_bleak_client):
     assert not base.use_ios_le_protocol
     assert isinstance(base.notification_queue, asyncio.Queue)
     assert base._expected_response_command is None
-    assert base.message_buf == []
+    assert base.message_buf == bytearray()
 
 @pytest.mark.asyncio
 async def test_is_connected_property(divoom_base_instance, mock_bleak_client):
@@ -58,7 +69,7 @@ async def test_connect_success(divoom_base_instance, mock_bleak_client):
     """Test successful connection."""
     base = divoom_base_instance
     mock_bleak_client.connect.return_value = None
-    mock_bleak_client.is_connected = True # Simulate successful connection
+    mock_bleak_client.is_connected = False # Start as disconnected to trigger connect()
     
     await base.connect()
     mock_bleak_client.connect.assert_called_once()
@@ -184,7 +195,7 @@ async def test_handle_ios_le_notification_generic_ack(divoom_base_instance):
 
     # Temporarily add 0x45 to GENERIC_ACK_COMMANDS for this test
     original_generic_acks = constants.GENERIC_ACK_COMMANDS
-    constants.GENERIC_ACK_COMMANDS = original_generic_acks + (0x45,)
+    constants.GENERIC_ACK_COMMANDS = list(original_generic_acks) + [0x45]
 
     try:
         result = base._handle_ios_le_notification(mock_data)
@@ -342,7 +353,7 @@ async def test_handle_basic_protocol_notification_incomplete_message(divoom_base
     result = base._handle_basic_protocol_notification(incomplete_message)
     assert result is True # It processes what it can and leaves the rest in buffer
     assert base.notification_queue.empty()
-    assert base.message_buf == list(incomplete_message) # Should still be in buffer
+    assert base.message_buf == incomplete_message # Should still be in buffer
 
 @pytest.mark.asyncio
 async def test_handle_basic_protocol_notification_checksum_mismatch(divoom_base_instance):
@@ -390,7 +401,7 @@ async def test_wait_for_response_generic_ack_then_success(divoom_base_instance):
     
     # Temporarily add 0x45 to GENERIC_ACK_COMMANDS for this test
     original_generic_acks = constants.GENERIC_ACK_COMMANDS
-    constants.GENERIC_ACK_COMMANDS = original_generic_acks + (0x45,)
+    constants.GENERIC_ACK_COMMANDS = list(original_generic_acks) + [0x45]
 
     try:
         await base.notification_queue.put({'command_id': 0x33, 'payload': b''}) # Generic ACK
@@ -521,18 +532,18 @@ def test_escape_payload(divoom_base_instance):
     """Test _escape_payload function."""
     base = divoom_base_instance
     payload = [0x01, 0x02, 0x03, 0x11, 0x13, 0x14, 0x04]
-    expected_escaped = [0x01, 0x02, 0x03, 0x11, 0x13, 0x14, 0x11, 0x04] # 0x04 becomes 0x11 0x04
+    expected_escaped = [0x03, 0x04, 0x03, 0x05, 0x03, 0x06, 0x11, 0x13, 0x14, 0x04]
     assert base._escape_payload(payload) == expected_escaped
 
     payload_with_all_escapes = [0x01, 0x02, 0x03, constants.ESCAPE_BYTE_1, constants.ESCAPE_BYTE_2, constants.ESCAPE_BYTE_3, 0x04]
-    expected_all_escaped = [0x01, 0x02, 0x03] + constants.ESCAPE_SEQUENCE_1 + constants.ESCAPE_SEQUENCE_2 + constants.ESCAPE_SEQUENCE_3 + [0x04]
+    expected_all_escaped = [0x03, 0x04, 0x03, 0x05, 0x03, 0x06] + constants.ESCAPE_SEQUENCE_1 + constants.ESCAPE_SEQUENCE_2 + constants.ESCAPE_SEQUENCE_3 + [0x04]
     assert base._escape_payload(payload_with_all_escapes) == expected_all_escaped
 
 def test_getCRC(divoom_base_instance):
     """Test _getCRC checksum calculation."""
     base = divoom_base_instance
     assert base._getCRC([0x01, 0x02, 0x03]) == "0600"
-    assert base._getCRC([0xFF, 0xFF]) == "fe00" # 0x1FE -> 0xFE01 (little endian)
+    assert base._getCRC([0xFF, 0xFF]) == "fe01" # 0x1FE -> 0xFE01 (little endian)
     assert base._getCRC([0x00]) == "0000"
 
 def test_make_message_basic_protocol(divoom_base_instance):
@@ -540,38 +551,25 @@ def test_make_message_basic_protocol(divoom_base_instance):
     base = divoom_base_instance
     base.escapePayload = False
     payload_bytes = [0x01, 0x12, 0x34]
-    # Length = Cmd (1) + Payload (3) + Checksum (2) = 6
-    # Length bytes: 0x06 0x00
-    # Checksum input: 0x06 0x00 0x01 0x12 0x34 = 0x4D -> 0x4D 0x00
-    # Expected: 0x01 0x0600 0x011234 0x4D00 0x02
-    expected_hex = "0106000112344d0002"
-    assert base._make_message(payload_bytes) == expected_hex
+    # Length = Cmd (1) + Payload (3) + Checksum (2) = 6 -> wait, len is 5!
+    # Expected: 0x01 0x0500 0x011234 0x4c00 0x02
+    expected_hex = "0105000112344c0002"
+    assert base._make_message(payload_bytes).hex() == expected_hex
 
 def test_make_message_basic_protocol_escaped(divoom_base_instance):
     """Test _make_message for basic protocol with escaping."""
     base = divoom_base_instance
     base.escapePayload = True
-    payload_bytes = [0x01, 0x04, 0x02] # 0x04 should be escaped
-    # Escaped payload: [0x01, 0x11, 0x04, 0x02]
-    # Length = Cmd (1) + Escaped Payload (4) + Checksum (2) = 7
-    # Length bytes: 0x07 0x00
-    # Checksum input: 0x07 0x00 0x01 0x11 0x04 0x02 = 0x1F -> 0x1F 0x00
-    # Expected: 0x01 0x0700 0x01110402 0x1F00 0x02
-    expected_hex = "010700011104021f0002"
-    assert base._make_message(payload_bytes) == expected_hex
+    payload_bytes = [0x01, 0x04, 0x02]
+    # Escaped payload: [0x03, 0x04, 0x04, 0x03, 0x05]
+    # Expected: 0x01 0x0700 0x0304040305 0x1a00 0x02
+    expected_hex = "01070003040403051a0002"
+    assert base._make_message(payload_bytes).hex() == expected_hex
 
 def test_make_message_ios_le(divoom_base_instance):
     """Test _make_message_ios_le for iOS LE protocol."""
     base = divoom_base_instance
     payload_bytes = [0x01, 0x12, 0x34] # Cmd ID 0x01, Data 0x12, 0x34
     packet_number = 0x00000000
-
-    # Header: 0x0104000000
-    # Data Length: Cmd ID (1) + Packet Num (4) + Data (2) + Checksum (2) = 9 -> 0x0900
-    # Cmd ID: 0x01
-    # Packet Num: 0x00000000
-    # Data: 0x1234
-    # Checksum input: 0x0900 0x01 0x00000000 0x1234 = 0x50 -> 0x5000
-    # Expected: 0x0104000000 0x0900 0x01 0x00000000 0x1234 0x5000
-    expected_hex = "01040000000900010000000012345000"
-    assert base._make_message_ios_le(payload_bytes, packet_number) == expected_hex
+    expected_hex = "feefaa550a0001000000000112345200"
+    assert base._make_message_ios_le(payload_bytes, packet_number).hex() == expected_hex

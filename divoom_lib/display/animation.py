@@ -42,7 +42,7 @@ class Animation:
         Args:
             divoom: The Divoom object to send commands to the device.
         """
-        self._divoom = divoom
+        self.communicator = divoom
         self.logger = divoom.logger
 
     async def set_gif_speed(self, speed: int):

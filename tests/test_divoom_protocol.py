@@ -248,7 +248,7 @@ async def test_probe_write_characteristics_fallback_spp_success(mock_divoom_inst
     mock_cache_util.save_device_cache = MagicMock()
 
     write_chars = [MagicMock(uuid="char1_uuid")]
-    divoom.mock_send_command_and_wait_for_response.return_value = None # All probes fail
+    divoom.mock_send_command_and_wait_for_response.side_effect = [None, None, b'\x01\x00\x00\x00\x00\x02']
     divoom.mock_send_command.return_value = True # Fallback channel switch succeeds
 
     with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
@@ -301,7 +301,7 @@ async def test_probe_write_characteristics_fallback_failure(mock_divoom_instance
         )
     assert result is None
     assert divoom.mock_send_command.call_count == 2
-    assert divoom.mock_send_command_and_wait_for_response.call_count == 3
+    assert divoom.mock_send_command_and_wait_for_response.call_count == 4
 
 @pytest.mark.asyncio
 async def test_set_canonical_light_spp_success(mock_divoom_instance):

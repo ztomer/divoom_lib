@@ -14,4 +14,4 @@ def divoom_device():
 async def test_set_light_pic(divoom_device):
     pic_data = [0x01, 0x02, 0x03]
     await divoom_device.drawing.set_light_pic(pic_data)
-    divoom_device.send_command.assert_called_once_with("set light pic", pic_data)
+    divoom_device.send_command.assert_called_once_with(0x44, pic_data)
