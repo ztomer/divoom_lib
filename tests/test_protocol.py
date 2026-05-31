@@ -8,10 +8,9 @@ import logging
 @pytest.fixture
 def mock_protocol_instance():
     """Fixture for a mock DivoomProtocol instance."""
-    with patch('divoom_lib.protocol.BleakClient') as mock_bleak_client:
+    with patch('divoom_lib.divoom.BleakClient') as mock_bleak_client:
         mock_bleak_client.return_value = AsyncMock()
         protocol = DivoomProtocol(mac="AA:BB:CC:DD:EE:FF", device_name="MockDevice")
-        # protocol.client is already set to the mock instance by __init__
         protocol.client.is_connected = True
         protocol.WRITE_CHARACTERISTIC_UUID = "mock_write_char_uuid"
         protocol.NOTIFY_CHARACTERISTIC_UUID = "mock_notify_char_uuid"
@@ -30,7 +29,7 @@ async def test_protocol_init(mock_protocol_instance):
     assert protocol.escapePayload is False
     assert protocol.notification_queue.empty()
     assert protocol._expected_response_command is None
-    assert protocol.message_buf == []
+    assert protocol.message_buf == bytearray()
 
 @pytest.mark.asyncio
 async def test_make_message(mock_protocol_instance):
@@ -39,7 +38,7 @@ async def test_make_message(mock_protocol_instance):
     payload = [0x45, 0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01]
     message = protocol._make_message(payload)
     # Expected: 01 (start) + 0a00 (len) + 4501ff0000640001 (payload) + b401 (crc) + 02 (end)
-    assert message == "010a004501ff0000640001b40102"
+    assert message.hex() == "010a004501ff0000640001b40102"
 
 @pytest.mark.asyncio
 async def test_make_message_with_escaping(mock_protocol_instance):
@@ -49,7 +48,7 @@ async def test_make_message_with_escaping(mock_protocol_instance):
     payload = [0x01, 0x02, 0x03, 0x04]
     message = protocol._make_message(payload)
     # Expected: 01 (start) + 0900 (len) + 03040305030604 (escaped payload) + 2500 (crc) + 02 (end)
-    assert message == "01090003040305030604250002"
+    assert message.hex() == "01090003040305030604250002"
 
 @pytest.mark.asyncio
 async def test_make_message_ios_le(mock_protocol_instance):
@@ -58,7 +57,7 @@ async def test_make_message_ios_le(mock_protocol_instance):
     payload = [0x45, 0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01]
     message = protocol._make_message_ios_le(payload)
     # Expected: feefaa55 (header) + 0f00 (len) + 45 (cmd) + 00000000 (packet num) + 4501ff0000640001 (payload) + fe01 (crc)
-    assert message == "feefaa550f0045000000004501ff0000640001fe01"
+    assert message.hex() == "feefaa550f0045000000004501ff0000640001fe01"
 
 @pytest.mark.asyncio
 async def test_escape_payload(mock_protocol_instance):
@@ -121,7 +120,7 @@ async def test_wait_for_response_timeout(mock_protocol_instance):
 async def test_send_command(mock_protocol_instance):
     """Test send_command."""
     protocol = mock_protocol_instance
-    with patch.object(protocol, 'send_payload', new_callable=AsyncMock) as mock_send_payload:
+    with patch.object(protocol, '_send_payload', new_callable=AsyncMock) as mock_send_payload:
         await protocol.send_command("set volume", [10])
         mock_send_payload.assert_called_once_with([models.COMMANDS["set volume"], 10], write_with_response=False)
 
@@ -175,7 +174,7 @@ async def test_send_command_and_wait_for_response(mock_protocol_instance):
     """Test send_command_and_wait_for_response."""
     protocol = mock_protocol_instance
     with patch.object(protocol, 'send_command', new_callable=AsyncMock) as mock_send_command, \
-         patch.object(protocol, 'wait_for_response', new_callable=AsyncMock) as mock_wait_for_response:
+         patch.object(protocol, '_wait_for_response', new_callable=AsyncMock) as mock_wait_for_response:
         mock_wait_for_response.return_value = b'test'
         response = await protocol.send_command_and_wait_for_response("set volume", [10])
         mock_send_command.assert_called_once_with("set volume", [10], write_with_response=True)
