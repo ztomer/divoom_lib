@@ -12,7 +12,10 @@ import logging
 import urllib.request
 import struct
 import webview
+import threading
+import time
 from pathlib import Path
+from bleak import BleakScanner
 
 # Add divoom-control paths
 sys.path.append(str(Path(__file__).parent.parent))
@@ -20,7 +23,7 @@ sys.path.append(str(Path(__file__).parent.parent / "api_scraper"))
 
 import divoom_auth
 from divoom_lib.divoom import Divoom
-from divoom_lib.utils import discovery
+from divoom_lib.utils import discovery, media_source
 from divoom_lib.wall import DivoomWall
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -35,6 +38,10 @@ class DivoomGuiAPI:
         self.cached_creds = None
         self.device_pw = 0
         self.device_id = 0
+        
+        self.music_sync_active = False
+        self.music_thread = None
+        self.current_track_cache = None
         
         # Load virtual device details for gallery API
         device_cache_path = Path(__file__).parent.parent / "api_scraper" / "divoom_docs" / "virtual_device.json"
@@ -57,10 +64,68 @@ class DivoomGuiAPI:
 
     def scan_devices(self) -> str:
         """Scan BLE devices and return discovered Divoom screens as JSON."""
-        logger.info("GUI Action: Scanning devices...")
+        return self.scan_devices_with_config(timeout=15, limit=4)
+
+    def scan_devices_with_config(self, timeout: int, limit: int) -> str:
+        """Scan BLE devices with custom timeouts and device limit."""
+        logger.info(f"GUI Action: Scanning devices with timeout={timeout}, limit={limit}...")
+        
+        # Save scanner limits into config.ini for next time
+        try:
+            import configparser
+            config_file = Path(__file__).parent.parent / "config.ini"
+            cfg = configparser.ConfigParser()
+            if config_file.exists():
+                cfg.read(config_file)
+            if "gui" not in cfg:
+                cfg["gui"] = {}
+            cfg["gui"]["timeout"] = str(timeout)
+            cfg["gui"]["limit"] = str(limit)
+            with open(config_file, "w") as f:
+                cfg.write(f)
+        except Exception as e:
+            logger.warning(f"Failed to save scan config: {e}")
+
+        # Scan using Bleak
         loop = self._get_async_loop()
         try:
-            results = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=4.0))
+            if limit > 0:
+                # Custom scanning logic to stop as soon as we discover `limit` Divoom devices!
+                discovered = []
+                divoom_keywords = ["timoo", "tivoo", "timebox", "pixoo", "ditoo", "backpack", "timegate"]
+                
+                def detection_callback(device, advertisement_data):
+                    if device.name:
+                        name_lower = device.name.lower()
+                        is_divoom = any(kw in name_lower for kw in divoom_keywords)
+                        if is_divoom:
+                            # Avoid duplicates
+                            if not any(d["address"] == device.address for d in discovered):
+                                discovered.append({
+                                    "name": device.name,
+                                    "address": device.address
+                                })
+                                logger.info(f"Scanner: Found Divoom device: {device.name} ({device.address})")
+                
+                scanner = BleakScanner(detection_callback=detection_callback)
+                
+                async def run_scan():
+                    await scanner.start()
+                    elapsed = 0.0
+                    while elapsed < timeout and len(discovered) < limit:
+                        await asyncio.sleep(0.5)
+                        elapsed += 0.5
+                    await scanner.stop()
+                    return discovered
+                    
+                results = loop.run_until_complete(run_scan())
+                # Fallback to all named devices if none match keywords
+                if not results:
+                    results = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=float(timeout)))
+                    results = results[:limit]
+            else:
+                results = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=float(timeout)))
+                
             self.discovered_list = results
             return json.dumps(results)
         except Exception as e:
@@ -84,10 +149,24 @@ class DivoomGuiAPI:
             return False
 
     def update_wall_slots(self, slots_json: str) -> None:
-        """Syncs drag-and-drop grid slot coordinate assignments from JS."""
+        """Syncs drag-and-drop grid slot coordinate assignments from JS and persists as last active."""
         logger.info(f"GUI Action: Syncing wall grid layout: {slots_json}")
         self.wall_slots = json.loads(slots_json)
         self.wall_instance = None # Invalidate to force rebuild on next display wall call
+        
+        # Persist as last active
+        try:
+            presets_file = Path(__file__).parent / "presets.json"
+            presets = {}
+            if presets_file.exists():
+                try:
+                    presets = json.loads(presets_file.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            presets["_last_active_slots_"] = self.wall_slots
+            presets_file.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"Failed to save last active slots: {e}")
 
     def _rebuild_wall_instance(self, cell_size: int = 16) -> bool:
         """Internal helper to construct DivoomWall coordinator from assigned grid slots."""
@@ -261,7 +340,6 @@ class DivoomGuiAPI:
                 if len(file_bytes) < 4:
                     return False
                 
-                # Broad-sync the downloaded payload directly to all arranged screens
                 targets = []
                 if self.wall_slots:
                     if not self._rebuild_wall_instance():
@@ -282,6 +360,218 @@ class DivoomGuiAPI:
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
             return False
+
+    # ── Live macOS Music Integration ─────────────────────────────────────────────
+    
+    def _music_sync_loop(self):
+        """Background thread polling macOS active playback and streaming artwork."""
+        last_track = None
+        last_artist = None
+        while self.music_sync_active:
+            try:
+                track_info = media_source.get_current_playing_track()
+                if track_info:
+                    track = track_info.get("track")
+                    artist = track_info.get("artist")
+                    source = track_info.get("source")
+                    
+                    if track != last_track or artist != last_artist:
+                        logger.info(f"Music Sync: New track: {track} by {artist} ({source})")
+                        last_track = track
+                        last_artist = artist
+                        
+                        art_url = media_source.fetch_album_art_url(track, artist)
+                        if art_url:
+                            size = 16
+                            out_path = media_source.render_and_downsample_artwork(art_url, size=size)
+                            if out_path and out_path.exists():
+                                logger.info(f"Music Sync: Push cover art frame: {out_path}")
+                                loop = asyncio.new_event_loop()
+                                try:
+                                    if self.wall_slots:
+                                        if self._rebuild_wall_instance(size):
+                                            loop.run_until_complete(self.wall_instance.show_image(str(out_path)))
+                                    elif self.current_divoom and self.current_divoom.is_connected:
+                                        loop.run_until_complete(self.current_divoom.display.show_image(str(out_path)))
+                                finally:
+                                    loop.close()
+                                    
+                            self.current_track_cache = {
+                                "track": track,
+                                "artist": artist,
+                                "source": source,
+                                "artwork_url": art_url
+                            }
+                        else:
+                            self.current_track_cache = {
+                                "track": track,
+                                "artist": artist,
+                                "source": source,
+                                "artwork_url": ""
+                            }
+                else:
+                    self.current_track_cache = None
+            except Exception as e:
+                logger.error(f"Music sync error: {e}")
+            time.sleep(3.0)
+
+    def toggle_music_sync(self, enable: bool) -> bool:
+        logger.info(f"GUI Action: Toggle music sync to {enable}")
+        self.music_sync_active = enable
+        if enable:
+            if not self.music_thread or not self.music_thread.is_alive():
+                self.music_thread = threading.Thread(target=self._music_sync_loop, daemon=True)
+                self.music_thread.start()
+        return True
+
+    def get_current_track_info(self) -> str:
+        if self.current_track_cache:
+            return json.dumps(self.current_track_cache)
+        return json.dumps({})
+
+    # ── Yahoo Finance Ticker Integration ──────────────────────────────────────────
+    
+    def apply_stock_ticker(self, symbol: str) -> str:
+        logger.info(f"GUI Action: Applying stock ticker for {symbol}...")
+        try:
+            data = media_source.fetch_stock_ticker(symbol)
+            if not data:
+                return json.dumps({"success": False})
+                
+            size = 16
+            frame_path = media_source.render_stock_ticker_frame(symbol, data, size=size)
+            
+            loop = self._get_async_loop()
+            res = False
+            if self.wall_slots:
+                if self._rebuild_wall_instance(size):
+                    res = loop.run_until_complete(self.wall_instance.show_image(str(frame_path)))
+            elif self.current_divoom and self.current_divoom.is_connected:
+                res = loop.run_until_complete(self.current_divoom.display.show_image(str(frame_path)))
+                
+            return json.dumps({
+                "success": res,
+                "price": data["price"],
+                "change": data["change"],
+                "pct_change": data["pct_change"]
+            })
+        except Exception as e:
+            logger.error(f"Failed to apply stock ticker: {e}")
+            return json.dumps({"success": False, "error": str(e)})
+
+    # ── Credentials & Config/Preset Persistence ──────────────────────────────────
+    
+    def save_credentials(self, email: str, password: str) -> bool:
+        logger.info(f"GUI Action: Saving cloud credentials for {email}...")
+        try:
+            import configparser
+            config_file = Path(__file__).parent.parent / "config.ini"
+            cfg = configparser.ConfigParser()
+            if config_file.exists():
+                cfg.read(config_file)
+            if "divoom" not in cfg:
+                cfg["divoom"] = {}
+            cfg["divoom"]["email"] = email
+            cfg["divoom"]["password"] = password
+            
+            with open(config_file, "w") as f:
+                cfg.write(f)
+                
+            # Invalidate credentials cache to force login
+            auth_cache = Path(__file__).parent.parent / "api_scraper" / "divoom_docs" / "auth_token.json"
+            if auth_cache.exists():
+                auth_cache.unlink()
+                
+            self.cached_creds = divoom_auth.get_credentials(force_refresh=True)
+            return self.cached_creds.is_valid()
+        except Exception as e:
+            logger.error(f"Failed to save credentials: {e}")
+            return False
+
+    def load_config(self) -> str:
+        logger.info("GUI Action: Loading configurations...")
+        try:
+            import configparser
+            config_file = Path(__file__).parent.parent / "config.ini"
+            cfg = configparser.ConfigParser()
+            email = ""
+            timeout = 15
+            limit = 4
+            
+            if config_file.exists():
+                cfg.read(config_file)
+                email = cfg.get("divoom", "email", fallback="")
+                timeout = int(cfg.get("gui", "timeout", fallback="15"))
+                limit = int(cfg.get("gui", "limit", fallback="4"))
+                
+            # Load active slots
+            presets_file = Path(__file__).parent / "presets.json"
+            slots = {}
+            if presets_file.exists():
+                try:
+                    data = json.loads(presets_file.read_text(encoding="utf-8"))
+                    slots = data.get("_last_active_slots_", {})
+                except Exception:
+                    pass
+                    
+            return json.dumps({
+                "email": email,
+                "timeout": timeout,
+                "limit": limit,
+                "slots": slots
+            })
+        except Exception as e:
+            logger.error(f"Failed to load config: {e}")
+            return json.dumps({})
+
+    def save_preset(self, name: str, slots_json: str) -> bool:
+        logger.info(f"GUI Action: Saving layout preset '{name}'...")
+        try:
+            presets_file = Path(__file__).parent / "presets.json"
+            presets = {}
+            if presets_file.exists():
+                try:
+                    presets = json.loads(presets_file.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            presets[name] = json.loads(slots_json)
+            presets_file.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save preset: {e}")
+            return False
+
+    def load_preset_names(self) -> str:
+        logger.info("GUI Action: Loading preset names...")
+        try:
+            presets_file = Path(__file__).parent / "presets.json"
+            if presets_file.exists():
+                try:
+                    presets = json.loads(presets_file.read_text(encoding="utf-8"))
+                    names = [k for k in presets.keys() if k != "_last_active_slots_"]
+                    return json.dumps(names)
+                except Exception:
+                    pass
+            return json.dumps([])
+        except Exception as e:
+            logger.error(f"Failed to load preset names: {e}")
+            return json.dumps([])
+
+    def load_preset_by_name(self, name: str) -> str:
+        logger.info(f"GUI Action: Loading preset '{name}'...")
+        try:
+            presets_file = Path(__file__).parent / "presets.json"
+            if presets_file.exists():
+                try:
+                    presets = json.loads(presets_file.read_text(encoding="utf-8"))
+                    slots = presets.get(name, {})
+                    return json.dumps(slots)
+                except Exception:
+                    pass
+            return json.dumps({})
+        except Exception as e:
+            logger.error(f"Failed to load preset '{name}': {e}")
+            return json.dumps({})
 
 def main():
     api = DivoomGuiAPI()

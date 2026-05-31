@@ -178,6 +178,52 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## Premium Desktop GUI & Multi-Device Wall Coordinator
+
+We have introduced a comprehensive desktop app suite and coordinator layer allowing you to orchestrate local Divoom environments:
+
+### 1. Stunning Glassmorphic Dashboard
+Run the root launcher to start the interactive desktop control center:
+```bash
+./run_gui.sh
+```
+*   **Active BLE Scanner**: Fully configurable scanning timeout and target limit overrides.
+*   **Display Wall Coordinate Arranger**: Map multiple Divoom screens in 2D space. The grid automatically loads visually gorgeous, high-resolution visual model mockups of your devices.
+*   **Ambient Solid Lights & Color Pickers**: Select custom RGB color spectrums and change brightness.
+*   **Clock Style Previews**: Pre-rendered mockups showing different styled clock faces.
+*   **Batch Monthly Best Sync**: Replicates top community-curated pixel art across all arranged screens in parallel async tasks.
+
+### 2. Multi-Device display wall (`DivoomWall`)
+Coordinates multiple physical Divoom displays as a single large virtual canvas using standard coordinates `(x, y)` and crops canvases using `NEAREST` Pillow scaling.
+```python
+from divoom_lib.wall import DivoomWall
+
+configs = [
+    {"mac": "XX:XX:XX:XX:XX:X1", "x": 0, "y": 0, "size": 16},
+    {"mac": "XX:XX:XX:XX:XX:X2", "x": 1, "y": 0, "size": 16}
+]
+wall = DivoomWall(configs)
+await wall.connect()
+await wall.show_image("artwork.gif")
+```
+
+### 3. AppleScript Cover Downsampler & Stock Tickers
+*   **macOS Song Tracking**: Automatically reads active tracks from Spotify or Apple Music using AppleScript, fetches their artwork via iTunes, downsamples them to pixel formats, and streams them.
+*   **Yahoo Stock Ticker**: Renders quotes and trend symbols for stock/crypto indexes (`BTC-USD`, `AAPL`) onto retro 16x16 canvas frames.
+
+### 4. Cocoa macOS Menubar & UNIX Socket IPC
+*   Start the native status bar application (`👾`) using PyObjC:
+    ```bash
+    python3 gui/menubar.py
+    ```
+*   **UNIX Domain Sockets**: Listens at `/tmp/divoom.sock` for remote IPC JSON controls:
+    ```bash
+    echo '{"command": "set_light", "args": {"color": "FF00CC", "brightness": 90}}' | nc -U /tmp/divoom.sock
+    ```
+*   **Model Context Protocol (MCP)**: Native JSON-RPC tool schemas to interface Divoom devices directly with AI coding assistants.
+
+---
+
 ## Library Structure
 
 The library is organized into the following modules:
@@ -186,6 +232,7 @@ The library is organized into the following modules:
   * `divoom.py`: The main `Divoom` class.
   * `protocol.py`: The `DivoomProtocol` class for low-level communication.
   * `models.py`: Divoom protocol constants and data models.
+  * `wall.py`: Display wall coordinator class (`DivoomWall`).
   * `display/`: Modules for controlling the display.
     * `light.py`: Light related commands.
     * `animation.py`: Animation related commands.
@@ -207,7 +254,12 @@ The library is organized into the following modules:
     * `timer.py`: Timer tool.
     * `countdown.py`: Countdown tool.
     * `noise.py`: Noise tool.
-  * `utils/`: Utility functions for discovery, image processing, etc.
+  * `utils/`: Utility functions for discovery, image processing, devices database, macOS media sync, etc.
+* `gui/`: Interactive Desktop applications.
+  * `gui_main.py`: PyWebView control bridge backend.
+  * `menubar.py`: Native Cocoa Status Bar App & UNIX Domain Socket IPC.
+  * `presets.json`: Screen grid presets cache.
+  * `web_ui/`: Glassmorphic fronted dashboard.
 * `examples/`: Example scripts.
 * `docs/`: Documentation files.
 

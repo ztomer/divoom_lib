@@ -39,8 +39,7 @@ async def main():
         await divoom.protocol.connect()
         logger.info(f"Successfully connected to {divoom.protocol.mac}!")
 
-        logger.info("Sending green light command...")
-        await divoom.display.light.show_light(color="00FF00", brightness=100)
+        await divoom.display.show_light(color="00FF00", brightness=100)
         logger.info("Command sent successfully.")
 
     except Exception as e:
