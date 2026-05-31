@@ -1,6 +1,5 @@
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from divoom_lib.display.scoreboard_channel import ScoreBoardChannel
 from divoom_lib.divoom import Divoom as DivoomBase
 
@@ -9,31 +8,20 @@ def mock_divoom_instance():
     """Fixture for a mock DivoomBase instance with _int2hexlittle method."""
     mock = AsyncMock(spec=DivoomBase)
     mock.send_command = AsyncMock()
-    # Mock _int2hexlittle to return a 4-char hex string (2 bytes)
     mock._int2hexlittle = MagicMock(side_effect=lambda x: f"{(x & 0xFF):02x}{((x >> 8) & 0xFF):02x}")
     return mock
 
-@pytest.fixture(autouse=True)
-def patch_asyncio_create_task():
-    """Patch asyncio.create_task to allow awaiting the created task."""
-    with patch('asyncio.create_task', new_callable=AsyncMock) as mock_create_task:
-        # Make the mock return an awaitable that immediately runs the coroutine
-        mock_create_task.side_effect = lambda coro: coro
-        yield mock_create_task
-
 @pytest.mark.asyncio
-async def test_scoreboard_channel_init_defaults(mock_divoom_instance, patch_asyncio_create_task):
+async def test_scoreboard_channel_init_defaults(mock_divoom_instance):
     """Test ScoreBoardChannel initialization with default scores."""
     channel = ScoreBoardChannel(mock_divoom_instance)
     
     assert channel._divoom_instance == mock_divoom_instance
     assert channel._opts["red"] == 0
     assert channel._opts["blue"] == 0
-    patch_asyncio_create_task.assert_called_once() # Called by __init__
-    mock_divoom_instance.send_command.assert_called_once() # Called by _update_message
 
 @pytest.mark.asyncio
-async def test_scoreboard_channel_init_custom_opts(mock_divoom_instance, patch_asyncio_create_task):
+async def test_scoreboard_channel_init_custom_opts(mock_divoom_instance):
     """Test ScoreBoardChannel initialization with custom scores."""
     custom_opts = {
         "red": 10,
@@ -43,26 +31,19 @@ async def test_scoreboard_channel_init_custom_opts(mock_divoom_instance, patch_a
     
     assert channel._opts["red"] == 10
     assert channel._opts["blue"] == 5
-    patch_asyncio_create_task.assert_called_once() # Called by __init__
-    mock_divoom_instance.send_command.assert_called_once() # Called by _update_message
 
 @pytest.mark.asyncio
-async def test_scoreboard_channel_show(mock_divoom_instance, patch_asyncio_create_task):
+async def test_scoreboard_channel_show(mock_divoom_instance):
     """Test the show method calls _update_message."""
     channel = ScoreBoardChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     await channel.show()
-    patch_asyncio_create_task.assert_called_once()
     mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_scoreboard_channel_update_message(mock_divoom_instance, patch_asyncio_create_task):
+async def test_scoreboard_channel_update_message(mock_divoom_instance):
     """Test _update_message sends the correct command with converted scores."""
     channel = ScoreBoardChannel(mock_divoom_instance, opts={"red": 123, "blue": 45})
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     await channel._update_message()
 
@@ -77,53 +58,29 @@ async def test_scoreboard_channel_update_message(mock_divoom_instance, patch_asy
     mock_divoom_instance._int2hexlittle.assert_any_call(45)
 
 @pytest.mark.asyncio
-async def test_scoreboard_channel_red_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the red setter updates option and calls _update_message, with clamping."""
+async def test_scoreboard_channel_red_setter(mock_divoom_instance):
+    """Test the red setter updates option and clamping."""
     channel = ScoreBoardChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.red = 50
     assert channel._opts["red"] == 50
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
-    mock_divoom_instance.send_command.reset_mock()
-    patch_asyncio_create_task.reset_mock()
 
-    channel.red = 1000 # Should be clamped to 999
+    channel.red = 1000
     assert channel._opts["red"] == 999
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
-    mock_divoom_instance.send_command.reset_mock()
-    patch_asyncio_create_task.reset_mock()
 
-    channel.red = -10 # Should be clamped to 0
+    channel.red = -10
     assert channel._opts["red"] == 0
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_scoreboard_channel_blue_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the blue setter updates option and calls _update_message, with clamping."""
+async def test_scoreboard_channel_blue_setter(mock_divoom_instance):
+    """Test the blue setter updates option and clamping."""
     channel = ScoreBoardChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.blue = 75
     assert channel._opts["blue"] == 75
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
-    mock_divoom_instance.send_command.reset_mock()
-    patch_asyncio_create_task.reset_mock()
 
-    channel.blue = 1001 # Should be clamped to 999
+    channel.blue = 1001
     assert channel._opts["blue"] == 999
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
-    mock_divoom_instance.send_command.reset_mock()
-    patch_asyncio_create_task.reset_mock()
 
-    channel.blue = -5 # Should be clamped to 0
+    channel.blue = -5
     assert channel._opts["blue"] == 0
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()

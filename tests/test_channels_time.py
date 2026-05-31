@@ -1,6 +1,5 @@
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from divoom_lib.display.time_channel import TimeChannel
 from divoom_lib.divoom import Divoom as DivoomBase
 from divoom_lib.models import TimeDisplayType
@@ -13,16 +12,8 @@ def mock_divoom_instance():
     mock.color2HexString = MagicMock(side_effect=lambda x: x.replace("#", ""))
     return mock
 
-@pytest.fixture(autouse=True)
-def patch_asyncio_create_task():
-    """Patch asyncio.create_task to allow awaiting the created task."""
-    with patch('asyncio.create_task', new_callable=AsyncMock) as mock_create_task:
-        # Make the mock return an awaitable that immediately runs the coroutine
-        mock_create_task.side_effect = lambda coro: coro
-        yield mock_create_task
-
 @pytest.mark.asyncio
-async def test_time_channel_init_defaults(mock_divoom_instance, patch_asyncio_create_task):
+async def test_time_channel_init_defaults(mock_divoom_instance):
     """Test TimeChannel initialization with default options."""
     channel = TimeChannel(mock_divoom_instance)
     
@@ -33,11 +24,9 @@ async def test_time_channel_init_defaults(mock_divoom_instance, patch_asyncio_cr
     assert channel._opts["showTemp"] is False
     assert channel._opts["showCalendar"] is False
     assert channel._opts["color"] == "FFFFFF"
-    patch_asyncio_create_task.assert_called_once() # Called by __init__
-    mock_divoom_instance.send_command.assert_called_once() # Called by _update_message
 
 @pytest.mark.asyncio
-async def test_time_channel_init_custom_opts(mock_divoom_instance, patch_asyncio_create_task):
+async def test_time_channel_init_custom_opts(mock_divoom_instance):
     """Test TimeChannel initialization with custom options."""
     custom_opts = {
         "type": TimeDisplayType.Rainbow,
@@ -55,22 +44,17 @@ async def test_time_channel_init_custom_opts(mock_divoom_instance, patch_asyncio
     assert channel._opts["showTemp"] is True
     assert channel._opts["showCalendar"] is True
     assert channel._opts["color"] == "00FF00"
-    patch_asyncio_create_task.assert_called_once() # Called by __init__
-    mock_divoom_instance.send_command.assert_called_once() # Called by _update_message
 
 @pytest.mark.asyncio
-async def test_time_channel_show(mock_divoom_instance, patch_asyncio_create_task):
+async def test_time_channel_show(mock_divoom_instance):
     """Test the show method calls _update_message."""
     channel = TimeChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     await channel.show()
-    patch_asyncio_create_task.assert_called_once()
     mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_time_channel_update_message(mock_divoom_instance, patch_asyncio_create_task):
+async def test_time_channel_update_message(mock_divoom_instance):
     """Test _update_message sends the correct command with converted arguments."""
     channel = TimeChannel(mock_divoom_instance, opts={
         "type": TimeDisplayType.WithBox,
@@ -80,8 +64,6 @@ async def test_time_channel_update_message(mock_divoom_instance, patch_asyncio_c
         "showCalendar": False,
         "color": "#FF00FF"
     })
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     await channel._update_message()
 
@@ -98,73 +80,49 @@ async def test_time_channel_update_message(mock_divoom_instance, patch_asyncio_c
     mock_divoom_instance.color2HexString.assert_called_once_with("#FF00FF")
 
 @pytest.mark.asyncio
-async def test_time_channel_type_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the type setter updates option and calls _update_message."""
+async def test_time_channel_type_setter(mock_divoom_instance):
+    """Test the type setter updates option."""
     channel = TimeChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.type = TimeDisplayType.AnalogRound
     assert channel._opts["type"] == TimeDisplayType.AnalogRound
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_time_channel_color_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the color setter updates option and calls _update_message."""
+async def test_time_channel_color_setter(mock_divoom_instance):
+    """Test the color setter updates option."""
     channel = TimeChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.color = "000000"
     assert channel._opts["color"] == "000000"
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_time_channel_show_time_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the show_time setter updates option and calls _update_message."""
+async def test_time_channel_show_time_setter(mock_divoom_instance):
+    """Test the show_time setter updates option."""
     channel = TimeChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.show_time = False
     assert channel._opts["showTime"] is False
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_time_channel_show_weather_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the show_weather setter updates option and calls _update_message."""
+async def test_time_channel_show_weather_setter(mock_divoom_instance):
+    """Test the show_weather setter updates option."""
     channel = TimeChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.show_weather = True
     assert channel._opts["showWeather"] is True
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_time_channel_show_temp_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the show_temp setter updates option and calls _update_message."""
+async def test_time_channel_show_temp_setter(mock_divoom_instance):
+    """Test the show_temp setter updates option."""
     channel = TimeChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.show_temp = True
     assert channel._opts["showTemp"] is True
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_time_channel_show_calendar_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the show_calendar setter updates option and calls _update_message."""
+async def test_time_channel_show_calendar_setter(mock_divoom_instance):
+    """Test the show_calendar setter updates option."""
     channel = TimeChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.show_calendar = True
     assert channel._opts["showCalendar"] is True
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()

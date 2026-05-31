@@ -5,11 +5,8 @@ from typing import List, Tuple, Optional, Dict, Any
 
 from bleak import BleakClient
 from bleak.exc import BleakError
-from bleak.backends.device import BLEDevice
-from bleak.backends.characteristic import BleakGATTCharacteristic
 
-from . import models
-from . import framing
+from . import models, framing
 from .exceptions import (
     DeviceAddressMissingError,
     CharacteristicConfigError,

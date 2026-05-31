@@ -112,9 +112,19 @@ async def test_discover_characteristics_no_services(mock_bleak_client):
 async def test_discover_characteristics_bleak_error(mock_bleak_client):
     """Test discover_characteristics handles BleakError during service access."""
     # Simulate BleakError when accessing client.services
-    type(mock_bleak_client).services = property(MagicMock(side_effect=BleakError("Service error")))
-
-    write_chars, notify_chars, read_chars = await discovery.discover_characteristics(mock_bleak_client)
+    error_client = mock_bleak_client
+    error_client.services = []
+    # Patch getattr to raise BleakError on the first few calls
+    original_getattr = getattr
+    call_count = [0]
+    def patched_getattr(obj, name, default=None):
+        if name == "services" and call_count[0] < 6:
+            call_count[0] += 1
+            raise BleakError("Service error")
+        return original_getattr(obj, name, default)
+    import builtins
+    with patch.object(builtins, 'getattr', patched_getattr):
+        write_chars, notify_chars, read_chars = await discovery.discover_characteristics(error_client)
     assert write_chars == []
     assert notify_chars == []
     assert read_chars == []

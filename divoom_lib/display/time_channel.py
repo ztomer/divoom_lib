@@ -2,7 +2,6 @@
 from ..divoom import Divoom as DivoomBase
 from ..models import TimeDisplayType
 from typing import Optional, Dict, Any
-import asyncio
 
 class TimeChannel:
     """
@@ -22,7 +21,6 @@ class TimeChannel:
         }
         if opts:
             self._opts.update(opts)
-        asyncio.create_task(self._update_message()) # Call async method from __init__
 
     async def show(self):
         """
@@ -57,7 +55,6 @@ class TimeChannel:
     @type.setter
     def type(self, value: int):
         self._opts["type"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def color(self) -> str:
@@ -66,7 +63,6 @@ class TimeChannel:
     @color.setter
     def color(self, value: str):
         self._opts["color"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def show_time(self) -> bool:
@@ -75,7 +71,6 @@ class TimeChannel:
     @show_time.setter
     def show_time(self, value: bool):
         self._opts["showTime"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def show_weather(self) -> bool:
@@ -84,7 +79,6 @@ class TimeChannel:
     @show_weather.setter
     def show_weather(self, value: bool):
         self._opts["showWeather"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def show_temp(self) -> bool:
@@ -93,7 +87,6 @@ class TimeChannel:
     @show_temp.setter
     def show_temp(self, value: bool):
         self._opts["showTemp"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def show_calendar(self) -> bool:
@@ -102,4 +95,3 @@ class TimeChannel:
     @show_calendar.setter
     def show_calendar(self, value: bool):
         self._opts["showCalendar"] = value
-        asyncio.create_task(self._update_message())

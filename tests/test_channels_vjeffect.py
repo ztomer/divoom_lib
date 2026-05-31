@@ -1,6 +1,5 @@
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from divoom_lib.display.vjeffect_channel import VJEffectChannel
 from divoom_lib.divoom import Divoom as DivoomBase
 from divoom_lib.models import VJEffectType
@@ -13,26 +12,16 @@ def mock_divoom_instance():
     mock.number2HexString = MagicMock(side_effect=lambda x: f"{x:02x}")
     return mock
 
-@pytest.fixture(autouse=True)
-def patch_asyncio_create_task():
-    """Patch asyncio.create_task to allow awaiting the created task."""
-    with patch('asyncio.create_task', new_callable=AsyncMock) as mock_create_task:
-        # Make the mock return an awaitable that immediately runs the coroutine
-        mock_create_task.side_effect = lambda coro: coro
-        yield mock_create_task
-
 @pytest.mark.asyncio
-async def test_vjeffect_channel_init_defaults(mock_divoom_instance, patch_asyncio_create_task):
+async def test_vjeffect_channel_init_defaults(mock_divoom_instance):
     """Test VJEffectChannel initialization with default options."""
     channel = VJEffectChannel(mock_divoom_instance)
     
     assert channel._divoom_instance == mock_divoom_instance
     assert channel._opts["type"] == VJEffectType.Sparkles
-    patch_asyncio_create_task.assert_called_once() # Called by __init__
-    mock_divoom_instance.send_command.assert_called_once() # Called by _update_message
 
 @pytest.mark.asyncio
-async def test_vjeffect_channel_init_custom_opts(mock_divoom_instance, patch_asyncio_create_task):
+async def test_vjeffect_channel_init_custom_opts(mock_divoom_instance):
     """Test VJEffectChannel initialization with custom options."""
     custom_opts = {
         "type": VJEffectType.Lava
@@ -40,26 +29,19 @@ async def test_vjeffect_channel_init_custom_opts(mock_divoom_instance, patch_asy
     channel = VJEffectChannel(mock_divoom_instance, opts=custom_opts)
     
     assert channel._opts["type"] == VJEffectType.Lava
-    patch_asyncio_create_task.assert_called_once() # Called by __init__
-    mock_divoom_instance.send_command.assert_called_once() # Called by _update_message
 
 @pytest.mark.asyncio
-async def test_vjeffect_channel_show(mock_divoom_instance, patch_asyncio_create_task):
+async def test_vjeffect_channel_show(mock_divoom_instance):
     """Test the show method calls _update_message."""
     channel = VJEffectChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     await channel.show()
-    patch_asyncio_create_task.assert_called_once()
     mock_divoom_instance.send_command.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_vjeffect_channel_update_message(mock_divoom_instance, patch_asyncio_create_task):
+async def test_vjeffect_channel_update_message(mock_divoom_instance):
     """Test _update_message sends the correct command with converted arguments."""
     channel = VJEffectChannel(mock_divoom_instance, opts={"type": VJEffectType.RainbowSwirl})
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     await channel._update_message()
 
@@ -72,13 +54,9 @@ async def test_vjeffect_channel_update_message(mock_divoom_instance, patch_async
     mock_divoom_instance.number2HexString.assert_called_once_with(VJEffectType.RainbowSwirl)
 
 @pytest.mark.asyncio
-async def test_vjeffect_channel_type_setter(mock_divoom_instance, patch_asyncio_create_task):
-    """Test the type setter updates option and calls _update_message."""
+async def test_vjeffect_channel_type_setter(mock_divoom_instance):
+    """Test the type setter updates option."""
     channel = VJEffectChannel(mock_divoom_instance)
-    mock_divoom_instance.send_command.reset_mock() # Clear init call
-    patch_asyncio_create_task.reset_mock()
 
     channel.type = VJEffectType.Fire
     assert channel._opts["type"] == VJEffectType.Fire
-    patch_asyncio_create_task.assert_called_once()
-    mock_divoom_instance.send_command.assert_called_once()

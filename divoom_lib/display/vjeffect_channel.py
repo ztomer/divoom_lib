@@ -2,7 +2,6 @@
 from ..divoom import Divoom as DivoomBase
 from ..models import VJEffectType
 from typing import Optional, Dict, Any
-import asyncio
 
 class VJEffectChannel:
     """
@@ -17,7 +16,6 @@ class VJEffectChannel:
         }
         if opts:
             self._opts.update(opts)
-        asyncio.create_task(self._update_message())
 
     async def show(self):
         """
@@ -50,4 +48,3 @@ class VJEffectChannel:
     @type.setter
     def type(self, value: int):
         self._opts["type"] = value
-        asyncio.create_task(self._update_message())

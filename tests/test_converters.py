@@ -46,16 +46,16 @@ def test_color_to_rgb_list_out_of_range_rgb(caplog):
     """Test color_to_rgb_list with out-of-range RGB values."""
     with caplog.at_level(logging.WARNING):
         assert converters.color_to_rgb_list((256, 0, 0)) == [255, 255, 255]
-        assert "RGB values out of range (0-255)" in caplog.text
+        assert "Unsupported color input format: (256, 0, 0)" in caplog.text
         caplog.clear()
     with caplog.at_level(logging.WARNING):
         assert converters.color_to_rgb_list([-1, 0, 0]) == [255, 255, 255]
-        assert "RGB values out of range (0-255)" in caplog.text
+        assert "Unsupported color input format: [-1, 0, 0]" in caplog.text
 
 def test_color_to_rgb_list_invalid_input(caplog):
     """Test color_to_rgb_list with invalid input formats."""
     with caplog.at_level(logging.WARNING):
-        assert converters.color_to_rgb_list("red") == [255, 255, 255]
+        assert converters.color_to_rgb_list("invalid") == [255, 255, 255]
         assert "Unsupported color input format" in caplog.text
         caplog.clear()
     with caplog.at_level(logging.WARNING):

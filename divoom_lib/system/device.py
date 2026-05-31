@@ -43,7 +43,7 @@ class Device:
             asyncio.run(main())
     """
     def __init__(self, divoom: CommandSender) -> None:
-        self._divoom = divoom
+        self.communicator = divoom
         self.logger = divoom.logger
 
     async def set_brightness(self, brightness: int) -> bool:

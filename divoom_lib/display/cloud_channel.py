@@ -1,7 +1,6 @@
 # divoom_api/channels/cloud.py
 from ..divoom import Divoom as DivoomBase
 from typing import Optional, Dict, Any
-import asyncio
 
 class CloudChannel:
     """
@@ -11,7 +10,6 @@ class CloudChannel:
 
     def __init__(self, divoom_instance: DivoomBase):
         self._divoom_instance = divoom_instance
-        asyncio.create_task(self._update_message())
 
     async def show(self):
         """

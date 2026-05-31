@@ -2,7 +2,6 @@
 from ..divoom import Divoom as DivoomBase
 from ..models import LightningType
 from typing import Optional, Dict, Any
-import asyncio
 
 class LightningChannel:
     """
@@ -21,7 +20,6 @@ class LightningChannel:
         }
         if opts:
             self._opts.update(opts)
-        asyncio.create_task(self._update_message())
 
     async def show(self):
         """
@@ -57,7 +55,6 @@ class LightningChannel:
     @type.setter
     def type(self, value: int):
         self._opts["type"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def color(self) -> str:
@@ -66,7 +63,6 @@ class LightningChannel:
     @color.setter
     def color(self, value: str):
         self._opts["color"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def power(self) -> bool:
@@ -75,7 +71,6 @@ class LightningChannel:
     @power.setter
     def power(self, value: bool):
         self._opts["power"] = value
-        asyncio.create_task(self._update_message())
 
     @property
     def brightness(self) -> int:
@@ -84,4 +79,3 @@ class LightningChannel:
     @brightness.setter
     def brightness(self, value: int):
         self._opts["brightness"] = value
-        asyncio.create_task(self._update_message())

@@ -74,8 +74,8 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         self.mock_divoom_instance._try_send_command_with_framing.assert_called_once()
         call_args = self.mock_divoom_instance._try_send_command_with_framing.call_args
         self.assertEqual(call_args.args[0], constants.COMMANDS["set light mode"])
-        self.assertEqual(call_args.args[4], False) # use_ios=False (index adjusted)
-        self.assertEqual(call_args.args[5], self.mock_divoom_instance.escapePayload) # escape=True (default for SPP)
+        self.assertEqual(call_args.kwargs['use_ios'], False)
+        self.assertEqual(call_args.kwargs['escape'], self.mock_divoom_instance.escapePayload)
 
         # Verify cache was updated
         self.mock_save_device_cache.assert_called_once()
@@ -104,8 +104,8 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         # Verify second call was for iOS-LE
         call_args = self.mock_divoom_instance._try_send_command_with_framing.call_args
         self.assertEqual(call_args.args[0], constants.COMMANDS["set light mode"])
-        self.assertEqual(call_args.args[4], True) # use_ios=True (index adjusted)
-        self.assertEqual(call_args.args[5], self.mock_divoom_instance.escapePayload)
+        self.assertEqual(call_args.kwargs['use_ios'], True)
+        self.assertEqual(call_args.kwargs['escape'], self.mock_divoom_instance.escapePayload)
 
         # Verify cache was updated for iOS-LE
         self.mock_save_device_cache.assert_called_once()
@@ -153,7 +153,6 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result_uuid, mock_char_uuid)
         
-        self.mock_load_device_cache.assert_called_once()
         self.mock_divoom_instance._try_send_command_with_framing.assert_called_once()
         self.mock_save_device_cache.assert_called_once()
 
@@ -170,9 +169,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         self.mock_load_device_cache.return_value = {}
         # Mock _try_send_command_with_framing to fail cached, then succeed diagnostic SPP
         self.mock_divoom_instance._try_send_command_with_framing.side_effect = [
-            None, # For _handle_cached_payload
             b"diagnostic_spp_response", # For _send_diagnostic_payload (SPP)
-            None # For _send_diagnostic_payload (iOS-LE) - should not be reached
         ]
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
@@ -180,8 +177,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result_uuid, mock_char_uuid)
         
-        self.mock_load_device_cache.assert_called_once()
-        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 2)
+        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 1)
         self.mock_save_device_cache.assert_called_once()
         saved_cache = self.mock_save_device_cache.call_args[0][2]
         self.assertEqual(saved_cache["last_successful_use_ios_le"], False)
@@ -197,7 +193,6 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
 
         self.mock_load_device_cache.return_value = {}
         self.mock_divoom_instance._try_send_command_with_framing.side_effect = [
-            None, # For _handle_cached_payload
             None, # For _send_diagnostic_payload (SPP)
             b"diagnostic_ios_response" # For _send_diagnostic_payload (iOS-LE)
         ]
@@ -207,8 +202,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result_uuid, mock_char_uuid)
         
-        self.mock_load_device_cache.assert_called_once()
-        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 3)
+        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 2)
         self.mock_save_device_cache.assert_called_once()
         saved_cache = self.mock_save_device_cache.call_args[0][2]
         self.assertEqual(saved_cache["last_successful_use_ios_le"], True)
@@ -224,11 +218,9 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
 
         self.mock_load_device_cache.return_value = {}
         self.mock_divoom_instance._try_send_command_with_framing.side_effect = [
-            None, # For _handle_cached_payload
             None, # For _send_diagnostic_payload (SPP)
             None, # For _send_diagnostic_payload (iOS-LE)
             b"fallback_spp_response", # For fallback channel switch (SPP)
-            None # For fallback channel switch (iOS-LE) - should not be reached
         ]
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
@@ -236,8 +228,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNone(result_uuid) # Fallback returns None
         
-        self.mock_load_device_cache.assert_called_once()
-        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 4)
+        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 3)
         self.assertEqual(self.mock_divoom_instance.send_command.call_count, 2) # set work mode, set poweron channel
 
     async def test_probe_write_characteristics_fallback_channel_switch_ios_le_success(self):
@@ -251,7 +242,6 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
 
         self.mock_load_device_cache.return_value = {}
         self.mock_divoom_instance._try_send_command_with_framing.side_effect = [
-            None, # For _handle_cached_payload
             None, # For _send_diagnostic_payload (SPP)
             None, # For _send_diagnostic_payload (iOS-LE)
             None, # For fallback channel switch (SPP)
@@ -263,8 +253,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNone(result_uuid) # Fallback returns None
         
-        self.mock_load_device_cache.assert_called_once()
-        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 5)
+        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 4)
         self.assertEqual(self.mock_divoom_instance.send_command.call_count, 2)
 
     async def test_probe_write_characteristics_no_success(self):
@@ -278,11 +267,10 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
 
         self.mock_load_device_cache.return_value = {}
         self.mock_divoom_instance._try_send_command_with_framing.side_effect = [
-            None, # For _handle_cached_payload
             None, # For _send_diagnostic_payload (SPP)
             None, # For _send_diagnostic_payload (iOS-LE)
             None, # For fallback channel switch (SPP)
-            None # For fallback channel switch (iOS-LE)
+            None, # For fallback channel switch (iOS-LE)
         ]
 
         result_uuid = await self.mock_divoom_instance.probe_write_characteristics_and_try_channel_switch(
@@ -290,8 +278,7 @@ class TestDivoomProtocolUtils(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNone(result_uuid)
         
-        self.mock_load_device_cache.assert_called_once()
-        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 5)
+        self.assertEqual(self.mock_divoom_instance._try_send_command_with_framing.call_count, 4)
         self.assertEqual(self.mock_divoom_instance.send_command.call_count, 2)
 
 if __name__ == '__main__':

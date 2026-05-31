@@ -1,7 +1,6 @@
 # divoom_api/channels/scoreboard.py
 from ..divoom import Divoom as DivoomBase
 from typing import Optional, Dict, Any
-import asyncio
 
 class ScoreBoardChannel:
     """
@@ -17,7 +16,6 @@ class ScoreBoardChannel:
         }
         if opts:
             self._opts.update(opts)
-        asyncio.create_task(self._update_message())
 
     async def show(self):
         """
@@ -50,8 +48,7 @@ class ScoreBoardChannel:
 
     @red.setter
     def red(self, value: int):
-        self._opts["red"] = max(0, min(999, value)) # Clamp between 0 and 999
-        asyncio.create_task(self._update_message())
+        self._opts["red"] = max(0, min(999, value))
 
     @property
     def blue(self) -> int:
@@ -59,5 +56,4 @@ class ScoreBoardChannel:
 
     @blue.setter
     def blue(self, value: int):
-        self._opts["blue"] = max(0, min(999, value)) # Clamp between 0 and 999
-        asyncio.create_task(self._update_message())
+        self._opts["blue"] = max(0, min(999, value))
