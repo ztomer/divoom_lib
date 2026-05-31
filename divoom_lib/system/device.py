@@ -1,6 +1,7 @@
 
 import datetime
 import logging
+from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
     CHANNEL_ID_MIN, CHANNEL_ID_MAX,
@@ -41,7 +42,7 @@ class Device:
         if __name__ == "__main__":
             asyncio.run(main())
     """
-    def __init__(self, divoom) -> None:
+    def __init__(self, divoom: CommandSender) -> None:
         self._divoom = divoom
         self.logger = divoom.logger
 

@@ -1,4 +1,5 @@
 
+from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
     STMI_STATUS, STMI_HOUR, STMI_MINUTE, STMI_WEEK, STMI_MODE, STMI_TRIGGER_MODE,
@@ -34,7 +35,7 @@ class Timeplan:
             asyncio.run(main())
     """
 
-    def __init__(self, divoom):
+    def __init__(self, divoom: CommandSender):
         self._divoom = divoom
         self.logger = divoom.logger
 

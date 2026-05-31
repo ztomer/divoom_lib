@@ -1,4 +1,5 @@
 
+from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
     SHOW_SLEEP_DEFAULT_SLEEPTIME, SHOW_SLEEP_DEFAULT_SLEEPMODE,
@@ -34,7 +35,7 @@ class Sleep:
             asyncio.run(main())
     """
 
-    def __init__(self, divoom):
+    def __init__(self, divoom: CommandSender):
         """
         Initializes the Sleep controller.
 

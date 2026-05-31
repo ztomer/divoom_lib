@@ -1,4 +1,5 @@
 
+from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
     GLM_CURRENT_LIGHT_EFFECT_MODE, GLM_TEMPERATURE_DISPLAY_MODE, GLM_VJ_SELECTION_OPTION,
@@ -32,7 +33,7 @@ class Light:
         if __name__ == "__main__":
             asyncio.run(main())
     """
-    def __init__(self, divoom):
+    def __init__(self, divoom: CommandSender):
         """
         Initializes the Light controller.
 

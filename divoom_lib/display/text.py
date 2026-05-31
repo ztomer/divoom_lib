@@ -1,4 +1,5 @@
 
+from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
     LPWA_CONTROL_SPEED, LPWA_CONTROL_EFFECTS, LPWA_CONTROL_DISPLAY_BOX,
@@ -28,7 +29,7 @@ class Text:
         if __name__ == "__main__":
             asyncio.run(main())
     """
-    def __init__(self, divoom):
+    def __init__(self, divoom: CommandSender):
         """
         Initializes the Text controller.
 

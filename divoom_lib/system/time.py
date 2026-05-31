@@ -1,4 +1,5 @@
 
+from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
     HOUR_TYPE_12, HOUR_TYPE_24, HOUR_TYPE_QUERY
@@ -27,7 +28,7 @@ class Time:
         if __name__ == "__main__":
             asyncio.run(main())
     """
-    def __init__(self, divoom) -> None:
+    def __init__(self, divoom: CommandSender) -> None:
         self._divoom = divoom
         self.logger = divoom.logger
 

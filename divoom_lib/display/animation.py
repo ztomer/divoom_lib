@@ -1,4 +1,5 @@
 
+from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
     ANSGC_CONTROL_START_SENDING, ANSGC_CONTROL_SENDING_DATA, ANSGC_CONTROL_TERMINATE_SENDING,
@@ -34,7 +35,7 @@ class Animation:
         if __name__ == "__main__":
             asyncio.run(main())
     """
-    def __init__(self, divoom):
+    def __init__(self, divoom: CommandSender):
         """
         Initializes the Animation controller.
 

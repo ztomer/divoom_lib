@@ -1,4 +1,5 @@
 
+from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
     TOOL_TYPE_NOISE,
@@ -29,7 +30,7 @@ class Noise:
         if __name__ == "__main__":
             asyncio.run(main())
     """
-    def __init__(self, divoom):
+    def __init__(self, divoom: CommandSender):
         self._divoom = divoom
         self.logger = divoom.logger
 
