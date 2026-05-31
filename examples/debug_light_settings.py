@@ -12,7 +12,7 @@ from divoom_lib import Divoom
 from divoom_lib.utils import discovery
 from divoom_lib.utils import logger_utils
 from divoom_lib.utils import converters
-from divoom_lib.constants import DIVOOM_DISP_LIGHT_MODE
+from divoom_lib.models import DIVOOM_DISP_LIGHT_MODE
 
 logger = logging.getLogger(__name__)
 

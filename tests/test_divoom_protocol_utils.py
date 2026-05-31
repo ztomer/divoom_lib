@@ -9,9 +9,9 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.characteristic import BleakGATTCharacteristic
 
-from divoom_lib.divoom_protocol import Divoom
-from divoom_lib.base import DivoomBase
-from divoom_lib import constants
+from divoom_lib.divoom import Divoom
+from divoom_lib.divoom import Divoom as DivoomBase
+from divoom_lib import models as constants
 from divoom_lib.utils import cache as cache_util
 
 # Setup basic logging

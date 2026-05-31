@@ -7,9 +7,9 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import List
 
-from divoom_lib.drawing.text import DisplayText
-from divoom_lib.base import DivoomBase # Import DivoomBase for type hinting and mocking
-from divoom_lib import constants
+from divoom_lib.display.display_text import DisplayText
+from divoom_lib.divoom import Divoom as DivoomBase # Import DivoomBase for type hinting and mocking
+from divoom_lib import models as constants
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

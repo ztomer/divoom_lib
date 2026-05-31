@@ -39,13 +39,7 @@ from .game import Game
 def _get_cache_module(cache_mod=None):
     if cache_mod is not None:
         return cache_mod
-    try:
-        from . import divoom_protocol
-        cache_mod = getattr(divoom_protocol, 'cache', None)
-    except Exception:
-        cache_mod = None
-    if cache_mod is None:
-        from .utils import cache as cache_mod
+    from .utils import cache as cache_mod
     return cache_mod
 
 class Divoom:

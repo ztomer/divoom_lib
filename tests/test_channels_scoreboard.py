@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from divoom_lib.channels.scoreboard import ScoreBoardChannel
-from divoom_lib.base import DivoomBase
+from divoom_lib.divoom import Divoom as DivoomBase
 
 @pytest.fixture
 def mock_divoom_instance():

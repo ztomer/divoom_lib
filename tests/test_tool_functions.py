@@ -7,7 +7,7 @@ import sys
 
 from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_device
-from divoom_lib import constants
+from divoom_lib import models as constants
 
 # --- Configuration ---
 DEVICE_NAME_SUBSTRING = "Timoo"

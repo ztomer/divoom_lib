@@ -1,5 +1,5 @@
 # divoom_api/drawing/drawing.py — migrated to display/display_animation.py
-from ..divoom import Divoom
+from ..sender_protocol import CommandSender
 from typing import Optional, Dict, Any, List, Union
 import asyncio
 import math
@@ -10,7 +10,7 @@ class DisplayAnimation:
     """
     This class is used to display static images and animations on the Divoom Timebox Evo.
     """
-    def __init__(self, divoom_instance: Divoom):
+    def __init__(self, divoom_instance: CommandSender):
         self._divoom_instance = divoom_instance
 
     async def read(self, input_data: Union[str, bytes]) -> List[List[int]]:

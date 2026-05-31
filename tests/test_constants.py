@@ -1,5 +1,5 @@
 import pytest
-from divoom_lib import constants
+from divoom_lib import models as constants
 
 def test_commands_dictionary_integrity():
     """Test that the COMMANDS dictionary contains expected keys and integer values."""

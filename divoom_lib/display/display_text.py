@@ -1,5 +1,5 @@
 # divoom_api/drawing/text.py — migrated to display/display_text.py
-from ..divoom import Divoom
+from ..sender_protocol import CommandSender
 from typing import Optional, Dict, Any, List, Callable
 import asyncio
 import math
@@ -11,7 +11,7 @@ class DisplayText:
     _PACKAGE_INIT_MESSAGE = "6e01"
     _PALETTE_HEADER = "6c00000704aa070446000000"
 
-    def __init__(self, divoom_instance: Divoom, opts: Optional[Dict[str, Any]] = None):
+    def __init__(self, divoom_instance: CommandSender, opts: Optional[Dict[str, Any]] = None):
         self._divoom_instance = divoom_instance
         self._anim_frame = 0
         self._opts = {

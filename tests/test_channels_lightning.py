@@ -2,8 +2,8 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from divoom_lib.channels.lightning import LightningChannel
-from divoom_lib.base import DivoomBase
-from divoom_lib.constants import LightningType
+from divoom_lib.divoom import Divoom as DivoomBase
+from divoom_lib.models import LightningType
 
 @pytest.fixture
 def mock_divoom_instance():

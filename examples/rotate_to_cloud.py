@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_divoom_devices
 from divoom_lib.utils.logger_utils import print_ok, print_wrn, print_err, print_info
-from divoom_lib.constants import CHANNEL_ID_CLOUD
+from divoom_lib.models import CHANNEL_ID_CLOUD
 
 logger = logging.getLogger(__name__)
 

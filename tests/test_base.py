@@ -1,8 +1,8 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from divoom_lib.base import DivoomBase
-from divoom_lib import constants
+from divoom_lib.divoom import Divoom as DivoomBase
+from divoom_lib import models as constants
 import logging
 from bleak import BleakClient
 from bleak.exc import BleakError

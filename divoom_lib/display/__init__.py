@@ -3,9 +3,11 @@ from .light import Light
 from .drawing import Drawing
 from .animation import Animation
 from .text import Text
+from .display_animation import DisplayAnimation
+from .display_text import DisplayText
 
 from ..utils.image_processing import process_image, chunks, make_framepart
-from .. import constants
+from .. import models as constants
 from ..utils.converters import to_int_if_str, bool_to_byte
 from ..sender_protocol import CommandSender
 

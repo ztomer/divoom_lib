@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_device
-from divoom_lib import constants
+from divoom_lib import models as constants
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s:%(message)s')

@@ -3,7 +3,7 @@ Divoom Game Commands
 """
 import time
 import asyncio
-from . import constants
+from . import models as constants
 from .utils.converters import to_int_if_str
 from .sender_protocol import CommandSender
 

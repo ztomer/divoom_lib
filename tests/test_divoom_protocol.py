@@ -1,31 +1,29 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from divoom_lib.divoom_protocol import Divoom
-from divoom_lib import constants
+from divoom_lib.divoom import Divoom
+from divoom_lib import models as constants
 import logging
 
 @pytest.fixture
 def mock_divoom_instance():
     """Fixture for a mock Divoom instance with patched methods."""
-    with patch('divoom_lib.divoom_protocol.Divoom.send_command_and_wait_for_response', new_callable=AsyncMock) as mock_send_command_and_wait, \
-         patch('divoom_lib.divoom_protocol.Divoom.send_command', new_callable=AsyncMock) as mock_send_command:
-        
+    with patch('divoom_lib.divoom.Divoom.send_command_and_wait_for_response', new_callable=AsyncMock) as mock_send_command_and_wait, \
+         patch('divoom_lib.divoom.Divoom.send_command', new_callable=AsyncMock) as mock_send_command:
+
         divoom = Divoom(mac="AA:BB:CC:DD:EE:FF", device_name="MockDevice")
-        divoom.client = AsyncMock() # Mock the client as well
-        divoom.client.is_connected = True # Assume connected for most tests
+        divoom.client = AsyncMock()
+        divoom.client.is_connected = True
         divoom.WRITE_CHARACTERISTIC_UUID = "mock_write_char_uuid"
         divoom.NOTIFY_CHARACTERISTIC_UUID = "mock_notify_char_uuid"
         divoom.use_ios_le_protocol = False
         divoom.escapePayload = False
 
-        # Attach the mocks to the instance for easier access in tests
         divoom.mock_send_command_and_wait_for_response = mock_send_command_and_wait
         divoom.mock_send_command = mock_send_command
 
-        # Set a default return value for send_command_and_wait_for_response
         divoom.mock_send_command_and_wait_for_response.return_value = b'\x01\x00\x00\x00\x00\x02'
-        divoom.mock_send_command.return_value = True # Default for send_command
+        divoom.mock_send_command.return_value = True
 
         yield divoom
 
@@ -35,7 +33,7 @@ async def test_divoom_init(mock_divoom_instance):
     divoom = mock_divoom_instance
     assert divoom.mac == "AA:BB:CC:DD:EE:FF"
     assert divoom.device_name == "MockDevice"
-    assert isinstance(divoom.display, object) # Check if sub-modules are initialized
+    assert isinstance(divoom.display, object)
     assert isinstance(divoom.system, object)
     assert isinstance(divoom.light, object)
     assert isinstance(divoom.music, object)
@@ -64,16 +62,14 @@ async def test_try_send_command_with_framing(mock_divoom_instance):
     """Test _try_send_command_with_framing calls send_command_and_wait_for_response with correct framing."""
     divoom = mock_divoom_instance
     command_id = constants.COMMANDS["set light mode"]
-    payload = [0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01] # Red color payload
+    payload = [0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01]
 
-    # Test with use_ios=True, escape=True
     divoom.mock_send_command_and_wait_for_response.reset_mock()
     await divoom._try_send_command_with_framing(command_id, payload, timeout=3, use_ios=True, escape=True)
     assert divoom.use_ios_le_protocol is True
     assert divoom.escapePayload is True
     divoom.mock_send_command_and_wait_for_response.assert_called_once_with(command_id, payload, timeout=3)
 
-    # Test with use_ios=False, escape=False
     divoom.mock_send_command_and_wait_for_response.reset_mock()
     await divoom._try_send_command_with_framing(command_id, payload, timeout=3, use_ios=False, escape=False)
     assert divoom.use_ios_le_protocol is False
@@ -86,18 +82,16 @@ async def test_send_diagnostic_payload_spp_success(mock_divoom_instance):
     divoom = mock_divoom_instance
     mock_cache_util = MagicMock()
     mock_cache_util.save_device_cache = MagicMock()
-    
-    divoom.mock_send_command_and_wait_for_response.return_value = b'\x01\x00\x00\x00\x00\x02' # Simulate success
 
-    # Patch the cache module directly for this test
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom._send_diagnostic_payload(
-            "mock_uuid", [0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01], {}, "mock_cache_dir", "mock_device_id"
-        )
+    divoom.mock_send_command_and_wait_for_response.return_value = b'\x01\x00\x00\x00\x00\x02'
+
+    result = await divoom._send_diagnostic_payload(
+        "mock_uuid", [0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01], {}, "mock_cache_dir", "mock_device_id", mock_cache_util
+    )
     assert result is True
     mock_cache_util.save_device_cache.assert_called_once()
-    assert divoom.use_ios_le_protocol is False # Should be SPP
-    assert divoom.escapePayload is True # Should be SPP
+    assert divoom.use_ios_le_protocol is False
+    assert divoom.escapePayload is True
 
 @pytest.mark.asyncio
 async def test_send_diagnostic_payload_ios_success(mock_divoom_instance):
@@ -106,20 +100,17 @@ async def test_send_diagnostic_payload_ios_success(mock_divoom_instance):
     mock_cache_util = MagicMock()
     mock_cache_util.save_device_cache = MagicMock()
 
-    # First call (SPP) fails, second (iOS-LE) succeeds
     divoom.mock_send_command_and_wait_for_response.side_effect = [
         None,
         b'\x01\x00\x00\x00\x00\x02'
     ]
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom._send_diagnostic_payload(
-            "mock_uuid", [0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01], {}, "mock_cache_dir", "mock_device_id"
-        )
+    result = await divoom._send_diagnostic_payload(
+        "mock_uuid", [0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01], {}, "mock_cache_dir", "mock_device_id", mock_cache_util
+    )
     assert result is True
     mock_cache_util.save_device_cache.assert_called_once()
-    assert divoom.use_ios_le_protocol is True # Should be iOS-LE
-    # escapePayload should be its original value for iOS-LE attempt
+    assert divoom.use_ios_le_protocol is True
     assert divoom.escapePayload is False
 
 @pytest.mark.asyncio
@@ -129,12 +120,11 @@ async def test_send_diagnostic_payload_failure(mock_divoom_instance):
     mock_cache_util = MagicMock()
     mock_cache_util.save_device_cache = MagicMock()
 
-    divoom.mock_send_command_and_wait_for_response.return_value = None # Simulate failure
+    divoom.mock_send_command_and_wait_for_response.return_value = None
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom._send_diagnostic_payload(
-            "mock_uuid", [0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01], {}, "mock_cache_dir", "mock_device_id"
-        )
+    result = await divoom._send_diagnostic_payload(
+        "mock_uuid", [0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01], {}, "mock_cache_dir", "mock_device_id", mock_cache_util
+    )
     assert result is False
     mock_cache_util.save_device_cache.assert_not_called()
 
@@ -152,10 +142,9 @@ async def test_handle_cached_payload_success(mock_divoom_instance):
     }
     divoom.mock_send_command_and_wait_for_response.return_value = b'\x01\x00\x00\x00\x00\x02'
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom._handle_cached_payload(
-            "mock_uuid", cached_data, "mock_cache_dir", "mock_device_id"
-        )
+    result = await divoom._handle_cached_payload(
+        "mock_uuid", cached_data, "mock_cache_dir", "mock_device_id", mock_cache_util
+    )
     assert result is True
     mock_cache_util.save_device_cache.assert_called_once()
     assert divoom.use_ios_le_protocol is False
@@ -171,10 +160,9 @@ async def test_handle_cached_payload_no_payload(mock_divoom_instance):
     cached_data = {}
     divoom.mock_send_command_and_wait_for_response.return_value = b'\x01\x00\x00\x00\x00\x02'
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom._handle_cached_payload(
-            "mock_uuid", cached_data, "mock_cache_dir", "mock_device_id"
-        )
+    result = await divoom._handle_cached_payload(
+        "mock_uuid", cached_data, "mock_cache_dir", "mock_device_id", mock_cache_util
+    )
     assert result is False
     mock_cache_util.save_device_cache.assert_not_called()
 
@@ -192,10 +180,9 @@ async def test_handle_cached_payload_failure(mock_divoom_instance):
     }
     divoom.mock_send_command_and_wait_for_response.return_value = None
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom._handle_cached_payload(
-            "mock_uuid", cached_data, "mock_cache_dir", "mock_device_id"
-        )
+    result = await divoom._handle_cached_payload(
+        "mock_uuid", cached_data, "mock_cache_dir", "mock_device_id", mock_cache_util
+    )
     assert result is False
     mock_cache_util.save_device_cache.assert_not_called()
 
@@ -214,10 +201,9 @@ async def test_probe_write_characteristics_success_cached(mock_divoom_instance):
     write_chars = [MagicMock(uuid="char1_uuid"), MagicMock(uuid="char2_uuid")]
     divoom.mock_send_command_and_wait_for_response.return_value = b'\x01\x00\x00\x00\x00\x02'
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", []
-        )
+    result = await divoom.probe_write_characteristics_and_try_channel_switch(
+        write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", [], mock_cache_util
+    )
     assert result == "char1_uuid"
     mock_cache_util.save_device_cache.assert_called_once()
 
@@ -226,16 +212,15 @@ async def test_probe_write_characteristics_success_diagnostic(mock_divoom_instan
     """Test probe_write_characteristics_and_try_channel_switch with diagnostic success."""
     divoom = mock_divoom_instance
     mock_cache_util = MagicMock()
-    mock_cache_util.load_device_cache.return_value = {} # No cached payload
+    mock_cache_util.load_device_cache.return_value = {}
     mock_cache_util.save_device_cache = MagicMock()
 
     write_chars = [MagicMock(uuid="char1_uuid"), MagicMock(uuid="char2_uuid")]
     divoom.mock_send_command_and_wait_for_response.return_value = b'\x01\x00\x00\x00\x00\x02'
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", []
-        )
+    result = await divoom.probe_write_characteristics_and_try_channel_switch(
+        write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", [], mock_cache_util
+    )
     assert result == "char1_uuid"
     mock_cache_util.save_device_cache.assert_called_once()
 
@@ -249,15 +234,14 @@ async def test_probe_write_characteristics_fallback_spp_success(mock_divoom_inst
 
     write_chars = [MagicMock(uuid="char1_uuid")]
     divoom.mock_send_command_and_wait_for_response.side_effect = [None, None, b'\x01\x00\x00\x00\x00\x02']
-    divoom.mock_send_command.return_value = True # Fallback channel switch succeeds
+    divoom.mock_send_command.return_value = True
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", []
-        )
-    assert result is None # Fallback doesn't return UUID
-    assert divoom.mock_send_command.call_count == 2 # set work mode, set poweron channel
-    assert divoom.mock_send_command_and_wait_for_response.call_count == 3 # 1 probe, 2 fallback attempts
+    result = await divoom.probe_write_characteristics_and_try_channel_switch(
+        write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", [], mock_cache_util
+    )
+    assert result is None
+    assert divoom.mock_send_command.call_count == 2
+    assert divoom.mock_send_command_and_wait_for_response.call_count == 3
 
 @pytest.mark.asyncio
 async def test_probe_write_characteristics_fallback_ios_success(mock_divoom_instance):
@@ -269,16 +253,15 @@ async def test_probe_write_characteristics_fallback_ios_success(mock_divoom_inst
 
     write_chars = [MagicMock(uuid="char1_uuid")]
     divoom.mock_send_command_and_wait_for_response.side_effect = [
-        None, # Probe fails
-        None, # SPP fallback fails
-        b'\x01\x00\x00\x00\x00\x02' # iOS-LE fallback succeeds
+        None,
+        None,
+        b'\x01\x00\x00\x00\x00\x02'
     ]
     divoom.mock_send_command.return_value = True
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", []
-        )
+    result = await divoom.probe_write_characteristics_and_try_channel_switch(
+        write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", [], mock_cache_util
+    )
     assert result is None
     assert divoom.mock_send_command.call_count == 2
     assert divoom.mock_send_command_and_wait_for_response.call_count == 3
@@ -292,13 +275,12 @@ async def test_probe_write_characteristics_fallback_failure(mock_divoom_instance
     mock_cache_util.save_device_cache = MagicMock()
 
     write_chars = [MagicMock(uuid="char1_uuid")]
-    divoom.mock_send_command_and_wait_for_response.return_value = None # All attempts fail
+    divoom.mock_send_command_and_wait_for_response.return_value = None
     divoom.mock_send_command.return_value = False
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom.probe_write_characteristics_and_try_channel_switch(
-            write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", []
-        )
+    result = await divoom.probe_write_characteristics_and_try_channel_switch(
+        write_chars, [], [], {}, "mock_cache_dir", "mock_device_id", [], mock_cache_util
+    )
     assert result is None
     assert divoom.mock_send_command.call_count == 2
     assert divoom.mock_send_command_and_wait_for_response.call_count == 4
@@ -313,8 +295,7 @@ async def test_set_canonical_light_spp_success(mock_divoom_instance):
 
     divoom.mock_send_command_and_wait_for_response.return_value = b'\x01\x00\x00\x00\x00\x02'
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom.set_canonical_light("mock_cache_dir", "mock_device_id", mock_cache_util)
+    result = await divoom.set_canonical_light("mock_cache_dir", "mock_device_id", mock_cache_util)
     assert result is True
     mock_cache_util.save_device_cache.assert_called_once()
     assert divoom.use_ios_le_protocol is False
@@ -328,12 +309,11 @@ async def test_set_canonical_light_ios_success(mock_divoom_instance):
     mock_cache_util.save_device_cache = MagicMock()
 
     divoom.mock_send_command_and_wait_for_response.side_effect = [
-        None, # SPP fails
-        b'\x01\x00\x00\x00\x00\x02' # iOS-LE succeeds
+        None,
+        b'\x01\x00\x00\x00\x00\x02'
     ]
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom.set_canonical_light("mock_cache_dir", "mock_device_id", mock_cache_util)
+    result = await divoom.set_canonical_light("mock_cache_dir", "mock_device_id", mock_cache_util)
     assert result is True
     mock_cache_util.save_device_cache.assert_called_once()
     assert divoom.use_ios_le_protocol is True
@@ -346,9 +326,8 @@ async def test_set_canonical_light_failure(mock_divoom_instance):
     mock_cache_util.load_device_cache.return_value = {}
     mock_cache_util.save_device_cache = MagicMock()
 
-    divoom.mock_send_command_and_wait_for_response.return_value = None # All attempts fail
+    divoom.mock_send_command_and_wait_for_response.return_value = None
 
-    with patch('divoom_lib.divoom_protocol.cache', mock_cache_util):
-        result = await divoom.set_canonical_light("mock_cache_dir", "mock_device_id", mock_cache_util)
+    result = await divoom.set_canonical_light("mock_cache_dir", "mock_device_id", mock_cache_util)
     assert result is False
     mock_cache_util.save_device_cache.assert_not_called()

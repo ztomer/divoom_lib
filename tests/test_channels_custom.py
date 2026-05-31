@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 from divoom_lib.channels.custom import CustomChannel
-from divoom_lib.base import DivoomBase # Import DivoomBase for type hinting
+from divoom_lib.divoom import Divoom as DivoomBase # Import DivoomBase for type hinting
 
 @pytest.fixture
 def mock_divoom_instance():

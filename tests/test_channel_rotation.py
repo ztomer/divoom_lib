@@ -7,7 +7,7 @@ from bleak import BleakClient
 
 from divoom_lib import Divoom
 from divoom_lib.utils.discovery import discover_device, discover_characteristics, pick_char_uuid
-from divoom_lib.constants import CHANNEL_ID_TIME, CHANNEL_ID_LIGHTNING, CHANNEL_ID_CLOUD, CHANNEL_ID_VJ_EFFECTS, CHANNEL_ID_VISUALIZATION, CHANNEL_ID_ANIMATION, CHANNEL_ID_SCOREBOARD
+from divoom_lib.models import CHANNEL_ID_TIME, CHANNEL_ID_LIGHTNING, CHANNEL_ID_CLOUD, CHANNEL_ID_VJ_EFFECTS, CHANNEL_ID_VISUALIZATION, CHANNEL_ID_ANIMATION, CHANNEL_ID_SCOREBOARD
 
 # Configure logging for the test
 logging.basicConfig(level=logging.INFO)
