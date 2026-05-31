@@ -54,6 +54,122 @@ class DivoomGuiAPI:
             except Exception as e:
                 logger.warning(f"Failed to load virtual device: {e}")
 
+    # ── Transport Status (4-badge panel) ──────────────────────────────────────
+
+    def get_transport_status(self) -> str:
+        """
+        Return live status of all four transport layers as JSON.
+
+        Called by the JS sidebar every 5 seconds to drive the 4-badge panel.
+        Each transport includes: available (bool), label, badge, color, description.
+
+        Transport legend:
+            🔵 BLE   — Bluetooth, 100 % local
+            🟢 LAN   — Wi-Fi HTTP :9000, 100 % local
+            🟡 Cloud — appin.divoom-gz.com, Divoom's servers
+            🔴 Ext   — 3rd-party APIs (weather, stocks)
+        """
+        ble_connected = bool(
+            self.current_divoom and self.current_divoom.is_connected
+        )
+        lan_ip = None
+        lan_ok = False
+        if self.current_divoom and self.current_divoom.lan:
+            lan_ip = self.current_divoom.lan.device_ip
+            lan_ok = True
+
+        cloud_ok = bool(self.cached_creds and self.cached_creds.is_valid())
+
+        return json.dumps({
+            "ble":  {
+                "available":   ble_connected,
+                "label":       "BLE",
+                "badge":       "🔵",
+                "color":       "#3b82f6",
+                "description": "Bluetooth — 100 % local, never leaves your device.",
+                "detail":      self.current_divoom._conn.mac if ble_connected and self.current_divoom else None,
+            },
+            "lan": {
+                "available":   lan_ok,
+                "label":       "LAN",
+                "badge":       "🟢",
+                "color":       "#22c55e",
+                "description": "Wi-Fi HTTP :9000 — 100 % local, WiFi-capable devices only.",
+                "detail":      f"{lan_ip}:9000" if lan_ip else "No device IP configured",
+            },
+            "cloud": {
+                "available":   cloud_ok,
+                "label":       "Divoom Cloud",
+                "badge":       "🟡",
+                "color":       "#f59e0b",
+                "description": "appin.divoom-gz.com — Divoom's servers, requires account.",
+                "detail":      "Authenticated" if cloud_ok else "Not authenticated",
+            },
+            "external": {
+                "available":   True,
+                "label":       "External",
+                "badge":       "🔴",
+                "color":       "#ef4444",
+                "description": "3rd-party APIs (weather, stocks) — no login required.",
+                "detail":      "Available",
+            },
+        })
+
+    def save_lan_config(self, device_ip: str, local_token: int) -> bool:
+        """
+        Save LAN device IP and token to config and attach LAN transport to
+        the current Divoom instance.
+
+        Transport: 🟢 LAN — configures local Wi-Fi HTTP transport.
+        """
+        logger.info(f"GUI Action: Saving LAN config ip={device_ip} token={local_token}...")
+        try:
+            import configparser
+            config_file = Path(__file__).parent.parent / "config.ini"
+            cfg = configparser.ConfigParser()
+            if config_file.exists():
+                cfg.read(config_file)
+            if "lan" not in cfg:
+                cfg["lan"] = {}
+            cfg["lan"]["device_ip"] = device_ip
+            cfg["lan"]["local_token"] = str(local_token)
+            with open(config_file, "w") as f:
+                cfg.write(f)
+
+            # Hot-attach to current device if connected
+            if self.current_divoom and device_ip:
+                from divoom_lib.lan_transport import LanTransport
+                self.current_divoom._lan = LanTransport(
+                    device_ip=device_ip,
+                    local_token=local_token,
+                    logger=logger,
+                )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save LAN config: {e}")
+            return False
+
+    def probe_lan(self) -> str:
+        """
+        Test LAN reachability. Returns JSON with {reachable: bool, detail: str}.
+
+        Transport: 🟢 LAN
+        """
+        logger.info("GUI Action: Probing LAN transport reachability...")
+        try:
+            if not self.current_divoom or not self.current_divoom.lan:
+                return json.dumps({"reachable": False, "detail": "No LAN IP configured. Save a device IP first."})
+            ok = asyncio.run(self.current_divoom.lan.probe())
+            ip = self.current_divoom.lan.device_ip
+            return json.dumps({
+                "reachable": ok,
+                "detail": f"{'✓ Connected' if ok else '✗ Unreachable'} — {ip}:9000",
+            })
+        except Exception as e:
+            return json.dumps({"reachable": False, "detail": str(e)})
+
+
+
     # ── Frameless Window State Controllers ────────────────────────────────────────
 
     def minimize_window(self) -> None:
@@ -526,12 +642,16 @@ class DivoomGuiAPI:
             email = ""
             timeout = 15
             limit = 4
+            lan_ip = ""
+            lan_token = 0
             
             if config_file.exists():
                 cfg.read(config_file)
                 email = cfg.get("divoom", "email", fallback="")
                 timeout = int(cfg.get("gui", "timeout", fallback="15"))
                 limit = int(cfg.get("gui", "limit", fallback="4"))
+                lan_ip = cfg.get("lan", "device_ip", fallback="")
+                lan_token = int(cfg.get("lan", "local_token", fallback="0"))
                 
             presets_file = Path(__file__).parent / "presets.json"
             slots = {}
@@ -546,11 +666,14 @@ class DivoomGuiAPI:
                 "email": email,
                 "timeout": timeout,
                 "limit": limit,
-                "slots": slots
+                "slots": slots,
+                "lan_ip": lan_ip,
+                "lan_token": lan_token,
             })
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
             return json.dumps({})
+
 
     def save_preset(self, name: str, slots_json: str) -> bool:
         logger.info(f"GUI Action: Saving layout preset '{name}'...")

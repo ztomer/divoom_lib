@@ -11,3 +11,8 @@ set_hot_pick.py
 # Credentials / secrets — never commit
 config.ini
 api_scraper/divoom_docs/guest_token.json
+
+# APK reverse engineering artifacts — large binaries, do not commit
+apk/*.apk
+apk/decompiled_src/
+apk/smali_src/
