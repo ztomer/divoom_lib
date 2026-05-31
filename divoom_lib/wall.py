@@ -49,36 +49,60 @@ class DivoomWall:
         self.devices: List[Tuple[Divoom, int, int, int]] = []
         
         # Calculate composite bounding box
-        max_x_slot = 0
-        max_y_slot = 0
+        self.is_free_form = any("width" in config for config in self.device_configs)
         
-        for config in self.device_configs:
-            mac = config["mac"]
-            x = config.get("x", 0)
-            y = config.get("y", 0)
-            size = config.get("size", 16)
+        if self.is_free_form:
+            self.min_x = min(config.get("x", 0) for config in self.device_configs)
+            self.min_y = min(config.get("y", 0) for config in self.device_configs)
+            max_x = max(config.get("x", 0) + config.get("width", 120) for config in self.device_configs)
+            max_y = max(config.get("y", 0) + config.get("height", 120) for config in self.device_configs)
             
-            divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=False)
-            self.devices.append((divoom, x, y, size))
+            self.total_width = max_x - self.min_x
+            self.total_height = max_y - self.min_y
+            self.grid_unit_size = self.device_configs[0].get("size", 16) if self.device_configs else 16
             
-            if x + 1 > max_x_slot:
-                max_x_slot = x + 1
-            if y + 1 > max_y_slot:
-                max_y_slot = y + 1
+            for config in self.device_configs:
+                mac = config["mac"]
+                x = config.get("x", 0)
+                y = config.get("y", 0)
+                size = config.get("size", 16)
+                width = config.get("width", 120)
+                height = config.get("height", 120)
                 
-        # Assume all devices are of the same size for uniform grid resolution calculation
-        self.grid_unit_size = self.device_configs[0].get("size", 16) if self.device_configs else 16
-        self.total_width = max_x_slot * self.grid_unit_size
-        self.total_height = max_y_slot * self.grid_unit_size
-        
-        self.logger.info(f"Initialized DivoomWall with grid layout of {max_x_slot}x{max_y_slot} units "
-                          f"(composite canvas size: {self.total_width}x{self.total_height} pixels)")
+                divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=False)
+                # Store absolute bounding box: (divoom, x, y, size, width, height)
+                self.devices.append((divoom, x, y, size, width, height))
+        else:
+            max_x_slot = 0
+            max_y_slot = 0
+            
+            for config in self.device_configs:
+                mac = config["mac"]
+                x = config.get("x", 0)
+                y = config.get("y", 0)
+                size = config.get("size", 16)
+                
+                divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=False)
+                self.devices.append((divoom, x, y, size, 0, 0)) # Mock width, height
+                
+                if x + 1 > max_x_slot:
+                    max_x_slot = x + 1
+                if y + 1 > max_y_slot:
+                    max_y_slot = y + 1
+                    
+            self.grid_unit_size = self.device_configs[0].get("size", 16) if self.device_configs else 16
+            self.total_width = max_x_slot * self.grid_unit_size
+            self.total_height = max_y_slot * self.grid_unit_size
+            self.min_x = 0
+            self.min_y = 0
+            
+        self.logger.info(f"Initialized DivoomWall (composite canvas size: {self.total_width}x{self.total_height} pixels)")
 
     async def connect(self) -> None:
         """Establishes connections to all wall Divoom devices in parallel."""
         self.logger.info("Connecting to all Divoom display wall devices...")
         connect_tasks = []
-        for divoom, x, y, size in self.devices:
+        for divoom, x, y, size, width, height in self.devices:
             self.logger.info(f"Connecting to screen at Slot ({x}, {y}) MAC: {divoom.mac}...")
             connect_tasks.append(divoom.connect())
         await asyncio.gather(*connect_tasks)
@@ -88,7 +112,7 @@ class DivoomWall:
         """Disconnects all wall Divoom devices in parallel."""
         self.logger.info("Disconnecting from all Divoom display wall devices...")
         disconnect_tasks = []
-        for divoom, x, y, size in self.devices:
+        for divoom, x, y, size, width, height in self.devices:
             disconnect_tasks.append(divoom.disconnect())
         await asyncio.gather(*disconnect_tasks)
         self.logger.info("All display wall devices disconnected.")
@@ -96,7 +120,7 @@ class DivoomWall:
     @property
     def is_connected(self) -> bool:
         """Returns True if all Divoom wall devices are connected."""
-        return all(d.is_connected for d, _, _, _ in self.devices)
+        return all(d.is_connected for d, _, _, _, _, _ in self.devices)
 
     async def show_image(self, file_path: str, time: int | None = None) -> bool:
         """
@@ -118,14 +142,22 @@ class DivoomWall:
         
         # Generate temporary files for each cropped quadrant and dispatch them
         with tempfile.TemporaryDirectory() as temp_dir:
-            for divoom, x, y, size in self.devices:
-                left = x * size
-                upper = y * size
-                right = left + size
-                lower = upper + size
+            for device_tuple in self.devices:
+                divoom, x, y, size, width, height = device_tuple
+                
+                if self.is_free_form:
+                    left = x - self.min_x
+                    upper = y - self.min_y
+                    right = left + width
+                    lower = upper + height
+                else:
+                    left = x * size
+                    upper = y * size
+                    right = left + size
+                    lower = upper + size
                 
                 # Perform the crop
-                self.logger.info(f"Cropping slot ({x}, {y}) bounding box: Left={left}, Upper={upper}, Right={right}, Lower={lower}")
+                self.logger.info(f"Cropping slots bounding box: Left={left}, Upper={upper}, Right={right}, Lower={lower}")
                 
                 # Check if image is animated
                 if hasattr(main_img, 'is_animated') and main_img.is_animated:
@@ -134,6 +166,8 @@ class DivoomWall:
                     for frame in ImageSequence.Iterator(main_img):
                         resized_frame = frame.resize((self.total_width, self.total_height), Image.NEAREST)
                         cropped_frame = resized_frame.crop((left, upper, right, lower))
+                        if self.is_free_form:
+                            cropped_frame = cropped_frame.resize((size, size), Image.NEAREST)
                         frames.append(cropped_frame)
                         
                     # Save cropped GIF
@@ -150,6 +184,8 @@ class DivoomWall:
                     # Process static image
                     resized_img = main_img.resize((self.total_width, self.total_height), Image.NEAREST)
                     cropped_img = resized_img.crop((left, upper, right, lower))
+                    if self.is_free_form:
+                        cropped_img = cropped_img.resize((size, size), Image.NEAREST)
                     
                     cropped_img_path = Path(temp_dir) / f"quad_{x}_{y}.png"
                     cropped_img.save(cropped_img_path)
@@ -171,7 +207,7 @@ class DivoomWall:
             # Check results
             all_ok = True
             for idx, res in enumerate(results):
-                divoom, x, y, _ = self.devices[idx]
+                divoom, x, y, size, width, height = self.devices[idx]
                 if isinstance(res, Exception):
                     self.logger.error(f"Failed to display slot ({x}, {y}) on device {divoom.mac}: {res}")
                     all_ok = False
@@ -185,7 +221,7 @@ class DivoomWall:
         """Sets a unified solid light color across all screens in the wall."""
         self.logger.info(f"Setting solid light {color} across all screens...")
         tasks = []
-        for divoom, x, y, _ in self.devices:
+        for divoom, x, y, size, width, height in self.devices:
             tasks.append(divoom.display.show_light(color=color, brightness=brightness))
         results = await asyncio.gather(*tasks)
         return all(results)
@@ -194,7 +230,7 @@ class DivoomWall:
         """Displays clock style on all screens in the wall."""
         self.logger.info(f"Displaying clock style {clock} across all screens...")
         tasks = []
-        for divoom, x, y, _ in self.devices:
+        for divoom, x, y, size, width, height in self.devices:
             tasks.append(divoom.display.show_clock(clock=clock))
         results = await asyncio.gather(*tasks)
         return all(results)

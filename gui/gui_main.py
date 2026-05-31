@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 gui_main.py — Divoom Desktop GUI controller backend.
-Launches the premium PyWebView dashboard, exposing Divoom's core BLE features
+Launches the premium frameless PyWebView dashboard, exposing Divoom's core BLE features
 and coordinate display wall capabilities to the HTML/CSS/JS frontend.
 """
 
@@ -33,11 +33,12 @@ class DivoomGuiAPI:
     def __init__(self) -> None:
         self.current_divoom = None
         self.discovered_list = []
-        self.wall_slots = {}  # "x_y" -> "mac"
+        self.wall_slots = {}  # "mac" -> {"x": x, "y": y, "width": w, "height": h, "size": size}
         self.wall_instance = None
         self.cached_creds = None
         self.device_pw = 0
         self.device_id = 0
+        self.window = None  # Reference to pywebview Window instance
         
         self.music_sync_active = False
         self.music_thread = None
@@ -53,14 +54,24 @@ class DivoomGuiAPI:
             except Exception as e:
                 logger.warning(f"Failed to load virtual device: {e}")
 
-    def _get_async_loop(self):
-        """Helper to get or create an event loop in the GUI thread."""
-        try:
-            return asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            return loop
+    # ── Frameless Window State Controllers ────────────────────────────────────────
+
+    def minimize_window(self) -> None:
+        logger.info("GUI Action: Minimizing window...")
+        if self.window:
+            self.window.minimize()
+
+    def maximize_window(self) -> None:
+        logger.info("GUI Action: Toggling fullscreen...")
+        if self.window:
+            self.window.toggle_fullscreen()
+
+    def close_window(self) -> None:
+        logger.info("GUI Action: Closing window...")
+        if self.window:
+            self.window.destroy()
+
+    # ── Device Scanner Core (asyncio.run Thread-Safe) ──────────────────────────────
 
     def scan_devices(self) -> str:
         """Scan BLE devices and return discovered Divoom screens as JSON."""
@@ -86,11 +97,9 @@ class DivoomGuiAPI:
         except Exception as e:
             logger.warning(f"Failed to save scan config: {e}")
 
-        # Scan using Bleak
-        loop = self._get_async_loop()
+        # Scan using Bleak cleanly inside thread-safe asyncio.run context
         try:
             if limit > 0:
-                # Custom scanning logic to stop as soon as we discover `limit` Divoom devices!
                 discovered = []
                 divoom_keywords = ["timoo", "tivoo", "timebox", "pixoo", "ditoo", "backpack", "timegate"]
                 
@@ -99,7 +108,6 @@ class DivoomGuiAPI:
                         name_lower = device.name.lower()
                         is_divoom = any(kw in name_lower for kw in divoom_keywords)
                         if is_divoom:
-                            # Avoid duplicates
                             if not any(d["address"] == device.address for d in discovered):
                                 discovered.append({
                                     "name": device.name,
@@ -118,13 +126,12 @@ class DivoomGuiAPI:
                     await scanner.stop()
                     return discovered
                     
-                results = loop.run_until_complete(run_scan())
-                # Fallback to all named devices if none match keywords
+                results = asyncio.run(run_scan())
                 if not results:
-                    results = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=float(timeout)))
+                    results = asyncio.run(discovery.discover_all_divoom_devices(timeout=float(timeout)))
                     results = results[:limit]
             else:
-                results = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=float(timeout)))
+                results = asyncio.run(discovery.discover_all_divoom_devices(timeout=float(timeout)))
                 
             self.discovered_list = results
             return json.dumps(results)
@@ -135,22 +142,23 @@ class DivoomGuiAPI:
     def connect_single_device(self, address: str) -> bool:
         """Establishes connection to a single BLE screen."""
         logger.info(f"GUI Action: Connecting to single device {address}...")
-        loop = self._get_async_loop()
         try:
             if self.current_divoom and self.current_divoom.is_connected:
-                loop.run_until_complete(self.current_divoom.disconnect())
+                asyncio.run(self.current_divoom.disconnect())
                 
             self.current_divoom = Divoom(mac=address, logger=logger, use_ios_le_protocol=False)
-            loop.run_until_complete(self.current_divoom.connect())
+            asyncio.run(self.current_divoom.connect())
             return True
         except Exception as e:
             logger.error(f"Single connect failed: {e}")
             self.current_divoom = None
             return False
 
+    # ── Display Coordinate Wall (Free-Form Crops) ──────────────────────────────
+
     def update_wall_slots(self, slots_json: str) -> None:
-        """Syncs drag-and-drop grid slot coordinate assignments from JS and persists as last active."""
-        logger.info(f"GUI Action: Syncing wall grid layout: {slots_json}")
+        """Syncs drag-and-drop free-form coordinates from JS and persists as last active."""
+        logger.info(f"GUI Action: Syncing free-form layout slots: {slots_json}")
         self.wall_slots = json.loads(slots_json)
         self.wall_instance = None # Invalidate to force rebuild on next display wall call
         
@@ -169,28 +177,28 @@ class DivoomGuiAPI:
             logger.warning(f"Failed to save last active slots: {e}")
 
     def _rebuild_wall_instance(self, cell_size: int = 16) -> bool:
-        """Internal helper to construct DivoomWall coordinator from assigned grid slots."""
+        """Internal helper to construct free-form DivoomWall coordinator from assigned coordinates."""
         if not self.wall_slots:
             return False
             
         if self.wall_instance and self.wall_instance.is_connected:
             return True
             
-        logger.info("Rebuilding DivoomWall coordinator instance...")
+        logger.info("Rebuilding free-form DivoomWall coordinator instance...")
         configs = []
-        for key, mac in self.wall_slots.items():
-            x_str, y_str = key.split("_")
+        for mac, slot in self.wall_slots.items():
             configs.append({
                 "mac": mac,
-                "x": int(x_str),
-                "y": int(y_str),
-                "size": cell_size
+                "x": int(slot.get("x", 0)),
+                "y": int(slot.get("y", 0)),
+                "size": int(slot.get("size", cell_size)),
+                "width": int(slot.get("width", 120)),
+                "height": int(slot.get("height", 120))
             })
             
         try:
             self.wall_instance = DivoomWall(configs, custom_logger=logger)
-            loop = self._get_async_loop()
-            loop.run_until_complete(self.wall_instance.connect())
+            asyncio.run(self.wall_instance.connect())
             return True
         except Exception as e:
             logger.error(f"Failed to build display wall: {e}")
@@ -200,14 +208,13 @@ class DivoomGuiAPI:
     def set_solid_light(self, color: str, brightness: int) -> bool:
         """Sets ambient solid lighting across active screen(s) / display wall."""
         logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness})...")
-        loop = self._get_async_loop()
         try:
             if self.wall_slots:
                 if not self._rebuild_wall_instance():
                     return False
-                return loop.run_until_complete(self.wall_instance.set_light(color, brightness))
+                return asyncio.run(self.wall_instance.set_light(color, brightness))
             elif self.current_divoom and self.current_divoom.is_connected:
-                return loop.run_until_complete(self.current_divoom.display.show_light(color, brightness))
+                return asyncio.run(self.current_divoom.display.show_light(color, brightness))
             return False
         except Exception as e:
             logger.error(f"Light setting failed: {e}")
@@ -216,14 +223,13 @@ class DivoomGuiAPI:
     def set_clock(self, style: int) -> bool:
         """Sets clock display channel across active screen(s) / display wall."""
         logger.info(f"GUI Action: Applying clock style {style}...")
-        loop = self._get_async_loop()
         try:
             if self.wall_slots:
                 if not self._rebuild_wall_instance():
                     return False
-                return loop.run_until_complete(self.wall_instance.show_clock(clock=style))
+                return asyncio.run(self.wall_instance.show_clock(clock=style))
             elif self.current_divoom and self.current_divoom.is_connected:
-                return loop.run_until_complete(self.current_divoom.display.show_clock(clock=style))
+                return asyncio.run(self.current_divoom.display.show_clock(clock=style))
             return False
         except Exception as e:
             logger.error(f"Clock setting failed: {e}")
@@ -232,26 +238,24 @@ class DivoomGuiAPI:
     def switch_channel(self, channel: str) -> bool:
         """Switches display active channel mode (Clock, Visualizer, VJ, Design)."""
         logger.info(f"GUI Action: Switching channel to {channel}...")
-        loop = self._get_async_loop()
         try:
             target = self.current_divoom
             if not target or not target.is_connected:
                 if self.wall_slots:
                     if not self._rebuild_wall_instance():
                         return False
-                    # Use the first slot device as default
                     target = self.wall_instance.devices[0][0]
                 else:
                     return False
                     
             if channel == "clock":
-                return loop.run_until_complete(target.display.show_clock())
+                return asyncio.run(target.display.show_clock())
             elif channel == "visualizer":
-                return loop.run_until_complete(target.display.show_visualization(number=0))
+                return asyncio.run(target.display.show_visualization(number=0))
             elif channel == "vj":
-                return loop.run_until_complete(target.display.show_effects(number=0))
+                return asyncio.run(target.display.show_effects(number=0))
             elif channel == "design":
-                return loop.run_until_complete(target.display.show_design())
+                return asyncio.run(target.display.show_design())
             return False
         except Exception as e:
             logger.error(f"Channel switch failed: {e}")
@@ -260,17 +264,18 @@ class DivoomGuiAPI:
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         """Crops, splits, and displays coordinate grid screen wall artworks."""
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
-        loop = self._get_async_loop()
         try:
             if not self._rebuild_wall_instance(cell_size):
                 return False
-            return loop.run_until_complete(self.wall_instance.show_image(file_path))
+            return asyncio.run(self.wall_instance.show_image(file_path))
         except Exception as e:
             logger.error(f"Wall display failed: {e}")
             return False
 
+    # ── Cloud Gallery & Previews Cache ───────────────────────────────────────────
+
     def fetch_gallery(self, classify: int) -> str:
-        """Fetches popular community gallery artworks from Divoom Cloud."""
+        """Fetches popular community gallery artworks and caches thumbnails locally."""
         logger.info(f"GUI Action: Fetching gallery classify={classify}...")
         try:
             if not self.cached_creds:
@@ -282,9 +287,9 @@ class DivoomGuiAPI:
                 "UserId": self.cached_creds.user_id,
                 "DeviceId": self.device_id,
                 "Classify": classify,
-                "FileSort": 1,   # Popular
-                "FileType": 5,   # All
-                "FileSize": 127, # All sizes
+                "FileSort": 1,
+                "FileType": 5,
+                "FileSize": 127,
                 "Version": 19,
                 "StartNum": 1,
                 "EndNum": 30,
@@ -309,13 +314,38 @@ class DivoomGuiAPI:
                 data = json.loads(resp.read().decode("utf-8"))
                 file_list = data.get("FileList", [])
                 
+                cache_dir = Path(__file__).parent / "web_ui" / "assets" / "cache_gallery"
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                
                 results = []
                 for item in file_list:
+                    file_id = item.get("FileId")
+                    pixel_amb_id = item.get("PixelAmbId")
+                    preview_url = ""
+                    
+                    if pixel_amb_id:
+                        cached_file = cache_dir / pixel_amb_id
+                        if not cached_file.exists():
+                            try:
+                                dl_url = f"https://fin.divoom-gz.com/{pixel_amb_id}"
+                                req_dl = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
+                                with urllib.request.urlopen(req_dl, timeout=5) as dl_resp:
+                                    cached_file.write_bytes(dl_resp.read())
+                                logger.info(f"Gallery Cache: Downloaded {pixel_amb_id}")
+                            except Exception as dl_err:
+                                logger.warning(f"Failed to cache preview {pixel_amb_id}: {dl_err}")
+                                
+                        if cached_file.exists():
+                            preview_url = f"assets/cache_gallery/{pixel_amb_id}"
+                        else:
+                            preview_url = f"https://fin.divoom-gz.com/{pixel_amb_id}"
+                    
                     results.append({
                         "name": item.get("FileName", "unnamed"),
-                        "file_id": item.get("FileId"),
+                        "file_id": file_id,
                         "likes": item.get("LikeCnt", 0),
-                        "magic": item.get("FileType", 3)
+                        "magic": item.get("FileType", 3),
+                        "preview_url": preview_url
                     })
                 return json.dumps(results)
         except Exception as e:
@@ -325,12 +355,10 @@ class DivoomGuiAPI:
     def batch_sync_artwork(self, artwork_json: str) -> bool:
         """Syncs the selected artwork to all active devices in parallel."""
         logger.info(f"GUI Action: Batch syncing artwork details: {artwork_json}")
-        loop = self._get_async_loop()
         try:
             art = json.loads(artwork_json)
             file_id = art["file_id"]
             
-            # Download file
             logger.info(f"Downloading gallery asset from CDN: {file_id}...")
             dl_url = f"https://fin.divoom-gz.com/{file_id}"
             d_req = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
@@ -344,7 +372,7 @@ class DivoomGuiAPI:
                 if self.wall_slots:
                     if not self._rebuild_wall_instance():
                         return False
-                    targets = [d for d, _, _, _ in self.wall_instance.devices]
+                    targets = [d for d, _, _, _, _, _ in self.wall_instance.devices]
                 elif self.current_divoom and self.current_divoom.is_connected:
                     targets = [self.current_divoom]
                 else:
@@ -355,7 +383,7 @@ class DivoomGuiAPI:
                     from monthly_best_daemon import stream_raw_bin_payload
                     sync_tasks.append(stream_raw_bin_payload(divoom, file_bytes))
                     
-                results = loop.run_until_complete(asyncio.gather(*sync_tasks, return_exceptions=True))
+                results = asyncio.run(asyncio.gather(*sync_tasks, return_exceptions=True))
                 return all(res is True for res in results)
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
@@ -386,15 +414,14 @@ class DivoomGuiAPI:
                             out_path = media_source.render_and_downsample_artwork(art_url, size=size)
                             if out_path and out_path.exists():
                                 logger.info(f"Music Sync: Push cover art frame: {out_path}")
-                                loop = asyncio.new_event_loop()
                                 try:
                                     if self.wall_slots:
                                         if self._rebuild_wall_instance(size):
-                                            loop.run_until_complete(self.wall_instance.show_image(str(out_path)))
+                                            asyncio.run(self.wall_instance.show_image(str(out_path)))
                                     elif self.current_divoom and self.current_divoom.is_connected:
-                                        loop.run_until_complete(self.current_divoom.display.show_image(str(out_path)))
-                                finally:
-                                    loop.close()
+                                        asyncio.run(self.current_divoom.display.show_image(str(out_path)))
+                                except Exception as e:
+                                    logger.error(f"Failed to stream artwork: {e}")
                                     
                             self.current_track_cache = {
                                 "track": track,
@@ -441,13 +468,12 @@ class DivoomGuiAPI:
             size = 16
             frame_path = media_source.render_stock_ticker_frame(symbol, data, size=size)
             
-            loop = self._get_async_loop()
             res = False
             if self.wall_slots:
                 if self._rebuild_wall_instance(size):
-                    res = loop.run_until_complete(self.wall_instance.show_image(str(frame_path)))
+                    res = asyncio.run(self.wall_instance.show_image(str(frame_path)))
             elif self.current_divoom and self.current_divoom.is_connected:
-                res = loop.run_until_complete(self.current_divoom.display.show_image(str(frame_path)))
+                res = asyncio.run(self.current_divoom.display.show_image(str(frame_path)))
                 
             return json.dumps({
                 "success": res,
@@ -477,7 +503,6 @@ class DivoomGuiAPI:
             with open(config_file, "w") as f:
                 cfg.write(f)
                 
-            # Invalidate credentials cache to force login
             auth_cache = Path(__file__).parent.parent / "api_scraper" / "divoom_docs" / "auth_token.json"
             if auth_cache.exists():
                 auth_cache.unlink()
@@ -504,7 +529,6 @@ class DivoomGuiAPI:
                 timeout = int(cfg.get("gui", "timeout", fallback="15"))
                 limit = int(cfg.get("gui", "limit", fallback="4"))
                 
-            # Load active slots
             presets_file = Path(__file__).parent / "presets.json"
             slots = {}
             if presets_file.exists():
@@ -578,17 +602,19 @@ def main():
     web_ui_dir = Path(__file__).parent / "web_ui"
     index_html = web_ui_dir / "index.html"
     
-    logger.info("Starting Divoom Desktop GUI window...")
+    logger.info("Starting Divoom Desktop GUI window in frameless mode...")
     
-    webview.create_window(
+    window = webview.create_window(
         title="Divoom Control Center",
         url=str(index_html),
         js_api=api,
         width=1024,
-        height=720,
+        height=768,
         resizable=True,
+        frameless=True,  # Integrated custom Appbar
         background_color="#0a0b10"
     )
+    api.window = window
     webview.start()
 
 if __name__ == "__main__":

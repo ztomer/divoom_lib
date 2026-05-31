@@ -75,10 +75,86 @@ body {
     left: 5%;
 }
 
+/* 1. Sleek Custom Integrated window appbar */
+.integrated-appbar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    background: rgba(10, 12, 22, 0.95);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 15px;
+    z-index: 1000;
+    position: relative;
+    user-select: none;
+    -webkit-app-region: drag; /* Allows moving window by dragging titlebar */
+}
+
+.appbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+}
+
+.appbar-logo {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+.appbar-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-main);
+    letter-spacing: 0.2px;
+}
+
+.appbar-drag-spacer {
+    flex: 1;
+    height: 100%;
+}
+
+.appbar-window-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    -webkit-app-region: no-drag; /* Excludes control buttons from window drags */
+}
+
+.win-btn {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 0; /* Hide text, style as macOS traffic lights */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: transparent;
+    font-weight: 700;
+}
+
+.win-btn.close { background-color: #ff5f56; }
+.win-btn.min { background-color: #ffbd2e; }
+.win-btn.max { background-color: #27c93f; }
+
+.win-btn:hover {
+    font-size: 9px;
+    color: rgba(0, 0, 0, 0.75);
+}
+
+.win-btn.close:hover { background-color: #ff4a40; }
+.win-btn.min:hover { background-color: #ffaa14; }
+.win-btn.max:hover { background-color: #1cc033; }
+
 /* App Container */
 .app-container {
     display: flex;
-    height: 100vh;
+    height: calc(100vh - 40px);
     width: 100vw;
     backdrop-filter: blur(8px);
 }
@@ -159,93 +235,6 @@ body {
     box-shadow: inset 0 0 12px rgba(0, 255, 204, 0.05);
 }
 
-/* Scanner Area */
-.scanner-section {
-    border-top: 1px solid var(--border-color);
-    padding-top: 25px;
-    margin-bottom: 25px;
-}
-
-.scanner-section h3 {
-    font-family: var(--font-display);
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-muted);
-    margin-bottom: 15px;
-}
-
-.scanner-params {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
-.form-group.row-compact {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-}
-
-.form-group.row-compact label {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-}
-
-.num-input.small {
-    padding: 6px 8px;
-    font-size: 12px;
-    width: 100%;
-}
-
-.device-list {
-    list-style: none;
-    margin-top: 15px;
-    max-height: 160px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.device-list li {
-    padding: 10px 12px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.device-list li:hover {
-    border-color: var(--border-hover);
-    background: rgba(0, 255, 204, 0.02);
-}
-
-.device-list li.empty-list {
-    color: var(--text-muted);
-    font-style: italic;
-    background: transparent;
-    border: none;
-    justify-content: center;
-    cursor: default;
-}
-
-.device-list li.empty-list:hover {
-    border-color: transparent;
-    background: transparent;
-}
-
-.device-mac {
-    font-family: monospace;
-    opacity: 0.6;
-}
-
 .connection-status {
     display: flex;
     align-items: center;
@@ -303,7 +292,7 @@ body {
 /* Main Content Area */
 .main-content {
     flex: 1;
-    padding: 40px;
+    padding: 30px;
     overflow-y: auto;
     width: calc(100% - var(--sidebar-width));
 }
@@ -317,7 +306,7 @@ body {
 .tab-content.active {
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: 20px;
 }
 
 @keyframes fadeIn {
@@ -327,15 +316,15 @@ body {
 
 .header-section h1 {
     font-family: var(--font-display);
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 800;
     letter-spacing: -0.5px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .header-section p {
     color: var(--text-muted);
-    font-size: 15px;
+    font-size: 14px;
 }
 
 /* Device Info Banner */
@@ -343,20 +332,19 @@ body {
     display: flex;
     align-items: center;
     gap: 25px;
-    padding: 25px;
-    margin-bottom: 5px;
+    padding: 20px;
 }
 
 .banner-preview {
-    width: 80px;
-    height: 80px;
+    width: 60px;
+    height: 60px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.03);
-    border-radius: 16px;
+    border-radius: 12px;
     border: 1px solid var(--border-color);
-    padding: 10px;
+    padding: 8px;
 }
 
 .banner-preview img {
@@ -370,25 +358,25 @@ body {
 }
 
 .banner-label {
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
     color: var(--primary);
     font-weight: 600;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .banner-info h2 {
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 700;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .banner-specs {
     display: flex;
     gap: 20px;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-muted);
 }
 
@@ -400,21 +388,21 @@ body {
 .grid-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 25px;
+    gap: 20px;
 }
 
 .grid-layout.vertical {
     display: flex;
     flex-direction: column;
-    gap: 25px;
+    gap: 20px;
 }
 
 /* Glassmorphic Card Stylings */
 .card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 20px;
-    padding: 25px;
+    border-radius: 16px;
+    padding: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(20px);
     transition: border-color 0.3s ease;
@@ -425,14 +413,14 @@ body {
 }
 
 .card-header {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    padding-bottom: 15px;
+    padding-bottom: 10px;
 }
 
 .card-header h3 {
     font-family: var(--font-display);
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
 }
 
@@ -452,14 +440,14 @@ body {
 .color-picker-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
     margin-top: 10px;
 }
 
 .color-swatch {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     border: 2px solid transparent;
     cursor: pointer;
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -485,9 +473,9 @@ body {
 
 .custom-color-container {
     position: relative;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-color);
 }
@@ -496,8 +484,8 @@ body {
     position: absolute;
     top: -5px;
     left: -5px;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border: none;
     background: transparent;
     cursor: pointer;
@@ -516,8 +504,8 @@ body {
 
 .range-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: var(--primary);
     box-shadow: 0 0 10px var(--primary-glow);
@@ -532,17 +520,17 @@ body {
 /* Buttons */
 .glow-btn {
     width: 100%;
-    padding: 14px 20px;
+    padding: 12px 18px;
     background: linear-gradient(135deg, var(--primary), #00ccaa);
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     color: #05060b;
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -551,7 +539,7 @@ body {
 
 .glow-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 255, 204, 0.4);
+    box-shadow: 0 6px 16px rgba(0, 255, 204, 0.35);
 }
 
 .glow-btn:active {
@@ -560,32 +548,32 @@ body {
 
 .glow-btn.compact {
     width: auto;
-    padding: 10px 18px;
-    font-size: 13px;
+    padding: 8px 14px;
+    font-size: 12px;
     display: inline-flex;
 }
 
 .glow-btn.pulse-glow {
     background: linear-gradient(135deg, var(--secondary), #7b2cbf);
     color: #ffffff;
-    box-shadow: 0 4px 15px rgba(157, 78, 221, 0.25);
+    box-shadow: 0 4px 12px rgba(157, 78, 221, 0.2);
 }
 
 .glow-btn.pulse-glow:hover {
-    box-shadow: 0 6px 20px rgba(157, 78, 221, 0.4);
+    box-shadow: 0 6px 16px rgba(157, 78, 221, 0.35);
 }
 
 /* Inputs & Form Groups */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .form-group label {
     display: block;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-muted);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .form-group.compact {
@@ -595,13 +583,14 @@ body {
 .custom-select {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 10px 14px;
+    border-radius: 8px;
+    padding: 8px 12px;
     color: var(--text-main);
     outline: none;
     font-family: var(--font-sans);
     cursor: pointer;
     min-width: 140px;
+    font-size: 13px;
 }
 
 .custom-select option {
@@ -609,15 +598,15 @@ body {
 }
 
 .custom-select.small {
-    padding: 8px 12px;
-    font-size: 13px;
+    padding: 6px 10px;
+    font-size: 12px;
 }
 
 .num-input {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 10px;
+    border-radius: 8px;
+    padding: 8px;
     color: var(--text-main);
     outline: none;
     width: 80px;
@@ -627,13 +616,13 @@ body {
 .text-input {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 12px 16px;
+    border-radius: 8px;
+    padding: 10px 14px;
     color: var(--text-main);
     outline: none;
     width: 100%;
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .text-input:focus {
@@ -643,7 +632,7 @@ body {
 .flex-row {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 15px;
 }
 
 .file-uploader {
@@ -654,14 +643,14 @@ body {
 .channel-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 15px;
+    gap: 12px;
 }
 
 .channel-card {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border-color);
-    border-radius: 14px;
-    padding: 18px;
+    border-radius: 12px;
+    padding: 15px;
     cursor: pointer;
     text-align: center;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -681,198 +670,259 @@ body {
 }
 
 .channel-icon {
-    font-size: 24px;
+    font-size: 20px;
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .channel-card h4 {
     font-family: var(--font-display);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
 }
 
-/* Clock Face Previews */
+/* 2. ACTUAL APK CLOCK PREVIEWS STYLINGS */
 .clock-preview-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+    gap: 10px;
 }
 
 .clock-preview-card {
-    border: 1.5px solid var(--border-color);
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.2);
-    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.clock-preview-card:hover {
-    border-color: rgba(0, 255, 204, 0.3);
-    background: rgba(0, 255, 204, 0.02);
-}
-
-.clock-preview-card.active {
-    border-color: var(--primary);
-    background: rgba(0, 255, 204, 0.05);
 }
 
 .clock-face-mock {
+    width: 100%;
+    aspect-ratio: 1;
+    background: #000000;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    aspect-ratio: 1;
-    border-radius: 8px;
-    background: #000;
-    border: 1px solid rgba(255,255,255,0.05);
-    position: relative;
-    overflow: hidden;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.face-simple { border: 1px solid #ff3b30; }
-.face-minimal { border: 1px dashed #5ac8fa; }
-.face-cyber { border: 1px solid var(--primary); }
-.face-blocks { border: 1px solid var(--secondary); }
-
-.face-time {
-    font-family: monospace;
-    font-size: 16px;
-    font-weight: 700;
-    color: #fff;
+.clock-preview-card:hover .clock-face-mock {
+    border-color: var(--primary-glow);
+    transform: scale(1.05);
 }
 
-.face-decor {
-    font-size: 8px;
-    text-transform: uppercase;
+.clock-preview-card.active .clock-face-mock {
+    border-color: var(--primary);
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+}
+
+.clock-face-label {
+    font-size: 11px;
+    font-weight: 500;
     color: var(--text-muted);
-    margin-top: 4px;
 }
 
-/* Display Wall Arranger Grid */
+.clock-preview-card.active .clock-face-label {
+    color: var(--primary);
+}
+
+/* Style presets matching actual Divoom designs */
+.apk-clock-neon {
+    background: radial-gradient(circle, #051a14 0%, #000000 100%);
+}
+
+.apk-clock-neon .apk-clock-digits {
+    font-family: monospace;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--primary);
+    text-shadow: 0 0 8px var(--primary-glow);
+}
+
+.apk-clock-neon .apk-clock-widget {
+    font-size: 7px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.apk-clock-analogue {
+    background: #090a0f;
+}
+
+.apk-clock-analogue .analogue-center {
+    width: 6px;
+    height: 6px;
+    background-color: var(--secondary);
+    border-radius: 50%;
+    z-index: 2;
+}
+
+.apk-clock-analogue .analogue-hand {
+    position: absolute;
+    background-color: #ffffff;
+    transform-origin: bottom center;
+}
+
+.apk-clock-analogue .hour-hand {
+    width: 2px;
+    height: 14px;
+    bottom: 50%;
+    transform: rotate(45deg);
+}
+
+.apk-clock-analogue .min-hand {
+    width: 1px;
+    height: 20px;
+    bottom: 50%;
+    transform: rotate(180deg);
+    background-color: var(--primary);
+}
+
+.apk-clock-cyber {
+    background: #000;
+    border-color: #3b82f6;
+}
+
+.apk-clock-cyber .cyber-top {
+    font-size: 12px;
+    font-weight: 900;
+    color: #3b82f6;
+    letter-spacing: 0.5px;
+}
+
+.apk-clock-cyber .cyber-icon {
+    font-size: 12px;
+    margin: 2px 0;
+}
+
+.apk-clock-cyber .cyber-footer {
+    font-size: 7px;
+    color: #10b981;
+}
+
+.apk-clock-cute {
+    background: #110e1a;
+}
+
+.apk-clock-cute .cute-digit {
+    font-family: monospace;
+    font-size: 12px;
+    color: #ff79c6;
+    font-weight: 700;
+}
+
+.apk-clock-cute .cute-character {
+    font-size: 16px;
+    animation: bouncePet 2s infinite alternate;
+}
+
+@keyframes bouncePet {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-4px); }
+}
+
+/* 3. FREE-FORM CANVASES Drag & Drop */
 .arranger-card {
     border-color: rgba(157, 78, 221, 0.15);
 }
 
-.arranger-card:hover {
-    border-color: rgba(157, 78, 221, 0.25);
+.arranger-workspace-free {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
 }
 
-.arranger-card .badge {
-    background: rgba(157, 78, 221, 0.15);
-    color: var(--secondary);
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    margin-left: 12px;
-}
-
-.arranger-workspace {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: rgba(0,0,0,0.15);
-    border-radius: 14px;
-    padding: 30px;
-    min-height: 250px;
-    border: 1px dashed rgba(255,255,255,0.05);
-}
-
-.wall-grid {
-    display: grid;
-    gap: 15px;
-}
-
-.grid-cell {
-    width: 120px;
-    height: 120px;
-    background: rgba(255, 255, 255, 0.01);
-    border: 2px dashed rgba(255, 255, 255, 0.08);
+/* Drag node representing Divoom screen proportional scaled sizes */
+.arranger-node {
+    position: absolute;
+    background: rgba(157, 78, 221, 0.1);
+    border: 2px solid var(--secondary);
     border-radius: 12px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-    padding: 8px;
-    text-align: center;
+    justify-content: center;
+    cursor: move;
+    user-select: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    overflow: hidden;
 }
 
-.grid-cell:hover {
-    background: rgba(157, 78, 221, 0.02);
-    border-color: rgba(157, 78, 221, 0.3);
+.arranger-node:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.25);
 }
 
-.grid-cell.assigned {
-    border: 1px solid var(--secondary);
-    background: rgba(157, 78, 221, 0.05);
-    border-style: solid;
+.arranger-node.dragging {
+    opacity: 0.75;
+    border-color: var(--primary);
+    box-shadow: 0 0 25px var(--primary-glow);
+    z-index: 100;
 }
 
-.grid-cell-label {
+.arranger-node-label {
     font-size: 10px;
-    color: var(--text-muted);
-    margin-bottom: 5px;
-    z-index: 2;
-}
-
-.grid-cell-device {
-    font-size: 11px;
     font-weight: 600;
     color: #ffffff;
-    max-width: 100%;
+    max-width: 90%;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
     z-index: 2;
 }
 
-.grid-cell-image {
-    position: absolute;
-    bottom: 5px;
-    width: 50px;
-    height: 50px;
+.arranger-node-mac {
+    font-size: 8px;
+    color: var(--text-muted);
+    font-family: monospace;
+    margin-top: 2px;
+    z-index: 2;
+}
+
+.arranger-node-image {
+    width: 50%;
+    height: 50%;
     object-fit: contain;
     opacity: 0.85;
+    margin-top: 5px;
     z-index: 1;
 }
 
-.grid-cell-remove {
+.arranger-node-remove {
     position: absolute;
-    top: 4px;
-    right: 4px;
+    top: 5px;
+    right: 5px;
     width: 16px;
     height: 16px;
     background: rgba(0, 0, 0, 0.6);
     border-radius: 50%;
-    color: var(--text-main);
+    color: #ffffff;
     font-size: 10px;
-    line-height: 16px;
-    display: none;
-    cursor: pointer;
-    z-index: 3;
-}
-
-.grid-cell.assigned:hover .grid-cell-remove {
-    display: block;
-}
-
-/* Live Widgets: macOS Music Tracker style */
-.music-tracker-card {
     display: flex;
     align-items: center;
-    gap: 20px;
-    padding: 20px;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    overflow: hidden;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+    transition: background 0.2s;
 }
 
+.arranger-node-remove:hover {
+    background: #ef4444;
+}
+
+/* 4. ACTUAL animated Music spectrum bars Overlay */
 .music-cover-preview {
     position: relative;
     width: 70px;
@@ -926,6 +976,43 @@ body {
 .music-track-info p {
     font-size: 13px;
     color: var(--text-muted);
+}
+
+.neon-eq-bars {
+    position: absolute;
+    bottom: 5px;
+    left: 10px;
+    right: 10px;
+    height: 25px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.music-track-status.active .neon-eq-bars,
+.music-tracker-card.active .neon-eq-bars {
+    opacity: 0.95;
+}
+
+.eq-bar {
+    width: 6px;
+    background-color: var(--primary);
+    box-shadow: 0 0 8px var(--primary-glow);
+    border-radius: 3px;
+    height: 3px;
+}
+
+.music-tracker-card.active .bar1 { animation: bounceBar 1.2s ease-in-out infinite alternate; }
+.music-tracker-card.active .bar2 { animation: bounceBar 0.8s ease-in-out infinite alternate 0.2s; }
+.music-tracker-card.active .bar3 { animation: bounceBar 1.5s ease-in-out infinite alternate 0.1s; }
+.music-tracker-card.active .bar4 { animation: bounceBar 1.0s ease-in-out infinite alternate 0.3s; }
+
+@keyframes bounceBar {
+    0% { height: 4px; }
+    100% { height: 22px; }
 }
 
 /* Switch styling */
@@ -996,8 +1083,8 @@ input:checked + .slider-round:before {
 .widget-preview-ticker {
     background: #000;
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 20px;
+    border-radius: 12px;
+    padding: 15px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1005,11 +1092,11 @@ input:checked + .slider-round:before {
 }
 
 .mini-canvas-view {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
     background: #05060c;
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1019,19 +1106,19 @@ input:checked + .slider-round:before {
 }
 
 .ticker-arrow-mock {
-    font-size: 20px;
+    font-size: 18px;
     color: var(--primary);
     text-shadow: 0 0 8px var(--primary-glow);
 }
 
 .ticker-price-mock {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--primary);
     font-weight: 700;
 }
 
 .ticker-name-mock {
-    font-size: 9px;
+    font-size: 8px;
     color: #fff;
     opacity: 0.6;
     margin-top: 4px;
@@ -1101,6 +1188,28 @@ input:checked + .slider-round:before {
 .gallery-item-name {
     font-size: 13px;
     font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gallery-item-preview-box {
+    width: 100%;
+    aspect-ratio: 1;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+}
+
+.gallery-item-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .gallery-item-meta {

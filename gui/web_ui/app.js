@@ -3,7 +3,34 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     
-    // Tab Navigation
+    // ── 1. FRAMELESS WINDOW TITLEBAR BUTTON BINDINGS ──
+    const winMin = document.getElementById("win-min");
+    const winMax = document.getElementById("win-max");
+    const winClose = document.getElementById("win-close");
+
+    if (winMin) {
+        winMin.addEventListener("click", () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.minimize_window();
+            }
+        });
+    }
+    if (winMax) {
+        winMax.addEventListener("click", () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.maximize_window();
+            }
+        });
+    }
+    if (winClose) {
+        winClose.addEventListener("click", () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.close_window();
+            }
+        });
+    }
+
+    // ── 2. TAB NAVIGATION ──
     const navButtons = document.querySelectorAll(".nav-btn");
     const tabContents = document.querySelectorAll(".tab-content");
     
@@ -18,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     
-    // Ambient Light Swatches
+    // ── 3. AMBIENT LIGHT SWATCHES ──
     const colorSwatches = document.querySelectorAll(".color-swatch");
     const customColorInput = document.getElementById("custom-color-input");
     let selectedColor = "00FFCC"; // Default
@@ -39,9 +66,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Brightness Slider
     const brightnessSlider = document.getElementById("brightness-slider");
     const brightnessVal = document.getElementById("brightness-val");
-    brightnessSlider.addEventListener("input", (e) => {
-        brightnessVal.textContent = e.target.value;
-    });
+    if (brightnessSlider) {
+        brightnessSlider.addEventListener("input", (e) => {
+            brightnessVal.textContent = e.target.value;
+        });
+    }
     
     // Channel selection
     const channelCards = document.querySelectorAll(".channel-card");
@@ -53,7 +82,6 @@ document.addEventListener("DOMContentLoaded", () => {
             card.classList.add("active");
             activeChannel = card.getAttribute("data-channel");
             
-            // Switch channel directly via python API
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.switch_channel(activeChannel)
                     .then(res => {
@@ -96,88 +124,129 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 3000);
     }
     
-    // Store discovered devices
+    // ── 4. FREE-FORM DRAG AND DROP CANVAS COORDINATOR ──
     let discoveredDevices = [];
-    // Store assigned slots mapping coordinates (x_y -> device_address)
-    let assignedSlots = {};
+    let assignedSlots = {}; // mac -> { x, y, width, height, size, name }
     
-    // Rebuild Display Wall grid slots
-    const gridColsInput = document.getElementById("grid-cols");
-    const gridRowsInput = document.getElementById("grid-rows");
-    const wallGrid = document.getElementById("wall-grid");
+    const arrangerCanvas = document.getElementById("arranger-canvas");
 
-    function getDeviceMockupAsset(name) {
+    // Physical sizes specifications mapped to CSS dimensions (pixels)
+    function getDeviceDimensions(name) {
         const lowerName = (name || "").toLowerCase();
-        if (lowerName.includes("timoo")) return "assets/timoo.png";
-        if (lowerName.includes("ditoo")) return "assets/ditoo.png";
-        if (lowerName.includes("pixoo")) return "assets/pixoo.png";
-        if (lowerName.includes("timebox") || lowerName.includes("evo")) return "assets/timebox.png";
-        return "assets/pixoo.png"; // Fallback mockup
+        if (lowerName.includes("timoo")) {
+            return { width: 110, height: 110, size: 16, image: "assets/timoo.png" };
+        }
+        if (lowerName.includes("ditoo")) {
+            return { width: 90, height: 90, size: 16, image: "assets/ditoo.png" };
+        }
+        if (lowerName.includes("pixoo") && !lowerName.includes("64")) {
+            return { width: 220, height: 220, size: 16, image: "assets/pixoo.png" };
+        }
+        if (lowerName.includes("pixoo") && lowerName.includes("64")) {
+            return { width: 260, height: 260, size: 64, image: "assets/pixoo.png" }; // larger size
+        }
+        if (lowerName.includes("timebox") || lowerName.includes("evo")) {
+            return { width: 100, height: 100, size: 16, image: "assets/timebox.png" };
+        }
+        return { width: 110, height: 110, size: 16, image: "assets/pixoo.png" }; // default fallback
     }
-    
-    function rebuildGrid() {
-        const cols = parseInt(gridColsInput.value) || 2;
-        const rows = parseInt(gridRowsInput.value) || 2;
-        
-        wallGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-        wallGrid.innerHTML = "";
-        
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                const key = `${x}_${y}`;
-                const cell = document.createElement("div");
-                cell.className = "grid-cell";
-                cell.setAttribute("data-x", x);
-                cell.setAttribute("data-y", y);
-                
-                if (assignedSlots[key]) {
-                    const dev = discoveredDevices.find(d => d.address === assignedSlots[key]);
-                    const devName = dev ? dev.name : "Divoom Screen";
-                    const mockup = getDeviceMockupAsset(devName);
-                    cell.classList.add("assigned");
-                    cell.innerHTML = `
-                        <div class="grid-cell-label">Slot [${x}, ${y}]</div>
-                        <div class="grid-cell-device">${devName}</div>
-                        <img src="${mockup}" class="grid-cell-image" alt="mockup">
-                        <div class="grid-cell-remove" data-key="${key}">×</div>
-                    `;
-                } else {
-                    cell.innerHTML = `
-                        <div class="grid-cell-label">Slot [${x}, ${y}]</div>
-                        <div class="grid-cell-device" style="opacity: 0.4;">Empty</div>
-                    `;
-                }
-                
-                // Clicking grid slot allows assigning a discovered device
-                cell.addEventListener("click", (e) => {
-                    if (e.target.classList.contains("grid-cell-remove")) {
-                        const keyToRemove = e.target.getAttribute("data-key");
-                        delete assignedSlots[keyToRemove];
-                        rebuildGrid();
-                        // Sync slots config to Python
-                        if (window.pywebview && window.pywebview.api) {
-                            window.pywebview.api.update_wall_slots(JSON.stringify(assignedSlots));
-                        }
-                        e.stopPropagation();
-                        return;
-                    }
-                    
-                    if (discoveredDevices.length === 0) {
-                        showToast("Please scan Bluetooth devices first!", "error");
-                        return;
-                    }
-                    
-                    // Show assignment prompt
-                    showAssignmentDialog(x, y);
-                });
-                
-                wallGrid.appendChild(cell);
-            }
+
+    function syncArrangerToPython() {
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.update_wall_slots(JSON.stringify(assignedSlots));
         }
     }
-    
-    function showAssignmentDialog(x, y) {
-        const key = `${x}_${y}`;
+
+    function renderArrangerCanvas() {
+        // Clear workspace
+        arrangerCanvas.innerHTML = "";
+        
+        Object.keys(assignedSlots).forEach(mac => {
+            const slot = assignedSlots[mac];
+            const node = document.createElement("div");
+            node.className = "arranger-node";
+            node.style.left = `${slot.x}px`;
+            node.style.top = `${slot.y}px`;
+            node.style.width = `${slot.width}px`;
+            node.style.height = `${slot.height}px`;
+            
+            node.innerHTML = `
+                <div class="arranger-node-label">${slot.name}</div>
+                <div class="arranger-node-mac">${mac}</div>
+                <img src="${slot.image}" class="arranger-node-image" alt="node-mock">
+                <div class="arranger-node-remove" data-mac="${mac}">×</div>
+            `;
+            
+            // Absolute positioning dragging math handlers
+            let isDragging = false;
+            let startX, startY;
+            let startLeft, startTop;
+            
+            node.addEventListener("mousedown", (e) => {
+                if (e.target.classList.contains("arranger-node-remove")) {
+                    const macToRemove = e.target.getAttribute("data-mac");
+                    delete assignedSlots[macToRemove];
+                    renderArrangerCanvas();
+                    syncArrangerToPython();
+                    e.stopPropagation();
+                    return;
+                }
+                
+                isDragging = true;
+                node.classList.add("dragging");
+                
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseInt(node.style.left) || 0;
+                startTop = parseInt(node.style.top) || 0;
+                
+                e.preventDefault();
+            });
+            
+            document.addEventListener("mousemove", (e) => {
+                if (!isDragging) return;
+                
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                
+                let newLeft = startLeft + deltaX;
+                let newTop = startTop + deltaY;
+                
+                // Keep inside arranger boundary limits
+                const maxLeft = arrangerCanvas.clientWidth - node.clientWidth;
+                const maxTop = arrangerCanvas.clientHeight - node.clientHeight;
+                
+                newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+                newTop = Math.max(0, Math.min(newTop, maxTop));
+                
+                node.style.left = `${newLeft}px`;
+                node.style.top = `${newTop}px`;
+                
+                // Update slots position cache
+                assignedSlots[mac].x = newLeft;
+                assignedSlots[mac].y = newTop;
+            });
+            
+            document.addEventListener("mouseup", () => {
+                if (isDragging) {
+                    isDragging = false;
+                    node.classList.remove("dragging");
+                    syncArrangerToPython();
+                }
+            });
+            
+            arrangerCanvas.appendChild(node);
+        });
+    }
+
+    // Add arranged Screen button click
+    document.getElementById("add-arranger-screen-btn").addEventListener("click", () => {
+        if (discoveredDevices.length === 0) {
+            showToast("Please scan Bluetooth devices first under Settings tab!", "error");
+            return;
+        }
+        
+        // Show assignments dropdown options prompt
         const options = discoveredDevices.map(d => `<option value="${d.address}">${d.name} (${d.address})</option>`).join("");
         
         const popup = document.createElement("div");
@@ -191,44 +260,68 @@ document.addEventListener("DOMContentLoaded", () => {
         popup.style.padding = "25px";
         popup.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
         popup.style.zIndex = "2000";
-        popup.style.minWidth = "300px";
+        popup.style.minWidth = "320px";
         popup.style.backdropFilter = "blur(15px)";
         
         popup.innerHTML = `
-            <h3 style="font-family: var(--font-display); font-size:16px; margin-bottom:15px; color:#fff;">Assign Device to [${x}, ${y}]</h3>
-            <select id="assign-select" class="custom-select" style="width:100%; margin-bottom:15px;">
+            <h3 style="font-family: var(--font-display); font-size:16px; margin-bottom:15px; color:#fff;">Add Screen to Arranger</h3>
+            <select id="canvas-add-select" class="custom-select" style="width:100%; margin-bottom:15px;">
                 ${options}
             </select>
             <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button id="assign-cancel" class="glow-btn compact" style="background:rgba(255,255,255,0.05); color:#fff; box-shadow:none;">Cancel</button>
-                <button id="assign-confirm" class="glow-btn compact" style="background:linear-gradient(135deg, var(--secondary), #7b2cbf); color:#fff; box-shadow:none;">Assign</button>
+                <button id="canvas-add-cancel" class="glow-btn compact" style="background:rgba(255,255,255,0.05); color:#fff; box-shadow:none;">Cancel</button>
+                <button id="canvas-add-confirm" class="glow-btn compact" style="background:linear-gradient(135deg, var(--secondary), #7b2cbf); color:#fff; box-shadow:none;">Add Node</button>
             </div>
         `;
         
         document.body.appendChild(popup);
         
-        document.getElementById("assign-cancel").addEventListener("click", () => {
+        document.getElementById("canvas-add-cancel").addEventListener("click", () => {
             popup.remove();
         });
         
-        document.getElementById("assign-confirm").addEventListener("click", () => {
-            const addr = document.getElementById("assign-select").value;
-            assignedSlots[key] = addr;
+        document.getElementById("canvas-add-confirm").addEventListener("click", () => {
+            const addr = document.getElementById("canvas-add-select").value;
             popup.remove();
-            rebuildGrid();
             
-            // Sync slots config to Python backend
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.update_wall_slots(JSON.stringify(assignedSlots));
+            if (assignedSlots[addr]) {
+                showToast("Device already placed on canvas!", "error");
+                return;
             }
-            showToast("Device assigned to grid slot", "success");
+            
+            const dev = discoveredDevices.find(d => d.address === addr);
+            const devName = dev ? dev.name : "Divoom Screen";
+            const dims = getDeviceDimensions(devName);
+            
+            // Center node on placement
+            const placementX = Math.round((arrangerCanvas.clientWidth - dims.width) / 2);
+            const placementY = Math.round((arrangerCanvas.clientHeight - dims.height) / 2);
+            
+            assignedSlots[addr] = {
+                x: placementX,
+                y: placementY,
+                width: dims.width,
+                height: dims.height,
+                size: dims.size,
+                name: devName,
+                image: dims.image
+            };
+            
+            renderArrangerCanvas();
+            syncArrangerToPython();
+            showToast("Device node added to arranger", "success");
         });
-    }
+    });
+
+    // Clear Canvas
+    document.getElementById("clear-arranger-btn").addEventListener("click", () => {
+        assignedSlots = {};
+        renderArrangerCanvas();
+        syncArrangerToPython();
+        showToast("Arranger canvas cleared", "success");
+    });
     
-    document.getElementById("rebuild-grid-btn").addEventListener("click", rebuildGrid);
-    rebuildGrid(); // Initial build
-    
-    // BLE Scanning
+    // ── 5. BLE SCANNING (RELOCATED TO SETTINGS) ──
     const scanBtn = document.getElementById("scan-btn");
     const scanSpinner = document.getElementById("scan-spinner");
     const deviceListUl = document.getElementById("device-list");
@@ -264,7 +357,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         `;
                         
                         li.addEventListener("click", () => {
-                            // Direct connect to device from list
                             showToast(`Connecting to ${d.name}...`, "success");
                             document.getElementById("global-status-dot").className = "status-indicator connecting";
                             document.getElementById("global-status-text").textContent = "Connecting...";
@@ -276,12 +368,13 @@ document.addEventListener("DOMContentLoaded", () => {
                                         document.getElementById("global-status-dot").className = "status-indicator connected";
                                         document.getElementById("global-status-text").textContent = `Connected: ${d.name}`;
                                         
-                                        // Update Active Screen Info Banner
                                         document.getElementById("banner-device-name").textContent = d.name;
                                         document.getElementById("banner-device-mac").textContent = d.address;
-                                        document.getElementById("banner-device-image").src = getDeviceMockupAsset(d.name);
                                         
-                                        // Simple heuristic specs
+                                        const dims = getDeviceDimensions(d.name);
+                                        document.getElementById("banner-device-image").src = dims.image;
+                                        document.getElementById("banner-device-res").textContent = `${dims.size}x${dims.size}`;
+                                        
                                         const isSpeaker = d.name.toLowerCase().includes("timoo") || d.name.toLowerCase().includes("ditoo");
                                         document.getElementById("banner-device-speaker").textContent = isSpeaker ? "Yes (Built-in)" : "No";
                                     } else {
@@ -296,7 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                     
                     showToast(`Discovered ${devices.length} screens!`, "success");
-                    rebuildGrid(); // Update list of available devices inside grid arranger dropdowns
+                    renderArrangerCanvas(); 
                 });
         } else {
             scanSpinner.style.display = "none";
@@ -320,7 +413,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Split and Push to Wall
     document.getElementById("apply-wall-art").addEventListener("click", () => {
         const path = document.getElementById("file-path-input").value.trim();
-        const cellSize = parseInt(document.getElementById("grid-cell-size").value) || 16;
+        const cellSize = 16; // default size
         
         if (!path) {
             showToast("Please provide a local file path!", "error");
@@ -328,11 +421,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         if (Object.keys(assignedSlots).length === 0) {
-            showToast("Please arrange at least one device on the grid first!", "error");
+            showToast("Please arrange at least one device on the canvas first!", "error");
             return;
         }
         
-        showToast("Splitting image & streaming quadrants...", "success");
+        showToast("Splitting image & streaming absolute crops...", "success");
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.display_wall_image(path, cellSize)
                 .then(res => {
@@ -342,7 +435,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
     
-    // Tab 3: Fetch Gallery List
+    // ── 6. CLOUD GALLERY WITH ANIMATED COVER PREVIEWS ──
     const galleryContainer = document.getElementById("gallery-container");
     let loadedArtworks = [];
     let selectedArtworkIndex = null;
@@ -367,7 +460,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     artworks.forEach((art, idx) => {
                         const item = document.createElement("div");
                         item.className = "gallery-item";
+                        
+                        // Beautiful visual gif cover animation
+                        const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
+                        
                         item.innerHTML = `
+                            <div class="gallery-item-preview-box">
+                                <img src="${previewSrc}" class="gallery-item-preview" alt="preview">
+                            </div>
                             <div class="gallery-item-name">${art.name}</div>
                             <div class="gallery-item-meta">
                                 <span>Likes: ${art.likes}</span>
@@ -385,7 +485,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         galleryContainer.appendChild(item);
                     });
                     
-                    showToast("Public gallery fetched successfully!", "success");
+                    showToast("Public gallery fetched with live previews!", "success");
                 });
         }
     });
@@ -409,28 +509,31 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Tab 4: Live Widgets (macOS Music & Stocks Ticker)
+    // Live Widgets (macOS Music & Stocks Ticker)
     const musicSyncToggle = document.getElementById("music-sync-toggle");
-    musicSyncToggle.addEventListener("change", (e) => {
-        const enable = e.target.checked;
-        if (enable) {
-            document.getElementById("music-track-status").classList.add("active");
-            showToast("Enabled macOS Music track listener thread", "success");
-        } else {
-            document.getElementById("music-track-status").classList.remove("active");
-            document.getElementById("music-track-name").textContent = "No Music Playing";
-            document.getElementById("music-artist-name").textContent = "Spotify / Apple Music";
-            showToast("Music synchronization stopped", "success");
-        }
+    if (musicSyncToggle) {
+        musicSyncToggle.addEventListener("change", (e) => {
+            const enable = e.target.checked;
+            const trackerStatus = document.getElementById("music-track-status");
+            if (enable) {
+                trackerStatus.classList.add("active");
+                showToast("Enabled macOS Music track listener thread", "success");
+            } else {
+                trackerStatus.classList.remove("active");
+                document.getElementById("music-track-name").textContent = "No Music Playing";
+                document.getElementById("music-artist-name").textContent = "Spotify / Apple Music";
+                showToast("Music synchronization stopped", "success");
+            }
 
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.toggle_music_sync(enable);
-        }
-    });
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.toggle_music_sync(enable);
+            }
+        });
+    }
 
     // Poll live track info from backend every 3 seconds to update the UI
     setInterval(() => {
-        if (musicSyncToggle.checked && window.pywebview && window.pywebview.api) {
+        if (musicSyncToggle && musicSyncToggle.checked && window.pywebview && window.pywebview.api) {
             window.pywebview.api.get_current_track_info()
                 .then(infoJson => {
                     if (infoJson) {
@@ -463,7 +566,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         const res = JSON.parse(resJson);
                         if (res.success) {
                             showToast(`Displaying ${symbol} price frame!`, "success");
-                            // Update UI mock values
                             const priceMock = document.querySelector(".ticker-price-mock");
                             const arrowMock = document.querySelector(".ticker-arrow-mock");
                             const nameMock = document.querySelector(".ticker-name-mock");
@@ -491,27 +593,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Tab 5: Credentials Settings tab
     const saveCredsBtn = document.getElementById("save-creds-btn");
-    saveCredsBtn.addEventListener("click", () => {
-        const email = document.getElementById("settings-email").value.trim();
-        const pwd = document.getElementById("settings-password").value.trim();
+    if (saveCredsBtn) {
+        saveCredsBtn.addEventListener("click", () => {
+            const email = document.getElementById("settings-email").value.trim();
+            const pwd = document.getElementById("settings-password").value.trim();
 
-        if (!email || !pwd) {
-            showToast("Email and Password are required!", "error");
-            return;
-        }
+            if (!email || !pwd) {
+                showToast("Email and Password are required!", "error");
+                return;
+            }
 
-        showToast("Saving cloud credentials...", "success");
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.save_credentials(email, pwd)
-                .then(res => {
-                    if (res) {
-                        showToast("Credentials configured & login cache generated!", "success");
-                    } else {
-                        showToast("Authentication failed. Please verify credentials.", "error");
-                    }
-                });
-        }
-    });
+            showToast("Saving cloud credentials...", "success");
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.save_credentials(email, pwd)
+                    .then(res => {
+                        if (res) {
+                            showToast("Credentials configured & login cache generated!", "success");
+                        } else {
+                            showToast("Authentication failed. Please verify credentials.", "error");
+                        }
+                    });
+            }
+        });
+    }
 
     // Load initial credentials & configurations from python backend on mount
     setTimeout(() => {
@@ -520,18 +624,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 .then(configJson => {
                     if (configJson) {
                         const conf = JSON.parse(configJson);
-                        if (conf.email) {
+                        if (conf.email && document.getElementById("settings-email")) {
                             document.getElementById("settings-email").value = conf.email;
                         }
-                        if (conf.timeout) {
+                        if (conf.timeout && document.getElementById("scan-timeout")) {
                             document.getElementById("scan-timeout").value = conf.timeout;
                         }
-                        if (conf.limit) {
+                        if (conf.limit && document.getElementById("scan-limit")) {
                             document.getElementById("scan-limit").value = conf.limit;
                         }
                         if (conf.slots) {
                             assignedSlots = conf.slots;
-                            rebuildGrid();
+                            renderArrangerCanvas();
                         }
                     }
                 });
@@ -565,7 +669,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 .then(slotsJson => {
                     if (slotsJson) {
                         assignedSlots = JSON.parse(slotsJson);
-                        rebuildGrid();
+                        renderArrangerCanvas();
                         showToast(`Layout preset '${name}' applied!`, "success");
                     } else {
                         showToast("Failed to load layout slots from file", "error");
@@ -589,7 +693,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 .then(res => {
                     if (res) {
                         showToast(`Preset '${name}' saved successfully!`, "success");
-                        // Refresh selector list
                         window.pywebview.api.load_preset_names()
                             .then(namesJson => {
                                 if (namesJson) {

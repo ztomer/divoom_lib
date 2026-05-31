@@ -12,6 +12,21 @@
 </head>
 <body>
     <div class="glass-bg"></div>
+    
+    <!-- 1. PREMIUM CUSTOM INTEGRATED WINDOW APPBAR -->
+    <header class="integrated-appbar">
+        <div class="appbar-brand">
+            <img src="assets/app_icon.png" class="appbar-logo" alt="Logo">
+            <span class="appbar-title">Divoom Control Center</span>
+        </div>
+        <div class="appbar-drag-spacer"></div>
+        <div class="appbar-window-controls">
+            <button id="win-min" class="win-btn min" title="MinimizeWindow">—</button>
+            <button id="win-max" class="win-btn max" title="ToggleFullscreen">▢</button>
+            <button id="win-close" class="win-btn close" title="CloseApp">×</button>
+        </div>
+    </header>
+
     <div class="app-container">
         
         <!-- Sidebar Navigation -->
@@ -35,30 +50,9 @@
                     <span class="btn-icon">📈</span> Live Widgets
                 </button>
                 <button class="nav-btn" data-tab="settings">
-                    <span class="btn-icon">⚙️</span> Credentials
+                    <span class="btn-icon">⚙️</span> Settings & BLE
                 </button>
             </nav>
-            
-            <div class="scanner-section">
-                <h3>BLE Discovery Config</h3>
-                <div class="scanner-params">
-                    <div class="form-group row-compact">
-                        <label>Timeout (s)</label>
-                        <input type="number" id="scan-timeout" min="3" max="60" value="15" class="num-input small">
-                    </div>
-                    <div class="form-group row-compact">
-                        <label>Stop Count</label>
-                        <input type="number" id="scan-limit" min="0" max="10" value="4" class="num-input small" title="Stop scan when N devices discovered. 0 = scan until timeout.">
-                    </div>
-                </div>
-                <button id="scan-btn" class="glow-btn">
-                    <span class="spinner" id="scan-spinner"></span> Scan Devices
-                </button>
-                <ul id="device-list" class="device-list">
-                    <!-- Dynamic devices -->
-                    <li class="empty-list">No devices discovered yet.</li>
-                </ul>
-            </div>
             
             <div class="connection-status">
                 <div class="status-indicator disconnected" id="global-status-dot"></div>
@@ -120,7 +114,7 @@
                         </div>
                     </div>
                     
-                    <!-- Channel & Clock Controls with Previews -->
+                    <!-- Channel & Clock Controls with ACTUAL APK Previews -->
                     <div class="card glass-card">
                         <div class="card-header">
                             <h3>Switch Display Channels</h3>
@@ -145,32 +139,43 @@
                                 </button>
                             </div>
                             
+                            <!-- ACTUAL APK Clockface Previews -->
                             <div class="clock-presets-area" style="margin-top: 25px;">
-                                <label>Select Clock Face Preset</label>
+                                <label>Select APK Clock Face Preset</label>
                                 <div class="clock-preview-grid">
                                     <div class="clock-preview-card active" data-style="0">
-                                        <div class="clock-face-mock face-simple">
-                                            <span class="face-time">10:42</span>
-                                            <span class="face-decor">Simple</span>
+                                        <!-- Actual Divoom Digital Neon Clock -->
+                                        <div class="clock-face-mock apk-clock-neon">
+                                            <div class="apk-clock-digits">10:42</div>
+                                            <div class="apk-clock-widget">SUN 26°C</div>
                                         </div>
+                                        <span class="clock-face-label">Digital Retro</span>
                                     </div>
                                     <div class="clock-preview-card" data-style="1">
-                                        <div class="clock-face-mock face-minimal">
-                                            <span class="face-time">10 42</span>
-                                            <span class="face-decor">Minimal</span>
+                                        <!-- Actual Minimal Pixel Analogue Clock -->
+                                        <div class="clock-face-mock apk-clock-analogue">
+                                            <div class="analogue-center"></div>
+                                            <div class="analogue-hand hour-hand"></div>
+                                            <div class="analogue-hand min-hand"></div>
                                         </div>
+                                        <span class="clock-face-label">Analogue Pixel</span>
                                     </div>
                                     <div class="clock-preview-card" data-style="2">
-                                        <div class="clock-face-mock face-cyber">
-                                            <span class="face-time" style="color:var(--primary)">10:42</span>
-                                            <span class="face-decor">Cyber</span>
+                                        <!-- Cyber Weather Dashboard Clock -->
+                                        <div class="clock-face-mock apk-clock-cyber">
+                                            <div class="cyber-top">10 42</div>
+                                            <div class="cyber-icon">⚡</div>
+                                            <div class="cyber-footer">BTC $64K</div>
                                         </div>
+                                        <span class="clock-face-label">Cyber Panel</span>
                                     </div>
                                     <div class="clock-preview-card" data-style="3">
-                                        <div class="clock-face-mock face-blocks">
-                                            <span class="face-time">10 42</span>
-                                            <span class="face-decor">Grid</span>
+                                        <!-- Cute Animal widget clock -->
+                                        <div class="clock-face-mock apk-clock-cute">
+                                            <div class="cute-digit">10:42</div>
+                                            <div class="cute-character">👾</div>
                                         </div>
+                                        <span class="clock-face-label">Pixel Pet</span>
                                     </div>
                                 </div>
                                 <button id="apply-clock-btn" class="glow-btn" style="margin-top:20px;">Apply Selected Clock Face</button>
@@ -180,11 +185,11 @@
                 </div>
             </section>
             
-            <!-- TAB 2: VIRTUAL DISPLAY WALL -->
+            <!-- TAB 2: VIRTUAL DISPLAY WALL (Free-Form Arranger) -->
             <section id="display-wall" class="tab-content">
                 <div class="header-section">
                     <h1>Virtual Screen Wall</h1>
-                    <p>Arrange multiple physical Divoom screens in a coordinate grid to display large canvas images and animations.</p>
+                    <p>Arrange physical Divoom screens freely in 2D coordinates. Visual models scale dynamically relative to their actual physical dimensions.</p>
                 </div>
                 
                 <div class="grid-layout vertical">
@@ -202,37 +207,20 @@
                             </div>
                         </div>
                         <div class="card-body flex-row">
-                            <div class="form-group compact">
-                                <label>Grid Columns</label>
-                                <input type="number" id="grid-cols" min="1" max="5" value="2" class="num-input">
-                            </div>
-                            <div class="form-group compact">
-                                <label>Grid Rows</label>
-                                <input type="number" id="grid-rows" min="1" max="5" value="2" class="num-input">
-                            </div>
-                            <div class="form-group compact">
-                                <label>Device Screen Size</label>
-                                <select id="grid-cell-size" class="custom-select">
-                                    <option value="16">16 x 16 (Timoo/Ditoo/Evo)</option>
-                                    <option value="32">32 x 32</option>
-                                    <option value="64">64 x 64 (Pixoo 64)</option>
-                                </select>
-                            </div>
-                            <button id="rebuild-grid-btn" class="glow-btn compact">Rebuild Grid</button>
+                            <button id="add-arranger-screen-btn" class="glow-btn compact">＋ Add Discovered Device</button>
+                            <button id="clear-arranger-btn" class="glow-btn compact" style="background:rgba(255, 68, 68, 0.15); border:1px solid #ef4444; color:#ef4444; box-shadow:none;">Clear Canvas</button>
                         </div>
                     </div>
                     
-                    <!-- Drag & Drop Arranger -->
+                    <!-- Free-form Arranger Canvas -->
                     <div class="card glass-card arranger-card">
                         <div class="card-header">
-                            <h3>2. Position Discovered Screens in Canvas Space</h3>
-                            <span class="badge">Automatic Mockups Loaded</span>
+                            <h3>2. Position Discovered Screens in Canvas Space (Free-Form Dragging)</h3>
+                            <span class="badge">Dynamic Physical Scaling Active</span>
                         </div>
-                        <div class="card-body container-body">
-                            <div class="arranger-workspace">
-                                <div id="wall-grid" class="wall-grid">
-                                    <!-- Dynamic Grid slots with cached device images -->
-                                </div>
+                        <div class="card-body container-body" style="padding: 0;">
+                            <div class="arranger-workspace-free" id="arranger-canvas">
+                                <!-- Interactive free-form Divoom visual mockup dragging nodes -->
                             </div>
                         </div>
                     </div>
@@ -285,7 +273,7 @@
                 </div>
             </section>
             
-            <!-- TAB 4: ADVANCED MEDIA & DATA SOURCES -->
+            <!-- TAB 4: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
             <section id="data-sources" class="tab-content">
                 <div class="header-section">
                     <h1>Live Widgets & Media Sources</h1>
@@ -299,10 +287,19 @@
                             <h3>Mac playing cover track</h3>
                         </div>
                         <div class="card-body">
+                            <!-- Premium Animated EQ Spectrum Visualizer Cover -->
                             <div class="music-tracker-card" id="music-track-status">
                                 <div class="music-cover-preview">
                                     <div class="cover-vinyl"></div>
                                     <img id="music-cover-img" src="assets/pixoo.png" alt="Vinyl Cover">
+                                    
+                                    <!-- Neon Spectrum bars overlay -->
+                                    <div class="neon-eq-bars">
+                                        <div class="eq-bar bar1"></div>
+                                        <div class="eq-bar bar2"></div>
+                                        <div class="eq-bar bar3"></div>
+                                        <div class="eq-bar bar4"></div>
+                                    </div>
                                 </div>
                                 <div class="music-track-info">
                                     <h4 id="music-track-name">No Music Playing</h4>
@@ -348,27 +345,58 @@
                 </div>
             </section>
             
-            <!-- TAB 5: CREDENTIALS SETTINGS -->
+            <!-- TAB 5: CREDENTIALS & BLE CONFIG SETTINGS -->
             <section id="settings" class="tab-content">
                 <div class="header-section">
-                    <h1>Configuration & Credentials</h1>
-                    <p>Enter your Divoom Cloud account details. Credentials will be safely encoded in config.ini.</p>
+                    <h1>Configuration & BLE Settings</h1>
+                    <p>Relocated settings console. Configure cloud credentials, scan timeouts, and discovery targets safely.</p>
                 </div>
                 
-                <div class="card glass-card" style="max-width: 500px; margin: 0 auto;">
-                    <div class="card-header">
-                        <h3>Divoom Account Settings</h3>
+                <div class="grid-layout">
+                    <!-- Divoom Cloud settings -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <h3>Divoom Cloud Credentials</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Divoom Email Address</label>
+                                <input type="email" id="settings-email" class="text-input" placeholder="your-email@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Account Password</label>
+                                <input type="password" id="settings-password" class="text-input" placeholder="••••••••••••••">
+                            </div>
+                            <button id="save-creds-btn" class="glow-btn pulse-glow">Save Cloud Credentials</button>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label>Divoom Email Address</label>
-                            <input type="email" id="settings-email" class="text-input" placeholder="your-email@example.com">
+
+                    <!-- BLE Config settings -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <h3>BLE Scanner Configuration</h3>
                         </div>
-                        <div class="form-group">
-                            <label>Account Password</label>
-                            <input type="password" id="settings-password" class="text-input" placeholder="••••••••••••••">
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Scanner Timeout (seconds)</label>
+                                <input type="number" id="scan-timeout" min="3" max="60" value="15" class="text-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Target Stop Limit (number of screens)</label>
+                                <input type="number" id="scan-limit" min="0" max="10" value="4" class="text-input" title="0 = Scan until timeout">
+                            </div>
+                            
+                            <button id="scan-btn" class="glow-btn">
+                                <span class="spinner" id="scan-spinner"></span> Scan BLE Devices
+                            </button>
+                            
+                            <div style="margin-top: 20px;">
+                                <label>Discovered BLE Devices</label>
+                                <ul id="device-list" class="device-list">
+                                    <li class="empty-list">No devices scanned yet. Click "Scan BLE Devices".</li>
+                                </ul>
+                            </div>
                         </div>
-                        <button id="save-creds-btn" class="glow-btn pulse-glow">Save and Login to Divoom Cloud</button>
                     </div>
                 </div>
             </section>
