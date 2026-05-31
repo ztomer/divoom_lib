@@ -353,8 +353,19 @@ skipped**; every step below held that line (zero regressions) unless noted.
       cleanly with a fake sender.
 - [x] Green island: 80 passed, 15 skipped (no regressions).
 
-### Remaining (not started)
-- **Collapse of the duplicate `divoom.py` / `protocol.py`** — every fix above
-  had to be written twice because of that duplication. This is the root cause
-  behind B1/B4 and should precede future architectural work.
+### Phase 4 — Collapse duplicate Divoom/DivoomProtocol — DONE
+- [x] `DivoomProtocol` now inherits from `Divoom` instead of being a
+      437-line standalone duplicate.
+- [x] `protocol.py` reduced to a thin 8-line backward-compat subclass.
+- [x] All shared protocol logic lives in `divoom_lib/framing.py`.
+- [x] Green island: 80 passed, 15 skipped (no regressions).
+
+### All phases complete
+All items from the remediation plan have been implemented:
+- Phase 0/0.5: Test baseline + conftest
+- Phase 1: Hot-path performance (L1/L2/L3)
+- Phase 2: Async I/O correctness (L4/L5/L6)
+- Phase 3: Domain exceptions (B3)
+- Phase 4: B2 (factories), B4 (framing extract), B1 (Protocol),
+  and Divoom/DivoomProtocol collapse.
 - The 39 pre-existing failures (migration debt) remain untouched by design.
