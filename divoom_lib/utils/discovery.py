@@ -139,3 +139,38 @@ def pick_char_uuid(preferred_uuid: str | None, candidates: list, prefix_hint: st
     
     # 4. Final fallback: return the first candidate if any
     return candidates[0].uuid if candidates else None
+
+
+async def discover_all_divoom_devices(timeout: float = 5.0) -> list[dict]:
+    """
+    Scans BLE devices and returns a list of discovered Divoom devices.
+    Matches devices by known Divoom name prefixes.
+    """
+    logger.info(f"Scanning for all nearby Divoom Bluetooth devices (timeout={timeout}s)...")
+    devices = await BleakScanner.discover(timeout=timeout)
+    
+    divoom_keywords = ["timoo", "tivoo", "timebox", "pixoo", "ditoo", "backpack", "timegate"]
+    results = []
+    
+    for d in devices:
+        if d.name:
+            name_lower = d.name.lower()
+            is_divoom = any(kw in name_lower for kw in divoom_keywords)
+            if is_divoom:
+                results.append({
+                    "name": d.name,
+                    "address": d.address
+                })
+                
+    # If no explicit matches, return all devices with names as a fallback
+    if not results:
+        logger.info("No devices matching Divoom keywords found; returning all named devices in range.")
+        for d in devices:
+            if d.name:
+                results.append({
+                    "name": d.name,
+                    "address": d.address
+                })
+                
+    logger.info(f"Discovered {len(results)} candidate Divoom BLE devices.")
+    return results

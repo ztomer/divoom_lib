@@ -1,0 +1,15 @@
+{
+  "write_characteristic_uuid": "char1_uuid",
+  "ack_characteristic_uuid": "mock_notify_char_uuid",
+  "last_successful_payload": [
+    "01",
+    "ff",
+    "00",
+    "00",
+    "64",
+    "00",
+    "01"
+  ],
+  "last_successful_use_ios_le": false,
+  "escapePayload": true
+}

@@ -7,3 +7,7 @@ __pycache__/
 # Gemini specific files
 progress.md
 set_hot_pick.py
+
+# Credentials / secrets — never commit
+config.ini
+api_scraper/divoom_docs/guest_token.json

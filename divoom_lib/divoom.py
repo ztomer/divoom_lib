@@ -188,6 +188,12 @@ class Divoom:
         """Returns True if the BleakClient is connected, False otherwise."""
         return self.client and self.client.is_connected
 
+    @property
+    def protocol(self):
+        """Backwards-compatibility accessor returning self as the protocol instance."""
+        return self
+
+
     def convert_color(self, color_input: str | tuple | list) -> list:
         """
         Converts a color input to a list of three integers [R, G, B].
