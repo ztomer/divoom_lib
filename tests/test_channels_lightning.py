@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from divoom_lib.channels.lightning import LightningChannel
+from divoom_lib.display.lightning_channel import LightningChannel
 from divoom_lib.divoom import Divoom as DivoomBase
 from divoom_lib.models import LightningType
 

@@ -6,7 +6,7 @@ import os
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from divoom_lib.commands.temp_weather import TempWeatherCommand
+from divoom_lib.system.temp_weather import TempWeatherCommand
 from divoom_lib.divoom import Divoom as DivoomBase # Import DivoomBase for type hinting and mocking
 from divoom_lib.models import WeatherType, COMMANDS
 
