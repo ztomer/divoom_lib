@@ -342,9 +342,19 @@ skipped**; every step below held that line (zero regressions) unless noted.
 - [x] Notification handlers in both classes use the shared parse functions.
 - [x] Green island: 80 passed, 15 skipped (zero regressions).
 
+### Phase 4 — B1: CommandSender Protocol — DONE
+- [x] Created `divoom_lib/sender_protocol.py` with a `CommandSender`
+      `typing.Protocol` exposing `send_command`, `send_command_and_wait_for_response`,
+      `wait_for_response`, `convert_color`, `is_connected`, `logger`.
+- [x] All sub-package module constructors (`display/`, `system/`, `media/`,
+      `scheduling/`, `tools/`, plus `tool.py`, `game.py`) type-hinted
+      against `CommandSender`.
+- [x] Verified: `isinstance(fake, CommandSender)` passes; modules construct
+      cleanly with a fake sender.
+- [x] Green island: 80 passed, 15 skipped (no regressions).
+
 ### Remaining (not started)
-- B1 (`CommandSender` Protocol / DIP), and the **collapse of the duplicate
-  `divoom.py` / `protocol.py`** — every step above had to be written twice
-  because of that duplication. These are larger architectural changes best done
-  as a separate, reviewed PR.
+- **Collapse of the duplicate `divoom.py` / `protocol.py`** — every fix above
+  had to be written twice because of that duplication. This is the root cause
+  behind B1/B4 and should precede future architectural work.
 - The 39 pre-existing failures (migration debt) remain untouched by design.
