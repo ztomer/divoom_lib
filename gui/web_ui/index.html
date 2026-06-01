@@ -50,19 +50,9 @@
                     <span class="btn-icon">📈</span> Live Widgets
                 </button>
                 <button class="nav-btn" data-tab="settings">
-                    <span class="btn-icon">⚙️</span> Settings & BLE
+                    <span class="btn-icon">⚙️</span> Settings
                 </button>
             </nav>
-            
-            <!-- Braun Aesthetic Mode Selector -->
-            <div class="theme-selector-panel">
-                <div class="panel-title">Aesthetic Mode</div>
-                <div class="theme-buttons">
-                    <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">🌙 Dark</button>
-                    <button class="theme-mode-btn" data-theme="light" title="Light Mode">☀️ Light</button>
-                    <button class="theme-mode-btn" data-theme="system" title="System Auto">💻 Auto</button>
-                </div>
-            </div>
             
             <div class="transport-status-panel">
                 <div class="panel-title">Transport Status</div>
@@ -384,11 +374,31 @@
             <!-- TAB 5: CREDENTIALS & BLE CONFIG SETTINGS -->
             <section id="settings" class="tab-content">
                 <div class="header-section">
-                    <h1>Configuration & BLE Settings</h1>
+                    <h1>Configuration & Settings</h1>
                     <p>Relocated settings console. Configure cloud credentials, scan timeouts, and discovery targets safely.</p>
                 </div>
                 
                 <div class="grid-layout">
+                    <!-- Aesthetic Theme Mode -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <h3>Aesthetic Theme Mode</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Interface Theme Style</label>
+                                <p style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:12px; line-height:1.4;">
+                                    Select the aesthetic layout theme. Selecting Auto will align with your system/macOS light/dark preferences.
+                                </p>
+                                <div class="theme-buttons">
+                                    <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">🌙 Dark</button>
+                                    <button class="theme-mode-btn" data-theme="light" title="Light Mode">☀️ Light</button>
+                                    <button class="theme-mode-btn" data-theme="system" title="System Auto">💻 Auto</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Divoom Cloud settings -->
                     <div class="card glass-card">
                         <div class="card-header">
