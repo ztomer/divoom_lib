@@ -37,6 +37,7 @@ body {
     overflow: hidden;
     height: 100vh;
     width: 100vw;
+    -webkit-app-region: no-drag;
 }
 
 /* Glassmorphic Background Blobs */
@@ -157,6 +158,7 @@ body {
     height: calc(100vh - 40px);
     width: 100vw;
     backdrop-filter: blur(8px);
+    -webkit-app-region: no-drag;
 }
 
 /* Sidebar Styling */
@@ -1225,4 +1227,297 @@ input:checked + .slider-round:before {
     background: rgba(255,255,255,0.05);
     padding: 2px 6px;
     border-radius: 4px;
+}
+
+/* ── Transport Layer Badges ─────────────────────────────────────────── */
+:root {
+  --transport-ble:    #3b82f6;
+  --transport-lan:    #22c55e;
+  --transport-cloud:  #f59e0b;
+  --transport-ext:    #ef4444;
+}
+
+.transport-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 20px;
+  opacity: 0.9;
+  white-space: nowrap;
+  user-select: none;
+}
+.transport-badge.ble   { background: rgba(59,130,246,0.15); color: var(--transport-ble);   border: 1px solid rgba(59,130,246,0.3); }
+.transport-badge.lan   { background: rgba(34,197,94,0.15);  color: var(--transport-lan);   border: 1px solid rgba(34,197,94,0.3); }
+.transport-badge.cloud { background: rgba(245,158,11,0.15); color: var(--transport-cloud); border: 1px solid rgba(245,158,11,0.3); }
+.transport-badge.ext   { background: rgba(239,68,68,0.15);  color: var(--transport-ext);   border: 1px solid rgba(239,68,68,0.3); }
+
+/* ── Transport Status Panel (replaces single dot) ───────────────────── */
+.transport-status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+  margin-top: 8px;
+}
+.transport-status-panel .panel-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 2px;
+}
+.transport-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  cursor: default;
+}
+.transport-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: box-shadow 0.3s;
+}
+.transport-dot.active {
+  box-shadow: 0 0 6px currentColor;
+}
+.transport-dot.inactive {
+  opacity: 0.25;
+}
+.transport-row-label {
+  color: rgba(255,255,255,0.7);
+  font-weight: 500;
+  flex: 1;
+}
+.transport-row-detail {
+  font-size: 9px;
+  color: rgba(255,255,255,0.35);
+  text-align: right;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Card transport badge (top-right corner of glass-card) ──────────── */
+.card-transport-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+}
+.glass-card { position: relative; } /* ensure positioned context */
+
+/* ── Toast transport suffix ─────────────────────────────────────────── */
+.toast-transport {
+  font-size: 10px;
+  opacity: 0.75;
+  margin-left: 6px;
+}
+
+/* ── Settings: Connectivity & Privacy legend ────────────────────────── */
+.connectivity-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.connectivity-legend-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.connectivity-legend-badge {
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.connectivity-legend-text strong {
+  display: block;
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  margin-bottom: 2px;
+}
+.connectivity-legend-text span {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.4;
+}
+
+/* ── LAN config section ─────────────────────────────────────────────── */
+.lan-config-section {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(34,197,94,0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(34,197,94,0.15);
+}
+.lan-config-section h4 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--transport-lan);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.lan-probe-result {
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  min-height: 16px;
+}
+.lan-probe-result.success { color: var(--transport-lan); }
+.lan-probe-result.error   { color: var(--transport-ext); }
+
+/* ── DIETER RAMS / BRAUN MINIMALIST THEME ───────────────────────────── */
+body.dieter-rams {
+    --bg-base: #121316;
+    --card-bg: #1e1f24;
+    --border-color: #2b2c32;
+    --border-hover: #ff5a1f;
+    --primary: #ff5a1f; /* Braun Tuner Orange Accent */
+    --primary-glow: rgba(255, 90, 31, 0.2);
+    --secondary: #6e6f76; /* Braun Matte Gray Accent */
+    --secondary-glow: rgba(110, 111, 118, 0.2);
+    --accent: #00cc66; /* Braun Indicator Green */
+    --text-main: #e8e9eb;
+    --text-muted: #82838a;
+}
+
+body.dieter-rams .glass-bg {
+    background: #121316 !important;
+}
+body.dieter-rams .glass-bg::before,
+body.dieter-rams .glass-bg::after {
+    display: none !important; /* No gaudy glass blobs */
+}
+
+body.dieter-rams .card,
+body.dieter-rams .glass-card,
+body.dieter-rams .device-banner {
+    background: #1e1f24 !important;
+    border: 1px solid #2b2c32 !important;
+    border-radius: 6px !important; /* Dieter Rams prefers precise, rational corners */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    backdrop-filter: none !important;
+}
+
+body.dieter-rams .card:hover {
+    border-color: #3b3c43 !important;
+}
+
+body.dieter-rams .nav-btn.active {
+    color: #ff5a1f !important;
+    background: rgba(255, 90, 31, 0.08) !important;
+    border-color: rgba(255, 90, 31, 0.3) !important;
+    box-shadow: none !important;
+}
+
+body.dieter-rams .glow-btn {
+    background: #ff5a1f !important;
+    color: #ffffff !important;
+    border: 1px solid #e04e17 !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    transition: background 0.2s;
+}
+
+body.dieter-rams .glow-btn:hover {
+    background: #e04e17 !important;
+    transform: none !important; /* Restraint from bouncing transitions */
+    box-shadow: none !important;
+}
+
+body.dieter-rams .glow-btn.compact {
+    background: #2e2f36 !important;
+    border: 1px solid #3e3f46 !important;
+    color: #e8e9eb !important;
+}
+body.dieter-rams .glow-btn.compact:hover {
+    background: #3d3e46 !important;
+}
+
+body.dieter-rams .range-slider::-webkit-slider-thumb {
+    background: #ff5a1f !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important;
+    width: 14px !important;
+    height: 14px !important;
+}
+
+body.dieter-rams .channel-card.active {
+    border-color: #ff5a1f !important;
+    background: rgba(255, 90, 31, 0.05) !important;
+    color: #ff5a1f !important;
+}
+
+body.dieter-rams .clock-face-mock {
+    border-radius: 4px !important;
+    border-color: #2d2f36 !important;
+}
+body.dieter-rams .clock-preview-card.active .clock-face-mock {
+    border-color: #ff5a1f !important;
+    box-shadow: none !important;
+}
+body.dieter-rams .clock-preview-card.active .clock-face-label {
+    color: #ff5a1f !important;
+}
+
+body.dieter-rams .custom-select,
+body.dieter-rams .text-input,
+body.dieter-rams .form-input {
+    background: #18191d !important;
+    border: 1px solid #33343c !important;
+    border-radius: 4px !important;
+    color: #e8e9eb !important;
+}
+
+body.dieter-rams .custom-select:focus,
+body.dieter-rams .text-input:focus {
+    border-color: #ff5a1f !important;
+}
+
+/* Braun Slider Toggle customization */
+body.dieter-rams .switch input:checked + .slider-round {
+    background-color: #ff5a1f !important;
+}
+
+body.dieter-rams .arranger-workspace-free {
+    background: #141518 !important;
+    border: 1px solid #2d2f36 !important;
+    border-radius: 4px !important;
+}
+
+body.dieter-rams .arranger-node {
+    background: #25262c !important;
+    border: 1px solid #ff5a1f !important;
+    border-radius: 4px !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+}
+
+body.dieter-rams .arranger-node:hover {
+    border-color: #ff5a1f !important;
+    box-shadow: 0 0 10px rgba(255, 90, 31, 0.3) !important;
+}
+
+body.dieter-rams .integrated-appbar {
+    background: #18191d !important;
+    border-bottom: 1px solid #2b2c32 !important;
+}
+
+body.dieter-rams .sidebar {
+    background: #18191d !important;
+    border-right: 1px solid #2b2c32 !important;
 }

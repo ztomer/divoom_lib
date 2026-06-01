@@ -54,9 +54,37 @@
                 </button>
             </nav>
             
-            <div class="connection-status">
-                <div class="status-indicator disconnected" id="global-status-dot"></div>
-                <span id="global-status-text">Disconnected</span>
+            <!-- Dieter Rams / Braun theme toggle option -->
+            <div class="theme-toggle-area" style="margin-top:auto; margin-bottom:15px; padding-top:15px; border-top:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:600; color:var(--text-muted); letter-spacing:0.04em;">
+                <span>📻 BRAUN EDITION</span>
+                <label class="switch" style="width:34px; height:20px;">
+                    <input type="checkbox" id="braun-theme-toggle">
+                    <span class="slider-round" style="before { width:14px; height:14px; left:3px; bottom:3px; }"></span>
+                </label>
+            </div>
+            
+            <div class="transport-status-panel">
+                <div class="panel-title">Transport Status</div>
+                <div class="transport-row" id="tr-ble" title="Bluetooth Low Energy — 100% local">
+                    <div class="transport-dot inactive" id="tr-ble-dot" style="background:#3b82f6; color:#3b82f6;"></div>
+                    <span class="transport-row-label">🔵 BLE</span>
+                    <span class="transport-row-detail" id="tr-ble-detail">Disconnected</span>
+                </div>
+                <div class="transport-row" id="tr-lan" title="Wi-Fi HTTP :9000 — 100% local">
+                    <div class="transport-dot inactive" id="tr-lan-dot" style="background:#22c55e; color:#22c55e;"></div>
+                    <span class="transport-row-label">🟢 LAN</span>
+                    <span class="transport-row-detail" id="tr-lan-detail">No IP set</span>
+                </div>
+                <div class="transport-row" id="tr-cloud" title="appin.divoom-gz.com — Divoom's servers">
+                    <div class="transport-dot inactive" id="tr-cloud-dot" style="background:#f59e0b; color:#f59e0b;"></div>
+                    <span class="transport-row-label">🟡 Cloud</span>
+                    <span class="transport-row-detail" id="tr-cloud-detail">Not signed in</span>
+                </div>
+                <div class="transport-row" id="tr-ext" title="3rd-party APIs — no login required">
+                    <div class="transport-dot active" id="tr-ext-dot" style="background:#ef4444; color:#ef4444;"></div>
+                    <span class="transport-row-label">🔴 External</span>
+                    <span class="transport-row-detail" id="tr-ext-detail">Available</span>
+                </div>
             </div>
         </aside>
         
@@ -67,12 +95,18 @@
             <section id="control-panel" class="tab-content active">
                 <!-- Connected Device Info Banner -->
                 <div class="device-banner glass-card" id="connected-device-banner">
+                    <span class="transport-badge ble card-transport-badge">🔵 BLE</span>
                     <div class="banner-preview">
                         <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
                     </div>
                     <div class="banner-info">
                         <div class="banner-label">Active Target Screen</div>
-                        <h2 id="banner-device-name">No Connected Screen</h2>
+                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+                            <h2 id="banner-device-name" style="margin-bottom:0; font-size:18px;">No Connected Screen</h2>
+                            <select id="banner-device-select" class="custom-select small" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; min-width:160px; font-weight:600;">
+                                <option value="">Select Screen...</option>
+                            </select>
+                        </div>
                         <div class="banner-specs">
                             <span>MAC: <b id="banner-device-mac">-</b></span>
                             <span>Grid size: <b id="banner-device-res">16x16</b></span>
@@ -114,7 +148,7 @@
                         </div>
                     </div>
                     
-                    <!-- Channel & Clock Controls with ACTUAL APK Previews -->
+                    <!-- Channel & Clock Controls with ACTUAL Clockface Previews -->
                     <div class="card glass-card">
                         <div class="card-header">
                             <h3>Switch Display Channels</h3>
@@ -139,9 +173,9 @@
                                 </button>
                             </div>
                             
-                            <!-- ACTUAL APK Clockface Previews -->
+                            <!-- Clock Face Previews -->
                             <div class="clock-presets-area" style="margin-top: 25px;">
-                                <label>Select APK Clock Face Preset</label>
+                                <label>Select Clock Face</label>
                                 <div class="clock-preview-grid">
                                     <div class="clock-preview-card active" data-style="0">
                                         <!-- Actual Divoom Digital Neon Clock -->
@@ -248,6 +282,7 @@
                 </div>
                 
                 <div class="card glass-card">
+                    <span class="transport-badge cloud card-transport-badge">🟡 Cloud</span>
                     <div class="card-header flex-header">
                         <h3>Community Recommends</h3>
                         <div class="header-actions">
@@ -395,6 +430,60 @@
                                 <ul id="device-list" class="device-list">
                                     <li class="empty-list">No devices scanned yet. Click "Scan BLE Devices".</li>
                                 </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LAN Transport Config -->
+                <div class="lan-config-section">
+                    <h4>🟢 Wi-Fi (LAN) Transport</h4>
+                    <p style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:12px;">For WiFi-capable devices (Pixoo 64, Timebox Evo). 100% local — no internet required.</p>
+                    <div class="form-group">
+                        <label class="form-label">Device IP Address</label>
+                        <input type="text" id="lan-ip-input" class="form-input" placeholder="192.168.1.42">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Local Token <span style="opacity:0.5; font-weight:400;">(from device pairing, 0 if none)</span></label>
+                        <input type="number" id="lan-token-input" class="form-input" value="0" min="0">
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:12px;">
+                        <button id="save-lan-btn" class="glow-btn compact">💾 Save LAN Config</button>
+                        <button id="probe-lan-btn" class="glow-btn compact" style="background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.3);">📡 Test Connection</button>
+                    </div>
+                    <div class="lan-probe-result" id="lan-probe-result"></div>
+                </div>
+
+                <!-- Connectivity & Privacy Legend -->
+                <div style="margin-top:24px;">
+                    <h3 style="font-size:13px; margin-bottom:12px; color:rgba(255,255,255,0.6);">Connectivity &amp; Privacy</h3>
+                    <div class="connectivity-legend">
+                        <div class="connectivity-legend-row">
+                            <div class="connectivity-legend-badge"><span class="transport-badge ble">🔵 BLE</span></div>
+                            <div class="connectivity-legend-text">
+                                <strong>Bluetooth Low Energy</strong>
+                                <span>100% local. Commands go directly to the device over Bluetooth. Nothing ever leaves your machine.</span>
+                            </div>
+                        </div>
+                        <div class="connectivity-legend-row">
+                            <div class="connectivity-legend-badge"><span class="transport-badge lan">🟢 LAN</span></div>
+                            <div class="connectivity-legend-text">
+                                <strong>Local Wi-Fi HTTP (:9000)</strong>
+                                <span>100% local. Talks directly to the device's built-in HTTP server. No internet, no account. WiFi-capable devices only.</span>
+                            </div>
+                        </div>
+                        <div class="connectivity-legend-row">
+                            <div class="connectivity-legend-badge"><span class="transport-badge cloud">🟡 Cloud</span></div>
+                            <div class="connectivity-legend-text">
+                                <strong>Divoom Cloud (appin.divoom-gz.com)</strong>
+                                <span>Sends commands to Divoom's servers. Required for: gallery browsing, clock face store, community features. Requires a Divoom account.</span>
+                            </div>
+                        </div>
+                        <div class="connectivity-legend-row">
+                            <div class="connectivity-legend-badge"><span class="transport-badge ext">🔴 External</span></div>
+                            <div class="connectivity-legend-text">
+                                <strong>External Internet APIs</strong>
+                                <span>Used for weather, stock prices, album art lookups. 3rd-party services — no Divoom account required. Data is anonymous.</span>
                             </div>
                         </div>
                     </div>

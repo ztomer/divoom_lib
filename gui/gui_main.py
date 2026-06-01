@@ -392,12 +392,61 @@ class DivoomGuiAPI:
 
     # ── Cloud Gallery & Previews Cache ───────────────────────────────────────────
 
-    def fetch_gallery(self, classify: int) -> str:
-        """Fetches popular community gallery artworks and caches thumbnails locally."""
-        logger.info(f"GUI Action: Fetching gallery classify={classify}...")
+    # ── Cloud Gallery & Previews Cache ───────────────────────────────────────────
+
+    def _get_device_size(self, address: str) -> int:
+        for d in self.discovered_list:
+            if d.get("address") == address:
+                name = d.get("name", "").lower()
+                if "64" in name:
+                    return 64
+                return 16
+        return 16
+
+    def _extract_gif_from_magic_43(self, file_data: bytes) -> bytes | None:
+        if len(file_data) < 10 or file_data[0] != 43:
+            return None
+        try:
+            text_len = struct.unpack("<I", file_data[6:10])[0]
+            text_start = 10
+            text_end = text_start + text_len
+            
+            gif_len_offset = text_end
+            if len(file_data) < gif_len_offset + 4:
+                return None
+                
+            gif_len = struct.unpack("<I", file_data[gif_len_offset:gif_len_offset+4])[0]
+            gif_start = gif_len_offset + 4
+            gif_end = gif_start + gif_len
+            
+            if gif_end > len(file_data):
+                gif_end = len(file_data)
+                
+            gif_data = file_data[gif_start:gif_end]
+            if gif_data.startswith(b"GIF89a") or gif_data.startswith(b"GIF87a"):
+                return gif_data
+        except Exception as e:
+            logger.warning(f"Failed to extract GIF: {e}")
+        return None
+
+    def fetch_gallery(self, classify: int, target_size: int = 16) -> str:
+        """
+        Fetches popular community gallery artworks and caches previews locally.
+        Filters by active connected device grid size to prevent hardware scaling mismatch.
+        """
+        logger.info(f"GUI Action: Fetching gallery classify={classify} target_size={target_size}...")
         try:
             if not self.cached_creds:
                 self.cached_creds = divoom_auth.get_credentials()
+                
+            # FileSize bitmask: 1=16px, 2=32px, 4=64px
+            file_size_bitmask = 127
+            if target_size == 16:
+                file_size_bitmask = 1
+            elif target_size == 32:
+                file_size_bitmask = 2
+            elif target_size == 64:
+                file_size_bitmask = 4
                 
             body = {
                 "Command": "GetCategoryFileListV2",
@@ -407,7 +456,7 @@ class DivoomGuiAPI:
                 "Classify": classify,
                 "FileSort": 1,
                 "FileType": 5,
-                "FileSize": 127,
+                "FileSize": file_size_bitmask,
                 "Version": 19,
                 "StartNum": 1,
                 "EndNum": 30,
@@ -441,22 +490,46 @@ class DivoomGuiAPI:
                     pixel_amb_id = item.get("PixelAmbId")
                     preview_url = ""
                     
-                    if pixel_amb_id:
-                        cached_file = cache_dir / pixel_amb_id
-                        if not cached_file.exists():
+                    if file_id:
+                        safe_filename = file_id.replace("/", "_")
+                        cache_file = cache_dir / safe_filename
+                        
+                        if not cache_file.exists():
                             try:
-                                dl_url = f"https://fin.divoom-gz.com/{pixel_amb_id}"
+                                dl_url = f"https://fin.divoom-gz.com/{file_id}"
                                 req_dl = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
                                 with urllib.request.urlopen(req_dl, timeout=5) as dl_resp:
-                                    cached_file.write_bytes(dl_resp.read())
-                                logger.info(f"Gallery Cache: Downloaded {pixel_amb_id}")
+                                    raw_bytes = dl_resp.read()
+                                    
+                                    extracted_gif = self._extract_gif_from_magic_43(raw_bytes)
+                                    if extracted_gif:
+                                        cache_file = cache_file.with_suffix(".gif")
+                                        cache_file.write_bytes(extracted_gif)
+                                        logger.info(f"Gallery Cache: Extracted Magic 43 GIF to {cache_file.name}")
+                                    elif raw_bytes.startswith(b"GIF89a") or raw_bytes.startswith(b"GIF87a"):
+                                        cache_file = cache_file.with_suffix(".gif")
+                                        cache_file.write_bytes(raw_bytes)
+                                        logger.info(f"Gallery Cache: Saved standard GIF to {cache_file.name}")
+                                    else:
+                                        if pixel_amb_id:
+                                            fallback_filename = pixel_amb_id.replace("/", "_")
+                                            cache_file = cache_dir / fallback_filename
+                                            if not cache_file.exists():
+                                                dl_url_fb = f"https://fin.divoom-gz.com/{pixel_amb_id}"
+                                                req_dl_fb = urllib.request.Request(dl_url_fb, headers={"User-Agent": "okhttp/4.12.0"})
+                                                with urllib.request.urlopen(req_dl_fb, timeout=5) as dl_resp_fb:
+                                                    cache_file.write_bytes(dl_resp_fb.read())
+                                        else:
+                                            cache_file = cache_file.with_suffix(".bin")
+                                            cache_file.write_bytes(raw_bytes)
                             except Exception as dl_err:
-                                logger.warning(f"Failed to cache preview {pixel_amb_id}: {dl_err}")
-                                
-                        if cached_file.exists():
-                            preview_url = f"assets/cache_gallery/{pixel_amb_id}"
-                        else:
-                            preview_url = f"https://fin.divoom-gz.com/{pixel_amb_id}"
+                                logger.warning(f"Failed to cache preview for {file_id}: {dl_err}")
+                        
+                        for ext in [".gif", "", ".png", ".bin"]:
+                            possible_file = cache_file.with_suffix(ext) if ext else cache_file
+                            if possible_file.exists():
+                                preview_url = f"assets/cache_gallery/{possible_file.name}"
+                                break
                     
                     results.append({
                         "name": item.get("FileName", "unnamed"),
@@ -471,7 +544,7 @@ class DivoomGuiAPI:
             return json.dumps([])
 
     def batch_sync_artwork(self, artwork_json: str) -> bool:
-        """Syncs the selected artwork to all active devices in parallel."""
+        """Syncs the selected artwork to all active devices in parallel with automatic PIL resizing."""
         logger.info(f"GUI Action: Batch syncing artwork details: {artwork_json}")
         try:
             art = json.loads(artwork_json)
@@ -496,11 +569,57 @@ class DivoomGuiAPI:
                 else:
                     return False
                     
+                extracted_gif = self._extract_gif_from_magic_43(file_bytes)
+                is_gif = False
+                gif_data = None
+                
+                if extracted_gif:
+                    is_gif = True
+                    gif_data = extracted_gif
+                elif file_bytes.startswith(b"GIF89a") or file_bytes.startswith(b"GIF87a"):
+                    is_gif = True
+                    gif_data = file_bytes
+                
                 async def run_sync():
                     sync_tasks = []
                     for divoom in targets:
-                        from monthly_best_daemon import stream_raw_bin_payload
-                        sync_tasks.append(stream_raw_bin_payload(divoom, file_bytes))
+                        if is_gif:
+                            target_size = self._get_device_size(divoom._conn.mac)
+                            temp_dir = Path(__file__).parent.parent / "scratch"
+                            temp_dir.mkdir(parents=True, exist_ok=True)
+                            
+                            temp_input = temp_dir / f"sync_in_{divoom._conn.mac}.gif"
+                            temp_input.write_bytes(gif_data)
+                            
+                            temp_output = temp_dir / f"sync_out_{divoom._conn.mac}.gif"
+                            
+                            try:
+                                from PIL import Image
+                                with Image.open(temp_input) as img:
+                                    frames = []
+                                    durations = []
+                                    for frame_idx in range(img.n_frames):
+                                        img.seek(frame_idx)
+                                        resized_frame = img.resize((target_size, target_size), Image.Resampling.NEAREST)
+                                        frames.append(resized_frame.convert("RGB"))
+                                        durations.append(img.info.get("duration", 100))
+                                    
+                                    frames[0].save(
+                                        temp_output,
+                                        save_all=True,
+                                        append_images=frames[1:],
+                                        duration=durations,
+                                        loop=0
+                                    )
+                                logger.info(f"Sync: Resized GIF to {target_size}x{target_size} for {divoom._conn.mac}")
+                                sync_tasks.append(divoom.display.show_image(str(temp_output)))
+                            except Exception as resize_err:
+                                logger.error(f"Failed to resize GIF: {resize_err}")
+                                sync_tasks.append(divoom.display.show_image(str(temp_input)))
+                        else:
+                            from monthly_best_daemon import stream_raw_bin_payload
+                            sync_tasks.append(stream_raw_bin_payload(divoom, file_bytes))
+                            
                     results = await asyncio.gather(*sync_tasks, return_exceptions=True)
                     return all(res is True for res in results)
                     

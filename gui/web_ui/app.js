@@ -85,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.switch_channel(activeChannel)
                     .then(res => {
-                        if (res) showToast("Switched channel successfully", "success");
+                        if (res) showToast("Switched channel", "success", "🔵 BLE");
                         else showToast("Failed to switch channel", "error");
                     });
             }
@@ -107,17 +107,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.set_clock(selectedClockStyle)
                 .then(res => {
-                    if (res) showToast("Clock style applied successfully", "success");
+                    if (res) showToast("Clock style applied", "success", "🔵 BLE");
                     else showToast("Failed to apply clock", "error");
                 });
         }
     });
     
     // Toast notifications
-    function showToast(message, type = "success") {
+    function showToast(message, type = "success", transport = null) {
         const toast = document.getElementById("toast");
         toast.className = `toast ${type} show`;
-        toast.textContent = message;
+        const transportSuffix = transport
+            ? `<span class="toast-transport">${transport}</span>`
+            : '';
+        toast.innerHTML = message + transportSuffix;
         
         setTimeout(() => {
             toast.classList.remove("show");
@@ -321,7 +324,90 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast("Arranger canvas cleared", "success");
     });
     
-    // ── 5. BLE SCANNING (RELOCATED TO SETTINGS) ──
+    // ── 5. BLE CONNECTION HELPER & SELECTOR POPULATION ──
+    function connectDevice(name, address) {
+        showToast(`Connecting to ${name}...`, "success");
+        const statusDot = document.getElementById("global-status-dot");
+        const statusText = document.getElementById("global-status-text");
+        
+        if (statusDot) statusDot.className = "status-indicator connecting";
+        if (statusText) statusText.textContent = "Connecting...";
+        
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.connect_single_device(address)
+                .then(res => {
+                    if (res) {
+                        showToast(`Successfully connected to ${name}!`, "success");
+                        if (statusDot) statusDot.className = "status-indicator connected";
+                        if (statusText) statusText.textContent = `Connected: ${name}`;
+                        
+                        document.getElementById("banner-device-name").textContent = name;
+                        document.getElementById("banner-device-mac").textContent = address;
+                        
+                        const dims = getDeviceDimensions(name);
+                        document.getElementById("banner-device-image").src = dims.image;
+                        document.getElementById("banner-device-res").textContent = `${dims.size}x${dims.size}`;
+                        
+                        const isSpeaker = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo");
+                        document.getElementById("banner-device-speaker").textContent = isSpeaker ? "Yes (Built-in)" : "No";
+                        
+                        const bannerSelect = document.getElementById("banner-device-select");
+                        if (bannerSelect) bannerSelect.value = address;
+                    } else {
+                        showToast(`Failed to connect to ${name}`, "error");
+                        if (statusDot) statusDot.className = "status-indicator disconnected";
+                        if (statusText) statusText.textContent = "Disconnected";
+                    }
+                });
+        }
+    }
+
+    function populateDeviceSelectors(devices) {
+        const deviceListUl = document.getElementById("device-list");
+        if (deviceListUl) {
+            deviceListUl.innerHTML = "";
+            if (devices.length === 0) {
+                deviceListUl.innerHTML = `<li class="empty-list">No Divoom screens found in range.</li>`;
+            } else {
+                devices.forEach(d => {
+                    const li = document.createElement("li");
+                    li.innerHTML = `
+                        <span>${d.name}</span>
+                        <span class="device-mac">${d.address}</span>
+                    `;
+                    li.addEventListener("click", () => {
+                        connectDevice(d.name, d.address);
+                    });
+                    deviceListUl.appendChild(li);
+                });
+            }
+        }
+        
+        const bannerSelect = document.getElementById("banner-device-select");
+        if (bannerSelect) {
+            bannerSelect.innerHTML = '<option value="">Select Screen...</option>';
+            devices.forEach(d => {
+                const opt = document.createElement("option");
+                opt.value = d.address;
+                opt.textContent = `${d.name} (${d.address})`;
+                const currentMac = document.getElementById("banner-device-mac")?.textContent;
+                if (currentMac === d.address) opt.selected = true;
+                bannerSelect.appendChild(opt);
+            });
+        }
+    }
+
+    const bannerSelect = document.getElementById("banner-device-select");
+    if (bannerSelect) {
+        bannerSelect.addEventListener("change", (e) => {
+            const addr = e.target.value;
+            if (!addr) return;
+            const dev = discoveredDevices.find(d => d.address === addr);
+            const devName = dev ? dev.name : "Divoom Screen";
+            connectDevice(devName, addr);
+        });
+    }
+
     const scanBtn = document.getElementById("scan-btn");
     const scanSpinner = document.getElementById("scan-spinner");
     const deviceListUl = document.getElementById("device-list");
@@ -341,53 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     const devices = JSON.parse(devicesJson);
                     discoveredDevices = devices;
-                    deviceListUl.innerHTML = "";
-                    
-                    if (devices.length === 0) {
-                        deviceListUl.innerHTML = `<li class="empty-list">No Divoom screens found in range.</li>`;
-                        showToast("No BLE screens discovered.", "error");
-                        return;
-                    }
-                    
-                    devices.forEach(d => {
-                        const li = document.createElement("li");
-                        li.innerHTML = `
-                            <span>${d.name}</span>
-                            <span class="device-mac">${d.address}</span>
-                        `;
-                        
-                        li.addEventListener("click", () => {
-                            showToast(`Connecting to ${d.name}...`, "success");
-                            document.getElementById("global-status-dot").className = "status-indicator connecting";
-                            document.getElementById("global-status-text").textContent = "Connecting...";
-                            
-                            window.pywebview.api.connect_single_device(d.address)
-                                .then(res => {
-                                    if (res) {
-                                        showToast(`Successfully connected to ${d.name}!`, "success");
-                                        document.getElementById("global-status-dot").className = "status-indicator connected";
-                                        document.getElementById("global-status-text").textContent = `Connected: ${d.name}`;
-                                        
-                                        document.getElementById("banner-device-name").textContent = d.name;
-                                        document.getElementById("banner-device-mac").textContent = d.address;
-                                        
-                                        const dims = getDeviceDimensions(d.name);
-                                        document.getElementById("banner-device-image").src = dims.image;
-                                        document.getElementById("banner-device-res").textContent = `${dims.size}x${dims.size}`;
-                                        
-                                        const isSpeaker = d.name.toLowerCase().includes("timoo") || d.name.toLowerCase().includes("ditoo");
-                                        document.getElementById("banner-device-speaker").textContent = isSpeaker ? "Yes (Built-in)" : "No";
-                                    } else {
-                                        showToast(`Failed to connect to ${d.name}`, "error");
-                                        document.getElementById("global-status-dot").className = "status-indicator disconnected";
-                                        document.getElementById("global-status-text").textContent = "Disconnected";
-                                    }
-                                });
-                        });
-                        
-                        deviceListUl.appendChild(li);
-                    });
-                    
+                    populateDeviceSelectors(devices);
                     showToast(`Discovered ${devices.length} screens!`, "success");
                     renderArrangerCanvas(); 
                 });
@@ -404,7 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.set_solid_light(selectedColor, brightness)
                 .then(res => {
-                    if (res) showToast("Ambient light applied successfully", "success");
+                    if (res) showToast("Ambient light applied", "success", "🔵 BLE");
                     else showToast("Failed to apply ambient light", "error");
                 });
         }
@@ -444,8 +484,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const classify = parseInt(document.getElementById("gallery-classify").value);
         galleryContainer.innerHTML = `<div class="empty-list">Fetching public community gallery...</div>`;
         
+        let targetSize = 16;
+        const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
+        if (bannerResText.includes("64")) {
+            targetSize = 64;
+        } else if (bannerResText.includes("32")) {
+            targetSize = 32;
+        }
+        
         if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.fetch_gallery(classify)
+            window.pywebview.api.fetch_gallery(classify, targetSize)
                 .then(artworksJson => {
                     const artworks = JSON.parse(artworksJson);
                     loadedArtworks = artworks;
@@ -485,7 +533,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         galleryContainer.appendChild(item);
                     });
                     
-                    showToast("Public gallery fetched with live previews!", "success");
+                    showToast("Gallery fetched", "success", "🟡 Cloud");
                 });
         }
     });
@@ -503,7 +551,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.batch_sync_artwork(JSON.stringify(artwork))
                 .then(res => {
-                    if (res) showToast(`Artwork '${artwork.name}' displayed!`, "success");
+                    if (res) showToast(`'${artwork.name}' synced`, "success", "🔵 BLE");
                     else showToast("Failed to batch sync artwork", "error");
                 });
         }
@@ -565,7 +613,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (resJson) {
                         const res = JSON.parse(resJson);
                         if (res.success) {
-                            showToast(`Displaying ${symbol} price frame!`, "success");
+                            showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Ext");
                             const priceMock = document.querySelector(".ticker-price-mock");
                             const arrowMock = document.querySelector(".ticker-arrow-mock");
                             const nameMock = document.querySelector(".ticker-name-mock");
@@ -713,5 +761,122 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
         }
     });
+
+    // ── TRANSPORT STATUS POLLING (4-badge sidebar panel) ──────────────────
+    function updateTransportPanel(status) {
+        const transports = [
+            { key: 'ble',      dotId: 'tr-ble-dot',   detailId: 'tr-ble-detail' },
+            { key: 'lan',      dotId: 'tr-lan-dot',   detailId: 'tr-lan-detail' },
+            { key: 'cloud',    dotId: 'tr-cloud-dot', detailId: 'tr-cloud-detail' },
+            { key: 'external', dotId: 'tr-ext-dot',   detailId: 'tr-ext-detail' },
+        ];
+        transports.forEach(({ key, dotId, detailId }) => {
+            const t = status[key];
+            if (!t) return;
+            const dot    = document.getElementById(dotId);
+            const detail = document.getElementById(detailId);
+            if (dot) {
+                dot.className = `transport-dot ${t.available ? 'active' : 'inactive'}`;
+            }
+            if (detail && t.detail) {
+                detail.textContent = t.detail;
+            }
+        });
+    }
+
+    function refreshTransportStatus() {
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.get_transport_status()
+                .then(json => {
+                    try { updateTransportPanel(JSON.parse(json)); } catch(e) {}
+                })
+                .catch(() => {});
+        }
+    }
+    // Poll every 5 seconds
+    setInterval(refreshTransportStatus, 5000);
+    // Also fire once at startup after a short delay
+    setTimeout(refreshTransportStatus, 1500);
+
+    // ── LAN CONFIG WIRING ─────────────────────────────────────────────────
+    const saveLanBtn   = document.getElementById('save-lan-btn');
+    const probeLanBtn  = document.getElementById('probe-lan-btn');
+    const lanProbeResult = document.getElementById('lan-probe-result');
+
+    if (saveLanBtn) {
+        saveLanBtn.addEventListener('click', () => {
+            const ip    = (document.getElementById('lan-ip-input')?.value || '').trim();
+            const token = parseInt(document.getElementById('lan-token-input')?.value || '0');
+            if (!ip) { showToast('Enter a device IP address first', 'error'); return; }
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.save_lan_config(ip, token)
+                    .then(ok => {
+                        if (ok) {
+                            showToast(`LAN transport configured — ${ip}:9000`, 'success', '🟢 LAN');
+                            refreshTransportStatus();
+                        } else {
+                            showToast('Failed to save LAN config', 'error');
+                        }
+                    });
+            }
+        });
+    }
+
+    if (probeLanBtn) {
+        probeLanBtn.addEventListener('click', () => {
+            if (lanProbeResult) { lanProbeResult.textContent = 'Testing…'; lanProbeResult.className = 'lan-probe-result'; }
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.probe_lan()
+                    .then(resJson => {
+                        const res = JSON.parse(resJson);
+                        if (lanProbeResult) {
+                            lanProbeResult.textContent = res.detail;
+                            lanProbeResult.className = `lan-probe-result ${res.reachable ? 'success' : 'error'}`;
+                        }
+                        refreshTransportStatus();
+                    });
+            }
+        });
+    }
+
+    // Load LAN config on startup
+    setTimeout(() => {
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.load_config()
+                .then(configJson => {
+                    if (configJson) {
+                        const conf = JSON.parse(configJson);
+                        if (conf.lan_ip && document.getElementById('lan-ip-input')) {
+                            document.getElementById('lan-ip-input').value = conf.lan_ip;
+                        }
+                        if (document.getElementById('lan-token-input')) {
+                            document.getElementById('lan-token-input').value = conf.lan_token ?? 0;
+                        }
+                    }
+                });
+        }
+    }, 1200);
+
+    // ── 7. BRAUN MINIMALIST THEME TOGGLE ──
+    const braunToggle = document.getElementById("braun-theme-toggle");
+    if (braunToggle) {
+        const ramsThemeActive = localStorage.getItem("braun_rams_theme") === "true";
+        braunToggle.checked = ramsThemeActive;
+        if (ramsThemeActive) {
+            document.body.classList.add("dieter-rams");
+        }
+        
+        braunToggle.addEventListener("change", (e) => {
+            const active = e.target.checked;
+            localStorage.setItem("braun_rams_theme", active ? "true" : "false");
+            if (active) {
+                document.body.classList.add("dieter-rams");
+                showToast("Braun Edition theme enabled — Less, but better 📻", "success");
+            } else {
+                document.body.classList.remove("dieter-rams");
+                showToast("Cyberpunk theme restored", "success");
+            }
+        });
+    }
     
 });
