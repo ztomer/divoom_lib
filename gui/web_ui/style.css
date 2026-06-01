@@ -6,6 +6,12 @@
 :root {
     --bg-base: #121316;
     --card-bg: #1e1f24;
+    --sidebar-bg: #18191d;
+    --legend-bg: #18191d;
+    --input-bg: #18191d;
+    --input-border: #33343c;
+    --win-appbar-bg: rgba(10, 12, 22, 0.95);
+    
     --border-color: #2b2c32;
     --border-hover: #ff5a1f;
     
@@ -22,6 +28,54 @@
     
     --font-display: 'Outfit', sans-serif;
     --font-sans: 'Inter', sans-serif;
+}
+
+/* ── Light Mode Redefinitions ── */
+body.theme-light {
+    --bg-base: #f4f4f6;
+    --card-bg: #ffffff;
+    --sidebar-bg: #e8e9eb;
+    --legend-bg: #e8e9eb;
+    --input-bg: #fdfdfe;
+    --input-border: #ccd0d8;
+    --win-appbar-bg: rgba(240, 241, 245, 0.95);
+    
+    --border-color: #d8dae0;
+    --border-hover: #e04e17;
+    
+    --primary: #ff5a1f;
+    --primary-glow: rgba(255, 90, 31, 0.12);
+    --secondary: #82838a;
+    --secondary-glow: rgba(130, 131, 138, 0.12);
+    --accent: #00a854;
+    
+    --text-main: #1c1d21;
+    --text-muted: #62636a;
+}
+
+/* ── System Auto Mode Mapping ── */
+@media (prefers-color-scheme: light) {
+    body.theme-system {
+        --bg-base: #f4f4f6;
+        --card-bg: #ffffff;
+        --sidebar-bg: #e8e9eb;
+        --legend-bg: #e8e9eb;
+        --input-bg: #fdfdfe;
+        --input-border: #ccd0d8;
+        --win-appbar-bg: rgba(240, 241, 245, 0.95);
+        
+        --border-color: #d8dae0;
+        --border-hover: #e04e17;
+        
+        --primary: #ff5a1f;
+        --primary-glow: rgba(255, 90, 31, 0.12);
+        --secondary: #82838a;
+        --secondary-glow: rgba(130, 131, 138, 0.12);
+        --accent: #00a854;
+        
+        --text-main: #1c1d21;
+        --text-muted: #62636a;
+    }
 }
 
 * {
@@ -57,7 +111,7 @@ body {
     height: 40px;
     display: flex;
     align-items: center;
-    background: rgba(10, 12, 22, 0.95);
+    background: var(--win-appbar-bg);
     border-bottom: 1px solid var(--border-color);
     padding: 0 15px;
     z-index: 1000;
@@ -140,7 +194,7 @@ body {
 /* Sidebar Styling */
 .sidebar {
     width: var(--sidebar-width);
-    background: #18191d;
+    background: var(--sidebar-bg);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
@@ -169,9 +223,7 @@ body {
     font-size: 22px;
     font-weight: 700;
     letter-spacing: -0.5px;
-    background: linear-gradient(to right, #ffffff, #a5b4fc);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-main);
 }
 
 .nav-menu {
@@ -554,8 +606,8 @@ body {
 }
 
 .custom-select {
-    background: #18191d;
-    border: 1px solid #33343c;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
     border-radius: 4px;
     padding: 8px 12px;
     color: var(--text-main);
@@ -576,8 +628,8 @@ body {
 }
 
 .num-input {
-    background: #18191d;
-    border: 1px solid #33343c;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
     border-radius: 4px;
     padding: 8px;
     color: var(--text-main);
@@ -587,8 +639,8 @@ body {
 }
 
 .text-input {
-    background: #18191d;
-    border: 1px solid #33343c;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
     border-radius: 4px;
     padding: 10px 14px;
     color: var(--text-main);
@@ -1312,7 +1364,7 @@ input:checked + .slider-round:before {
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  background: #18191d;
+  background: var(--legend-bg);
   border-radius: 6px;
   border: 1px solid var(--border-color);
 }
@@ -1328,12 +1380,13 @@ input:checked + .slider-round:before {
 .connectivity-legend-text strong {
   display: block;
   font-size: 12px;
-  color: rgba(255,255,255,0.85);
+  color: var(--text-main);
+  opacity: 0.85;
   margin-bottom: 2px;
 }
 .connectivity-legend-text span {
   font-size: 11px;
-  color: rgba(255,255,255,0.45);
+  color: var(--text-muted);
   line-height: 1.4;
 }
 
@@ -1361,3 +1414,59 @@ input:checked + .slider-round:before {
 }
 .lan-probe-result.success { color: var(--transport-lan); }
 .lan-probe-result.error   { color: var(--transport-ext); }
+
+/* ── Theme Mode Selector (Braun Edition) ───────────────────────────── */
+.theme-selector-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  margin-top: 20px;
+}
+.theme-selector-panel .panel-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.theme-buttons {
+  display: flex;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  padding: 2px;
+  gap: 2px;
+}
+.theme-mode-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 0;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.theme-mode-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+.theme-mode-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+body.theme-light .theme-mode-btn.active {
+  color: #ffffff; /* always white text inside active orange buttons */
+}

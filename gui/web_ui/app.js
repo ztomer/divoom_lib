@@ -45,6 +45,34 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     
+    // ── 2B. THEME SELECTOR WIRING ──
+    const themeButtons = document.querySelectorAll(".theme-mode-btn");
+    
+    function applyTheme(theme) {
+        document.body.classList.remove("theme-dark", "theme-light", "theme-system");
+        document.body.classList.add(`theme-${theme}`);
+        
+        themeButtons.forEach(btn => {
+            if (btn.getAttribute("data-theme") === theme) {
+                btn.classList.add("active");
+            } else {
+                btn.classList.remove("active");
+            }
+        });
+        
+        localStorage.setItem("aesthetic-theme", theme);
+    }
+    
+    themeButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const selectedTheme = btn.getAttribute("data-theme");
+            applyTheme(selectedTheme);
+        });
+    });
+    
+    const savedTheme = localStorage.getItem("aesthetic-theme") || "dark";
+    applyTheme(savedTheme);
+    
     // ── 3. AMBIENT LIGHT SWATCHES ──
     const colorSwatches = document.querySelectorAll(".color-swatch");
     const customColorInput = document.getElementById("custom-color-input");
