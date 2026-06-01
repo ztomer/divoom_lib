@@ -884,5 +884,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
         }
     }, 1200);
+
+    // ── 2C. SETTINGS SUB-TAB NAVIGATION ──
+    const settingsTabButtons = document.querySelectorAll(".settings-tab-btn");
+    const settingsTabContents = document.querySelectorAll(".settings-tab-content");
+
+    settingsTabButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            settingsTabButtons.forEach(b => b.classList.remove("active"));
+            settingsTabContents.forEach(t => t.classList.remove("active"));
+
+            btn.classList.add("active");
+            const targetSubTab = btn.getAttribute("data-settings-tab");
+            document.getElementById(targetSubTab).classList.add("active");
+        });
+    });
     
 });
+

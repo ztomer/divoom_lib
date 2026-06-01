@@ -373,128 +373,143 @@
             
             <!-- TAB 5: CREDENTIALS & BLE CONFIG SETTINGS -->
             <section id="settings" class="tab-content">
-                <div class="header-section">
-                    <h1>Configuration & Settings</h1>
-                    <p>Relocated settings console. Configure cloud credentials, scan timeouts, and discovery targets safely.</p>
+                <!-- Settings Sub-Tabs Navigation -->
+                <div class="settings-tabs-nav">
+                    <button class="settings-tab-btn active" data-settings-tab="settings-devices">Devices</button>
+                    <button class="settings-tab-btn" data-settings-tab="settings-divoom">Divoom</button>
+                    <button class="settings-tab-btn" data-settings-tab="settings-appearance">Appearance</button>
                 </div>
-                
-                <div class="grid-layout">
-                    <!-- Aesthetic Theme Mode -->
-                    <div class="card glass-card">
-                        <div class="card-header">
-                            <h3>Aesthetic Theme Mode</h3>
+
+                <!-- 1. DEVICES TAB -->
+                <div class="settings-tab-content active" id="settings-devices">
+                    <div class="grid-layout">
+                        <!-- BLE Config settings -->
+                        <div class="card glass-card">
+                            <div class="card-header">
+                                <h3>BLE Scanner Configuration</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label>Scanner Timeout (seconds)</label>
+                                    <input type="number" id="scan-timeout" min="3" max="60" value="15" class="text-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Target Stop Limit (number of screens)</label>
+                                    <input type="number" id="scan-limit" min="0" max="10" value="4" class="text-input" title="0 = Scan until timeout">
+                                </div>
+                                
+                                <button id="scan-btn" class="glow-btn">
+                                    <span class="spinner" id="scan-spinner"></span> Scan BLE Devices
+                                </button>
+                                
+                                <div style="margin-top: 20px;">
+                                    <label>Discovered BLE Devices</label>
+                                    <ul id="device-list" class="device-list">
+                                        <li class="empty-list">No devices scanned yet. Click "Scan BLE Devices".</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
-                        <div class="card-body">
+
+                        <!-- LAN Transport Config -->
+                        <div class="lan-config-section" style="margin-top: 0;">
+                            <h4>🟢 Wi-Fi (LAN) Transport</h4>
+                            <p style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:12px;">For WiFi-capable devices (Pixoo 64, Timebox Evo). 100% local — no internet required.</p>
                             <div class="form-group">
-                                <label>Interface Theme Style</label>
-                                <p style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:12px; line-height:1.4;">
-                                    Select the aesthetic layout theme. Selecting Auto will align with your system/macOS light/dark preferences.
-                                </p>
-                                <div class="theme-buttons">
-                                    <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">🌙 Dark</button>
-                                    <button class="theme-mode-btn" data-theme="light" title="Light Mode">☀️ Light</button>
-                                    <button class="theme-mode-btn" data-theme="system" title="System Auto">💻 Auto</button>
+                                <label class="form-label">Device IP Address</label>
+                                <input type="text" id="lan-ip-input" class="form-input" placeholder="192.168.1.42">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Local Token <span style="opacity:0.5; font-weight:400;">(from device pairing, 0 if none)</span></label>
+                                <input type="number" id="lan-token-input" class="form-input" value="0" min="0">
+                            </div>
+                            <div style="display:flex; gap:10px; margin-top:12px;">
+                                <button id="save-lan-btn" class="glow-btn compact">💾 Save LAN Config</button>
+                                <button id="probe-lan-btn" class="glow-btn compact" style="background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.3);">📡 Test Connection</button>
+                            </div>
+                            <div class="lan-probe-result" id="lan-probe-result"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. DIVOOM TAB -->
+                <div class="settings-tab-content" id="settings-divoom">
+                    <div class="grid-layout">
+                        <!-- Divoom Cloud credentials -->
+                        <div class="card glass-card">
+                            <div class="card-header">
+                                <h3>Divoom Cloud Credentials</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label>Divoom Email Address</label>
+                                    <input type="email" id="settings-email" class="text-input" placeholder="your-email@example.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>Account Password</label>
+                                    <input type="password" id="settings-password" class="text-input" placeholder="••••••••••••••">
+                                </div>
+                                <button id="save-creds-btn" class="glow-btn pulse-glow">Save Cloud Credentials</button>
+                            </div>
+                        </div>
+
+                        <!-- Connectivity & Privacy Legend -->
+                        <div style="margin-top: 0;">
+                            <h3 style="font-size:13px; margin-bottom:12px; color:rgba(255,255,255,0.6);">Connectivity &amp; Privacy</h3>
+                            <div class="connectivity-legend">
+                                <div class="connectivity-legend-row">
+                                    <div class="connectivity-legend-badge"><span class="transport-badge ble">🔵 BLE</span></div>
+                                    <div class="connectivity-legend-text">
+                                        <strong>Bluetooth Low Energy</strong>
+                                        <span>100% local. Commands go directly to the device over Bluetooth. Nothing ever leaves your machine.</span>
+                                    </div>
+                                </div>
+                                <div class="connectivity-legend-row">
+                                    <div class="connectivity-legend-badge"><span class="transport-badge lan">🟢 LAN</span></div>
+                                    <div class="connectivity-legend-text">
+                                        <strong>Local Wi-Fi HTTP (:9000)</strong>
+                                        <span>100% local. Talks directly to the device's built-in HTTP server. No internet, no account. WiFi-capable devices only.</span>
+                                    </div>
+                                </div>
+                                <div class="connectivity-legend-row">
+                                    <div class="connectivity-legend-badge"><span class="transport-badge cloud">🟡 Cloud</span></div>
+                                    <div class="connectivity-legend-text">
+                                        <strong>Divoom Cloud (appin.divoom-gz.com)</strong>
+                                        <span>Sends commands to Divoom's servers. Required for: gallery browsing, clock face store, community features. Requires a Divoom account.</span>
+                                    </div>
+                                </div>
+                                <div class="connectivity-legend-row">
+                                    <div class="connectivity-legend-badge"><span class="transport-badge ext">🔴 External</span></div>
+                                    <div class="connectivity-legend-text">
+                                        <strong>External Internet APIs</strong>
+                                        <span>Used for weather, stock prices, album art lookups. 3rd-party services — no Divoom account required. Data is anonymous.</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Divoom Cloud settings -->
-                    <div class="card glass-card">
-                        <div class="card-header">
-                            <h3>Divoom Cloud Credentials</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="form-group">
-                                <label>Divoom Email Address</label>
-                                <input type="email" id="settings-email" class="text-input" placeholder="your-email@example.com">
-                            </div>
-                            <div class="form-group">
-                                <label>Account Password</label>
-                                <input type="password" id="settings-password" class="text-input" placeholder="••••••••••••••">
-                            </div>
-                            <button id="save-creds-btn" class="glow-btn pulse-glow">Save Cloud Credentials</button>
-                        </div>
-                    </div>
-
-                    <!-- BLE Config settings -->
-                    <div class="card glass-card">
-                        <div class="card-header">
-                            <h3>BLE Scanner Configuration</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="form-group">
-                                <label>Scanner Timeout (seconds)</label>
-                                <input type="number" id="scan-timeout" min="3" max="60" value="15" class="text-input">
-                            </div>
-                            <div class="form-group">
-                                <label>Target Stop Limit (number of screens)</label>
-                                <input type="number" id="scan-limit" min="0" max="10" value="4" class="text-input" title="0 = Scan until timeout">
-                            </div>
-                            
-                            <button id="scan-btn" class="glow-btn">
-                                <span class="spinner" id="scan-spinner"></span> Scan BLE Devices
-                            </button>
-                            
-                            <div style="margin-top: 20px;">
-                                <label>Discovered BLE Devices</label>
-                                <ul id="device-list" class="device-list">
-                                    <li class="empty-list">No devices scanned yet. Click "Scan BLE Devices".</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
-                <!-- LAN Transport Config -->
-                <div class="lan-config-section">
-                    <h4>🟢 Wi-Fi (LAN) Transport</h4>
-                    <p style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:12px;">For WiFi-capable devices (Pixoo 64, Timebox Evo). 100% local — no internet required.</p>
-                    <div class="form-group">
-                        <label class="form-label">Device IP Address</label>
-                        <input type="text" id="lan-ip-input" class="form-input" placeholder="192.168.1.42">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Local Token <span style="opacity:0.5; font-weight:400;">(from device pairing, 0 if none)</span></label>
-                        <input type="number" id="lan-token-input" class="form-input" value="0" min="0">
-                    </div>
-                    <div style="display:flex; gap:10px; margin-top:12px;">
-                        <button id="save-lan-btn" class="glow-btn compact">💾 Save LAN Config</button>
-                        <button id="probe-lan-btn" class="glow-btn compact" style="background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.3);">📡 Test Connection</button>
-                    </div>
-                    <div class="lan-probe-result" id="lan-probe-result"></div>
-                </div>
-
-                <!-- Connectivity & Privacy Legend -->
-                <div style="margin-top:24px;">
-                    <h3 style="font-size:13px; margin-bottom:12px; color:rgba(255,255,255,0.6);">Connectivity &amp; Privacy</h3>
-                    <div class="connectivity-legend">
-                        <div class="connectivity-legend-row">
-                            <div class="connectivity-legend-badge"><span class="transport-badge ble">🔵 BLE</span></div>
-                            <div class="connectivity-legend-text">
-                                <strong>Bluetooth Low Energy</strong>
-                                <span>100% local. Commands go directly to the device over Bluetooth. Nothing ever leaves your machine.</span>
+                <!-- 3. APPEARANCE TAB -->
+                <div class="settings-tab-content" id="settings-appearance">
+                    <div class="grid-layout" style="grid-template-columns: 1fr;">
+                        <!-- Aesthetic Theme Mode -->
+                        <div class="card glass-card" style="max-width: 540px;">
+                            <div class="card-header">
+                                <h3>Aesthetic Theme Mode</h3>
                             </div>
-                        </div>
-                        <div class="connectivity-legend-row">
-                            <div class="connectivity-legend-badge"><span class="transport-badge lan">🟢 LAN</span></div>
-                            <div class="connectivity-legend-text">
-                                <strong>Local Wi-Fi HTTP (:9000)</strong>
-                                <span>100% local. Talks directly to the device's built-in HTTP server. No internet, no account. WiFi-capable devices only.</span>
-                            </div>
-                        </div>
-                        <div class="connectivity-legend-row">
-                            <div class="connectivity-legend-badge"><span class="transport-badge cloud">🟡 Cloud</span></div>
-                            <div class="connectivity-legend-text">
-                                <strong>Divoom Cloud (appin.divoom-gz.com)</strong>
-                                <span>Sends commands to Divoom's servers. Required for: gallery browsing, clock face store, community features. Requires a Divoom account.</span>
-                            </div>
-                        </div>
-                        <div class="connectivity-legend-row">
-                            <div class="connectivity-legend-badge"><span class="transport-badge ext">🔴 External</span></div>
-                            <div class="connectivity-legend-text">
-                                <strong>External Internet APIs</strong>
-                                <span>Used for weather, stock prices, album art lookups. 3rd-party services — no Divoom account required. Data is anonymous.</span>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label>Interface Theme Style</label>
+                                    <p style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:12px; line-height:1.4;">
+                                        Select the aesthetic layout theme. Selecting Auto will align with your system/macOS light/dark preferences.
+                                    </p>
+                                    <div class="theme-buttons">
+                                        <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">🌙 Dark</button>
+                                        <button class="theme-mode-btn" data-theme="light" title="Light Mode">☀️ Light</button>
+                                        <button class="theme-mode-btn" data-theme="system" title="System Auto">💻 Auto</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -1470,3 +1470,49 @@ input:checked + .slider-round:before {
 body.theme-light .theme-mode-btn.active {
   color: #ffffff; /* always white text inside active orange buttons */
 }
+
+/* ── Settings Sub-Tabs Navigation (Braun Design) ───────────────────── */
+.settings-tabs-nav {
+  display: flex;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 24px;
+  max-width: 480px;
+}
+.settings-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.settings-tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+.settings-tab-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+body.theme-light .settings-tab-btn.active {
+  color: #ffffff;
+}
+
+/* ── Settings Sub-Tab Contents ─────────────────────────────────────── */
+.settings-tab-content {
+  display: none;
+}
+.settings-tab-content.active {
+  display: block;
+}
+
