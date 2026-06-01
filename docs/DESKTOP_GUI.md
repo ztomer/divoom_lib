@@ -6,19 +6,29 @@ The `divoom-control` library includes a modern, high-performance Desktop Dashboa
 
 ## 1. Desktop GUI Dashboard
 
-The Desktop Dashboard is built using an embedded HTML/CSS/JS viewport via **PyWebView** powered by a robust Python backend bridge (`api_scraper/gui_main.py`).
+The Desktop Dashboard is built using an embedded HTML/CSS/JS viewport via **PyWebView** powered by a robust, thread-safe Python backend bridge ([gui_main.py](file:///Users/ztomer/Projects/divoom-control/gui/gui_main.py)).
 
 ### Capabilities
-- **Active BLE Scanner**: Discovery tool scanning nearby BLE devices and identifying them by known Divoom signatures.
+- **Active Bluetooth Scanner**: Discovery tool scanning nearby BLE devices and identifying them by known Divoom signatures, with support for custom devices limit and scan timeouts.
 - **Ambient Light Controller**: A solid color pick grid plus Custom Color spectrum selection, linked with an active brightness slider to control ambient moods.
 - **Active Channel Switcher**: Direct buttons to switch active device displays to Clock Mode, Music EQ (Visualizer), VJ Effects, and custom uploader art.
-- **Visual Display Wall Arranger**: A visual canvas slot arrangement panel. Select grid dimensions (rows/cols) and slot resolutions (e.g. 16x16, 32x32) to map discovered Divoom screens into slots.
-- **Batch Monthly Best Sync**: Fetches community-voted public artwork lists from Divoom Cloud and synchronizes/replicates them across all screens at once in parallel tasks.
+- **Visual Display Wall Arranger**: A visual canvas slot arrangement panel. Drag and drop discovered BLE or Wi-Fi screens inside the canvas to arrange physical matrix walls.
+- **Unified Target Screen Selectors**: Synchronized Active Device dropdown selectors integrated across the Sidebar (global), Control Center banner, Gallery sync bar, and Live Widgets header. Connects to selected BLE/Wi-Fi devices and updates all dropdown selections in unison.
+- **Batch Monthly Best Sync**: Fetches community-voted public artwork lists from Divoom Cloud and synchronizes/replicates them across all screens at once in parallel tasks, with offline caching support.
+- **Braun Accent Styling**: High-contrast minimal aesthetics inspired by Dieter Rams' design systems. Visuals and panel texts automatically adapt to Light Theme and system dark/light preferences.
+
+### Persistent Caching & Configuration (Home Directory)
+All configurations, cache registries, and layout presets are securely saved under the standard user home folder `~/.config/divoom-control/`:
+* `~/.config/divoom-control/config.ini`: Persistent scanner limits, timeout options, and credentials.
+* `~/.config/divoom-control/presets.json`: Persistent grid canvas slot coordinates and registered LAN device configurations.
+* `~/.config/divoom-control/discovered_devices.json`: Discovered BLE devices cached upon successful scans to load instantly on startup.
+* `~/.config/divoom-control/gallery_cache.json`: Local offline cache for fetched community gallery items to act as a resilient fallback when offline.
+* `~/.config/divoom-control/auth_token.json` & `virtual_device.json`: Sessions and cloud daemon identities.
 
 ### To Launch the Dashboard
-Run the main controller file using python:
+Run the main controller file using python3:
 ```bash
-python3 api_scraper/gui_main.py
+python3 gui/gui_main.py
 ```
 
 ---
