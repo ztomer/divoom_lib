@@ -856,27 +856,5 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
         }
     }, 1200);
-
-    // ── 7. BRAUN MINIMALIST THEME TOGGLE ──
-    const braunToggle = document.getElementById("braun-theme-toggle");
-    if (braunToggle) {
-        const ramsThemeActive = localStorage.getItem("braun_rams_theme") === "true";
-        braunToggle.checked = ramsThemeActive;
-        if (ramsThemeActive) {
-            document.body.classList.add("dieter-rams");
-        }
-        
-        braunToggle.addEventListener("change", (e) => {
-            const active = e.target.checked;
-            localStorage.setItem("braun_rams_theme", active ? "true" : "false");
-            if (active) {
-                document.body.classList.add("dieter-rams");
-                showToast("Braun Edition theme enabled — Less, but better 📻", "success");
-            } else {
-                document.body.classList.remove("dieter-rams");
-                showToast("Cyberpunk theme restored", "success");
-            }
-        });
-    }
     
 });

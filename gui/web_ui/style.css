@@ -4,19 +4,19 @@
 */
 
 :root {
-    --bg-base: #0a0b10;
-    --card-bg: rgba(20, 24, 38, 0.45);
-    --border-color: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(0, 255, 204, 0.3);
+    --bg-base: #121316;
+    --card-bg: #1e1f24;
+    --border-color: #2b2c32;
+    --border-hover: #ff5a1f;
     
-    --primary: #00ffcc;
-    --primary-glow: rgba(0, 255, 204, 0.35);
-    --secondary: #9d4edd;
-    --secondary-glow: rgba(157, 78, 221, 0.35);
-    --accent: #ff9e00;
+    --primary: #ff5a1f; /* Braun Tuner Orange Accent */
+    --primary-glow: rgba(255, 90, 31, 0.2);
+    --secondary: #6e6f76; /* Braun Matte Gray Accent */
+    --secondary-glow: rgba(110, 111, 118, 0.2);
+    --accent: #00cc66; /* Braun Indicator Green */
     
-    --text-main: #f3f4f6;
-    --text-muted: #9ca3af;
+    --text-main: #e8e9eb;
+    --text-muted: #82838a;
     --sidebar-width: 280px;
     --header-height: 80px;
     
@@ -40,7 +40,7 @@ body {
     -webkit-app-region: no-drag;
 }
 
-/* Glassmorphic Background Blobs */
+/* Matte Minimal Background */
 .glass-bg {
     position: absolute;
     top: 0;
@@ -49,31 +49,7 @@ body {
     bottom: 0;
     z-index: -1;
     overflow: hidden;
-    background: radial-gradient(circle at 10% 20%, rgba(15, 10, 40, 1) 0%, rgba(5, 5, 15, 1) 90.1%);
-}
-
-.glass-bg::before, .glass-bg::after {
-    content: '';
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(150px);
-    opacity: 0.22;
-}
-
-.glass-bg::before {
-    background: var(--primary);
-    width: 450px;
-    height: 450px;
-    top: -50px;
-    right: 5%;
-}
-
-.glass-bg::after {
-    background: var(--secondary);
-    width: 600px;
-    height: 600px;
-    bottom: -150px;
-    left: 5%;
+    background: var(--bg-base);
 }
 
 /* 1. Sleek Custom Integrated window appbar */
@@ -164,12 +140,11 @@ body {
 /* Sidebar Styling */
 .sidebar {
     width: var(--sidebar-width);
-    background: rgba(10, 12, 22, 0.5);
+    background: #18191d;
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
     padding: 30px 20px;
-    backdrop-filter: blur(30px);
     z-index: 10;
 }
 
@@ -232,9 +207,9 @@ body {
 
 .nav-btn.active {
     color: var(--primary);
-    background: rgba(0, 255, 204, 0.06);
-    border-color: rgba(0, 255, 204, 0.25);
-    box-shadow: inset 0 0 12px rgba(0, 255, 204, 0.05);
+    background: rgba(255, 90, 31, 0.08);
+    border-color: rgba(255, 90, 31, 0.3);
+    box-shadow: none;
 }
 
 .connection-status {
@@ -399,19 +374,18 @@ body {
     gap: 20px;
 }
 
-/* Glassmorphic Card Stylings */
+/* Matte Card Stylings */
 .card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
+    border-radius: 6px;
     padding: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(20px);
-    transition: border-color 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: border-color 0.2s ease;
 }
 
 .card:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: #3b3c43;
 }
 
 .card-header {
@@ -506,33 +480,28 @@ body {
 
 .range-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: var(--primary);
-    box-shadow: 0 0 10px var(--primary-glow);
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     cursor: pointer;
-    transition: transform 0.15s ease;
-}
-
-.range-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.2);
 }
 
 /* Buttons */
 .glow-btn {
     width: 100%;
     padding: 12px 18px;
-    background: linear-gradient(135deg, var(--primary), #00ccaa);
-    border: none;
-    border-radius: 10px;
-    color: #05060b;
+    background: var(--primary);
+    border: 1px solid #e04e17;
+    border-radius: 4px;
+    color: #ffffff;
     font-family: var(--font-display);
     font-weight: 700;
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);
+    transition: background 0.2s;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -540,12 +509,7 @@ body {
 }
 
 .glow-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 255, 204, 0.35);
-}
-
-.glow-btn:active {
-    transform: translateY(0);
+    background: #e04e17;
 }
 
 .glow-btn.compact {
@@ -553,16 +517,23 @@ body {
     padding: 8px 14px;
     font-size: 12px;
     display: inline-flex;
+    background: #2e2f36;
+    border: 1px solid #3e3f46;
+    color: #e8e9eb;
+}
+
+.glow-btn.compact:hover {
+    background: #3d3e46;
 }
 
 .glow-btn.pulse-glow {
-    background: linear-gradient(135deg, var(--secondary), #7b2cbf);
+    background: var(--primary);
+    border: 1px solid #e04e17;
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(157, 78, 221, 0.2);
 }
 
 .glow-btn.pulse-glow:hover {
-    box-shadow: 0 6px 16px rgba(157, 78, 221, 0.35);
+    background: #e04e17;
 }
 
 /* Inputs & Form Groups */
@@ -583,9 +554,9 @@ body {
 }
 
 .custom-select {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    background: #18191d;
+    border: 1px solid #33343c;
+    border-radius: 4px;
     padding: 8px 12px;
     color: var(--text-main);
     outline: none;
@@ -605,9 +576,9 @@ body {
 }
 
 .num-input {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    background: #18191d;
+    border: 1px solid #33343c;
+    border-radius: 4px;
     padding: 8px;
     color: var(--text-main);
     outline: none;
@@ -616,9 +587,9 @@ body {
 }
 
 .text-input {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    background: #18191d;
+    border: 1px solid #33343c;
+    border-radius: 4px;
     padding: 10px 14px;
     color: var(--text-main);
     outline: none;
@@ -627,7 +598,10 @@ body {
     font-size: 13px;
 }
 
-.text-input:focus {
+.text-input:focus,
+.custom-select:focus {
+    border-color: var(--primary);
+}
     border-color: var(--primary);
 }
 
@@ -1316,7 +1290,14 @@ input:checked + .slider-round:before {
   right: 12px;
   z-index: 2;
 }
-.glass-card { position: relative; } /* ensure positioned context */
+.glass-card {
+    position: relative;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    backdrop-filter: none !important;
+}
 
 /* ── Toast transport suffix ─────────────────────────────────────────── */
 .toast-transport {
@@ -1331,9 +1312,9 @@ input:checked + .slider-round:before {
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  background: rgba(255,255,255,0.03);
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.06);
+  background: #18191d;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
 }
 .connectivity-legend-row {
   display: flex;
@@ -1361,7 +1342,7 @@ input:checked + .slider-round:before {
   margin-top: 20px;
   padding: 16px;
   background: rgba(34,197,94,0.05);
-  border-radius: 12px;
+  border-radius: 6px;
   border: 1px solid rgba(34,197,94,0.15);
 }
 .lan-config-section h4 {
@@ -1380,144 +1361,3 @@ input:checked + .slider-round:before {
 }
 .lan-probe-result.success { color: var(--transport-lan); }
 .lan-probe-result.error   { color: var(--transport-ext); }
-
-/* ── DIETER RAMS / BRAUN MINIMALIST THEME ───────────────────────────── */
-body.dieter-rams {
-    --bg-base: #121316;
-    --card-bg: #1e1f24;
-    --border-color: #2b2c32;
-    --border-hover: #ff5a1f;
-    --primary: #ff5a1f; /* Braun Tuner Orange Accent */
-    --primary-glow: rgba(255, 90, 31, 0.2);
-    --secondary: #6e6f76; /* Braun Matte Gray Accent */
-    --secondary-glow: rgba(110, 111, 118, 0.2);
-    --accent: #00cc66; /* Braun Indicator Green */
-    --text-main: #e8e9eb;
-    --text-muted: #82838a;
-}
-
-body.dieter-rams .glass-bg {
-    background: #121316 !important;
-}
-body.dieter-rams .glass-bg::before,
-body.dieter-rams .glass-bg::after {
-    display: none !important; /* No gaudy glass blobs */
-}
-
-body.dieter-rams .card,
-body.dieter-rams .glass-card,
-body.dieter-rams .device-banner {
-    background: #1e1f24 !important;
-    border: 1px solid #2b2c32 !important;
-    border-radius: 6px !important; /* Dieter Rams prefers precise, rational corners */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-    backdrop-filter: none !important;
-}
-
-body.dieter-rams .card:hover {
-    border-color: #3b3c43 !important;
-}
-
-body.dieter-rams .nav-btn.active {
-    color: #ff5a1f !important;
-    background: rgba(255, 90, 31, 0.08) !important;
-    border-color: rgba(255, 90, 31, 0.3) !important;
-    box-shadow: none !important;
-}
-
-body.dieter-rams .glow-btn {
-    background: #ff5a1f !important;
-    color: #ffffff !important;
-    border: 1px solid #e04e17 !important;
-    border-radius: 4px !important;
-    box-shadow: none !important;
-    transition: background 0.2s;
-}
-
-body.dieter-rams .glow-btn:hover {
-    background: #e04e17 !important;
-    transform: none !important; /* Restraint from bouncing transitions */
-    box-shadow: none !important;
-}
-
-body.dieter-rams .glow-btn.compact {
-    background: #2e2f36 !important;
-    border: 1px solid #3e3f46 !important;
-    color: #e8e9eb !important;
-}
-body.dieter-rams .glow-btn.compact:hover {
-    background: #3d3e46 !important;
-}
-
-body.dieter-rams .range-slider::-webkit-slider-thumb {
-    background: #ff5a1f !important;
-    border: 2px solid #ffffff !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important;
-    width: 14px !important;
-    height: 14px !important;
-}
-
-body.dieter-rams .channel-card.active {
-    border-color: #ff5a1f !important;
-    background: rgba(255, 90, 31, 0.05) !important;
-    color: #ff5a1f !important;
-}
-
-body.dieter-rams .clock-face-mock {
-    border-radius: 4px !important;
-    border-color: #2d2f36 !important;
-}
-body.dieter-rams .clock-preview-card.active .clock-face-mock {
-    border-color: #ff5a1f !important;
-    box-shadow: none !important;
-}
-body.dieter-rams .clock-preview-card.active .clock-face-label {
-    color: #ff5a1f !important;
-}
-
-body.dieter-rams .custom-select,
-body.dieter-rams .text-input,
-body.dieter-rams .form-input {
-    background: #18191d !important;
-    border: 1px solid #33343c !important;
-    border-radius: 4px !important;
-    color: #e8e9eb !important;
-}
-
-body.dieter-rams .custom-select:focus,
-body.dieter-rams .text-input:focus {
-    border-color: #ff5a1f !important;
-}
-
-/* Braun Slider Toggle customization */
-body.dieter-rams .switch input:checked + .slider-round {
-    background-color: #ff5a1f !important;
-}
-
-body.dieter-rams .arranger-workspace-free {
-    background: #141518 !important;
-    border: 1px solid #2d2f36 !important;
-    border-radius: 4px !important;
-}
-
-body.dieter-rams .arranger-node {
-    background: #25262c !important;
-    border: 1px solid #ff5a1f !important;
-    border-radius: 4px !important;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
-}
-
-body.dieter-rams .arranger-node:hover {
-    border-color: #ff5a1f !important;
-    box-shadow: 0 0 10px rgba(255, 90, 31, 0.3) !important;
-}
-
-body.dieter-rams .integrated-appbar {
-    background: #18191d !important;
-    border-bottom: 1px solid #2b2c32 !important;
-}
-
-body.dieter-rams .sidebar {
-    background: #18191d !important;
-    border-right: 1px solid #2b2c32 !important;
-}
