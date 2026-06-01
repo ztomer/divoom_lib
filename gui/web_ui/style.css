@@ -226,6 +226,20 @@ body {
     color: var(--text-main);
 }
 
+/* ── Susan Kare Retro Icon Elements ────────────────────────────────── */
+.kare-icon {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  vertical-align: middle;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.btn-icon .kare-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .nav-menu {
     display: flex;
     flex-direction: column;
@@ -365,21 +379,24 @@ body {
 }
 
 .banner-preview {
-    width: 60px;
-    height: 60px;
+    width: 120px;
+    height: 120px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(0, 0, 0, 0.4);
     border-radius: 12px;
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
     padding: 8px;
+    flex-shrink: 0;
 }
 
 .banner-preview img {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+    image-rendering: pixelated;
+    filter: grayscale(100%) contrast(300%) brightness(110%);
 }
 
 .banner-info {
@@ -1514,5 +1531,124 @@ body.theme-light .settings-tab-btn.active {
 }
 .settings-tab-content.active {
   display: block;
+}
+
+/* ── Sticky Flex Monthly Best & Scrollable Grid ─────────────────────── */
+#monthly-best.active {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 40px - var(--header-height) - 40px); /* Fit cleanly inside main viewport */
+    min-height: 0;
+}
+
+#monthly-best .card.glass-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#monthly-best .card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#monthly-best .gallery-grid {
+    flex: 1;
+    max-height: none; /* Override absolute pixel max-height */
+    overflow-y: auto;
+    min-height: 0;
+    margin-bottom: 0;
+    padding-bottom: 20px;
+}
+
+.batch-sync-bar {
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 16px 20px;
+    background: var(--card-bg); /* Match the theme's background */
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    border-radius: 0 0 6px 6px;
+    margin-left: -20px;
+    margin-right: -20px;
+    margin-bottom: -20px;
+}
+
+/* ── Sync Target Info Elements ─────────────────────────────────────── */
+.sync-target-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sync-target-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.sync-target-list {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary); /* highlight the targets in tuner orange! */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ── Light Mode Status Panel Text & Variables Overrides ──────────────── */
+body.theme-light .transport-status-panel {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+body.theme-light .transport-status-panel .panel-title {
+  color: rgba(0, 0, 0, 0.45) !important;
+}
+body.theme-light .transport-row-label {
+  color: rgba(0, 0, 0, 0.8) !important;
+}
+body.theme-light .transport-row-detail {
+  color: rgba(0, 0, 0, 0.5) !important;
+}
+body.theme-light #gallery-device-select,
+body.theme-light #widget-device-select {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #1c1d21 !important;
+}
+
+@media (prefers-color-scheme: light) {
+    body.theme-system .transport-status-panel {
+      background: rgba(0, 0, 0, 0.04) !important;
+      border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    }
+    body.theme-system .transport-status-panel .panel-title {
+      color: rgba(0, 0, 0, 0.45) !important;
+    }
+    body.theme-system .transport-row-label {
+      color: rgba(0, 0, 0, 0.8) !important;
+    }
+    body.theme-system .transport-row-detail {
+      color: rgba(0, 0, 0, 0.5) !important;
+    }
+    body.theme-system #gallery-device-select,
+    body.theme-system #widget-device-select {
+      background: rgba(0, 0, 0, 0.05) !important;
+      border: 1px solid rgba(0, 0, 0, 0.1) !important;
+      color: #1c1d21 !important;
+    }
 }
 

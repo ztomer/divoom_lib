@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 # Add parent directory to path so we can import divoom_auth
-sys.path.append(str(Path(__file__).parent))
-import divoom_auth
+sys.path.append(str(Path(__file__).parent.parent))
+from divoom_lib import divoom_auth
 
 def print_info(message):
     """Prints an informational message."""

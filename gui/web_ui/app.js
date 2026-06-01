@@ -191,6 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.update_wall_slots(JSON.stringify(assignedSlots));
         }
+        updateSyncTargetList();
     }
 
     function renderArrangerCanvas() {
@@ -308,7 +309,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </select>
                 <div style="display:flex; gap:10px; justify-content:flex-end;">
                     <button id="canvas-add-cancel" class="glow-btn compact" style="background:rgba(255,255,255,0.05); color:#fff; box-shadow:none;">Cancel</button>
-                    <button id="canvas-add-confirm" class="glow-btn compact" style="background:linear-gradient(135deg, var(--secondary), #7b2cbf); color:#fff; box-shadow:none;">Add Node</button>
+                    <button id="canvas-add-confirm" class="glow-btn compact" style="background: var(--primary); color:#fff; border: 1px solid var(--primary); box-shadow:none;">Add Node</button>
                 </div>
             `;
             
@@ -392,10 +393,15 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         const bannerSelect = document.getElementById("banner-device-select");
                         if (bannerSelect) bannerSelect.value = address;
+                        
+                        updateSyncTargetList();
                     } else {
                         showToast(`Failed to connect to ${name}`, "error");
                         if (statusDot) statusDot.className = "status-indicator disconnected";
                         if (statusText) statusText.textContent = "Disconnected";
+                        document.getElementById("banner-device-name").textContent = "None";
+                        document.getElementById("banner-device-mac").textContent = "None";
+                        updateSyncTargetList();
                     }
                 });
         }
@@ -426,47 +432,71 @@ document.addEventListener("DOMContentLoaded", () => {
         updateDeviceSelectorDropdown();
     }
 
-    function updateDeviceSelectorDropdown() {
-        const bannerSelect = document.getElementById("banner-device-select");
-        if (!bannerSelect) return;
+      function updateDeviceSelectorDropdown() {
+        const selectors = [
+            document.getElementById("banner-device-select"),
+            document.getElementById("sidebar-device-select"),
+            document.getElementById("gallery-device-select"),
+            document.getElementById("widget-device-select")
+        ];
         
-        const currentMac = document.getElementById("banner-device-mac")?.textContent;
-        bannerSelect.innerHTML = '<option value="">Select Screen...</option>';
+        const currentMac = document.getElementById("banner-device-mac")?.textContent || "";
         
-        // Populate BLE devices
-        discoveredDevices.forEach(d => {
-            const opt = document.createElement("option");
-            opt.value = d.address;
-            opt.textContent = `🔵 BLE: ${d.name} (${d.address})`;
-            if (currentMac === d.address) opt.selected = true;
-            bannerSelect.appendChild(opt);
-        });
-        
-        // Populate Wi-Fi devices
-        registeredLanDevices.forEach(d => {
-            const opt = document.createElement("option");
-            opt.value = `LAN:${d.ip}`;
-            opt.textContent = `🟢 Wi-Fi: ${d.ip}`;
-            if (currentMac === `LAN:${d.ip}`) opt.selected = true;
-            bannerSelect.appendChild(opt);
+        selectors.forEach(sel => {
+            if (!sel) return;
+            
+            sel.innerHTML = '<option value="">Select Screen...</option>';
+            
+            // Populate BLE devices
+            discoveredDevices.forEach(d => {
+                const opt = document.createElement("option");
+                opt.value = d.address;
+                opt.textContent = `🔵 BLE: ${d.name} (${d.address})`;
+                if (currentMac === d.address) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            
+            // Populate Wi-Fi devices
+            registeredLanDevices.forEach(d => {
+                const opt = document.createElement("option");
+                opt.value = `LAN:${d.ip}`;
+                opt.textContent = `🟢 Wi-Fi: ${d.ip}`;
+                if (currentMac === `LAN:${d.ip}`) opt.selected = true;
+                sel.appendChild(opt);
+            });
         });
     }
 
-    const bannerSelect = document.getElementById("banner-device-select");
-    if (bannerSelect) {
-        bannerSelect.addEventListener("change", (e) => {
-            const addr = e.target.value;
-            if (!addr) return;
-            if (addr.startsWith("LAN:")) {
-                const ip = addr.split("LAN:")[1];
-                connectDevice(`Wi-Fi: ${ip}`, addr);
-            } else {
-                const dev = discoveredDevices.find(d => d.address === addr);
-                const devName = dev ? dev.name : "Divoom Screen";
-                connectDevice(devName, addr);
-            }
-        });
-    }
+    const selectors = [
+        "banner-device-select",
+        "sidebar-device-select",
+        "gallery-device-select",
+        "widget-device-select"
+    ];
+    selectors.forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) {
+            sel.addEventListener("change", (e) => {
+                const addr = e.target.value;
+                if (!addr) return;
+                
+                // Keep selectors visually in sync
+                selectors.forEach(otherId => {
+                    const otherSel = document.getElementById(otherId);
+                    if (otherSel) otherSel.value = addr;
+                });
+                
+                if (addr.startsWith("LAN:")) {
+                    const ip = addr.split("LAN:")[1];
+                    connectDevice(`Wi-Fi: ${ip}`, addr);
+                } else {
+                    const dev = discoveredDevices.find(d => d.address === addr);
+                    const name = dev ? dev.name : "BLE Device";
+                    connectDevice(name, addr);
+                }
+            });
+        }
+    });
 
     const scanBtn = document.getElementById("scan-btn");
     const scanSpinner = document.getElementById("scan-spinner");
@@ -595,6 +625,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.pywebview.api.fetch_gallery(classify, targetSize)
                     .then(artworksJson => {
                         const artworks = JSON.parse(artworksJson);
+                        if (artworks.error) {
+                            showToast(artworks.error, "error");
+                            if (galleryContainer) {
+                                galleryContainer.innerHTML = `<div class="empty-list" style="color:#ef4444; padding:20px; font-weight:600; text-align:center;">⚠️ ${artworks.error}</div>`;
+                            }
+                            return;
+                        }
+                        
                         loadedArtworks = artworks;
                         selectedArtworkIndex = null;
                         if (galleryContainer) galleryContainer.innerHTML = "";
@@ -787,6 +825,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                         if (conf.slots) {
                             assignedSlots = conf.slots;
+                            renderArrangerCanvas();
+                        }
+                        if (conf.devices && conf.devices.length > 0) {
+                            discoveredDevices = conf.devices;
+                            populateDeviceSelectors(discoveredDevices);
                             renderArrangerCanvas();
                         }
                     }
@@ -1006,20 +1049,56 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }, 1200);
 
-    // ── 2C. SETTINGS SUB-TAB NAVIGATION ──
-    const settingsTabButtons = document.querySelectorAll(".settings-tab-btn");
-    const settingsTabContents = document.querySelectorAll(".settings-tab-content");
-
-    settingsTabButtons.forEach(btn => {
-        btn.addEventListener("click", () => {
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".settings-tab-btn");
+        if (btn) {
+            const settingsTabButtons = document.querySelectorAll(".settings-tab-btn");
+            const settingsTabContents = document.querySelectorAll(".settings-tab-content");
+            
             settingsTabButtons.forEach(b => b.classList.remove("active"));
             settingsTabContents.forEach(t => t.classList.remove("active"));
 
             btn.classList.add("active");
             const targetSubTab = btn.getAttribute("data-settings-tab");
-            document.getElementById(targetSubTab).classList.add("active");
-        });
+            const targetEl = document.getElementById(targetSubTab);
+            if (targetEl) {
+                targetEl.classList.add("active");
+            }
+        }
     });
+
+    // ── 2D. DYNAMIC TARGET SCREENS LIST FOR MONTHLY BEST ──
+    function updateSyncTargetList() {
+        const targetListEl = document.getElementById("sync-target-list");
+        if (!targetListEl) return;
+
+        const slotCount = Object.keys(assignedSlots || {}).length;
+        if (slotCount > 0) {
+            const names = Object.keys(assignedSlots).map(mac => {
+                const slot = assignedSlots[mac];
+                return `${slot.name || 'Screen'} (${mac})`;
+            });
+            targetListEl.innerHTML = `🧱 Matrix Wall: ${names.join(", ")}`;
+            targetListEl.style.color = "var(--primary)";
+        } else {
+            const deviceMac = document.getElementById("banner-device-mac")?.textContent || "";
+            const deviceName = document.getElementById("banner-device-name")?.textContent || "";
+            const globalStatusText = document.getElementById("global-status-text")?.textContent || "";
+            
+            if (deviceMac && deviceMac !== "None" && deviceMac !== "00:00:00:00:00:00") {
+                targetListEl.innerHTML = `📺 Active Device: ${deviceName || 'Divoom'} (${deviceMac})`;
+                targetListEl.style.color = "var(--accent)";
+            } else {
+                targetListEl.innerHTML = `⚠️ No active screen connected. Connect a device in Settings first.`;
+                targetListEl.style.color = "#ef4444";
+            }
+        }
+    }
+
+    // Trigger updateSyncTargetList at startup
+    setTimeout(() => {
+        updateSyncTargetList();
+    }, 1500);
     
 });
 

@@ -20,7 +20,7 @@ from PIL import Image
 sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent))
 
-import divoom_auth
+from divoom_lib import divoom_auth
 from divoom_lib.divoom import Divoom
 from divoom_lib.utils import discovery
 from divoom_lib.models import (
@@ -164,7 +164,7 @@ async def main_async():
     # Load virtual device info
     device_id = 0
     device_pw = 0
-    device_cache_path = Path(__file__).parent / "divoom_docs" / "virtual_device.json"
+    device_cache_path = Path.home() / ".config" / "divoom-control" / "virtual_device.json"
     if device_cache_path.exists():
         try:
             device_info = json.loads(device_cache_path.read_text(encoding="utf-8"))

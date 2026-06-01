@@ -146,7 +146,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
             return True
         mock_stream.side_effect = dummy_stream
         
-        with patch("monthly_best_daemon.stream_raw_bin_payload", mock_stream):
+        with patch("divoom_lib.monthly_best_daemon.stream_raw_bin_payload", mock_stream):
             # Setup wall coordinates and mock targets
             mock_device = MagicMock()
             self.api.wall_slots = {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16}}

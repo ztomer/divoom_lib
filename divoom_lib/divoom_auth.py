@@ -38,8 +38,8 @@ def print_ok(message):
 BASE_URL   = "https://appin.divoom-gz.com"
 HMAC_KEY   = b"DivoomBluetoothDevice<>?"  # from P2/a.java
 TIMEOUT    = 15
-CONFIG_FILE = Path(__file__).parent.parent / "config.ini"
-CACHE_FILE  = Path(__file__).parent / "divoom_docs" / "auth_token.json"
+CONFIG_FILE = Path.home() / ".config" / "divoom-control" / "config.ini"
+CACHE_FILE  = Path.home() / ".config" / "divoom-control" / "auth_token.json"
 
 
 @dataclass

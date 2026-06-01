@@ -134,7 +134,7 @@ class DivoomMenuBarAgent(NSObject):
                     req = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
                     with urllib.request.urlopen(req, timeout=10) as resp:
                         file_bytes = resp.read()
-                        from monthly_best_daemon import stream_raw_bin_payload
+                        from divoom_lib.monthly_best_daemon import stream_raw_bin_payload
                         return loop.run_until_complete(stream_raw_bin_payload(self.current_divoom, file_bytes))
 
         except Exception as e:

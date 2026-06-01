@@ -30,8 +30,26 @@ from media_sync import MediaSyncMixin
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("divoom_gui")
 
+class AsyncLoopThread(threading.Thread):
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.loop = asyncio.new_event_loop()
+        self.ready = threading.Event()
+
+    def run(self):
+        asyncio.set_event_loop(self.loop)
+        self.ready.set()
+        self.loop.run_forever()
+
+    def stop(self):
+        self.loop.call_soon_threadsafe(self.loop.stop)
+
 class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
     def __init__(self) -> None:
+        self.loop_thread = AsyncLoopThread()
+        self.loop_thread.start()
+        self.loop_thread.ready.wait()
+        
         self.current_divoom = None
         self.discovered_list = []
         self.wall_slots = {}  # "mac" -> {"x": x, "y": y, "width": w, "height": h, "size": size}
@@ -44,16 +62,29 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         self.music_sync_active = False
         self.music_thread = None
         self.current_track_cache = None
-        
+
+        # Load credentials on startup
+        try:
+            self.cached_creds = divoom_auth.get_credentials()
+        except Exception as e:
+            logger.warning(f"Failed to load credentials on startup: {e}")
+
         # Load virtual device details for gallery API
-        device_cache_path = Path(__file__).parent.parent / "api_scraper" / "divoom_docs" / "virtual_device.json"
+        device_cache_path = Path.home() / ".config" / "divoom-control" / "virtual_device.json"
+        if not device_cache_path.exists():
+            device_cache_path = Path(__file__).parent.parent / "api_scraper" / "divoom_docs" / "virtual_device.json"
         if device_cache_path.exists():
             try:
                 device_info = json.loads(device_cache_path.read_text(encoding="utf-8"))
                 self.device_id = device_info.get("BluetoothDeviceId", 0)
                 self.device_pw = device_info.get("DevicePassword", 0)
+                logger.info(f"Loaded virtual device: DeviceId={self.device_id}")
             except Exception as e:
                 logger.warning(f"Failed to load virtual device: {e}")
+
+    def _run_async(self, coro):
+        future = asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
+        return future.result()
 
     # ── Transport Status (4-badge panel) ──────────────────────────────────────
 
@@ -114,7 +145,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         logger.info(f"GUI Action: Saving LAN config ip={device_ip} token={local_token}...")
         try:
             import configparser
-            config_file = Path(__file__).parent.parent / "config.ini"
+            config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
             cfg = configparser.ConfigParser()
             if config_file.exists():
                 cfg.read(config_file)
@@ -146,7 +178,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         try:
             if not self.current_divoom or not self.current_divoom.lan:
                 return json.dumps({"reachable": False, "detail": "No LAN IP configured. Save a device IP first."})
-            ok = asyncio.run(self.current_divoom.lan.probe())
+            ok = self._run_async(self.current_divoom.lan.probe())
             ip = self.current_divoom.lan.device_ip
             return json.dumps({
                 "reachable": ok,
@@ -169,6 +201,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
 
     def close_window(self) -> None:
         logger.info("GUI Action: Closing window...")
+        if hasattr(self, "loop_thread"):
+            self.loop_thread.stop()
         if self.window:
             def _destroy():
                 time.sleep(0.1)
@@ -188,7 +222,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         # Save scanner limits into config.ini for next time
         try:
             import configparser
-            config_file = Path(__file__).parent.parent / "config.ini"
+            config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
             cfg = configparser.ConfigParser()
             if config_file.exists():
                 cfg.read(config_file)
@@ -229,14 +264,21 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                     await scanner.stop()
                     return discovered
                     
-                results = asyncio.run(run_scan())
+                results = self._run_async(run_scan())
                 if not results:
-                    results = asyncio.run(discovery.discover_all_divoom_devices(timeout=float(timeout)))
+                    results = self._run_async(discovery.discover_all_divoom_devices(timeout=float(timeout)))
                     results = results[:limit]
             else:
-                results = asyncio.run(discovery.discover_all_divoom_devices(timeout=float(timeout)))
+                results = self._run_async(discovery.discover_all_divoom_devices(timeout=float(timeout)))
                 
             self.discovered_list = results
+            try:
+                cache_file = Path.home() / ".config" / "divoom-control" / "discovered_devices.json"
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(json.dumps(results, indent=2), encoding="utf-8")
+                logger.info(f"Scanner: Cached {len(results)} discovered devices to discovered_devices.json")
+            except Exception as ce:
+                logger.warning(f"Failed to cache discovered devices: {ce}")
             return json.dumps(results)
         except Exception as e:
             logger.error(f"Device scan failed: {e}")
@@ -247,14 +289,14 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         logger.info(f"GUI Action: Connecting to single device {address}...")
         try:
             if self.current_divoom and self.current_divoom.is_connected:
-                asyncio.run(self.current_divoom.disconnect())
+                self._run_async(self.current_divoom.disconnect())
                 
             if address.startswith("LAN:"):
                 ip = address.split("LAN:")[1]
                 local_token = 0
                 
                 # Retrieve token from saved LAN devices if configured
-                presets_file = Path(__file__).parent / "presets.json"
+                presets_file = self._get_presets_file()
                 if presets_file.exists():
                     try:
                         presets = json.loads(presets_file.read_text(encoding="utf-8"))
@@ -270,7 +312,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 from divoom_lib.lan_transport import LanTransport
                 self.current_divoom._lan = LanTransport(device_ip=ip, local_token=local_token, logger=logger)
                 
-                reachable = asyncio.run(self.current_divoom._lan.probe())
+                reachable = self._run_async(self.current_divoom._lan.probe())
                 if not reachable:
                     logger.error(f"LAN Device at {ip} is unreachable")
                     self.current_divoom = None
@@ -278,7 +320,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 return True
             else:
                 self.current_divoom = Divoom(mac=address, logger=logger, use_ios_le_protocol=False)
-                asyncio.run(self.current_divoom.connect())
+                self._run_async(self.current_divoom.connect())
                 return True
         except Exception as e:
             logger.error(f"Single connect failed: {e}")
@@ -295,7 +337,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         
         # Persist as last active
         try:
-            presets_file = Path(__file__).parent / "presets.json"
+            presets_file = self._get_presets_file()
             presets = {}
             if presets_file.exists():
                 try:
@@ -329,7 +371,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
             
         try:
             self.wall_instance = DivoomWall(configs, custom_logger=logger)
-            asyncio.run(self.wall_instance.connect())
+            self._run_async(self.wall_instance.connect())
             return True
         except Exception as e:
             logger.error(f"Failed to build display wall: {e}")
@@ -343,14 +385,14 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
             if self.wall_slots:
                 if not self._rebuild_wall_instance():
                     return False
-                return asyncio.run(self.wall_instance.set_light(color, brightness))
+                return self._run_async(self.wall_instance.set_light(color, brightness))
             elif self.current_divoom and self.current_divoom.lan:
                 c = color.lstrip('#')
                 r, g, b = tuple(int(c[i:i+2], 16) for i in (0, 2, 4))
-                asyncio.run(self.current_divoom.lan.set_ambient_light(brightness, r, g, b))
+                self._run_async(self.current_divoom.lan.set_ambient_light(brightness, r, g, b))
                 return True
             elif self.current_divoom and self.current_divoom.is_connected:
-                return asyncio.run(self.current_divoom.display.show_light(color, brightness))
+                return self._run_async(self.current_divoom.display.show_light(color, brightness))
             return False
         except Exception as e:
             logger.error(f"Light setting failed: {e}")
@@ -363,12 +405,12 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
             if self.wall_slots:
                 if not self._rebuild_wall_instance():
                     return False
-                return asyncio.run(self.wall_instance.show_clock(clock=style))
+                return self._run_async(self.wall_instance.show_clock(clock=style))
             elif self.current_divoom and self.current_divoom.lan:
-                asyncio.run(self.current_divoom.lan.set_clock(style))
+                self._run_async(self.current_divoom.lan.set_clock(style))
                 return True
             elif self.current_divoom and self.current_divoom.is_connected:
-                return asyncio.run(self.current_divoom.display.show_clock(clock=style))
+                return self._run_async(self.current_divoom.display.show_clock(clock=style))
             return False
         except Exception as e:
             logger.error(f"Clock setting failed: {e}")
@@ -391,17 +433,17 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
             if is_lan:
                 mapping = {"clock": 0, "vj": 1, "visualizer": 2, "design": 3}
                 val = mapping.get(channel, 0)
-                asyncio.run(target.lan.set_channel(val))
+                self._run_async(target.lan.set_channel(val))
                 return True
             
             if channel == "clock":
-                return asyncio.run(target.display.show_clock())
+                return self._run_async(target.display.show_clock())
             elif channel == "visualizer":
-                return asyncio.run(target.display.show_visualization(number=0))
+                return self._run_async(target.display.show_visualization(number=0))
             elif channel == "vj":
-                return asyncio.run(target.display.show_effects(number=0))
+                return self._run_async(target.display.show_effects(number=0))
             elif channel == "design":
-                return asyncio.run(target.display.show_design())
+                return self._run_async(target.display.show_design())
             return False
         except Exception as e:
             logger.error(f"Channel switch failed: {e}")
@@ -413,7 +455,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         try:
             if not self._rebuild_wall_instance(cell_size):
                 return False
-            return asyncio.run(self.wall_instance.show_image(file_path))
+            return self._run_async(self.wall_instance.show_image(file_path))
         except Exception as e:
             logger.error(f"Wall display failed: {e}")
             return False
@@ -433,6 +475,7 @@ def main():
         height=768,
         resizable=True,
         frameless=True,  # Integrated custom Appbar
+        easy_drag=False,  # Prevents dragging canvas from moving window
         background_color="#0a0b10"
     )
     api.window = window

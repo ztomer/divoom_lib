@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent.parent / "api_scraper"))
 
-import monthly_best_daemon
+from divoom_lib import monthly_best_daemon
 
 class TestMonthlyBestDaemon(unittest.IsolatedAsyncioTestCase):
 
@@ -40,7 +40,7 @@ class TestMonthlyBestDaemon(unittest.IsolatedAsyncioTestCase):
         result = monthly_best_daemon.extract_gif_from_magic_43(bytes(payload))
         self.assertEqual(result, gif)
 
-    @patch('monthly_best_daemon.asyncio.sleep', new_callable=AsyncMock)
+    @patch('divoom_lib.monthly_best_daemon.asyncio.sleep', new_callable=AsyncMock)
     async def test_stream_raw_bin_payload(self, mock_sleep):
         """Test stream_raw_bin_payload correctly calls app_new_send_gif_cmd for CW 0, 1, 2."""
         mock_divoom = MagicMock()

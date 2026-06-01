@@ -31,6 +31,12 @@
         
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
+            <div class="sidebar-device-panel" style="padding: 15px; border-bottom: 1px solid var(--border-color); margin-bottom: 10px;">
+                <label style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.35); margin-bottom: 6px; display: block;">Active Device</label>
+                <select id="sidebar-device-select" class="custom-select" style="width: 100%; font-size: 12px; font-weight: 600;">
+                    <option value="">Select Screen...</option>
+                </select>
+            </div>
             
             <nav class="nav-menu">
                 <button class="nav-btn active" data-tab="control-panel">
@@ -354,14 +360,16 @@
                 </div>
                 
                 <div class="card glass-card">
-                    <span class="transport-badge cloud card-transport-badge">
-                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
-                            <path d="M4,11 C2.5,11 1,9.5 1,8 C1,6.5 2.5,5 4,5 C4.5,3 6.5,2 9,2 C12,2 14.5,4.5 14.5,7.5 C14.5,9.5 13,11 11,11 Z" fill="none" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                        Cloud
-                    </span>
                     <div class="card-header flex-header">
-                        <h3>Gallery</h3>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <h3>Gallery</h3>
+                            <span class="transport-badge cloud" style="position:static; margin-left: 0;">
+                                <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                                    <path d="M4,11 C2.5,11 1,9.5 1,8 C1,6.5 2.5,5 4,5 C4.5,3 6.5,2 9,2 C12,2 14.5,4.5 14.5,7.5 C14.5,9.5 13,11 11,11 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                                Cloud
+                            </span>
+                        </div>
                         <div class="header-actions">
                             <select id="gallery-classify" class="custom-select small">
                                 <option value="18">Recommend</option>
@@ -378,7 +386,19 @@
                             <div class="empty-list">Click "Fetch Gallery" to load public artworks.</div>
                         </div>
                         
-                        <div class="batch-sync-bar" style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.1); padding-top:20px;">
+                        <div class="batch-sync-bar">
+                            <div class="sync-target-info" style="display:flex; align-items:center; gap:15px; flex:1;">
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    <span class="sync-target-title">Sync Target</span>
+                                    <select id="gallery-device-select" class="custom-select small" style="min-width:180px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; font-weight:600;">
+                                        <option value="">Select Screen...</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    <span class="sync-target-title">Active Screen Info</span>
+                                    <span id="sync-target-list" class="sync-target-list">No active screens</span>
+                                </div>
+                            </div>
                             <button id="batch-sync-btn" class="glow-btn pulse-glow">Sync Selection</button>
                         </div>
                     </div>
@@ -387,8 +407,14 @@
             
             <!-- TAB 4: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
             <section id="data-sources" class="tab-content">
-                <div class="header-section">
+                <div class="header-section" style="display:flex; justify-content:space-between; align-items:center;">
                     <h1>Live Widgets &amp; Media Sources</h1>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:11px; font-weight:600; color:rgba(255,255,255,0.45);">Target Screen:</span>
+                        <select id="widget-device-select" class="custom-select small" style="min-width:180px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; font-weight:600;">
+                            <option value="">Select Screen...</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="grid-layout">
@@ -470,7 +496,7 @@
                         <!-- BLE Scanner -->
                         <div class="card glass-card">
                             <div class="card-header">
-                                <h3>BLE Scanner</h3>
+                                <h3>Bluetooth Scanner</h3>
                             </div>
                             <div class="card-body">
                                 <div style="display:flex; gap:10px; margin-bottom:15px;">
@@ -479,7 +505,7 @@
                                         <input type="number" id="scan-timeout" min="3" max="60" value="15" class="text-input">
                                     </div>
                                     <div style="flex:1;">
-                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Limit</label>
+                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Devices</label>
                                         <input type="number" id="scan-limit" min="0" max="10" value="4" class="text-input">
                                     </div>
                                 </div>

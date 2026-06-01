@@ -7,8 +7,8 @@ import time
 from pathlib import Path
 
 # Add parent directory to path so we can import divoom_auth
-sys.path.append(str(Path(__file__).parent))
-import divoom_auth
+sys.path.append(str(Path(__file__).parent.parent))
+from divoom_lib import divoom_auth
 
 def print_info(message):
     """Prints an informational message."""
@@ -84,7 +84,8 @@ def main():
                 print_ok(f"DevicePassword:    {dev_pw}")
                 
                 # Write to a device cache file so we can reuse it
-                device_cache_path = Path(__file__).parent / "divoom_docs" / "virtual_device.json"
+                device_cache_path = Path.home() / ".config" / "divoom-control" / "virtual_device.json"
+                device_cache_path.parent.mkdir(parents=True, exist_ok=True)
                 device_cache_path.write_text(json.dumps({
                     "BluetoothDeviceId": dev_id,
                     "DevicePassword": dev_pw,
