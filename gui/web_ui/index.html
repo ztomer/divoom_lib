@@ -34,19 +34,49 @@
             
             <nav class="nav-menu">
                 <button class="nav-btn active" data-tab="control-panel">
-                    <span class="btn-icon">🎮</span> Control Center
+                    <span class="btn-icon">
+                        <svg class="kare-icon" viewBox="0 0 16 16">
+                            <rect x="1" y="4" width="14" height="8" rx="2"/>
+                            <rect x="4" y="7" width="3" height="1"/>
+                            <rect x="5" y="6" width="1" height="3"/>
+                            <circle cx="10" cy="8" r="1"/>
+                            <circle cx="12" cy="8" r="1"/>
+                        </svg>
+                    </span> Control Center
                 </button>
                 <button class="nav-btn" data-tab="display-wall">
-                    <span class="btn-icon">🖥️</span> Virtual Wall
+                    <span class="btn-icon">
+                        <svg class="kare-icon" viewBox="0 0 16 16">
+                            <rect x="1" y="1" width="14" height="11" rx="1"/>
+                            <rect x="3" y="3" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1"/>
+                            <rect x="6" y="12" width="4" height="2"/>
+                            <rect x="4" y="14" width="8" height="1"/>
+                        </svg>
+                    </span> Virtual Wall
                 </button>
                 <button class="nav-btn" data-tab="monthly-best">
-                    <span class="btn-icon">🔥</span> Monthly Best
+                    <span class="btn-icon">
+                        <svg class="kare-icon" viewBox="0 0 16 16">
+                            <path d="M8,1 C8,1 11,4 11,7 C11,10 8,15 8,15 C8,15 5,10 5,7 C5,4 8,1 8,1 Z"/>
+                            <path d="M8,4 C8,4 9.5,6 9.5,7.5 C9.5,9.5 8,12 8,12 C8,12 6.5,9.5 6.5,7.5 C6.5,6 8,4 8,4 Z" fill="var(--bg-base)"/>
+                        </svg>
+                    </span> Monthly Best
                 </button>
                 <button class="nav-btn" data-tab="data-sources">
-                    <span class="btn-icon">📈</span> Live Widgets
+                    <span class="btn-icon">
+                        <svg class="kare-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="1" y1="15" x2="15" y2="15"/>
+                            <line x1="1" y1="1" x2="1" y2="15"/>
+                            <path d="M2,12 L6,8 L10,10 L14,3"/>
+                        </svg>
+                    </span> Live Widgets
                 </button>
                 <button class="nav-btn" data-tab="settings">
-                    <span class="btn-icon">⚙️</span> Settings
+                    <span class="btn-icon">
+                        <svg class="kare-icon" viewBox="0 0 16 16">
+                            <path d="M8,6 C6.9,6 6,6.9 6,8 C6,9.1 6.9,10 8,10 C9.1,10 10,9.1 10,8 C10,6.9 9.1,6 8,6 Z M8,0 L6,3 L10,3 Z M8,16 L10,13 L6,13 Z M0,8 L3,6 L3,10 Z M16,8 L13,10 L13,6 Z"/>
+                        </svg>
+                    </span> Settings
                 </button>
             </nav>
             
@@ -54,22 +84,22 @@
                 <div class="panel-title">Transport Status</div>
                 <div class="transport-row" id="tr-ble" title="Bluetooth Low Energy — 100% local">
                     <div class="transport-dot inactive" id="tr-ble-dot" style="background:#3b82f6; color:#3b82f6;"></div>
-                    <span class="transport-row-label">🔵 BLE</span>
+                    <span class="transport-row-label">BLE</span>
                     <span class="transport-row-detail" id="tr-ble-detail">Disconnected</span>
                 </div>
                 <div class="transport-row" id="tr-lan" title="Wi-Fi HTTP :9000 — 100% local">
                     <div class="transport-dot inactive" id="tr-lan-dot" style="background:#22c55e; color:#22c55e;"></div>
-                    <span class="transport-row-label">🟢 LAN</span>
+                    <span class="transport-row-label">LAN</span>
                     <span class="transport-row-detail" id="tr-lan-detail">No IP set</span>
                 </div>
                 <div class="transport-row" id="tr-cloud" title="appin.divoom-gz.com — Divoom's servers">
                     <div class="transport-dot inactive" id="tr-cloud-dot" style="background:#f59e0b; color:#f59e0b;"></div>
-                    <span class="transport-row-label">🟡 Cloud</span>
+                    <span class="transport-row-label">Cloud</span>
                     <span class="transport-row-detail" id="tr-cloud-detail">Not signed in</span>
                 </div>
                 <div class="transport-row" id="tr-ext" title="3rd-party APIs — no login required">
                     <div class="transport-dot active" id="tr-ext-dot" style="background:#ef4444; color:#ef4444;"></div>
-                    <span class="transport-row-label">🔴 External</span>
+                    <span class="transport-row-label">External</span>
                     <span class="transport-row-detail" id="tr-ext-detail">Available</span>
                 </div>
             </div>
@@ -81,7 +111,12 @@
             <section id="control-panel" class="tab-content active">
                 <!-- Connected Device Info Banner -->
                 <div class="device-banner glass-card" id="connected-device-banner">
-                    <span class="transport-badge ble card-transport-badge">🔵 BLE</span>
+                    <span class="transport-badge ble card-transport-badge">
+                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                            <path d="M5,4 L11,9.5 L8,12 L8,1 L11,3.5 L5,9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter"/>
+                        </svg>
+                        BLE
+                    </span>
                     <div class="banner-preview">
                         <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
                     </div>
@@ -141,19 +176,45 @@
                         <div class="card-body">
                             <div class="channel-grid">
                                 <button class="channel-card active" data-channel="clock">
-                                    <span class="channel-icon">🕒</span>
+                                    <span class="channel-icon">
+                                        <svg class="kare-icon" viewBox="0 0 16 16">
+                                            <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M8,4 L8,8 L11,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                    </span>
                                     <h4>Clock Mode</h4>
                                 </button>
                                 <button class="channel-card" data-channel="visualizer">
-                                    <span class="channel-icon">📊</span>
+                                    <span class="channel-icon">
+                                        <svg class="kare-icon" viewBox="0 0 16 16">
+                                            <rect x="2" y="10" width="2" height="6"/>
+                                            <rect x="6" y="4" width="2" height="12"/>
+                                            <rect x="10" y="7" width="2" height="9"/>
+                                            <rect x="14" y="2" width="2" height="14"/>
+                                        </svg>
+                                    </span>
                                     <h4>Music EQ</h4>
                                 </button>
                                 <button class="channel-card" data-channel="vj">
-                                    <span class="channel-icon">🌀</span>
+                                    <span class="channel-icon">
+                                        <svg class="kare-icon" viewBox="0 0 16 16">
+                                            <rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                                            <rect x="4" y="4" width="8" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+                                            <rect x="7" y="7" width="2" height="2" fill="currentColor"/>
+                                        </svg>
+                                    </span>
                                     <h4>VJ Effects</h4>
                                 </button>
                                 <button class="channel-card" data-channel="design">
-                                    <span class="channel-icon">🎨</span>
+                                    <span class="channel-icon">
+                                        <svg class="kare-icon" viewBox="0 0 16 16">
+                                            <path d="M2,4 C2,2 5,1 8,1 C12,1 15,3 15,7 C15,11 11,14 7,14 C5.5,14 4.5,13.5 3.5,13.5 C2.5,13.5 1,15 1,13 C1,11.5 1,9.5 2,7 C2,5.5 2,5 2,4 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                                            <circle cx="5" cy="4" r="1"/>
+                                            <circle cx="9" cy="4" r="1"/>
+                                            <circle cx="11" cy="7" r="1"/>
+                                            <circle cx="8" cy="10" r="1"/>
+                                        </svg>
+                                    </span>
                                     <h4>Custom Art</h4>
                                 </button>
                             </div>
@@ -182,7 +243,11 @@
                                         <!-- Cyber Weather Dashboard Clock -->
                                         <div class="clock-face-mock apk-clock-cyber">
                                             <div class="cyber-top">10 42</div>
-                                            <div class="cyber-icon">⚡</div>
+                                            <div class="cyber-icon">
+                                                <svg class="kare-icon" viewBox="0 0 16 16" style="width: 10px; height: 10px;">
+                                                    <polygon points="10,1 4,8 8,8 6,15 13,6 9,6" fill="currentColor"/>
+                                                </svg>
+                                            </div>
                                             <div class="cyber-footer">BTC $64K</div>
                                         </div>
                                         <span class="clock-face-label">Cyber Panel</span>
@@ -191,7 +256,20 @@
                                         <!-- Cute Animal widget clock -->
                                         <div class="clock-face-mock apk-clock-cute">
                                             <div class="cute-digit">10:42</div>
-                                            <div class="cute-character">👾</div>
+                                            <div class="cute-character">
+                                                <svg class="kare-icon" viewBox="0 0 16 16" style="width: 12px; height: 12px;">
+                                                    <rect x="4" y="2" width="2" height="2"/>
+                                                    <rect x="10" y="2" width="2" height="2"/>
+                                                    <rect x="6" y="4" width="4" height="2"/>
+                                                    <rect x="4" y="6" width="8" height="2"/>
+                                                    <rect x="2" y="8" width="12" height="2"/>
+                                                    <rect x="2" y="10" width="2" height="2"/>
+                                                    <rect x="6" y="10" width="4" height="2"/>
+                                                    <rect x="12" y="10" width="2" height="2"/>
+                                                    <rect x="4" y="12" width="2" height="2"/>
+                                                    <rect x="10" y="12" width="2" height="2"/>
+                                                </svg>
+                                            </div>
                                         </div>
                                         <span class="clock-face-label">Pixel Pet</span>
                                     </div>
@@ -215,7 +293,15 @@
                         <div class="card-header flex-header">
                             <h3>Layout &amp; Presets</h3>
                             <div class="header-actions">
-                                <button id="save-preset-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Save Preset</button>
+                                <button id="save-preset-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none; display:inline-flex; align-items:center;">
+                                    <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px; width:12px; height:12px;">
+                                        <path d="M2,2 L11,2 L14,5 L14,14 L2,14 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="5" y="2" width="5" height="4" fill="none" stroke="currentColor" stroke-width="1"/>
+                                        <rect x="7" y="3" width="1" height="2"/>
+                                        <rect x="4" y="9" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                                    </svg>
+                                    Save Preset
+                                </button>
                                 <select id="presets-select" class="custom-select small">
                                     <option value="">Load Preset...</option>
                                     <option value="wall_2x2">2x2 Matrix Wall</option>
@@ -259,7 +345,12 @@
                 </div>
                 
                 <div class="card glass-card">
-                    <span class="transport-badge cloud card-transport-badge">🟡 Cloud</span>
+                    <span class="transport-badge cloud card-transport-badge">
+                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                            <path d="M4,11 C2.5,11 1,9.5 1,8 C1,6.5 2.5,5 4,5 C4.5,3 6.5,2 9,2 C12,2 14.5,4.5 14.5,7.5 C14.5,9.5 13,11 11,11 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        Cloud
+                    </span>
                     <div class="card-header flex-header">
                         <h3>Gallery</h3>
                         <div class="header-actions">
@@ -444,7 +535,15 @@
                                 <div class="form-group">
                                     <input type="password" id="settings-password" class="text-input" placeholder="Account Password">
                                 </div>
-                                <button id="save-creds-btn" class="glow-btn pulse-glow">Save Credentials</button>
+                                <button id="save-creds-btn" class="glow-btn pulse-glow" style="display:inline-flex; align-items:center; justify-content:center;">
+                                    <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 6px;">
+                                        <path d="M2,2 L11,2 L14,5 L14,14 L2,14 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="5" y="2" width="5" height="4" fill="none" stroke="currentColor" stroke-width="1"/>
+                                        <rect x="7" y="3" width="1" height="2"/>
+                                        <rect x="4" y="9" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                                    </svg>
+                                    Save Credentials
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -460,9 +559,27 @@
                             </div>
                             <div class="card-body">
                                 <div class="theme-buttons">
-                                    <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">🌙 Dark</button>
-                                    <button class="theme-mode-btn" data-theme="light" title="Light Mode">☀️ Light</button>
-                                    <button class="theme-mode-btn" data-theme="system" title="System Auto">💻 Auto</button>
+                                    <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">
+                                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                                            <path d="M12,2 C10,2 6,4 6,9 C6,13 9,14 12,14 C6,16 2,12 2,8 C2,4 6,2 12,2 Z" fill="currentColor"/>
+                                        </svg>
+                                        Dark
+                                    </button>
+                                    <button class="theme-mode-btn" data-theme="light" title="Light Mode">
+                                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                                            <circle cx="8" cy="8" r="3" fill="currentColor"/>
+                                            <path d="M8,1 L8,3 M8,13 L8,15 M1,8 L3,8 M13,8 L15,8 M3,3 L4.5,4.5 M11.5,11.5 L13,13 M3,13 L4.5,11.5 M11.5,4.5 L13,3" stroke="currentColor" stroke-width="2"/>
+                                        </svg>
+                                        Light
+                                    </button>
+                                    <button class="theme-mode-btn" data-theme="system" title="System Auto">
+                                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                                            <rect x="1" y="2" width="14" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+                                            <rect x="6" y="12" width="4" height="2"/>
+                                            <rect x="4" y="14" width="8" height="1"/>
+                                        </svg>
+                                        Auto
+                                    </button>
                                 </div>
                             </div>
                         </div>
