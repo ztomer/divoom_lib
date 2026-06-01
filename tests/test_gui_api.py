@@ -177,5 +177,38 @@ class TestDivoomGuiAPI(unittest.TestCase):
             mock_fetch.assert_called_with("AAPL")
             mock_render.assert_called_with("AAPL", mock_data, size=16)
 
+    def test_lan_device_operations(self):
+        """Test adding, loading, and deleting LAN devices with mock preset file storage."""
+        mock_presets_data = {}
+        def mock_read_text(*args, **kwargs):
+            return json.dumps(mock_presets_data)
+        def mock_write_text(content, *args, **kwargs):
+            nonlocal mock_presets_data
+            mock_presets_data = json.loads(content)
+            return len(content)
+            
+        with patch("pathlib.Path.exists", return_value=True), \
+             patch("pathlib.Path.read_text", side_effect=mock_read_text), \
+             patch("pathlib.Path.write_text", side_effect=mock_write_text):
+                 
+            # Add device
+            success = self.api.add_lan_device("192.168.1.100", 123)
+            self.assertTrue(success)
+            
+            # Load devices
+            devices_json = self.api.load_lan_devices()
+            devices = json.loads(devices_json)
+            self.assertEqual(len(devices), 1)
+            self.assertEqual(devices[0]["ip"], "192.168.1.100")
+            self.assertEqual(devices[0]["token"], 123)
+            
+            # Delete device
+            del_success = self.api.delete_lan_device("192.168.1.100")
+            self.assertTrue(del_success)
+            
+            # Load again to check empty
+            devices_json2 = self.api.load_lan_devices()
+            self.assertEqual(json.loads(devices_json2), [])
+
 if __name__ == "__main__":
     unittest.main()

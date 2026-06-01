@@ -86,10 +86,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     
-    customColorInput.addEventListener("input", (e) => {
-        colorSwatches.forEach(s => s.classList.remove("active"));
-        selectedColor = e.target.value.replace("#", "");
-    });
+    if (customColorInput) {
+        customColorInput.addEventListener("input", (e) => {
+            colorSwatches.forEach(s => s.classList.remove("active"));
+            selectedColor = e.target.value.replace("#", "");
+        });
+    }
     
     // Brightness Slider
     const brightnessSlider = document.getElementById("brightness-slider");
@@ -131,15 +133,18 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    document.getElementById("apply-clock-btn").addEventListener("click", () => {
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.set_clock(selectedClockStyle)
-                .then(res => {
-                    if (res) showToast("Clock style applied", "success", "🔵 BLE");
-                    else showToast("Failed to apply clock", "error");
-                });
-        }
-    });
+    const applyClockBtn = document.getElementById("apply-clock-btn");
+    if (applyClockBtn) {
+        applyClockBtn.addEventListener("click", () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.set_clock(selectedClockStyle)
+                    .then(res => {
+                        if (res) showToast("Clock style applied", "success", "🔵 BLE");
+                        else showToast("Failed to apply clock", "error");
+                    });
+            }
+        });
+    }
     
     // Toast notifications
     function showToast(message, type = "success", transport = null) {
@@ -271,86 +276,92 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Add arranged Screen button click
-    document.getElementById("add-arranger-screen-btn").addEventListener("click", () => {
-        if (discoveredDevices.length === 0) {
-            showToast("Please scan Bluetooth devices first under Settings tab!", "error");
-            return;
-        }
-        
-        // Show assignments dropdown options prompt
-        const options = discoveredDevices.map(d => `<option value="${d.address}">${d.name} (${d.address})</option>`).join("");
-        
-        const popup = document.createElement("div");
-        popup.style.position = "fixed";
-        popup.style.top = "50%";
-        popup.style.left = "50%";
-        popup.style.transform = "translate(-50%, -50%)";
-        popup.style.background = "rgba(20, 24, 38, 0.98)";
-        popup.style.border = "1px solid var(--secondary)";
-        popup.style.borderRadius = "16px";
-        popup.style.padding = "25px";
-        popup.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
-        popup.style.zIndex = "2000";
-        popup.style.minWidth = "320px";
-        popup.style.backdropFilter = "blur(15px)";
-        
-        popup.innerHTML = `
-            <h3 style="font-family: var(--font-display); font-size:16px; margin-bottom:15px; color:#fff;">Add Screen to Arranger</h3>
-            <select id="canvas-add-select" class="custom-select" style="width:100%; margin-bottom:15px;">
-                ${options}
-            </select>
-            <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button id="canvas-add-cancel" class="glow-btn compact" style="background:rgba(255,255,255,0.05); color:#fff; box-shadow:none;">Cancel</button>
-                <button id="canvas-add-confirm" class="glow-btn compact" style="background:linear-gradient(135deg, var(--secondary), #7b2cbf); color:#fff; box-shadow:none;">Add Node</button>
-            </div>
-        `;
-        
-        document.body.appendChild(popup);
-        
-        document.getElementById("canvas-add-cancel").addEventListener("click", () => {
-            popup.remove();
-        });
-        
-        document.getElementById("canvas-add-confirm").addEventListener("click", () => {
-            const addr = document.getElementById("canvas-add-select").value;
-            popup.remove();
-            
-            if (assignedSlots[addr]) {
-                showToast("Device already placed on canvas!", "error");
+    const addArrangerBtn = document.getElementById("add-arranger-screen-btn");
+    if (addArrangerBtn) {
+        addArrangerBtn.addEventListener("click", () => {
+            if (discoveredDevices.length === 0) {
+                showToast("Please scan Bluetooth devices first under Settings tab!", "error");
                 return;
             }
             
-            const dev = discoveredDevices.find(d => d.address === addr);
-            const devName = dev ? dev.name : "Divoom Screen";
-            const dims = getDeviceDimensions(devName);
+            // Show assignments dropdown options prompt
+            const options = discoveredDevices.map(d => `<option value="${d.address}">${d.name} (${d.address})</option>`).join("");
             
-            // Center node on placement
-            const placementX = Math.round((arrangerCanvas.clientWidth - dims.width) / 2);
-            const placementY = Math.round((arrangerCanvas.clientHeight - dims.height) / 2);
+            const popup = document.createElement("div");
+            popup.style.position = "fixed";
+            popup.style.top = "50%";
+            popup.style.left = "50%";
+            popup.style.transform = "translate(-50%, -50%)";
+            popup.style.background = "rgba(20, 24, 38, 0.98)";
+            popup.style.border = "1px solid var(--secondary)";
+            popup.style.borderRadius = "16px";
+            popup.style.padding = "25px";
+            popup.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
+            popup.style.zIndex = "2000";
+            popup.style.minWidth = "320px";
+            popup.style.backdropFilter = "blur(15px)";
             
-            assignedSlots[addr] = {
-                x: placementX,
-                y: placementY,
-                width: dims.width,
-                height: dims.height,
-                size: dims.size,
-                name: devName,
-                image: dims.image
-            };
+            popup.innerHTML = `
+                <h3 style="font-family: var(--font-display); font-size:16px; margin-bottom:15px; color:#fff;">Add Screen to Arranger</h3>
+                <select id="canvas-add-select" class="custom-select" style="width:100%; margin-bottom:15px;">
+                    ${options}
+                </select>
+                <div style="display:flex; gap:10px; justify-content:flex-end;">
+                    <button id="canvas-add-cancel" class="glow-btn compact" style="background:rgba(255,255,255,0.05); color:#fff; box-shadow:none;">Cancel</button>
+                    <button id="canvas-add-confirm" class="glow-btn compact" style="background:linear-gradient(135deg, var(--secondary), #7b2cbf); color:#fff; box-shadow:none;">Add Node</button>
+                </div>
+            `;
             
-            renderArrangerCanvas();
-            syncArrangerToPython();
-            showToast("Device node added to arranger", "success");
+            document.body.appendChild(popup);
+            
+            document.getElementById("canvas-add-cancel").addEventListener("click", () => {
+                popup.remove();
+            });
+            
+            document.getElementById("canvas-add-confirm").addEventListener("click", () => {
+                const addr = document.getElementById("canvas-add-select").value;
+                popup.remove();
+                
+                if (assignedSlots[addr]) {
+                    showToast("Device already placed on canvas!", "error");
+                    return;
+                }
+                
+                const dev = discoveredDevices.find(d => d.address === addr);
+                const devName = dev ? dev.name : "Divoom Screen";
+                const dims = getDeviceDimensions(devName);
+                
+                // Center node on placement
+                const placementX = Math.round((arrangerCanvas.clientWidth - dims.width) / 2);
+                const placementY = Math.round((arrangerCanvas.clientHeight - dims.height) / 2);
+                
+                assignedSlots[addr] = {
+                    x: placementX,
+                    y: placementY,
+                    width: dims.width,
+                    height: dims.height,
+                    size: dims.size,
+                    name: devName,
+                    image: dims.image
+                };
+                
+                renderArrangerCanvas();
+                syncArrangerToPython();
+                showToast("Device node added to arranger", "success");
+            });
         });
-    });
+    }
 
     // Clear Canvas
-    document.getElementById("clear-arranger-btn").addEventListener("click", () => {
-        assignedSlots = {};
-        renderArrangerCanvas();
-        syncArrangerToPython();
-        showToast("Arranger canvas cleared", "success");
-    });
+    const clearArrangerBtn = document.getElementById("clear-arranger-btn");
+    if (clearArrangerBtn) {
+        clearArrangerBtn.addEventListener("click", () => {
+            assignedSlots = {};
+            renderArrangerCanvas();
+            syncArrangerToPython();
+            showToast("Arranger canvas cleared", "success");
+        });
+    }
     
     // ── 5. BLE CONNECTION HELPER & SELECTOR POPULATION ──
     function connectDevice(name, address) {
@@ -461,150 +472,192 @@ document.addEventListener("DOMContentLoaded", () => {
     const scanSpinner = document.getElementById("scan-spinner");
     const deviceListUl = document.getElementById("device-list");
     
-    scanBtn.addEventListener("click", () => {
-        const timeout = parseInt(document.getElementById("scan-timeout").value) || 15;
-        const limit = parseInt(document.getElementById("scan-limit").value) || 0;
+    if (scanBtn) {
+        scanBtn.addEventListener("click", () => {
+            const timeout = parseInt(document.getElementById("scan-timeout")?.value) || 15;
+            const limit = parseInt(document.getElementById("scan-limit")?.value) || 0;
 
-        scanSpinner.style.display = "inline-block";
-        scanBtn.disabled = true;
-        
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.scan_devices_with_config(timeout, limit)
-                .then(devicesJson => {
-                    scanSpinner.style.display = "none";
-                    scanBtn.disabled = false;
-                    
-                    const devices = JSON.parse(devicesJson);
-                    discoveredDevices = devices;
-                    populateDeviceSelectors(devices);
-                    showToast(`Discovered ${devices.length} screens!`, "success");
-                    renderArrangerCanvas(); 
-                });
-        } else {
-            scanSpinner.style.display = "none";
-            scanBtn.disabled = false;
-            showToast("Web interface API unavailable.", "error");
-        }
-    });
+            if (scanSpinner) scanSpinner.style.display = "inline-block";
+            scanBtn.disabled = true;
+            
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.scan_devices_with_config(timeout, limit)
+                    .then(devicesJson => {
+                        if (scanSpinner) scanSpinner.style.display = "none";
+                        scanBtn.disabled = false;
+                        
+                        const devices = JSON.parse(devicesJson);
+                        discoveredDevices = devices;
+                        populateDeviceSelectors(devices);
+                        showToast(`Discovered ${devices.length} screens!`, "success");
+                        renderArrangerCanvas(); 
+                    });
+            } else {
+                if (scanSpinner) scanSpinner.style.display = "none";
+                scanBtn.disabled = false;
+                showToast("Web interface API unavailable.", "error");
+            }
+        });
+    }
     
     // Light Controls Apply
-    document.getElementById("apply-light-btn").addEventListener("click", () => {
-        const brightness = parseInt(brightnessSlider.value);
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.set_solid_light(selectedColor, brightness)
-                .then(res => {
-                    if (res) showToast("Ambient light applied", "success", "🔵 BLE");
-                    else showToast("Failed to apply ambient light", "error");
-                });
-        }
-    });
+    const applyLightBtn = document.getElementById("apply-light-btn");
+    if (applyLightBtn) {
+        applyLightBtn.addEventListener("click", () => {
+            const brightness = brightnessSlider ? parseInt(brightnessSlider.value) : 100;
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.set_solid_light(selectedColor, brightness)
+                    .then(res => {
+                        if (res) showToast("Ambient light applied", "success", "🔵 BLE");
+                        else showToast("Failed to apply ambient light", "error");
+                    });
+            }
+        });
+    }
     
     // Split and Push to Wall
-    document.getElementById("apply-wall-art").addEventListener("click", () => {
-        const path = document.getElementById("file-path-input").value.trim();
-        const cellSize = 16; // default size
-        
-        if (!path) {
-            showToast("Please provide a local file path!", "error");
-            return;
-        }
-        
-        if (Object.keys(assignedSlots).length === 0) {
-            showToast("Please arrange at least one device on the canvas first!", "error");
-            return;
-        }
-        
-        showToast("Splitting image & streaming absolute crops...", "success");
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.display_wall_image(path, cellSize)
-                .then(res => {
-                    if (res) showToast("Display wall updated successfully!", "success");
-                    else showToast("Failed to display image wall", "error");
-                });
-        }
-    });
+    const applyWallArtBtn = document.getElementById("apply-wall-art");
+    if (applyWallArtBtn) {
+        applyWallArtBtn.addEventListener("click", () => {
+            const path = document.getElementById("file-path-input").value.trim();
+            const cellSize = 16; // default size
+            
+            if (!path) {
+                showToast("Please provide a local file path!", "error");
+                return;
+            }
+            
+            if (Object.keys(assignedSlots).length === 0) {
+                showToast("Please arrange at least one device on the canvas first!", "error");
+                return;
+            }
+            
+            showToast("Splitting image and syncing wall...", "success");
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.apply_wall_image(path, cellSize)
+                    .then(res => {
+                        if (res) showToast("Synchronized display wall", "success", "🔵 BLE");
+                        else showToast("Failed to split and push wall image", "error");
+                    });
+            }
+        });
+    }
+
+    // Dynamic Live Preview for Split & Sync local GIF/PNG path input
+    const filePathInput = document.getElementById("file-path-input");
+    const filePreviewContainer = document.getElementById("file-preview-container");
+    const filePreviewImg = document.getElementById("file-preview-img");
+
+    if (filePathInput && filePreviewContainer && filePreviewImg) {
+        const updatePreview = () => {
+            const val = filePathInput.value.trim();
+            if (val) {
+                let src = val;
+                if (!val.startsWith("http://") && !val.startsWith("https://") && !val.startsWith("file://") && !val.startsWith("data:")) {
+                    if (val.startsWith("/")) {
+                        src = "file://" + val;
+                    } else {
+                        src = "file:///" + val.replace(/\\/g, "/");
+                    }
+                }
+                filePreviewImg.src = src;
+                filePreviewContainer.style.display = "flex";
+            } else {
+                filePreviewImg.src = "";
+                filePreviewContainer.style.display = "none";
+            }
+        };
+
+        filePathInput.addEventListener("input", updatePreview);
+        filePathInput.addEventListener("change", updatePreview);
+    }
     
     // ── 6. CLOUD GALLERY WITH ANIMATED COVER PREVIEWS ──
     const galleryContainer = document.getElementById("gallery-container");
     let loadedArtworks = [];
     let selectedArtworkIndex = null;
     
-    document.getElementById("load-gallery-btn").addEventListener("click", () => {
-        const classify = parseInt(document.getElementById("gallery-classify").value);
-        galleryContainer.innerHTML = `<div class="empty-list">Fetching public community gallery...</div>`;
-        
-        let targetSize = 16;
-        const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
-        if (bannerResText.includes("64")) {
-            targetSize = 64;
-        } else if (bannerResText.includes("32")) {
-            targetSize = 32;
-        }
-        
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.fetch_gallery(classify, targetSize)
-                .then(artworksJson => {
-                    const artworks = JSON.parse(artworksJson);
-                    loadedArtworks = artworks;
-                    selectedArtworkIndex = null;
-                    galleryContainer.innerHTML = "";
-                    
-                    if (artworks.length === 0) {
-                        galleryContainer.innerHTML = `<div class="empty-list">No gallery items found for classification.</div>`;
-                        return;
-                    }
-                    
-                    artworks.forEach((art, idx) => {
-                        const item = document.createElement("div");
-                        item.className = "gallery-item";
+    const loadGalleryBtn = document.getElementById("load-gallery-btn");
+    if (loadGalleryBtn) {
+        loadGalleryBtn.addEventListener("click", () => {
+            const classify = parseInt(document.getElementById("gallery-classify")?.value || "18");
+            if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">Fetching public community gallery...</div>`;
+            
+            let targetSize = 16;
+            const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
+            if (bannerResText.includes("64")) {
+                targetSize = 64;
+            } else if (bannerResText.includes("32")) {
+                targetSize = 32;
+            }
+            
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.fetch_gallery(classify, targetSize)
+                    .then(artworksJson => {
+                        const artworks = JSON.parse(artworksJson);
+                        loadedArtworks = artworks;
+                        selectedArtworkIndex = null;
+                        if (galleryContainer) galleryContainer.innerHTML = "";
                         
-                        // Beautiful visual gif cover animation
-                        const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
+                        if (artworks.length === 0) {
+                            if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">No gallery items found for classification.</div>`;
+                            return;
+                        }
                         
-                        item.innerHTML = `
-                            <div class="gallery-item-preview-box">
-                                <img src="${previewSrc}" class="gallery-item-preview" alt="preview">
-                            </div>
-                            <div class="gallery-item-name">${art.name}</div>
-                            <div class="gallery-item-meta">
-                                <span>Likes: ${art.likes}</span>
-                                <span class="gallery-item-magic">Magic: ${art.magic}</span>
-                            </div>
-                        `;
-                        
-                        item.addEventListener("click", () => {
-                            const items = document.querySelectorAll(".gallery-item");
-                            items.forEach(it => it.classList.remove("selected"));
-                            item.classList.add("selected");
-                            selectedArtworkIndex = idx;
+                        artworks.forEach((art, idx) => {
+                            const item = document.createElement("div");
+                            item.className = "gallery-item";
+                            
+                            // Beautiful visual gif cover animation
+                            const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
+                            
+                            item.innerHTML = `
+                                <div class="gallery-item-preview-box">
+                                    <img src="${previewSrc}" alt="${art.name}">
+                                </div>
+                                <div class="gallery-item-info">
+                                    <h5>${art.name}</h5>
+                                    <span>❤️ ${art.likes}</span>
+                                </div>
+                            `;
+                            
+                            item.addEventListener("click", () => {
+                                const items = galleryContainer.querySelectorAll(".gallery-item");
+                                items.forEach(it => it.classList.remove("active"));
+                                item.classList.add("active");
+                                selectedArtworkIndex = idx;
+                            });
+                            
+                            if (galleryContainer) galleryContainer.appendChild(item);
                         });
                         
-                        galleryContainer.appendChild(item);
+                        showToast("Gallery fetched", "success", "🟡 Cloud");
                     });
-                    
-                    showToast("Gallery fetched", "success", "🟡 Cloud");
-                });
-        }
-    });
+            }
+        });
+    }
     
     // Batch Sync Monthly Best to Grid Wall
-    document.getElementById("batch-sync-btn").addEventListener("click", () => {
-        if (selectedArtworkIndex === null) {
-            showToast("Please select an artwork from the gallery list first!", "error");
-            return;
-        }
-        
-        const artwork = loadedArtworks[selectedArtworkIndex];
-        showToast(`Downloading and syncing '${artwork.name}'...`, "success");
-        
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.batch_sync_artwork(JSON.stringify(artwork))
-                .then(res => {
-                    if (res) showToast(`'${artwork.name}' synced`, "success", "🔵 BLE");
-                    else showToast("Failed to batch sync artwork", "error");
-                });
-        }
-    });
+    const batchSyncBtn = document.getElementById("batch-sync-btn");
+    if (batchSyncBtn) {
+        batchSyncBtn.addEventListener("click", () => {
+            if (selectedArtworkIndex === null) {
+                showToast("Please select an artwork from the gallery list first!", "error");
+                return;
+            }
+            
+            const artwork = loadedArtworks[selectedArtworkIndex];
+            showToast(`Downloading and syncing '${artwork.name}'...`, "success");
+            
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.batch_sync_artwork(JSON.stringify(artwork))
+                    .then(res => {
+                        if (res) showToast(`'${artwork.name}' synced`, "success", "🔵 BLE");
+                        else showToast("Failed to batch sync artwork", "error");
+                    });
+            }
+        });
+    }
 
     // Live Widgets (macOS Music & Stocks Ticker)
     const musicSyncToggle = document.getElementById("music-sync-toggle");
@@ -648,45 +701,47 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 3000);
 
     // Stock price submit
-    document.getElementById("apply-stock-btn").addEventListener("click", () => {
-        const symbol = document.getElementById("stock-symbol-input").value.trim().toUpperCase();
-        if (!symbol) {
-            showToast("Please enter a ticker symbol!", "error");
-            return;
-        }
+    const applyStockBtn = document.getElementById("apply-stock-btn");
+    if (applyStockBtn) {
+        applyStockBtn.addEventListener("click", () => {
+            const symbol = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
+            if (!symbol) {
+                showToast("Please enter a ticker symbol!", "error");
+                return;
+            }
 
-        showToast(`Fetching Yahoo price data for ${symbol}...`, "success");
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.apply_stock_ticker(symbol)
-                .then(resJson => {
-                    if (resJson) {
-                        const res = JSON.parse(resJson);
-                        if (res.success) {
-                            showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Ext");
-                            const priceMock = document.querySelector(".ticker-price-mock");
-                            const arrowMock = document.querySelector(".ticker-arrow-mock");
-                            const nameMock = document.querySelector(".ticker-name-mock");
+            showToast(`Fetching Yahoo price data for ${symbol}...`, "success");
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.apply_stock_ticker(symbol)
+                    .then(resJson => {
+                        if (resJson) {
+                            const res = JSON.parse(resJson);
+                            if (res.success) {
+                                showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Ext");
+                                const priceMock = document.querySelector(".ticker-price-mock");
+                                const arrowMock = document.querySelector(".ticker-arrow-mock");
+                                const nameMock = document.querySelector(".ticker-name-mock");
 
-                            nameMock.textContent = symbol;
-                            priceMock.textContent = `$${res.price}`;
-                            if (res.change >= 0) {
-                                arrowMock.textContent = "▲";
-                                arrowMock.style.color = "var(--primary)";
-                                priceMock.style.color = "var(--primary)";
+                                if (nameMock) nameMock.textContent = symbol;
+                                if (priceMock) priceMock.textContent = `$${res.price}`;
+                                if (arrowMock) {
+                                    arrowMock.textContent = res.change >= 0 ? "▲" : "▼";
+                                    if (res.change >= 0) {
+                                        arrowMock.style.color = "var(--secondary)";
+                                    } else {
+                                        arrowMock.style.color = "red";
+                                    }
+                                }
                             } else {
-                                arrowMock.textContent = "▼";
-                                arrowMock.style.color = "#ef4444";
-                                priceMock.style.color = "#ef4444";
+                                showToast(`Failed to fetch/display ${symbol}`, "error");
                             }
                         } else {
-                            showToast(`Failed to fetch/display ${symbol}`, "error");
+                            showToast("API return error", "error");
                         }
-                    } else {
-                        showToast("API return error", "error");
-                    }
-                });
-        }
-    });
+                    });
+            }
+        });
+    }
 
     // Tab 5: Credentials Settings tab
     const saveCredsBtn = document.getElementById("save-creds-btn");
@@ -743,73 +798,84 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (namesJson) {
                         const names = JSON.parse(namesJson);
                         const select = document.getElementById("presets-select");
-                        select.innerHTML = '<option value="">Load Preset...</option>';
-                        names.forEach(name => {
-                            const opt = document.createElement("option");
-                            opt.value = name;
-                            opt.textContent = name;
-                            select.appendChild(opt);
-                        });
+                        if (select) {
+                            select.innerHTML = '<option value="">Load Preset...</option>';
+                            names.forEach(name => {
+                                const opt = document.createElement("option");
+                                opt.value = name;
+                                opt.textContent = name;
+                                select.appendChild(opt);
+                            });
+                        }
                     }
                 });
         }
     }, 1000);
 
     // Preset dropdown select event
-    document.getElementById("presets-select").addEventListener("change", (e) => {
-        const name = e.target.value;
-        if (!name) return;
+    const presetsSelect = document.getElementById("presets-select");
+    if (presetsSelect) {
+        presetsSelect.addEventListener("change", (e) => {
+            const name = e.target.value;
+            if (!name) return;
 
-        showToast(`Loading layout preset '${name}'...`, "success");
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.load_preset_by_name(name)
-                .then(slotsJson => {
-                    if (slotsJson) {
-                        assignedSlots = JSON.parse(slotsJson);
-                        renderArrangerCanvas();
-                        showToast(`Layout preset '${name}' applied!`, "success");
-                    } else {
-                        showToast("Failed to load layout slots from file", "error");
-                    }
-                });
-        }
-    });
+            showToast(`Loading layout preset '${name}'...`, "success");
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.load_preset_by_name(name)
+                    .then(slotsJson => {
+                        if (slotsJson) {
+                            assignedSlots = JSON.parse(slotsJson);
+                            renderArrangerCanvas();
+                            showToast(`Layout preset '${name}' applied!`, "success");
+                        } else {
+                            showToast("Failed to load layout slots from file", "error");
+                        }
+                    });
+            }
+        });
+    }
 
     // Save Preset button click
-    document.getElementById("save-preset-btn").addEventListener("click", () => {
-        if (Object.keys(assignedSlots).length === 0) {
-            showToast("No arranged screens to save!", "error");
-            return;
-        }
+    const savePresetBtn = document.getElementById("save-preset-btn");
+    if (savePresetBtn) {
+        savePresetBtn.addEventListener("click", () => {
+            if (Object.keys(assignedSlots).length === 0) {
+                showToast("No arranged screens to save!", "error");
+                return;
+            }
 
-        const name = prompt("Enter a unique name for this screen wall layout preset:", "My Custom Wall");
-        if (!name) return;
+            const name = prompt("Enter a unique name for this screen wall layout preset:", "My Custom Wall");
+            if (!name) return;
 
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.save_preset(name, JSON.stringify(assignedSlots))
-                .then(res => {
-                    if (res) {
-                        showToast(`Preset '${name}' saved successfully!`, "success");
-                        window.pywebview.api.load_preset_names()
-                            .then(namesJson => {
-                                if (namesJson) {
-                                    const names = JSON.parse(namesJson);
-                                    const select = document.getElementById("presets-select");
-                                    select.innerHTML = '<option value="">Load Preset...</option>';
-                                    names.forEach(n => {
-                                        const opt = document.createElement("option");
-                                        opt.value = n;
-                                        opt.textContent = n;
-                                        select.appendChild(opt);
-                                    });
-                                }
-                            });
-                    } else {
-                        showToast("Failed to save preset to presets.json", "error");
-                    }
-                });
-        }
-    });
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.save_preset(name, JSON.stringify(assignedSlots))
+                    .then(res => {
+                        if (res) {
+                            showToast(`Saved wall layout preset '${name}'`, "success");
+                            // Refresh selector options
+                            window.pywebview.api.load_preset_names()
+                                .then(namesJson => {
+                                    if (namesJson) {
+                                        const names = JSON.parse(namesJson);
+                                        const select = document.getElementById("presets-select");
+                                        if (select) {
+                                            select.innerHTML = '<option value="">Load Preset...</option>';
+                                            names.forEach(n => {
+                                                const opt = document.createElement("option");
+                                                opt.value = n;
+                                                opt.textContent = n;
+                                                select.appendChild(opt);
+                                            });
+                                        }
+                                    }
+                                });
+                        } else {
+                            showToast("Failed to save layout preset", "error");
+                        }
+                    });
+            }
+        });
+    }
 
     // ── TRANSPORT STATUS POLLING (4-badge sidebar panel) ──────────────────
     function updateTransportPanel(status) {

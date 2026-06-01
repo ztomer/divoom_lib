@@ -313,8 +313,12 @@
                     
                     <!-- Free-form Arranger Canvas -->
                     <div class="card glass-card arranger-card">
-                        <div class="card-header">
+                        <div class="card-header flex-header">
                             <h3>Canvas</h3>
+                            <div class="header-actions">
+                                <button id="add-arranger-screen-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Add Screen</button>
+                                <button id="clear-arranger-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Clear Canvas</button>
+                            </div>
                         </div>
                         <div class="card-body container-body" style="padding: 0;">
                             <div class="arranger-workspace-free" id="arranger-canvas">
@@ -324,15 +328,20 @@
                     </div>
                     
                     <!-- Asset Push -->
-                    <div class="card glass-card">
+                    <div class="card glass-card" style="width: 100%; box-sizing: border-box;">
                         <div class="card-header">
                             <h3>Split &amp; Sync GIF</h3>
                         </div>
-                        <div class="card-body flex-row">
-                            <div class="file-uploader">
-                                <input type="text" id="file-path-input" placeholder="GIF/PNG local path..." class="text-input">
+                        <div class="card-body" style="display:flex; flex-direction:column; gap:12px; width:100%; box-sizing:border-box;">
+                            <div style="display:flex; gap:10px; width:100%; align-items:center;">
+                                <div class="file-uploader" style="flex:1;">
+                                    <input type="text" id="file-path-input" placeholder="GIF/PNG local path..." class="text-input" style="width:100%; box-sizing:border-box;">
+                                </div>
+                                <button id="apply-wall-art" class="glow-btn" style="margin:0; white-space:nowrap;">Split &amp; Push</button>
                             </div>
-                            <button id="apply-wall-art" class="glow-btn">Split &amp; Push to Grid</button>
+                            <div id="file-preview-container" style="display:none; align-items:center; justify-content:center; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05); text-align:center;">
+                                <img id="file-preview-img" src="" alt="Local Preview" style="max-width:120px; max-height:120px; border-radius:4px; object-fit:contain; border:1px solid rgba(255,255,255,0.1);">
+                            </div>
                         </div>
                     </div>
                 </div>
