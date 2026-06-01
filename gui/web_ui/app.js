@@ -390,12 +390,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    let registeredLanDevices = [];
+
     function populateDeviceSelectors(devices) {
         const deviceListUl = document.getElementById("device-list");
         if (deviceListUl) {
             deviceListUl.innerHTML = "";
             if (devices.length === 0) {
-                deviceListUl.innerHTML = `<li class="empty-list">No Divoom screens found in range.</li>`;
+                deviceListUl.innerHTML = `<li class="empty-list">No BLE screens found.</li>`;
             } else {
                 devices.forEach(d => {
                     const li = document.createElement("li");
@@ -410,19 +412,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
         }
-        
+        updateDeviceSelectorDropdown();
+    }
+
+    function updateDeviceSelectorDropdown() {
         const bannerSelect = document.getElementById("banner-device-select");
-        if (bannerSelect) {
-            bannerSelect.innerHTML = '<option value="">Select Screen...</option>';
-            devices.forEach(d => {
-                const opt = document.createElement("option");
-                opt.value = d.address;
-                opt.textContent = `${d.name} (${d.address})`;
-                const currentMac = document.getElementById("banner-device-mac")?.textContent;
-                if (currentMac === d.address) opt.selected = true;
-                bannerSelect.appendChild(opt);
-            });
-        }
+        if (!bannerSelect) return;
+        
+        const currentMac = document.getElementById("banner-device-mac")?.textContent;
+        bannerSelect.innerHTML = '<option value="">Select Screen...</option>';
+        
+        // Populate BLE devices
+        discoveredDevices.forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = d.address;
+            opt.textContent = `🔵 BLE: ${d.name} (${d.address})`;
+            if (currentMac === d.address) opt.selected = true;
+            bannerSelect.appendChild(opt);
+        });
+        
+        // Populate Wi-Fi devices
+        registeredLanDevices.forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = `LAN:${d.ip}`;
+            opt.textContent = `🟢 Wi-Fi: ${d.ip}`;
+            if (currentMac === `LAN:${d.ip}`) opt.selected = true;
+            bannerSelect.appendChild(opt);
+        });
     }
 
     const bannerSelect = document.getElementById("banner-device-select");
@@ -430,9 +446,14 @@ document.addEventListener("DOMContentLoaded", () => {
         bannerSelect.addEventListener("change", (e) => {
             const addr = e.target.value;
             if (!addr) return;
-            const dev = discoveredDevices.find(d => d.address === addr);
-            const devName = dev ? dev.name : "Divoom Screen";
-            connectDevice(devName, addr);
+            if (addr.startsWith("LAN:")) {
+                const ip = addr.split("LAN:")[1];
+                connectDevice(`Wi-Fi: ${ip}`, addr);
+            } else {
+                const dev = discoveredDevices.find(d => d.address === addr);
+                const devName = dev ? dev.name : "Divoom Screen";
+                connectDevice(devName, addr);
+            }
         });
     }
 
@@ -826,62 +847,96 @@ document.addEventListener("DOMContentLoaded", () => {
     // Also fire once at startup after a short delay
     setTimeout(refreshTransportStatus, 1500);
 
-    // ── LAN CONFIG WIRING ─────────────────────────────────────────────────
-    const saveLanBtn   = document.getElementById('save-lan-btn');
-    const probeLanBtn  = document.getElementById('probe-lan-btn');
-    const lanProbeResult = document.getElementById('lan-probe-result');
-
-    if (saveLanBtn) {
-        saveLanBtn.addEventListener('click', () => {
-            const ip    = (document.getElementById('lan-ip-input')?.value || '').trim();
-            const token = parseInt(document.getElementById('lan-token-input')?.value || '0');
-            if (!ip) { showToast('Enter a device IP address first', 'error'); return; }
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.save_lan_config(ip, token)
-                    .then(ok => {
-                        if (ok) {
-                            showToast(`LAN transport configured — ${ip}:9000`, 'success', '🟢 LAN');
-                            refreshTransportStatus();
-                        } else {
-                            showToast('Failed to save LAN config', 'error');
-                        }
-                    });
-            }
-        });
-    }
-
-    if (probeLanBtn) {
-        probeLanBtn.addEventListener('click', () => {
-            if (lanProbeResult) { lanProbeResult.textContent = 'Testing…'; lanProbeResult.className = 'lan-probe-result'; }
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.probe_lan()
-                    .then(resJson => {
-                        const res = JSON.parse(resJson);
-                        if (lanProbeResult) {
-                            lanProbeResult.textContent = res.detail;
-                            lanProbeResult.className = `lan-probe-result ${res.reachable ? 'success' : 'error'}`;
-                        }
-                        refreshTransportStatus();
-                    });
-            }
-        });
-    }
-
-    // Load LAN config on startup
-    setTimeout(() => {
+    // ── Wi-Fi DEVICES MANAGER WIRING ──────────────────────────────────────
+    function loadLanDevices() {
         if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.load_config()
-                .then(configJson => {
-                    if (configJson) {
-                        const conf = JSON.parse(configJson);
-                        if (conf.lan_ip && document.getElementById('lan-ip-input')) {
-                            document.getElementById('lan-ip-input').value = conf.lan_ip;
-                        }
-                        if (document.getElementById('lan-token-input')) {
-                            document.getElementById('lan-token-input').value = conf.lan_token ?? 0;
-                        }
+            window.pywebview.api.load_lan_devices()
+                .then(json => {
+                    try {
+                        registeredLanDevices = JSON.parse(json);
+                        renderLanDevicesList();
+                        updateDeviceSelectorDropdown();
+                    } catch(e) {
+                        registeredLanDevices = [];
                     }
                 });
+        }
+    }
+
+    function renderLanDevicesList() {
+        const ul = document.getElementById("lan-device-list");
+        if (!ul) return;
+        ul.innerHTML = "";
+        if (registeredLanDevices.length === 0) {
+            ul.innerHTML = '<li class="empty-list">No Wi-Fi screens registered.</li>';
+            return;
+        }
+        registeredLanDevices.forEach(d => {
+            const li = document.createElement("li");
+            li.style.display = "flex";
+            li.style.justifyContent = "space-between";
+            li.style.alignItems = "center";
+            li.innerHTML = `
+                <span style="font-weight:600; cursor:pointer;">🟢 Wi-Fi Device (${d.ip})</span>
+                <button class="glow-btn compact" style="margin:0; background:rgba(255, 68, 68, 0.15); border-color:#ef4444; color:#ef4444;" data-ip="${d.ip}">Delete</button>
+            `;
+            li.querySelector("span").addEventListener("click", () => {
+                connectDevice(`Wi-Fi: ${d.ip}`, `LAN:${d.ip}`);
+            });
+            li.querySelector("button").addEventListener("click", (e) => {
+                e.stopPropagation();
+                const ip = e.target.getAttribute("data-ip");
+                if (window.pywebview && window.pywebview.api) {
+                    window.pywebview.api.delete_lan_device(ip)
+                        .then(ok => {
+                            if (ok) {
+                                showToast("Deleted Wi-Fi device", "success");
+                                loadLanDevices();
+                            }
+                        });
+                }
+            });
+            ul.appendChild(li);
+        });
+    }
+
+    const addLanBtn = document.getElementById("add-lan-btn");
+    if (addLanBtn) {
+        addLanBtn.addEventListener("click", () => {
+            const ipInput = document.getElementById("lan-ip-input");
+            const tokenInput = document.getElementById("lan-token-input");
+            const probeResult = document.getElementById("lan-probe-result");
+            
+            const ip = (ipInput?.value || "").trim();
+            const token = parseInt(tokenInput?.value || "0");
+            if (!ip) { showToast("Enter an IP Address", "error"); return; }
+            
+            if (probeResult) { probeResult.textContent = "Connecting..."; probeResult.className = "lan-probe-result"; }
+            
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.add_lan_device(ip, token)
+                    .then(ok => {
+                        if (ok) {
+                            showToast(`Added Wi-Fi device: ${ip}`, "success");
+                            if (probeResult) { probeResult.textContent = "Device registered successfully."; probeResult.className = "lan-probe-result success"; }
+                            if (ipInput) ipInput.value = "";
+                            if (tokenInput) tokenInput.value = "0";
+                            loadLanDevices();
+                        } else {
+                            showToast("Failed to add Wi-Fi device", "error");
+                            if (probeResult) { probeResult.textContent = "Could not register device."; probeResult.className = "lan-probe-result error"; }
+                        }
+                    });
+            }
+        });
+    }
+
+    // Load LAN config and devices on startup
+    setTimeout(() => {
+        loadLanDevices();
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.load_config()
+                .then(() => {});
         }
     }, 1200);
 

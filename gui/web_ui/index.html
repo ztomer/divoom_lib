@@ -79,7 +79,6 @@
             </div>
         </aside>
         
-        <!-- Main Content Area -->
         <main class="main-content">
             
             <!-- TAB 1: CONTROL CENTER -->
@@ -99,8 +98,8 @@
                             </select>
                         </div>
                         <div class="banner-specs">
-                            <span>MAC: <b id="banner-device-mac">-</b></span>
-                            <span>Grid size: <b id="banner-device-res">16x16</b></span>
+                            <span>Target: <b id="banner-device-mac">-</b></span>
+                            <span>Resolution: <b id="banner-device-res">16x16</b></span>
                             <span>Speaker: <b id="banner-device-speaker">No</b></span>
                         </div>
                     </div>
@@ -110,11 +109,10 @@
                     <!-- Light Controls -->
                     <div class="card glass-card">
                         <div class="card-header">
-                            <h3>Solid Light & Ambient Mode</h3>
+                            <h3>Ambient Color</h3>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Pick Ambient Color</label>
                                 <div class="color-picker-grid">
                                     <button class="color-swatch red" data-color="FF0000"></button>
                                     <button class="color-swatch orange" data-color="FF8C00"></button>
@@ -131,18 +129,18 @@
                             </div>
                             
                             <div class="form-group">
-                                <label>Brightness (<span id="brightness-val">100</span>%)</label>
+                                <label>Brightness <span id="brightness-val">100</span>%</label>
                                 <input type="range" id="brightness-slider" min="0" max="100" value="100" class="range-slider">
                             </div>
                             
-                            <button id="apply-light-btn" class="glow-btn">Apply Ambient Light</button>
+                            <button id="apply-light-btn" class="glow-btn">Apply Color</button>
                         </div>
                     </div>
                     
                     <!-- Channel & Clock Controls with ACTUAL Clockface Previews -->
                     <div class="card glass-card">
                         <div class="card-header">
-                            <h3>Switch Display Channels</h3>
+                            <h3>Channels</h3>
                         </div>
                         <div class="card-body">
                             <div class="channel-grid">
@@ -166,7 +164,6 @@
                             
                             <!-- Clock Face Previews -->
                             <div class="clock-presets-area" style="margin-top: 25px;">
-                                <label>Select Clock Face</label>
                                 <div class="clock-preview-grid">
                                     <div class="clock-preview-card active" data-style="0">
                                         <!-- Actual Divoom Digital Neon Clock -->
@@ -203,7 +200,7 @@
                                         <span class="clock-face-label">Pixel Pet</span>
                                     </div>
                                 </div>
-                                <button id="apply-clock-btn" class="glow-btn" style="margin-top:20px;">Apply Selected Clock Face</button>
+                                <button id="apply-clock-btn" class="glow-btn" style="margin-top:20px;">Apply Clock Face</button>
                             </div>
                         </div>
                     </div>
@@ -214,14 +211,13 @@
             <section id="display-wall" class="tab-content">
                 <div class="header-section">
                     <h1>Virtual Screen Wall</h1>
-                    <p>Arrange physical Divoom screens freely in 2D coordinates. Visual models scale dynamically relative to their actual physical dimensions.</p>
                 </div>
                 
                 <div class="grid-layout vertical">
                     <!-- Layout Config -->
                     <div class="card glass-card">
                         <div class="card-header flex-header">
-                            <h3>1. Wall Layout Settings & Presets</h3>
+                            <h3>Layout &amp; Presets</h3>
                             <div class="header-actions">
                                 <button id="save-preset-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Save Preset</button>
                                 <select id="presets-select" class="custom-select small">
@@ -231,17 +227,12 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="card-body flex-row">
-                            <button id="add-arranger-screen-btn" class="glow-btn compact">＋ Add Discovered Device</button>
-                            <button id="clear-arranger-btn" class="glow-btn compact" style="background:rgba(255, 68, 68, 0.15); border:1px solid #ef4444; color:#ef4444; box-shadow:none;">Clear Canvas</button>
-                        </div>
                     </div>
                     
                     <!-- Free-form Arranger Canvas -->
                     <div class="card glass-card arranger-card">
                         <div class="card-header">
-                            <h3>2. Position Discovered Screens in Canvas Space (Free-Form Dragging)</h3>
-                            <span class="badge">Dynamic Physical Scaling Active</span>
+                            <h3>Canvas</h3>
                         </div>
                         <div class="card-body container-body" style="padding: 0;">
                             <div class="arranger-workspace-free" id="arranger-canvas">
@@ -253,13 +244,13 @@
                     <!-- Asset Push -->
                     <div class="card glass-card">
                         <div class="card-header">
-                            <h3>3. Split and Display Animation / GIF</h3>
+                            <h3>Split &amp; Sync GIF</h3>
                         </div>
                         <div class="card-body flex-row">
                             <div class="file-uploader">
-                                <input type="text" id="file-path-input" placeholder="Paste local GIF/PNG path here..." class="text-input">
+                                <input type="text" id="file-path-input" placeholder="GIF/PNG local path..." class="text-input">
                             </div>
-                            <button id="apply-wall-art" class="glow-btn">Split & Push to Grid</button>
+                            <button id="apply-wall-art" class="glow-btn">Split &amp; Push to Grid</button>
                         </div>
                     </div>
                 </div>
@@ -269,13 +260,12 @@
             <section id="monthly-best" class="tab-content">
                 <div class="header-section">
                     <h1>Batch Monthly Best</h1>
-                    <p>Download the top popular community artworks and sync them concurrently across your active screen displays.</p>
                 </div>
                 
                 <div class="card glass-card">
                     <span class="transport-badge cloud card-transport-badge">🟡 Cloud</span>
                     <div class="card-header flex-header">
-                        <h3>Community Recommends</h3>
+                        <h3>Gallery</h3>
                         <div class="header-actions">
                             <select id="gallery-classify" class="custom-select small">
                                 <option value="18">Recommend</option>
@@ -293,7 +283,7 @@
                         </div>
                         
                         <div class="batch-sync-bar" style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.1); padding-top:20px;">
-                            <button id="batch-sync-btn" class="glow-btn pulse-glow">Batch Sync Selection to Display Wall</button>
+                            <button id="batch-sync-btn" class="glow-btn pulse-glow">Sync Selection</button>
                         </div>
                     </div>
                 </div>
@@ -302,8 +292,7 @@
             <!-- TAB 4: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
             <section id="data-sources" class="tab-content">
                 <div class="header-section">
-                    <h1>Live Widgets & Media Sources</h1>
-                    <p>Broadcast live calendar, stock tickers, or macOS music cover art downsampled to active devices.</p>
+                    <h1>Live Widgets &amp; Media Sources</h1>
                 </div>
                 
                 <div class="grid-layout">
@@ -348,13 +337,12 @@
                     <!-- Stock Prices Widget -->
                     <div class="card glass-card">
                         <div class="card-header">
-                            <h3>Live Stocks & Crypto Tickers</h3>
+                            <h3>Live Stocks &amp; Crypto Tickers</h3>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label>Stock / Crypto Symbol</label>
                                 <div class="flex-row">
-                                    <input type="text" id="stock-symbol-input" placeholder="e.g. AAPL, BTC-USD, TSLA" class="text-input" value="BTC-USD">
+                                    <input type="text" id="stock-symbol-input" placeholder="Symbol e.g. AAPL, BTC-USD" class="text-input" value="BTC-USD">
                                     <button id="apply-stock-btn" class="glow-btn compact">Display Ticker</button>
                                 </div>
                             </div>
@@ -383,108 +371,84 @@
                 <!-- 1. DEVICES TAB -->
                 <div class="settings-tab-content active" id="settings-devices">
                     <div class="grid-layout">
-                        <!-- BLE Config settings -->
+                        <!-- BLE Scanner -->
                         <div class="card glass-card">
                             <div class="card-header">
-                                <h3>BLE Scanner Configuration</h3>
+                                <h3>BLE Scanner</h3>
                             </div>
                             <div class="card-body">
-                                <div class="form-group">
-                                    <label>Scanner Timeout (seconds)</label>
-                                    <input type="number" id="scan-timeout" min="3" max="60" value="15" class="text-input">
-                                </div>
-                                <div class="form-group">
-                                    <label>Target Stop Limit (number of screens)</label>
-                                    <input type="number" id="scan-limit" min="0" max="10" value="4" class="text-input" title="0 = Scan until timeout">
+                                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                                    <div style="flex:1;">
+                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Timeout (s)</label>
+                                        <input type="number" id="scan-timeout" min="3" max="60" value="15" class="text-input">
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Limit</label>
+                                        <input type="number" id="scan-limit" min="0" max="10" value="4" class="text-input">
+                                    </div>
                                 </div>
                                 
                                 <button id="scan-btn" class="glow-btn">
-                                    <span class="spinner" id="scan-spinner"></span> Scan BLE Devices
+                                    <span class="spinner" id="scan-spinner"></span> Scan Devices
                                 </button>
                                 
                                 <div style="margin-top: 20px;">
-                                    <label>Discovered BLE Devices</label>
+                                    <label style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:8px; display:block;">Discovered BLE Screens</label>
                                     <ul id="device-list" class="device-list">
-                                        <li class="empty-list">No devices scanned yet. Click "Scan BLE Devices".</li>
+                                        <li class="empty-list">No BLE screens found.</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- LAN Transport Config -->
-                        <div class="lan-config-section" style="margin-top: 0;">
-                            <h4>🟢 Wi-Fi (LAN) Transport</h4>
-                            <p style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:12px;">For WiFi-capable devices (Pixoo 64, Timebox Evo). 100% local — no internet required.</p>
-                            <div class="form-group">
-                                <label class="form-label">Device IP Address</label>
-                                <input type="text" id="lan-ip-input" class="form-input" placeholder="192.168.1.42">
+                        <!-- Wi-Fi Devices -->
+                        <div class="card glass-card">
+                            <div class="card-header">
+                                <h3>Wi-Fi Screens</h3>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Local Token <span style="opacity:0.5; font-weight:400;">(from device pairing, 0 if none)</span></label>
-                                <input type="number" id="lan-token-input" class="form-input" value="0" min="0">
+                            <div class="card-body">
+                                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                                    <div style="flex:2;">
+                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">IP Address</label>
+                                        <input type="text" id="lan-ip-input" class="text-input" placeholder="192.168.1.42">
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Token</label>
+                                        <input type="number" id="lan-token-input" class="text-input" value="0" min="0">
+                                    </div>
+                                    <div style="display:flex; align-items:flex-end;">
+                                        <button id="add-lan-btn" class="glow-btn compact" style="margin-bottom:0; height:32px;">Add</button>
+                                    </div>
+                                </div>
+                                <div class="lan-probe-result" id="lan-probe-result" style="margin-bottom:10px;"></div>
+                                
+                                <div style="margin-top: 10px;">
+                                    <label style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:8px; display:block;">Registered Wi-Fi Screens</label>
+                                    <ul id="lan-device-list" class="device-list">
+                                        <li class="empty-list">No Wi-Fi screens registered.</li>
+                                    </ul>
+                                </div>
                             </div>
-                            <div style="display:flex; gap:10px; margin-top:12px;">
-                                <button id="save-lan-btn" class="glow-btn compact">💾 Save LAN Config</button>
-                                <button id="probe-lan-btn" class="glow-btn compact" style="background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.3);">📡 Test Connection</button>
-                            </div>
-                            <div class="lan-probe-result" id="lan-probe-result"></div>
                         </div>
                     </div>
                 </div>
 
                 <!-- 2. DIVOOM TAB -->
                 <div class="settings-tab-content" id="settings-divoom">
-                    <div class="grid-layout">
-                        <!-- Divoom Cloud credentials -->
+                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
+                        <!-- Divoom Cloud -->
                         <div class="card glass-card">
                             <div class="card-header">
-                                <h3>Divoom Cloud Credentials</h3>
+                                <h3>Divoom Cloud</h3>
                             </div>
                             <div class="card-body">
                                 <div class="form-group">
-                                    <label>Divoom Email Address</label>
-                                    <input type="email" id="settings-email" class="text-input" placeholder="your-email@example.com">
+                                    <input type="email" id="settings-email" class="text-input" placeholder="Email Address">
                                 </div>
                                 <div class="form-group">
-                                    <label>Account Password</label>
-                                    <input type="password" id="settings-password" class="text-input" placeholder="••••••••••••••">
+                                    <input type="password" id="settings-password" class="text-input" placeholder="Account Password">
                                 </div>
-                                <button id="save-creds-btn" class="glow-btn pulse-glow">Save Cloud Credentials</button>
-                            </div>
-                        </div>
-
-                        <!-- Connectivity & Privacy Legend -->
-                        <div style="margin-top: 0;">
-                            <h3 style="font-size:13px; margin-bottom:12px; color:rgba(255,255,255,0.6);">Connectivity &amp; Privacy</h3>
-                            <div class="connectivity-legend">
-                                <div class="connectivity-legend-row">
-                                    <div class="connectivity-legend-badge"><span class="transport-badge ble">🔵 BLE</span></div>
-                                    <div class="connectivity-legend-text">
-                                        <strong>Bluetooth Low Energy</strong>
-                                        <span>100% local. Commands go directly to the device over Bluetooth. Nothing ever leaves your machine.</span>
-                                    </div>
-                                </div>
-                                <div class="connectivity-legend-row">
-                                    <div class="connectivity-legend-badge"><span class="transport-badge lan">🟢 LAN</span></div>
-                                    <div class="connectivity-legend-text">
-                                        <strong>Local Wi-Fi HTTP (:9000)</strong>
-                                        <span>100% local. Talks directly to the device's built-in HTTP server. No internet, no account. WiFi-capable devices only.</span>
-                                    </div>
-                                </div>
-                                <div class="connectivity-legend-row">
-                                    <div class="connectivity-legend-badge"><span class="transport-badge cloud">🟡 Cloud</span></div>
-                                    <div class="connectivity-legend-text">
-                                        <strong>Divoom Cloud (appin.divoom-gz.com)</strong>
-                                        <span>Sends commands to Divoom's servers. Required for: gallery browsing, clock face store, community features. Requires a Divoom account.</span>
-                                    </div>
-                                </div>
-                                <div class="connectivity-legend-row">
-                                    <div class="connectivity-legend-badge"><span class="transport-badge ext">🔴 External</span></div>
-                                    <div class="connectivity-legend-text">
-                                        <strong>External Internet APIs</strong>
-                                        <span>Used for weather, stock prices, album art lookups. 3rd-party services — no Divoom account required. Data is anonymous.</span>
-                                    </div>
-                                </div>
+                                <button id="save-creds-btn" class="glow-btn pulse-glow">Save Credentials</button>
                             </div>
                         </div>
                     </div>
@@ -492,23 +456,17 @@
 
                 <!-- 3. APPEARANCE TAB -->
                 <div class="settings-tab-content" id="settings-appearance">
-                    <div class="grid-layout" style="grid-template-columns: 1fr;">
+                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
                         <!-- Aesthetic Theme Mode -->
-                        <div class="card glass-card" style="max-width: 540px;">
+                        <div class="card glass-card">
                             <div class="card-header">
-                                <h3>Aesthetic Theme Mode</h3>
+                                <h3>Theme</h3>
                             </div>
                             <div class="card-body">
-                                <div class="form-group">
-                                    <label>Interface Theme Style</label>
-                                    <p style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:12px; line-height:1.4;">
-                                        Select the aesthetic layout theme. Selecting Auto will align with your system/macOS light/dark preferences.
-                                    </p>
-                                    <div class="theme-buttons">
-                                        <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">🌙 Dark</button>
-                                        <button class="theme-mode-btn" data-theme="light" title="Light Mode">☀️ Light</button>
-                                        <button class="theme-mode-btn" data-theme="system" title="System Auto">💻 Auto</button>
-                                    </div>
+                                <div class="theme-buttons">
+                                    <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">🌙 Dark</button>
+                                    <button class="theme-mode-btn" data-theme="light" title="Light Mode">☀️ Light</button>
+                                    <button class="theme-mode-btn" data-theme="system" title="System Auto">💻 Auto</button>
                                 </div>
                             </div>
                         </div>
