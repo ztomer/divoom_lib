@@ -68,6 +68,47 @@ class HeadlessGuiTester:
             # Step 3: Monthly Best Gallery View
             window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'monthly-best\']").click();')
             time.sleep(1.0)
+            
+            # Trigger Fetch Gallery button click
+            print_info("E2E Test: Triggering 'Fetch Gallery' click...")
+            window.evaluate_js('document.getElementById("load-gallery-btn").click();')
+            time.sleep(4.0)  # Wait for cloud API, file download, AES decryption/LZO transcoding to complete
+            
+            # Assert correct previews are rendered
+            js_assert = """
+            (function() {
+                const previews = document.querySelectorAll(".gallery-item-preview");
+                if (previews.length === 0) return JSON.stringify({error: "No gallery items rendered at all"});
+                const list = [];
+                previews.forEach((img, idx) => {
+                    list.push({
+                        idx: idx,
+                        src: img.src,
+                        is_mockup: img.src.includes("assets/pixoo.png"),
+                        is_badge: img.src.includes("eEwpPWIfSLqEFi3ZAAAAAEVtmrs365"),
+                        is_cached: img.src.includes("assets/cache_gallery/")
+                    });
+                });
+                return JSON.stringify({error: null, items: list});
+            })()
+            """
+            assert_res_json = window.evaluate_js(js_assert)
+            assert_res = json.loads(assert_res_json)
+            
+            if assert_res.get("error"):
+                raise AssertionError(f"E2E Gallery Assert: {assert_res.get('error')}")
+                
+            items = assert_res.get("items", [])
+            print_info(f"E2E Gallery Assert: Validating {len(items)} rendered previews...")
+            for item in items:
+                if item["is_mockup"]:
+                    raise AssertionError(f"E2E Gallery Assert: Card {item['idx']} shows empty checkerboard grid mockup fallback!")
+                if item["is_badge"]:
+                    raise AssertionError(f"E2E Gallery Assert: Card {item['idx']} displays duplicate orange 'V' ambassador badge instead of artwork!")
+                if not item["is_cached"]:
+                    raise AssertionError(f"E2E Gallery Assert: Card {item['idx']} preview URL '{item['src']}' is not fetched/cached locally!")
+                    
+            print_ok("E2E Gallery Assert: ALL gallery item previews rendered ACTUAL pixel art thumbnails successfully!")
             self.capture_screenshot("3_monthly_best_gallery")
 
             # Step 4: Live Widgets View

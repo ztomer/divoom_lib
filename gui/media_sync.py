@@ -135,7 +135,8 @@ class MediaSyncMixin:
                         safe_filename = file_id.replace("/", "_")
                         cache_file = cache_dir / safe_filename
                         
-                        if not cache_file.exists():
+                        has_cached = any(cache_file.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg", ".bin"])
+                        if not has_cached:
                             try:
                                 dl_url = f"https://fin.divoom-gz.com/{file_id}"
                                 req_dl = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
@@ -161,21 +162,14 @@ class MediaSyncMixin:
                                         cache_file.write_bytes(raw_bytes)
                                         logger.info(f"Gallery Cache: Saved standard JPEG to {cache_file.name}")
                                     else:
-                                        if pixel_amb_id:
-                                            ext_fb = Path(pixel_amb_id).suffix or ".png"
-                                            cache_file_fb = cache_file.with_suffix(ext_fb)
-                                            if not cache_file_fb.exists():
-                                                dl_url_fb = f"https://fin.divoom-gz.com/{pixel_amb_id}"
-                                                req_dl_fb = urllib.request.Request(dl_url_fb, headers={"User-Agent": "okhttp/4.12.0"})
-                                                with urllib.request.urlopen(req_dl_fb, timeout=5) as dl_resp_fb:
-                                                    cache_file_fb.write_bytes(dl_resp_fb.read())
-                                            # Also save the raw binary file for streaming if needed
-                                            cache_file_bin = cache_file.with_suffix(".bin")
-                                            if not cache_file_bin.exists():
-                                                cache_file_bin.write_bytes(raw_bytes)
-                                        else:
-                                            cache_file_bin = cache_file.with_suffix(".bin")
+                                        # Also save the raw binary file for streaming if needed
+                                        cache_file_bin = cache_file.with_suffix(".bin")
+                                        if not cache_file_bin.exists():
                                             cache_file_bin.write_bytes(raw_bytes)
+                                        
+                                        # Decode the actual first frame as PNG preview
+                                        cache_file_png = cache_file.with_suffix(".png")
+                                        self._decode_and_save_preview(raw_bytes, cache_file_png)
                             except Exception as dl_err:
                                 logger.warning(f"Failed to cache preview for {file_id}: {dl_err}")
                         
@@ -389,3 +383,61 @@ class MediaSyncMixin:
         except Exception as e:
             logger.error(f"Failed to apply stock ticker: {e}")
             return json.dumps({"success": False, "error": str(e)})
+
+    def _decode_and_save_preview(self, raw_bytes: bytes, cache_file_png: Path) -> bool:
+        try:
+            from Crypto.Cipher import AES
+            from PIL import Image
+            import struct
+            
+            magic = raw_bytes[0]
+            key = '78hrey23y28ogs89'.encode('utf-8')
+            iv = '1234567890123456'.encode('utf-8')
+            
+            def decrypt_aes(data):
+                return AES.new(key, AES.MODE_CBC, iv).decrypt(data)
+
+            if magic == 9:
+                encrypted = raw_bytes[4:]
+                decrypted = decrypt_aes(encrypted)
+                if len(decrypted) >= 768:
+                    img = Image.frombytes("RGB", (16, 16), bytes(decrypted[:768]))
+                    img.resize((128, 128), Image.Resampling.NEAREST).save(cache_file_png)
+                    logger.info(f"Gallery Cache: Decoded Magic 9 16x16 asset to {cache_file_png.name}")
+                    return True
+                    
+            elif magic == 18 or magic == 26:
+                import lzallright
+                total_frames, speed, row_count, column_count = struct.unpack('>BHBB', raw_bytes[1:6])
+                encrypted = raw_bytes[6:]
+                decrypted = decrypt_aes(encrypted)
+                
+                frame_size = struct.unpack('>I', decrypted[:4])[0]
+                compressed_frame = decrypted[4 : 4 + frame_size]
+                
+                uncompressed_size = row_count * column_count * 768
+                lzo = lzallright.LZOCompressor()
+                frame_data = lzo.decompress(compressed_frame, uncompressed_size)
+                
+                img = self._compact_tiles(frame_data, row_count, column_count)
+                img.resize((128, 128), Image.Resampling.NEAREST).save(cache_file_png)
+                logger.info(f"Gallery Cache: Decoded Magic {magic} asset to {cache_file_png.name}")
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to transcode preview for Magic {raw_bytes[0] if raw_bytes else 0}: {e}")
+        return False
+
+    def _compact_tiles(self, frame_data: bytes, row_count: int, column_count: int) -> "Image":
+        from PIL import Image
+        width, height = column_count * 16, row_count * 16
+        img = Image.new("RGB", (width, height))
+        pixels = img.load()
+        pos = 0
+        for grid_y in range(row_count):
+            for grid_x in range(column_count):
+                for y in range(16):
+                    for x in range(16):
+                        if pos + 3 <= len(frame_data):
+                            pixels[grid_x * 16 + x, grid_y * 16 + y] = (frame_data[pos], frame_data[pos+1], frame_data[pos+2])
+                            pos += 3
+        return img
