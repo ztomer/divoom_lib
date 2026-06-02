@@ -16,3 +16,9 @@ api_scraper/divoom_docs/guest_token.json
 apk/*.apk
 apk/decompiled_src/
 apk/smali_src/
+
+# Test reports, logs, and coverage files
+test_reports/
+.coverage
+*.log
+
