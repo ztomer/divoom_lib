@@ -341,14 +341,38 @@
                             <div class="empty-list">Click "Fetch Gallery" to load public artworks.</div>
                         </div>
                         
-                        <div class="batch-sync-bar">
-                            <div class="sync-target-info" style="display:flex; align-items:center; gap:15px; flex:1;">
-                                <div style="display:flex; flex-direction:column; gap:4px;">
-                                    <span class="sync-target-title">Active Screen Info</span>
-                                    <span id="sync-target-list" class="sync-target-list">No active screens</span>
-                                </div>
+                        <!-- Sync targets (4.c): explicit device multi-select -->
+                        <div class="hot-channel">
+                            <div class="hc-row">
+                                <div class="hc-label">Sync Targets</div>
+                                <button id="refresh-targets-btn" class="glow-btn compact ghost">Refresh</button>
                             </div>
-                            <button id="batch-sync-btn" class="glow-btn pulse-glow">Sync Selection</button>
+                            <div id="sync-targets-list" class="sync-targets-list">
+                                <span class="empty-list">No devices — scan under Settings, or add a Wi-Fi screen.</span>
+                            </div>
+
+                            <div class="hc-actions">
+                                <button id="batch-sync-btn" class="glow-btn">Sync Selected Art</button>
+                                <button id="sync-all-btn" class="glow-btn pulse-glow">Sync All → Targets</button>
+                            </div>
+
+                            <!-- Automatic hot-channel schedule (4.d) -->
+                            <div class="hc-schedule">
+                                <div class="hc-label">Automatic Hot-Channel Schedule</div>
+                                <label class="hc-toggle">
+                                    <input type="checkbox" id="hc-enabled"> Enable scheduled sync (runs headless)
+                                </label>
+                                <label class="slider-label">Sync every
+                                    <select id="hc-interval" class="custom-select small">
+                                        <option value="3600">1 hour</option>
+                                        <option value="21600">6 hours</option>
+                                        <option value="43200">12 hours</option>
+                                        <option value="86400">24 hours</option>
+                                    </select>
+                                </label>
+                                <button id="hc-save-schedule-btn" class="glow-btn compact">Save Schedule</button>
+                                <span id="hc-schedule-status" class="panel-hint"></span>
+                            </div>
                         </div>
                     </div>
                 </div>

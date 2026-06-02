@@ -290,6 +290,122 @@ class MediaSyncMixin:
             logger.error(f"Batch sync failed: {e}")
             return False
 
+    # ── Monthly Best "hot channel" (request area 4) ────────────────────────
+
+    @staticmethod
+    def _coerce_list(args, kwargs, key) -> list:
+        """Normalize varied call conventions into a list.
+
+        Accepts: a single JSON string (pywebview bridge), a single native list
+        (REST single-arg), spread positional values (REST array body), or a
+        ``key=[...]`` kwarg (REST object body)."""
+        if len(args) == 1:
+            v = args[0]
+            if isinstance(v, str):
+                try:
+                    parsed = json.loads(v)
+                    return parsed if isinstance(parsed, list) else [parsed]
+                except ValueError:
+                    return [v]
+            return list(v) if isinstance(v, (list, tuple)) else [v]
+        if len(args) > 1:
+            return list(args)
+        if key in kwargs and isinstance(kwargs[key], (list, tuple)):
+            return list(kwargs[key])
+        return []
+
+    @staticmethod
+    def _coerce_dict(args, kwargs) -> dict:
+        """Normalize into a dict: single JSON string / native dict, or kwargs."""
+        if len(args) == 1:
+            v = args[0]
+            if isinstance(v, str):
+                try:
+                    parsed = json.loads(v)
+                    return parsed if isinstance(parsed, dict) else {}
+                except ValueError:
+                    return {}
+            return dict(v) if isinstance(v, dict) else {}
+        allowed = ("enabled", "interval", "classify", "targets")
+        return {k: kwargs[k] for k in allowed if k in kwargs}
+
+    def get_sync_candidates(self) -> str:
+        """List devices selectable as hot-channel sync targets, marking which
+        are currently selected (4.c). Combines discovered + wall + connected."""
+        from divoom_lib import hotchannel_config
+        selected = set(hotchannel_config.get_targets())
+        seen, candidates = set(), []
+
+        def add(address, name):
+            if not address or address in seen:
+                return
+            seen.add(address)
+            candidates.append({"address": address, "name": name or "Divoom Screen",
+                               "selected": address in selected})
+
+        # Discovered devices cache
+        try:
+            cache = Path.home() / ".config" / "divoom-control" / "discovered_devices.json"
+            if cache.exists():
+                for d in json.loads(cache.read_text(encoding="utf-8")):
+                    add(d.get("address"), d.get("name"))
+        except Exception:
+            pass
+        # Wall slots
+        for mac, slot in (getattr(self, "wall_slots", {}) or {}).items():
+            add(mac, (slot or {}).get("name"))
+        # Any selected target not otherwise listed (keep it visible/removable)
+        for addr in selected:
+            add(addr, None)
+        return json.dumps(candidates)
+
+    def set_sync_targets(self, *addresses, **kwargs) -> bool:
+        """Persist the selected hot-channel target devices (4.c).
+
+        Accepts a JSON-string array (pywebview), a native list, or spread
+        addresses (REST)."""
+        from divoom_lib import hotchannel_config
+        try:
+            addrs = self._coerce_list(addresses, kwargs, "targets")
+            return hotchannel_config.set_targets([str(a) for a in addrs])
+        except Exception as e:
+            logger.error(f"set_sync_targets failed: {e}")
+            return False
+
+    def get_hot_channel_config(self) -> str:
+        """Return the persisted hot-channel schedule + targets (4.d)."""
+        from divoom_lib import hotchannel_config
+        return json.dumps(hotchannel_config.load_config())
+
+    def save_hot_channel_config(self, *config, **kwargs) -> bool:
+        """Persist hot-channel schedule (enabled/interval/classify/targets) (4.d).
+
+        Accepts a JSON-string object (pywebview), a native dict, or kwargs (REST)."""
+        from divoom_lib import hotchannel_config
+        try:
+            cfg = self._coerce_dict(config, kwargs)
+            return hotchannel_config.save_config(cfg)
+        except Exception as e:
+            logger.error(f"save_hot_channel_config failed: {e}")
+            return False
+
+    def sync_hot_channel(self, *file_ids_arg, **kwargs) -> str:
+        """Sync MULTIPLE monthly-best images to all current targets at once (4.b).
+
+        Replaces the one-image-at-a-time flow: pushes each provided artwork to
+        the resolved target set (wall = every wall device). Returns a summary.
+        Accepts a JSON-string array, native list, or spread file ids."""
+        file_ids = self._coerce_list(file_ids_arg, kwargs, "file_ids")
+        synced, failed = [], []
+        for fid in file_ids:
+            ok = False
+            try:
+                ok = self.batch_sync_artwork(json.dumps({"file_id": fid}))
+            except Exception as e:
+                logger.error(f"hot-channel sync of {fid} failed: {e}")
+            (synced if ok else failed).append(fid)
+        return json.dumps({"ok": len(failed) == 0, "synced": synced, "failed": failed})
+
     def _music_sync_loop(self):
         """Background thread polling macOS active playback and streaming artwork."""
         last_track = None

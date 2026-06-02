@@ -1663,6 +1663,63 @@ body.theme-light .settings-tab-btn.active {
     margin-bottom: -20px;
 }
 
+/* ── Hot-channel: target multi-select + schedule (area 4) ──────────── */
+.hot-channel {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.hc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.hc-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.sync-targets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+}
+.target-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+}
+.target-row:hover { background: rgba(130, 131, 138, 0.08); }
+.target-name { font-size: 13px; font-weight: 600; color: var(--text-main); }
+.target-addr { font-size: 11px; color: var(--text-muted); font-family: monospace; margin-left: auto; }
+.hc-actions { display: flex; gap: 10px; }
+.hc-schedule {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.hc-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-main);
+    cursor: pointer;
+}
+
 /* ── Sync Target Info Elements ─────────────────────────────────────── */
 .sync-target-info {
     display: flex;

@@ -5,6 +5,7 @@ Launches the premium frameless PyWebView dashboard, exposing Divoom's core BLE f
 and coordinate display wall capabilities to the HTML/CSS/JS frontend.
 """
 
+import os
 import sys
 import json
 import asyncio
@@ -529,7 +530,18 @@ def main():
     api = DivoomGuiAPI()
     web_ui_dir = Path(__file__).parent / "web_ui"
     index_html = web_ui_dir / "index.html"
-    
+
+    # Optional headless control surface (instrumentation / scripting / E2E).
+    # Enable with DIVOOM_CONTROL_SERVER=1 (port via DIVOOM_CONTROL_PORT).
+    if os.environ.get("DIVOOM_CONTROL_SERVER") in ("1", "true", "yes"):
+        try:
+            from control_server import serve_in_background
+            port = int(os.environ.get("DIVOOM_CONTROL_PORT", "8787"))
+            serve_in_background(api, port=port)
+            logger.info(f"Control server enabled on http://127.0.0.1:{port}")
+        except Exception as e:
+            logger.warning(f"Failed to start control server: {e}")
+
     logger.info("Starting Divoom Desktop GUI window in frameless mode...")
     
     window = webview.create_window(

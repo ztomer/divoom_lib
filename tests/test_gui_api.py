@@ -144,6 +144,39 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertFalse(self.api.set_vj_effect(0))
         self.assertFalse(self.api.set_visualization(0))
 
+    def test_hot_channel_bridges_delegate(self):
+        """4.c/4.d: target + schedule bridges delegate to hotchannel_config."""
+        cfg = {"enabled": False, "interval": 3600, "classify": 18, "targets": ["AA"]}
+        with patch("divoom_lib.hotchannel_config.set_targets", return_value=True) as mset, \
+             patch("divoom_lib.hotchannel_config.load_config", return_value=cfg), \
+             patch("divoom_lib.hotchannel_config.get_targets", return_value=["AA"]), \
+             patch("divoom_lib.hotchannel_config.save_config", return_value=True) as msave:
+
+            self.assertTrue(self.api.set_sync_targets(json.dumps(["AA", "BB"])))
+            mset.assert_called_once_with(["AA", "BB"])
+
+            self.assertEqual(json.loads(self.api.get_hot_channel_config())["targets"], ["AA"])
+
+            self.assertTrue(self.api.save_hot_channel_config(json.dumps({"enabled": True})))
+            msave.assert_called_once()
+
+            cands = json.loads(self.api.get_sync_candidates())
+            sel = {c["address"]: c["selected"] for c in cands}
+            self.assertTrue(sel.get("AA"))  # persisted target shows as selected
+
+    def test_sync_hot_channel_multi(self):
+        """4.b: sync_hot_channel pushes every artwork and reports a summary."""
+        with patch.object(self.api, "batch_sync_artwork", return_value=True) as m:
+            res = json.loads(self.api.sync_hot_channel(json.dumps(["id1", "id2", "id3"])))
+            self.assertTrue(res["ok"])
+            self.assertEqual(res["synced"], ["id1", "id2", "id3"])
+            self.assertEqual(m.call_count, 3)
+
+        with patch.object(self.api, "batch_sync_artwork", side_effect=[True, False]):
+            res2 = json.loads(self.api.sync_hot_channel(json.dumps(["a", "b"])))
+            self.assertFalse(res2["ok"])
+            self.assertEqual(res2["failed"], ["b"])
+
     @patch("urllib.request.urlopen")
     def test_fetch_gallery_and_batch_sync(self, mock_urlopen):
         """Test cloud gallery catalog scraping and concurrent monthly best async streams."""

@@ -146,11 +146,33 @@ async def main_async():
     parser.add_argument("--dry-run", action="store_true", help="Run without connecting to physical BLE device (downloads only)")
     parser.add_argument("--loop", action="store_true", help="Run as a daemon looping indefinitely")
     parser.add_argument("--interval", type=int, default=3600, help="Loop interval in seconds (default: 3600)")
+    parser.add_argument("--use-config", action="store_true",
+                        help="Drive classify/interval/targets from the GUI-persisted "
+                             "hot-channel config (~/.config/divoom-control/hotchannel.json)")
     args = parser.parse_args()
 
     # Configure logging
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger("monthly_best_daemon")
+
+    # Resolve run parameters. With --use-config, the GUI-selected targets and
+    # schedule drive the daemon so automatic syncs run headless (request 4.d).
+    from divoom_lib import hotchannel_config
+    hc_cfg = hotchannel_config.load_config()
+    if args.use_config:
+        classify = hc_cfg["classify"]
+        interval = hc_cfg["interval"]
+        targets = list(hc_cfg["targets"])
+        if not args.loop:
+            args.loop = bool(hc_cfg["enabled"])
+        if not targets:
+            print_wrn("Hot-channel config has no selected target devices; "
+                      "select devices in the Monthly Best tab first.")
+    else:
+        classify = args.classify
+        interval = args.interval
+        # None => fall back to name-based discovery (existing behavior).
+        targets = [args.address] if args.address else [None]
 
     # Load credentials
     print_info("Loading credentials from divoom_auth...")
@@ -184,7 +206,7 @@ async def main_async():
             "Token": creds.token,
             "UserId": creds.user_id,
             "DeviceId": device_id,
-            "Classify": args.classify,
+            "Classify": classify,
             "FileSort": 1,   # Popular
             "FileType": 5,   # All
             "FileSize": 127, # All sizes
@@ -283,57 +305,55 @@ async def main_async():
             # Physical BLE display execution
             if len(items_to_display) == 0:
                 print_wrn("No items downloaded to display.")
+            elif not targets:
+                print_wrn("No target devices configured; skipping push this cycle.")
             else:
-                divoom = None
-                try:
-                    if args.address:
-                        target_addr = args.address
-                    else:
-                        print_info(f"Discovering BLE device with name containing {args.name!r}...")
-                        ble_device, device_addr = await discovery.discover_device(name_substring=args.name, address=None)
-                        if not ble_device:
-                            raise RuntimeError(f"No Divoom device found with name substring {args.name!r}")
-                        target_addr = device_addr
-
-                    print_info(f"Connecting to BLE device at {target_addr}...")
-                    divoom = Divoom(mac=target_addr, logger=logger, use_ios_le_protocol=False)
-                    await divoom.connect()
-                    print_ok("Connected successfully!")
-
-                    for idx, item in enumerate(items_to_display):
-                        print_info(f"Displaying item [{idx+1}/{len(items_to_display)}]: {item['name']!r} ({item['type']})")
-                        
-                        if item["type"] == "gif":
-                            # Stream processed GIF
-                            success = await divoom.display.show_image(item["path"])
-                            if success:
-                                print_ok(f"Successfully pushed GIF {item['name']!r}")
-                            else:
-                                print_err(f"Failed to push GIF {item['name']!r}")
-                        elif item["type"] == "bin":
-                            # Stream raw native BIN via 0x8b
-                            success = await stream_raw_bin_payload(divoom, item["bytes"])
-                            if success:
-                                print_ok(f"Successfully pushed native BIN {item['name']!r}")
-                            else:
-                                print_err(f"Failed to push native BIN {item['name']!r}")
-                        
-                        # Wait between displaying different artworks (e.g. 15 seconds)
-                        if idx < len(items_to_display) - 1:
-                            print_info("Waiting 15 seconds before showing next artwork...")
-                            await asyncio.sleep(15.0)
-
-                except Exception as ble_err:
-                    print_err(f"BLE Communication error: {ble_err}")
-                finally:
-                    if divoom and divoom.is_connected:
-                        await divoom.disconnect()
-                        print_info("Disconnected from BLE device.")
+                # Push the monthly-best set to every selected target (4.b/4.d).
+                for target in targets:
+                    await _push_items_to_target(target, args.name, items_to_display, logger)
 
         if not args.loop:
             break
-        print_info(f"Sleeping for {args.interval} seconds until the next cycle...")
-        await asyncio.sleep(args.interval)
+        print_info(f"Sleeping for {interval} seconds until the next cycle...")
+        await asyncio.sleep(interval)
+
+
+async def _push_items_to_target(target_addr, name_substring, items_to_display, logger):
+    """Connect to one device (by address, or by name when address is None) and
+    push every downloaded artwork to it, then disconnect."""
+    divoom = None
+    try:
+        if not target_addr:
+            print_info(f"Discovering BLE device with name containing {name_substring!r}...")
+            ble_device, device_addr = await discovery.discover_device(name_substring=name_substring, address=None)
+            if not ble_device:
+                raise RuntimeError(f"No Divoom device found with name substring {name_substring!r}")
+            target_addr = device_addr
+
+        print_info(f"Connecting to BLE device at {target_addr}...")
+        divoom = Divoom(mac=target_addr, logger=logger, use_ios_le_protocol=False)
+        await divoom.connect()
+        print_ok(f"Connected to {target_addr} successfully!")
+
+        for idx, item in enumerate(items_to_display):
+            print_info(f"[{target_addr}] Displaying item [{idx+1}/{len(items_to_display)}]: {item['name']!r} ({item['type']})")
+            if item["type"] == "gif":
+                success = await divoom.display.show_image(item["path"])
+            elif item["type"] == "bin":
+                success = await stream_raw_bin_payload(divoom, item["bytes"])
+            else:
+                success = False
+            print_ok(f"Pushed {item['name']!r}") if success else print_err(f"Failed to push {item['name']!r}")
+
+            if idx < len(items_to_display) - 1:
+                print_info("Waiting 15 seconds before showing next artwork...")
+                await asyncio.sleep(15.0)
+    except Exception as ble_err:
+        print_err(f"BLE Communication error for {target_addr}: {ble_err}")
+    finally:
+        if divoom and divoom.is_connected:
+            await divoom.disconnect()
+            print_info(f"Disconnected from {target_addr}.")
 
 if __name__ == "__main__":
     try:

@@ -107,6 +107,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const channelPanels = document.querySelectorAll(".channel-panel");
     let activeChannel = "clock";
 
+    // Track active connection so Control Center actions can explain *why* nothing
+    // happens (the bridge returns false when no device is connected — the real
+    // cause behind "switching channels doesn't work").
+    let appConnected = false;
+    function requireDevice() {
+        if (!appConnected) {
+            showToast("Connect a device first — scan and connect under Settings.", "error");
+            return false;
+        }
+        return true;
+    }
+
     function showChannelPanel(channel) {
         channelPanels.forEach(p => p.classList.toggle("active", p.id === `panel-${channel}`));
     }
@@ -120,6 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Ambient is a light mode applied via its own button, not a device
             // channel switch, so don't fire switch_channel for it.
             if (activeChannel === "ambient") return;
+            if (!requireDevice()) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.switch_channel) {
                 window.pywebview.api.switch_channel(activeChannel).then(res => {
                     if (res) showToast("Switched channel", "success", "🔵 BLE");
@@ -161,6 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const applyClockBtn = document.getElementById("apply-clock-btn");
     if (applyClockBtn) {
         applyClockBtn.addEventListener("click", () => {
+            if (!requireDevice()) return;
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.set_clock(selectedClockStyle).then(res => {
                     showToast(res ? "Clock face applied" : "Failed to apply clock", res ? "success" : "error", "🔵 BLE");
@@ -175,6 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "Pink/Blue Fade", "Rainbow Polygons", "Pink/Blue Wave", "Rainbow Cross", "Rainbow Shapes"]
         .map((name, i) => ({ value: i, name }));
     buildSelectorGrid("vj-effects-grid", VJ_EFFECTS, (v) => {
+        if (!requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_vj_effect) {
             window.pywebview.api.set_vj_effect(v).then(res => {
                 showToast(res ? "VJ effect applied" : "Failed to apply VJ effect", res ? "success" : "error", "🔵 BLE");
@@ -186,6 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // inventing names; count to be confirmed against a real device.
     const EQ_PATTERNS = Array.from({ length: 12 }, (_, i) => ({ value: i, name: `EQ ${String(i + 1).padStart(2, "0")}` }));
     buildSelectorGrid("eq-visualizer-grid", EQ_PATTERNS, (v) => {
+        if (!requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_visualization) {
             window.pywebview.api.set_visualization(v).then(res => {
                 showToast(res ? "EQ pattern applied" : "Failed to apply EQ", res ? "success" : "error", "🔵 BLE");
@@ -197,6 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const applyAmbientBtn = document.getElementById("apply-ambient-btn");
     if (applyAmbientBtn) {
         applyAmbientBtn.addEventListener("click", () => {
+            if (!requireDevice()) return;
             const color = document.getElementById("ambient-color-input")?.value || "#00ffcc";
             const brightness = parseInt(document.getElementById("ambient-brightness")?.value) || 80;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.set_solid_light) {
@@ -472,6 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
             window.pywebview.api.connect_single_device(address)
                 .then(res => {
                     if (res) {
+                        appConnected = true;
                         showToast(`Successfully connected to ${name}!`, "success");
                         if (statusDot) statusDot.className = "status-indicator connected";
                         if (statusText) statusText.textContent = `Connected: ${name}`;
@@ -491,6 +509,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         updateSyncTargetList();
                     } else {
+                        appConnected = false;
                         showToast(`Failed to connect to ${name}`, "error");
                         if (statusDot) statusDot.className = "status-indicator disconnected";
                         if (statusText) statusText.textContent = "Disconnected";
@@ -1220,37 +1239,108 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ── 2D. DYNAMIC TARGET SCREENS LIST FOR MONTHLY BEST ──
-    function updateSyncTargetList() {
-        const targetListEl = document.getElementById("sync-target-list");
-        if (!targetListEl) return;
+    // 4.c — render the sync-target multi-select from backend candidates.
+    function renderSyncTargets(candidates) {
+        const el = document.getElementById("sync-targets-list");
+        if (!el) return;
+        if (!candidates || candidates.length === 0) {
+            el.innerHTML = `<span class="empty-list">No devices — scan under Settings, or add a Wi-Fi screen.</span>`;
+            return;
+        }
+        el.innerHTML = "";
+        candidates.forEach(c => {
+            const row = document.createElement("label");
+            row.className = "target-row";
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.value = c.address;
+            cb.checked = !!c.selected;
+            cb.addEventListener("change", persistSyncTargets);
+            const name = document.createElement("span");
+            name.className = "target-name";
+            name.textContent = c.name;
+            const addr = document.createElement("span");
+            addr.className = "target-addr";
+            addr.textContent = c.address;
+            row.append(cb, name, addr);
+            el.appendChild(row);
+        });
+    }
 
-        const slotCount = Object.keys(assignedSlots || {}).length;
-        if (slotCount > 0) {
-            const names = Object.keys(assignedSlots).map(mac => {
-                const slot = assignedSlots[mac];
-                return `${slot.name || 'Screen'} (${mac})`;
-            });
-            targetListEl.innerHTML = `🧱 Matrix Wall: ${names.join(", ")}`;
-            targetListEl.style.color = "var(--primary)";
-        } else {
-            const deviceMac = document.getElementById("banner-device-mac")?.textContent || "";
-            const deviceName = document.getElementById("banner-device-name")?.textContent || "";
-            const globalStatusText = document.getElementById("global-status-text")?.textContent || "";
-            
-            if (deviceMac && deviceMac !== "None" && deviceMac !== "00:00:00:00:00:00") {
-                targetListEl.innerHTML = `📺 Active Device: ${deviceName || 'Divoom'} (${deviceMac})`;
-                targetListEl.style.color = "var(--accent)";
-            } else {
-                targetListEl.innerHTML = `⚠️ No active screen connected. Connect a device in Settings first.`;
-                targetListEl.style.color = "#ef4444";
-            }
+    function persistSyncTargets() {
+        const checked = Array.from(document.querySelectorAll("#sync-targets-list input:checked")).map(i => i.value);
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_sync_targets) {
+            window.pywebview.api.set_sync_targets(JSON.stringify(checked));
         }
     }
 
-    // Trigger updateSyncTargetList at startup
+    function updateSyncTargetList() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_sync_candidates) {
+            window.pywebview.api.get_sync_candidates().then(json => {
+                try { renderSyncTargets(JSON.parse(json)); } catch (e) { /* ignore */ }
+            });
+        }
+    }
+
+    const refreshTargetsBtn = document.getElementById("refresh-targets-btn");
+    if (refreshTargetsBtn) refreshTargetsBtn.addEventListener("click", updateSyncTargetList);
+
+    // 4.b — sync ALL loaded gallery items to every selected target at once.
+    const syncAllBtn = document.getElementById("sync-all-btn");
+    if (syncAllBtn) {
+        syncAllBtn.addEventListener("click", () => {
+            if (!loadedArtworks || loadedArtworks.length === 0) {
+                showToast("Fetch the gallery first.", "error");
+                return;
+            }
+            const fileIds = loadedArtworks.map(a => a.file_id).filter(Boolean);
+            showToast(`Syncing ${fileIds.length} artworks to targets…`, "success");
+            window.pywebview.api.sync_hot_channel(JSON.stringify(fileIds)).then(json => {
+                try {
+                    const r = JSON.parse(json);
+                    if (r.ok) showToast(`Synced ${r.synced.length} artworks`, "success", "🔵 BLE");
+                    else showToast(`Synced ${r.synced.length}, ${r.failed.length} failed`, "error");
+                } catch (e) { showToast("Sync failed", "error"); }
+            });
+        });
+    }
+
+    // 4.d — load + save the automatic hot-channel schedule.
+    function loadHotChannelSchedule() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_hot_channel_config) {
+            window.pywebview.api.get_hot_channel_config().then(json => {
+                try {
+                    const cfg = JSON.parse(json);
+                    const en = document.getElementById("hc-enabled");
+                    const iv = document.getElementById("hc-interval");
+                    const cl = document.getElementById("gallery-classify");
+                    if (en) en.checked = !!cfg.enabled;
+                    if (iv) iv.value = String(cfg.interval);
+                    if (cl && cfg.classify != null) cl.value = String(cfg.classify);
+                } catch (e) { /* ignore */ }
+            });
+        }
+    }
+
+    const hcSaveBtn = document.getElementById("hc-save-schedule-btn");
+    if (hcSaveBtn) {
+        hcSaveBtn.addEventListener("click", () => {
+            const enabled = document.getElementById("hc-enabled")?.checked || false;
+            const interval = parseInt(document.getElementById("hc-interval")?.value) || 3600;
+            const classify = parseInt(document.getElementById("gallery-classify")?.value) || 18;
+            window.pywebview.api.save_hot_channel_config(JSON.stringify({ enabled, interval, classify })).then(ok => {
+                const st = document.getElementById("hc-schedule-status");
+                if (st) st.textContent = ok ? (enabled ? "Saved — scheduled" : "Saved — disabled") : "Failed to save";
+                showToast(ok ? "Schedule saved" : "Failed to save schedule", ok ? "success" : "error");
+            });
+        });
+    }
+
+    // Initial load of targets + schedule.
     setTimeout(() => {
         updateSyncTargetList();
+        loadHotChannelSchedule();
     }, 1500);
-    
+
 });
 

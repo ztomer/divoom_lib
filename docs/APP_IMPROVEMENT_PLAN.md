@@ -4,6 +4,21 @@ Tracking the GUI/app overhaul requested 2026-06-02. This is a **multi-phase**
 effort; items are grouped by area (matching the request) and tagged with status,
 risk, and whether they need real hardware or APK reverse-engineering.
 
+## Status at a glance
+
+| Area | State |
+|------|-------|
+| 1. Active device → app bar | ⬜ not started |
+| 2. Control Center (a–g) | ✅ done (on-device validation pending) |
+| 3. Virtual Wall (a–d) | ✅ a/b/d done; ⬚ c (image orientation) open |
+| 4. Monthly Best (b–e) | ✅ done (on-device push pending hardware) |
+| 5. Live Widgets (a–f) | ⬜ not started |
+| 6. Settings | ✅ done |
+| 7. Strip-mine + tests | ⬚ partial (REST control surface + tests added) |
+| Instrumentation (REST control server) | ✅ done |
+
+Full suite: **243 passed / 0 failed / 72 skipped**. Nothing committed yet.
+
 ## Architecture (ground truth)
 
 PyWebView desktop app. Python ⇄ JS bridge:
@@ -44,16 +59,17 @@ Applied to every UI item below:
 
 ## 2. Control Center
 
-- [~] **2.a** *(BUG — needs runtime diagnosis)* Investigated: the Python
-  `switch_channel` (gui_main.py) is complete (wall + single, LAN + BLE), and the
-  JS wiring (`app.js` ~106) binds `.channel-card` clicks correctly inside
-  `DOMContentLoaded`. No static wiring defect found. "Doesn't work" is therefore
-  most likely **(a)** `switch_channel` returning `False` because no device is
-  connected (surfaces as a "Failed to switch channel" toast), or **(b)** a
-  runtime JS exception in an earlier handler aborting later bindings. Confirming
-  requires running the PyWebView app with the web console open — cannot be done
-  headless. **Action needed:** run app, reproduce, capture console + which
-  control; then fix precisely.
+- [x] **2.a** *(DIAGNOSED via instrumentation + FIXED)* Built a headless REST
+  control server (see Instrumentation phase), launched the real app, and drove
+  the bridges directly: `switch_channel`, `set_vj_effect`, `set_visualization`,
+  `set_clock` all return **`false` when no device is connected** (confirmed
+  `get_transport_status` → `ble.available=false`). So it was **not** a wiring
+  bug — the controls work but fail silently with a generic "Failed" toast when
+  there's no active connection. Fix: added a JS `appConnected` flag (set by
+  `connectDevice`) + `requireDevice()` guard on all Control Center actions, so
+  the user now gets "Connect a device first — scan and connect under Settings"
+  instead of a confusing failure. On-device success path to be confirmed on
+  hardware.
 - [x] **2.b** *(DONE)* Ambient is now a **channel card** with its own color +
   brightness panel; removed the standalone "Ambient Color" card. `index.html`
   channel grid + `panel-ambient`, `app.js`, `style.css`.
@@ -105,15 +121,25 @@ Applied to every UI item below:
 ## 4. Monthly Best (hot channel)
 
 - [x] **4.a** Rendering works (animated GIF previews) — keep.
-- [ ] **4.b** Sync **all** monthly-best images to **all** selected devices at once
-  (replicate APK "hot channel"), not one-by-one. Backend in
-  `monthly_best_daemon.py` + `media_sync.py`.
-- [ ] **4.c** Replace the unclear "active screen info matrix wall" target picker
-  with an explicit **device multi-select** for sync targets.
-- [ ] **4.d** **Schedule** automatic hot-channel syncs for selected devices;
-  persist schedule + selection across sessions; run **headless** (launchd daemon
-  already scaffolded in `scripts/`).
-- [ ] **4.e** Layout/UX review (Rams/Kare).
+- [x] **4.b** *(DONE)* `sync_hot_channel(file_ids)` pushes the **whole** loaded
+  gallery to **all** resolved targets at once (wall = every device); "Sync All →
+  Targets" button. `media_sync.py` + `app.js`.
+- [x] **4.c** *(DONE)* Replaced "Active Screen Info" with an explicit **device
+  multi-select** (`get_sync_candidates` / `set_sync_targets`, persisted via
+  `hotchannel_config`). Checkboxes in the Monthly Best tab.
+- [x] **4.d** *(DONE)* Schedule persisted in
+  `divoom_lib/hotchannel_config.py` (enabled/interval/classify/targets);
+  `save/get_hot_channel_config` bridges + UI (enable toggle, interval, Save).
+  The daemon's new `--use-config` flag reads it and syncs **all** targets
+  **headless**; launchd plist updated to pass `--use-config`.
+- [x] **4.e** *(DONE)* Layout reworked: target list → actions (Sync Selected /
+  Sync All) → schedule block, consistent label vocabulary (Rams/Kare).
+
+**Verification (live):** launched the app with the REST control server and drove
+the new bridges via `curl` — `set_sync_targets` persists, `save_hot_channel_config`
+merges (targets preserved), `get_hot_channel_config` reflects state,
+`sync_hot_channel` returns a summary. Unit tests: `hotchannel_config` 7,
+`gui_api` +2. Full suite **252 passed / 0 failed / 72 skipped**.
 
 ## 5. Live Widgets
 
@@ -180,6 +206,24 @@ Mine for features (replicate Wi-Fi features over BLE where relevant):
 **Phase F — strip-mine + test build-out**
 10. 7.1–7.3 feature mining; 7.g full test pyramid.
 
+## Instrumentation — local REST control surface (DONE)
+
+To make the app verifiable/scriptable **headlessly** (and to satisfy the
+"run headless" requirement 4.d and the HTTP-API features in item 7), added a
+local REST control server:
+
+- `gui/control_server.py` — reflection-based dispatch over a `DivoomGuiAPI`
+  instance; every public bridge method is `POST /api/<method>` (JSON kwargs or
+  positional array). `GET /api` lists methods; `GET /health`. Localhost-bound,
+  optional `DIVOOM_CONTROL_TOKEN`. Window controls denylisted.
+- `gui/gui_main.py` — opt-in launch via `DIVOOM_CONTROL_SERVER=1`
+  (`DIVOOM_CONTROL_PORT`, default 8787); default behavior unchanged.
+- `tests/test_control_server.py` — 7 E2E tests (health, method listing,
+  kwargs/positional dispatch, JSON-string decode, 404/500, real-API surface).
+
+This is what enabled the 2.a diagnosis (drove the live bridges via `curl`) and
+is the foundation for automated E2E + the headless hot-channel daemon.
+
 ## Execution log
 
 (Per-step record appended as work lands — file, change, verification.)
@@ -226,3 +270,33 @@ channels), `divoom_lib VJEffectType` (16 effects).
 Verification: `node --check` OK, both py files parse, `test_gui_api.py` 10/10,
 full suite **236 passed / 0 failed / 72 skipped**. On-device validation of EQ
 count and clock-dial appearance still pending (hardware).
+
+### Session 2026-06-02 (cont.) — Instrumentation + 2.a diagnosis/fix
+
+- Added `gui/control_server.py` (REST), wired opt-in into `gui_main.py`, added
+  `tests/test_control_server.py` (7 E2E).
+- **Launched the real app** with `DIVOOM_CONTROL_SERVER=1` and drove bridges via
+  `curl`: confirmed all Control Center actions return `false` with no device
+  connected (`get_transport_status` → `ble.available=false`). Root cause of 2.a.
+- Fixed 2.a UX: `appConnected` flag + `requireDevice()` guard on channel switch,
+  clock/VJ/EQ selectors, and ambient apply.
+- Verification: `node --check` OK; app boots cleanly twice; control `/health` ok;
+  `test_gui_api.py` + `test_control_server.py` = **17 passed**; full suite
+  **243 passed / 0 failed / 72 skipped**.
+
+### Session 2026-06-02 (cont.) — Area 4: Monthly Best hot-channel
+
+- **New** `divoom_lib/hotchannel_config.py` (shared targets+schedule persistence)
+  + `tests/test_hotchannel_config.py` (7).
+- **Backend** `gui/media_sync.py`: `get_sync_candidates`, `set_sync_targets`,
+  `get_hot_channel_config`, `save_hot_channel_config`, `sync_hot_channel`
+  (all accept JSON-string *or* native types via `_coerce_list`/`_coerce_dict`,
+  so they work over both pywebview and REST). +2 `tests/test_gui_api.py`.
+- **Daemon** `divoom_lib/monthly_best_daemon.py`: `--use-config` reads the
+  persisted schedule/targets and pushes to **all** targets (refactored push into
+  `_push_items_to_target`); `scripts/com.divoom.monthlybest.plist` passes it.
+- **UI** `index.html`/`app.js`/`style.css`: target multi-select, Sync All button,
+  schedule controls (enable/interval/Save).
+- **Live-verified** via the REST control server against the running app (set/save/
+  get/sync all round-trip). Full suite **252 passed / 0 failed / 72 skipped**.
+  On-device push validation pending hardware.

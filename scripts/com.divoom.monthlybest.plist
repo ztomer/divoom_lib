@@ -10,6 +10,7 @@
         <string>/Users/ztomer/Projects/divoom-control/divoom_lib/monthly_best_daemon.py</string>
         <string>--limit</string>
         <string>5</string>
+        <string>--use-config</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
