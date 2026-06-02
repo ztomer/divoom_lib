@@ -726,6 +726,74 @@ body {
     font-weight: 600;
 }
 
+/* Control Center: channel sub-selection panels (2.b–f) */
+.channel-panel {
+    display: none;
+}
+.channel-panel.active {
+    display: block;
+}
+.panel-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 12px;
+}
+.panel-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+.selector-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+}
+.selector-cell {
+    padding: 10px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: rgba(130, 131, 138, 0.06);
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s;
+    -webkit-app-region: no-drag;
+}
+.selector-cell:hover {
+    border-color: var(--secondary);
+}
+.selector-cell.active {
+    border-color: var(--primary);
+    background: rgba(0, 255, 204, 0.12);
+    color: var(--primary);
+}
+.ambient-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-start;
+}
+.color-input-large {
+    width: 100%;
+    height: 48px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+}
+.slider-label {
+    width: 100%;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
 /* 2. ACTUAL APK CLOCK PREVIEWS STYLINGS */
 .clock-preview-grid {
     display: grid;
@@ -917,32 +985,42 @@ body {
     z-index: 100;
 }
 
-.arranger-node-label {
-    font-size: 10px;
-    font-weight: 600;
-    color: #ffffff;
-    max-width: 90%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    z-index: 2;
+/* Legacy text labels retained for backward-compat but no longer rendered on
+   the canvas (3.b declutter); kept hidden in case other views reuse them. */
+.arranger-node-label,
+.arranger-node-mac {
+    display: none;
 }
 
-.arranger-node-mac {
-    font-size: 8px;
-    color: var(--text-muted);
-    font-family: monospace;
-    margin-top: 2px;
-    z-index: 2;
+/* Color chip: the device's identity color (3.b color-coding). */
+.arranger-node-chip {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.35);
+    z-index: 3;
 }
 
 .arranger-node-image {
-    width: 50%;
-    height: 50%;
+    width: 78%;
+    height: 78%;
     object-fit: contain;
-    opacity: 0.85;
-    margin-top: 5px;
+    opacity: 0.9;
     z-index: 1;
+}
+
+/* Live preview rendered into the device's screen region (pixelated, 1:1). */
+.arranger-node-preview {
+    position: absolute;
+    width: 38%;
+    height: 38%;
+    object-fit: cover;
+    image-rendering: pixelated;
+    border-radius: 2px;
+    z-index: 2;
 }
 
 .arranger-node-remove {

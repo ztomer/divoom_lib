@@ -116,6 +116,34 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertTrue(clock_success)
         mock_wall.show_clock.assert_called_with(clock=3)
 
+    @patch("gui_main.DivoomWall")
+    def test_vj_and_visualization_selectors(self, mock_wall_cls):
+        """2.c/2.d: VJ effect and EQ/visualizer selectors dispatch to the device."""
+        mock_wall = MagicMock()
+        mock_wall.connect = AsyncMock()
+        mock_wall.is_connected = True
+        mock_wall.show_effects = AsyncMock(return_value=True)
+        mock_wall.show_visualization = AsyncMock(return_value=True)
+        mock_wall_cls.return_value = mock_wall
+
+        # Put the API in wall-target mode.
+        self.api.update_wall_slots(json.dumps(
+            {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16, "width": 120, "height": 120}}
+        ))
+
+        self.assertTrue(self.api.set_vj_effect(5))
+        mock_wall.show_effects.assert_called_with(number=5)
+
+        self.assertTrue(self.api.set_visualization(3))
+        mock_wall.show_visualization.assert_called_with(number=3)
+
+    def test_vj_visualization_no_target(self):
+        """With no connected device and no wall, selectors fail gracefully (no raise)."""
+        self.api.current_divoom = None
+        self.api.wall_slots = {}
+        self.assertFalse(self.api.set_vj_effect(0))
+        self.assertFalse(self.api.set_visualization(0))
+
     @patch("urllib.request.urlopen")
     def test_fetch_gallery_and_batch_sync(self, mock_urlopen):
         """Test cloud gallery catalog scraping and concurrent monthly best async streams."""

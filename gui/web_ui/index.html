@@ -140,38 +140,7 @@
                 </div>
                 
                 <div class="grid-layout">
-                    <!-- Light Controls -->
-                    <div class="card glass-card">
-                        <div class="card-header">
-                            <h3>Ambient Color</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="form-group">
-                                <div class="color-picker-grid">
-                                    <button class="color-swatch red" data-color="FF0000"></button>
-                                    <button class="color-swatch orange" data-color="FF8C00"></button>
-                                    <button class="color-swatch yellow" data-color="FFFF00"></button>
-                                    <button class="color-swatch green" data-color="00FF00"></button>
-                                    <button class="color-swatch cyan" data-color="00FFFF"></button>
-                                    <button class="color-swatch blue" data-color="0000FF"></button>
-                                    <button class="color-swatch purple" data-color="800080"></button>
-                                    <button class="color-swatch pink" data-color="FFC0CB"></button>
-                                    <div class="custom-color-container">
-                                        <input type="color" id="custom-color-input" value="#00ffcc">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>Brightness <span id="brightness-val">100</span>%</label>
-                                <input type="range" id="brightness-slider" min="0" max="100" value="100" class="range-slider">
-                            </div>
-                            
-                            <button id="apply-light-btn" class="glow-btn">Apply Color</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Channel & Clock Controls with ACTUAL Clockface Previews -->
+                    <!-- Channels (Ambient is now one of the channel selections, 2.b) -->
                     <div class="card glass-card">
                         <div class="card-header">
                             <h3>Channels</h3>
@@ -220,64 +189,53 @@
                                     </span>
                                     <h4>Custom Art</h4>
                                 </button>
+                                <button class="channel-card" data-channel="ambient">
+                                    <span class="channel-icon">
+                                        <svg class="kare-icon" viewBox="0 0 16 16">
+                                            <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+                                            <circle cx="8" cy="8" r="2" fill="currentColor"/>
+                                        </svg>
+                                    </span>
+                                    <h4>Ambient</h4>
+                                </button>
                             </div>
-                            
-                            <!-- Clock Face Previews -->
-                            <div class="clock-presets-area" style="margin-top: 25px;">
-                                <div class="clock-preview-grid">
-                                    <div class="clock-preview-card active" data-style="0">
-                                        <!-- Actual Divoom Digital Neon Clock -->
-                                        <div class="clock-face-mock apk-clock-neon">
-                                            <div class="apk-clock-digits">10:42</div>
-                                            <div class="apk-clock-widget">SUN 26°C</div>
-                                        </div>
-                                        <span class="clock-face-label">Digital Retro</span>
-                                    </div>
-                                    <div class="clock-preview-card" data-style="1">
-                                        <!-- Actual Minimal Pixel Analogue Clock -->
-                                        <div class="clock-face-mock apk-clock-analogue">
-                                            <div class="analogue-center"></div>
-                                            <div class="analogue-hand hour-hand"></div>
-                                            <div class="analogue-hand min-hand"></div>
-                                        </div>
-                                        <span class="clock-face-label">Analogue Pixel</span>
-                                    </div>
-                                    <div class="clock-preview-card" data-style="2">
-                                        <!-- Cyber Weather Dashboard Clock -->
-                                        <div class="clock-face-mock apk-clock-cyber">
-                                            <div class="cyber-top">10 42</div>
-                                            <div class="cyber-icon">
-                                                <svg class="kare-icon" viewBox="0 0 16 16" style="width: 10px; height: 10px;">
-                                                    <polygon points="10,1 4,8 8,8 6,15 13,6 9,6" fill="currentColor"/>
-                                                </svg>
-                                            </div>
-                                            <div class="cyber-footer">BTC $64K</div>
-                                        </div>
-                                        <span class="clock-face-label">Cyber Panel</span>
-                                    </div>
-                                    <div class="clock-preview-card" data-style="3">
-                                        <!-- Cute Animal widget clock -->
-                                        <div class="clock-face-mock apk-clock-cute">
-                                            <div class="cute-digit">10:42</div>
-                                            <div class="cute-character">
-                                                <svg class="kare-icon" viewBox="0 0 16 16" style="width: 12px; height: 12px;">
-                                                    <rect x="4" y="2" width="2" height="2"/>
-                                                    <rect x="10" y="2" width="2" height="2"/>
-                                                    <rect x="6" y="4" width="4" height="2"/>
-                                                    <rect x="4" y="6" width="8" height="2"/>
-                                                    <rect x="2" y="8" width="12" height="2"/>
-                                                    <rect x="2" y="10" width="2" height="2"/>
-                                                    <rect x="6" y="10" width="4" height="2"/>
-                                                    <rect x="12" y="10" width="2" height="2"/>
-                                                    <rect x="4" y="12" width="2" height="2"/>
-                                                    <rect x="10" y="12" width="2" height="2"/>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        <span class="clock-face-label">Pixel Pet</span>
+
+                            <!-- Channel sub-selection panels (shown based on active channel) -->
+                            <div class="channel-panels" style="margin-top: 25px;">
+                                <!-- Clock faces (real built-in dial types) -->
+                                <div class="channel-panel active" id="panel-clock">
+                                    <div class="panel-title">Clock Face</div>
+                                    <div class="selector-grid" id="clock-faces-grid"></div>
+                                    <button id="apply-clock-btn" class="glow-btn" style="margin-top:18px;">Apply Clock Face</button>
+                                </div>
+                                <!-- Music EQ / visualizer patterns -->
+                                <div class="channel-panel" id="panel-visualizer">
+                                    <div class="panel-title">Music EQ Pattern</div>
+                                    <div class="selector-grid" id="eq-visualizer-grid"></div>
+                                </div>
+                                <!-- VJ effects -->
+                                <div class="channel-panel" id="panel-vj">
+                                    <div class="panel-title">VJ Effect</div>
+                                    <div class="selector-grid" id="vj-effects-grid"></div>
+                                </div>
+                                <!-- Custom art -->
+                                <div class="channel-panel" id="panel-design">
+                                    <div class="panel-title">Custom Art</div>
+                                    <p class="panel-hint">Custom Art displays your own uploaded designs/animations
+                                    (the device's "Custom" channel). Push a GIF or image from the Live Widgets or
+                                    Virtual Wall tabs to set custom artwork on the active screen.</p>
+                                </div>
+                                <!-- Ambient light (now a channel selection) -->
+                                <div class="channel-panel" id="panel-ambient">
+                                    <div class="panel-title">Ambient Color</div>
+                                    <div class="ambient-controls">
+                                        <input type="color" id="ambient-color-input" value="#00ffcc" class="color-input-large">
+                                        <label class="slider-label">Brightness
+                                            <input type="range" id="ambient-brightness" min="1" max="100" value="80">
+                                        </label>
+                                        <button id="apply-ambient-btn" class="glow-btn">Apply Ambient Color</button>
                                     </div>
                                 </div>
-                                <button id="apply-clock-btn" class="glow-btn" style="margin-top:20px;">Apply Clock Face</button>
                             </div>
                         </div>
                     </div>

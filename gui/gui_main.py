@@ -97,30 +97,10 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         lan_ip = self.current_divoom.lan.device_ip if (self.current_divoom and self.current_divoom.lan) else None
         cloud_ok = bool(self.cached_creds and self.cached_creds.is_valid())
         return json.dumps({
-            "ble": {
-                "available": ble_connected,
-                "label": "BLE", "badge": "🔵", "color": "#3b82f6",
-                "description": "Bluetooth — 100% local, never leaves your device.",
-                "detail": self.current_divoom._conn.mac if ble_connected and self.current_divoom else None,
-            },
-            "lan": {
-                "available": bool(lan_ip),
-                "label": "LAN", "badge": "🟢", "color": "#22c55e",
-                "description": "Wi-Fi HTTP :9000 — 100% local, WiFi-capable devices only.",
-                "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured",
-            },
-            "cloud": {
-                "available": cloud_ok,
-                "label": "Divoom Cloud", "badge": "🟡", "color": "#f59e0b",
-                "description": "appin.divoom-gz.com — Divoom's servers, requires account.",
-                "detail": "Authenticated" if cloud_ok else "Not authenticated",
-            },
-            "external": {
-                "available": True,
-                "label": "External", "badge": "🔴", "color": "#ef4444",
-                "description": "3rd-party APIs (weather, stocks) — no login required.",
-                "detail": "Available",
-            },
+            "ble": {"available": ble_connected, "label": "BLE", "badge": "🔵", "color": "#3b82f6", "description": "Bluetooth — 100% local, never leaves your device.", "detail": self.current_divoom._conn.mac if ble_connected and self.current_divoom else None},
+            "lan": {"available": bool(lan_ip), "label": "LAN", "badge": "🟢", "color": "#22c55e", "description": "Wi-Fi HTTP :9000 — 100% local, WiFi-capable devices only.", "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured"},
+            "cloud": {"available": cloud_ok, "label": "Divoom Cloud", "badge": "🟡", "color": "#f59e0b", "description": "appin.divoom-gz.com — Divoom's servers, requires account.", "detail": "Authenticated" if cloud_ok else "Not authenticated"},
+            "external": {"available": True, "label": "External", "badge": "🔴", "color": "#ef4444", "description": "3rd-party APIs (weather, stocks) — no login required.", "detail": "Available"}
         })
 
 
@@ -201,11 +181,12 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Scan BLE devices and return discovered Divoom screens as JSON."""
         return self.scan_devices_with_config(timeout=15, limit=4)
 
-    def scan_devices_with_config(self, timeout: int, limit: int) -> str:
-        """Scan BLE devices with custom timeouts and device limit."""
-        logger.info(f"GUI Action: Scanning devices with timeout={timeout}, limit={limit}...")
-        
-        # Save scanner limits into config.ini for next time
+    def save_scan_settings(self, timeout: int, limit: int) -> bool:
+        """Persist scan timeout + device limit to config.ini.
+
+        Called both before a scan and on settings-field changes, so the values
+        are remembered across sessions even without triggering a scan.
+        """
         try:
             import configparser
             config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
@@ -215,12 +196,21 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 cfg.read(config_file)
             if "gui" not in cfg:
                 cfg["gui"] = {}
-            cfg["gui"]["timeout"] = str(timeout)
-            cfg["gui"]["limit"] = str(limit)
+            cfg["gui"]["timeout"] = str(int(timeout))
+            cfg["gui"]["limit"] = str(int(limit))
             with open(config_file, "w") as f:
                 cfg.write(f)
+            return True
         except Exception as e:
             logger.warning(f"Failed to save scan config: {e}")
+            return False
+
+    def scan_devices_with_config(self, timeout: int, limit: int) -> str:
+        """Scan BLE devices with custom timeouts and device limit."""
+        logger.info(f"GUI Action: Scanning devices with timeout={timeout}, limit={limit}...")
+
+        # Save scanner limits into config.ini for next time
+        self.save_scan_settings(timeout, limit)
 
         # Scan using Bleak cleanly inside thread-safe asyncio.run context
         try:
@@ -274,46 +264,68 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Establishes connection to a single BLE or Wi-Fi (LAN) screen."""
         logger.info(f"GUI Action: Connecting to single device {address}...")
         try:
+            connected = False
             if address == "MatrixWall":
                 self.current_target_mode = "wall"
                 logger.info("Switched to multi-screen display wall mode.")
-                return True
+                connected = True
                 
-            self.current_target_mode = "single"
-            if self.current_divoom and self.current_divoom.is_connected:
-                self._run_async(self.current_divoom.disconnect())
-                
-            if address.startswith("LAN:"):
-                ip = address.split("LAN:")[1]
-                local_token = 0
-                
-                # Retrieve token from saved LAN devices if configured
-                presets_file = self._get_presets_file()
-                if presets_file.exists():
-                    try:
-                        presets = json.loads(presets_file.read_text(encoding="utf-8"))
-                        devices = presets.get("lan_devices", [])
-                        for d in devices:
-                            if d.get("ip") == ip:
-                                local_token = int(d.get("token", 0))
-                                break
-                    except Exception:
-                        pass
-                
-                self.current_divoom = Divoom(mac=None, lan_ip=ip, lan_token=local_token, logger=logger)
-                from divoom_lib.lan_transport import LanTransport
-                self.current_divoom._lan = LanTransport(device_ip=ip, local_token=local_token, logger=logger)
-                
-                reachable = self._run_async(self.current_divoom._lan.probe())
-                if not reachable:
-                    logger.error(f"LAN Device at {ip} is unreachable")
-                    self.current_divoom = None
-                    return False
-                return True
             else:
-                self.current_divoom = Divoom(mac=address, logger=logger, use_ios_le_protocol=False)
-                self._run_async(self.current_divoom.connect())
+                self.current_target_mode = "single"
+                if self.current_divoom and self.current_divoom.is_connected:
+                    self._run_async(self.current_divoom.disconnect())
+                    
+                if address.startswith("LAN:"):
+                    ip = address.split("LAN:")[1]
+                    local_token = 0
+                    
+                    # Retrieve token from saved LAN devices if configured
+                    presets_file = self._get_presets_file()
+                    if presets_file.exists():
+                        try:
+                            presets = json.loads(presets_file.read_text(encoding="utf-8"))
+                            devices = presets.get("lan_devices", [])
+                            for d in devices:
+                                if d.get("ip") == ip:
+                                    local_token = int(d.get("token", 0))
+                                    break
+                        except Exception:
+                            pass
+                    
+                    self.current_divoom = Divoom(mac=None, lan_ip=ip, lan_token=local_token, logger=logger)
+                    from divoom_lib.lan_transport import LanTransport
+                    self.current_divoom._lan = LanTransport(device_ip=ip, local_token=local_token, logger=logger)
+                    
+                    reachable = self._run_async(self.current_divoom._lan.probe())
+                    if not reachable:
+                        logger.error(f"LAN Device at {ip} is unreachable")
+                        self.current_divoom = None
+                        return False
+                    connected = True
+                else:
+                    self.current_divoom = Divoom(mac=address, logger=logger, use_ios_le_protocol=False)
+                    self._run_async(self.current_divoom.connect())
+                    connected = True
+
+            if connected:
+                # Save successful connection in config.ini
+                try:
+                    import configparser
+                    config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
+                    config_file.parent.mkdir(parents=True, exist_ok=True)
+                    cfg = configparser.ConfigParser()
+                    if config_file.exists():
+                        cfg.read(config_file)
+                    if "gui" not in cfg:
+                        cfg["gui"] = {}
+                    cfg["gui"]["last_connected_device"] = address
+                    with open(config_file, "w") as f:
+                        cfg.write(f)
+                    logger.info(f"Saved last active connection: {address}")
+                except Exception as save_err:
+                    logger.warning(f"Failed to persist active connection: {save_err}")
                 return True
+            return False
         except Exception as e:
             logger.error(f"Single connect failed: {e}")
             self.current_divoom = None
@@ -350,16 +362,12 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
             return True
             
         logger.info("Rebuilding free-form DivoomWall coordinator instance...")
-        configs = []
-        for mac, slot in self.wall_slots.items():
-            configs.append({
-                "mac": mac,
-                "x": int(slot.get("x", 0)),
-                "y": int(slot.get("y", 0)),
-                "size": int(slot.get("size", cell_size)),
-                "width": int(slot.get("width", 120)),
-                "height": int(slot.get("height", 120))
-            })
+        configs = [{
+            "mac": mac,
+            "x": int(s.get("x", 0)), "y": int(s.get("y", 0)),
+            "size": int(s.get("size", cell_size)),
+            "width": int(s.get("width", 120)), "height": int(s.get("height", 120))
+        } for mac, s in self.wall_slots.items()]
             
         try:
             self.wall_instance = DivoomWall(configs, custom_logger=logger)
@@ -462,6 +470,50 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
             logger.error(f"Channel switch failed: {e}")
             return False
 
+    def set_vj_effect(self, number: int) -> bool:
+        """Select a specific VJ effect (0-15) on the active screen(s)/wall.
+
+        Effect indices map to divoom_lib VJEffectType (Sparkles..RainbowShapes).
+        """
+        logger.info(f"GUI Action: Applying VJ effect {number}...")
+        try:
+            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
+                if not self._rebuild_wall_instance():
+                    return False
+                return self._run_async(self.wall_instance.show_effects(number=int(number)))
+            target = self.current_divoom
+            is_lan = bool(target and target.lan)
+            if not target or (not target.is_connected and not is_lan):
+                return False
+            if is_lan:
+                # LAN protocol switches to the VJ channel (no per-effect index).
+                self._run_async(target.lan.set_channel(1))
+                return True
+            return self._run_async(target.display.show_effects(number=int(number)))
+        except Exception as e:
+            logger.error(f"VJ effect failed: {e}")
+            return False
+
+    def set_visualization(self, number: int) -> bool:
+        """Select a specific Music EQ / visualizer pattern on the active screen(s)/wall."""
+        logger.info(f"GUI Action: Applying visualizer {number}...")
+        try:
+            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
+                if not self._rebuild_wall_instance():
+                    return False
+                return self._run_async(self.wall_instance.show_visualization(number=int(number)))
+            target = self.current_divoom
+            is_lan = bool(target and target.lan)
+            if not target or (not target.is_connected and not is_lan):
+                return False
+            if is_lan:
+                self._run_async(target.lan.set_channel(2))
+                return True
+            return self._run_async(target.display.show_visualization(number=int(number)))
+        except Exception as e:
+            logger.error(f"Visualizer failed: {e}")
+            return False
+
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         """Crops, splits, and displays coordinate grid screen wall artworks."""
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
@@ -488,7 +540,11 @@ def main():
         height=768,
         resizable=True,
         frameless=True,  # Integrated custom Appbar
-        easy_drag=True,  # Titlebar movement (blocked on panels/elements via CSS)
+        # easy_drag operates at the native window level and is NOT blocked by
+        # CSS -webkit-app-region: no-drag, so it dragged the whole window when
+        # moving canvas nodes (regression). Window movement is handled instead
+        # by the titlebar's `-webkit-app-region: drag` region (see style.css).
+        easy_drag=False,
         background_color="#0a0b10"
     )
     api.window = window

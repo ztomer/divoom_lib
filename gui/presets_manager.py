@@ -61,11 +61,14 @@ class PresetsManagerMixin:
             lan_ip = ""
             lan_token = 0
             
+            last_connected_device = ""
+            
             if config_file.exists():
                 cfg.read(config_file)
                 email = cfg.get("divoom", "email", fallback="")
                 timeout = int(cfg.get("gui", "timeout", fallback="15"))
                 limit = int(cfg.get("gui", "limit", fallback="4"))
+                last_connected_device = cfg.get("gui", "last_connected_device", fallback="")
                 lan_ip = cfg.get("lan", "device_ip", fallback="")
                 lan_token = int(cfg.get("lan", "local_token", fallback="0"))
                 
@@ -74,7 +77,14 @@ class PresetsManagerMixin:
             if presets_file.exists():
                 try:
                     data = json.loads(presets_file.read_text(encoding="utf-8"))
-                    slots = data.get("_last_active_slots_", {})
+                    raw_slots = data.get("_last_active_slots_", {})
+                    # Drop stale/placeholder slots (null value, missing name, or
+                    # the mock "AA:BB:CC:DD:EE:FF" address) so the canvas never
+                    # shows an "undefined" device.
+                    slots = {
+                        mac: s for mac, s in (raw_slots or {}).items()
+                        if isinstance(s, dict) and s.get("name") and mac and mac != "AA:BB:CC:DD:EE:FF"
+                    }
                 except Exception:
                     pass
             
@@ -96,6 +106,7 @@ class PresetsManagerMixin:
                 "email": email,
                 "timeout": timeout,
                 "limit": limit,
+                "last_connected_device": last_connected_device,
                 "slots": slots,
                 "lan_ip": lan_ip,
                 "lan_token": lan_token,

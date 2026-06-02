@@ -102,46 +102,107 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
     
-    // Channel selection
+    // ── 3. CONTROL CENTER: channels + APK/protocol-sourced sub-selectors ──
     const channelCards = document.querySelectorAll(".channel-card");
+    const channelPanels = document.querySelectorAll(".channel-panel");
     let activeChannel = "clock";
-    
+
+    function showChannelPanel(channel) {
+        channelPanels.forEach(p => p.classList.toggle("active", p.id === `panel-${channel}`));
+    }
+
     channelCards.forEach(card => {
         card.addEventListener("click", () => {
             channelCards.forEach(c => c.classList.remove("active"));
             card.classList.add("active");
             activeChannel = card.getAttribute("data-channel");
-            
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.switch_channel(activeChannel)
-                    .then(res => {
-                        if (res) showToast("Switched channel", "success", "🔵 BLE");
-                        else showToast("Failed to switch channel", "error");
-                    });
+            showChannelPanel(activeChannel);
+            // Ambient is a light mode applied via its own button, not a device
+            // channel switch, so don't fire switch_channel for it.
+            if (activeChannel === "ambient") return;
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.switch_channel) {
+                window.pywebview.api.switch_channel(activeChannel).then(res => {
+                    if (res) showToast("Switched channel", "success", "🔵 BLE");
+                    else showToast("Failed to switch channel", "error");
+                });
             }
         });
     });
 
-    // Clock Face Previews
-    const clockPreviewCards = document.querySelectorAll(".clock-preview-card");
-    let selectedClockStyle = 0;
-    clockPreviewCards.forEach(card => {
-        card.addEventListener("click", () => {
-            clockPreviewCards.forEach(c => c.classList.remove("active"));
-            card.classList.add("active");
-            selectedClockStyle = parseInt(card.getAttribute("data-style"));
+    // Generic selector-grid builder. `activeIndex < 0` => no pre-selection.
+    function buildSelectorGrid(containerId, items, onSelect, activeIndex = 0) {
+        const grid = document.getElementById(containerId);
+        if (!grid) return;
+        grid.innerHTML = "";
+        items.forEach((it, i) => {
+            const cell = document.createElement("button");
+            cell.className = "selector-cell" + (i === activeIndex ? " active" : "");
+            cell.setAttribute("data-value", it.value);
+            cell.textContent = it.name;
+            cell.addEventListener("click", () => {
+                grid.querySelectorAll(".selector-cell").forEach(c => c.classList.remove("active"));
+                cell.classList.add("active");
+                onSelect(it.value, it.name);
+            });
+            grid.appendChild(cell);
         });
-    });
+    }
+
+    // 2.f — REAL built-in Timebox Evo clock dial types (from node-divoom
+    // PROTOCOL.md Time channel `TT`), replacing the previously hallucinated set.
+    const CLOCK_FACES = [
+        { value: 0, name: "Full Screen" }, { value: 1, name: "Rainbow" },
+        { value: 2, name: "With Box" }, { value: 3, name: "Analog Square" },
+        { value: 4, name: "Full Screen Neg" }, { value: 5, name: "Analog Round" },
+    ];
+    let selectedClockStyle = 0;
+    buildSelectorGrid("clock-faces-grid", CLOCK_FACES, (v) => { selectedClockStyle = v; }, 0);
 
     const applyClockBtn = document.getElementById("apply-clock-btn");
     if (applyClockBtn) {
         applyClockBtn.addEventListener("click", () => {
             if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.set_clock(selectedClockStyle)
-                    .then(res => {
-                        if (res) showToast("Clock style applied", "success", "🔵 BLE");
-                        else showToast("Failed to apply clock", "error");
-                    });
+                window.pywebview.api.set_clock(selectedClockStyle).then(res => {
+                    showToast(res ? "Clock face applied" : "Failed to apply clock", res ? "success" : "error", "🔵 BLE");
+                });
+            }
+        });
+    }
+
+    // 2.d — 16 named VJ effects (divoom_lib VJEffectType).
+    const VJ_EFFECTS = ["Sparkles", "Lava", "Vertical Rainbow", "Drops", "Rainbow Swirl",
+        "CMY Fade", "Rainbow Lava", "Pastel Patterns", "CMY Wave", "Fire", "Countdown",
+        "Pink/Blue Fade", "Rainbow Polygons", "Pink/Blue Wave", "Rainbow Cross", "Rainbow Shapes"]
+        .map((name, i) => ({ value: i, name }));
+    buildSelectorGrid("vj-effects-grid", VJ_EFFECTS, (v) => {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_vj_effect) {
+            window.pywebview.api.set_vj_effect(v).then(res => {
+                showToast(res ? "VJ effect applied" : "Failed to apply VJ effect", res ? "success" : "error", "🔵 BLE");
+            });
+        }
+    }, -1);
+
+    // 2.c — Music EQ / visualizer patterns. Numbered (honest) rather than
+    // inventing names; count to be confirmed against a real device.
+    const EQ_PATTERNS = Array.from({ length: 12 }, (_, i) => ({ value: i, name: `EQ ${String(i + 1).padStart(2, "0")}` }));
+    buildSelectorGrid("eq-visualizer-grid", EQ_PATTERNS, (v) => {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_visualization) {
+            window.pywebview.api.set_visualization(v).then(res => {
+                showToast(res ? "EQ pattern applied" : "Failed to apply EQ", res ? "success" : "error", "🔵 BLE");
+            });
+        }
+    }, -1);
+
+    // 2.b — Ambient color, now a channel selection.
+    const applyAmbientBtn = document.getElementById("apply-ambient-btn");
+    if (applyAmbientBtn) {
+        applyAmbientBtn.addEventListener("click", () => {
+            const color = document.getElementById("ambient-color-input")?.value || "#00ffcc";
+            const brightness = parseInt(document.getElementById("ambient-brightness")?.value) || 80;
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_solid_light) {
+                window.pywebview.api.set_solid_light(color, brightness).then(res => {
+                    showToast(res ? "Ambient color applied" : "Failed to apply ambient", res ? "success" : "error", "🔵 BLE");
+                });
             }
         });
     }
@@ -197,12 +258,27 @@ document.addEventListener("DOMContentLoaded", () => {
         updateSyncTargetList();
     }
 
+    // Deterministic accent color per device, so devices are distinguished by
+    // color (Kare: meaningful color-coding) instead of verbose text labels.
+    function deviceColor(key) {
+        let h = 0;
+        const s = String(key || "");
+        for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        return `hsl(${h % 360}, 70%, 55%)`;
+    }
+
     function renderArrangerCanvas() {
         // Clear workspace
         arrangerCanvas.innerHTML = "";
-        
+
         Object.keys(assignedSlots).forEach(mac => {
             const slot = assignedSlots[mac];
+            // Drop stale/placeholder slots (e.g. "AA:BB:CC:DD:EE:FF" -> null)
+            // that otherwise render as an "undefined" device on an empty canvas.
+            if (!slot || !slot.name || !mac || mac === "undefined") {
+                delete assignedSlots[mac];
+                return;
+            }
             const node = document.createElement("div");
             node.className = "arranger-node";
             node.style.left = `${slot.x}px`;
@@ -210,10 +286,20 @@ document.addEventListener("DOMContentLoaded", () => {
             node.style.width = `${slot.width}px`;
             node.style.height = `${slot.height}px`;
             
+            // Declutter (3.b): show the device mockup (with its preview in the
+            // screen region when available) and identify it by an accent color
+            // rather than on-canvas name/MAC text. Full name lives in the tooltip.
+            const accent = deviceColor(mac);
+            node.style.borderColor = accent;
+            node.style.setProperty("--node-accent", accent);
+            node.title = `${slot.name} — ${mac}`;
+            const previewLayer = slot.preview
+                ? `<img src="${slot.preview}" class="arranger-node-preview" alt="">`
+                : "";
             node.innerHTML = `
-                <div class="arranger-node-label">${slot.name}</div>
-                <div class="arranger-node-mac">${mac}</div>
-                <img src="${slot.image}" class="arranger-node-image" alt="node-mock">
+                <span class="arranger-node-chip" style="background:${accent}"></span>
+                <img src="${slot.image}" class="arranger-node-image" alt="${slot.name}">
+                ${previewLayer}
                 <div class="arranger-node-remove" data-mac="${mac}">×</div>
             `;
             
@@ -499,7 +585,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const scanBtn = document.getElementById("scan-btn");
     const scanSpinner = document.getElementById("scan-spinner");
     const deviceListUl = document.getElementById("device-list");
-    
+
+    // Persist scan timeout / device limit on change so they survive across
+    // sessions even when the user adjusts them without running a scan.
+    ["scan-timeout", "scan-limit"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("change", () => {
+                const t = parseInt(document.getElementById("scan-timeout")?.value) || 15;
+                const l = parseInt(document.getElementById("scan-limit")?.value);
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.save_scan_settings) {
+                    window.pywebview.api.save_scan_settings(t, isNaN(l) ? 0 : l);
+                }
+            });
+        }
+    });
+
     if (scanBtn) {
         scanBtn.addEventListener("click", () => {
             const timeout = parseInt(document.getElementById("scan-timeout")?.value) || 15;
@@ -831,10 +932,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (conf.email && document.getElementById("settings-email")) {
                             document.getElementById("settings-email").value = conf.email;
                         }
-                        if (conf.timeout && document.getElementById("scan-timeout")) {
+                        if (conf.timeout != null && document.getElementById("scan-timeout")) {
                             document.getElementById("scan-timeout").value = conf.timeout;
                         }
-                        if (conf.limit && document.getElementById("scan-limit")) {
+                        // Use an explicit null check so a saved limit of 0
+                        // ("unlimited") is restored instead of being dropped as falsy.
+                        if (conf.limit != null && document.getElementById("scan-limit")) {
                             document.getElementById("scan-limit").value = conf.limit;
                         }
                         if (conf.slots) {
@@ -845,6 +948,23 @@ document.addEventListener("DOMContentLoaded", () => {
                             discoveredDevices = conf.devices;
                             populateDeviceSelectors(discoveredDevices);
                             renderArrangerCanvas();
+                        }
+                        
+                        if (conf.last_connected_device) {
+                            const addr = conf.last_connected_device;
+                            let name = "Divoom Screen";
+                            if (addr === "MatrixWall") {
+                                name = "Matrix Wall Grid";
+                            } else if (addr.startsWith("LAN:")) {
+                                const ip = addr.split("LAN:")[1];
+                                name = `Wi-Fi: ${ip}`;
+                            } else {
+                                const dev = discoveredDevices.find(d => d.address === addr);
+                                if (dev) name = dev.name;
+                            }
+                            setTimeout(() => {
+                                connectDevice(name, addr);
+                            }, 500);
                         }
                         
                         // Cloud Connection Status Indicator Card
