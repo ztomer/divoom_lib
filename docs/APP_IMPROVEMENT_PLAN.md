@@ -10,7 +10,7 @@ risk, and whether they need real hardware or APK reverse-engineering.
 |------|-------|
 | 1. Active device → app bar | ✅ done |
 | 2. Control Center (a–g) | ✅ done (on-device validation pending) |
-| 3. Virtual Wall (a–d) | ✅ a/b/d done; ⬚ c (image orientation) open |
+| 3. Virtual Wall (a–d) | ✅ done |
 | 4. Monthly Best (b–e) | ✅ done (on-device push pending hardware) |
 | 5. Live Widgets (a–f) | ✅ done (on-device display pending hardware) |
 | 6. Settings | ✅ done |
@@ -112,9 +112,13 @@ Applied to every UI item below:
   to a tooltip. Added a `slot.preview` overlay that renders the device's preview
   in the screen region when supplied (populating that content is a sync-pipeline
   follow-up). `app.js renderArrangerCanvas`, `style.css .arranger-node*`.
-- [ ] **3.c** Some cached device images don't face the user → breaks preview. Audit
-  the device-image cache / mockup orientation (front-facing mockups, commit
-  `29bbd950`).
+- [x] **3.c** *(FIXED)* Audited the mockups: `tivoo_max.png`/`pixoo.png` are
+  front-facing but `ditoo.png`/`timoo.png`/`timebox.png` are 3/4-angled, so a
+  preview overlaid on their screen region wouldn't align. Replaced the photo in
+  the canvas node with a **uniform front-facing schematic screen**
+  (`.arranger-node-screen`, accent-tinted bezel) that always faces the viewer and
+  holds the preview 1:1 — consistent across all devices (the banner still shows
+  the product photo). `app.js renderArrangerCanvas`, `style.css`.
 - [x] **3.d** *(FIXED)* Root cause: a stale placeholder slot
   `AA:BB:CC:DD:EE:FF → null` persisted in `_last_active_slots_`; its null name
   rendered as "undefined". Added render guard (`app.js`), load-time sanitizer

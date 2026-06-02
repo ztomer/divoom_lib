@@ -310,13 +310,16 @@ document.addEventListener("DOMContentLoaded", () => {
             node.style.borderColor = accent;
             node.style.setProperty("--node-accent", accent);
             node.title = `${slot.name} — ${mac}`;
-            const previewLayer = slot.preview
+            // 3.c: render a uniform FRONT-FACING schematic screen (the body is
+            // the node itself, accent-tinted) so the preview always aligns —
+            // the product photos are inconsistently angled (ditoo/timoo/timebox)
+            // which broke the in-screen preview.
+            const previewInner = slot.preview
                 ? `<img src="${slot.preview}" class="arranger-node-preview" alt="">`
                 : "";
             node.innerHTML = `
                 <span class="arranger-node-chip" style="background:${accent}"></span>
-                <img src="${slot.image}" class="arranger-node-image" alt="${slot.name}">
-                ${previewLayer}
+                <div class="arranger-node-screen">${previewInner}</div>
                 <div class="arranger-node-remove" data-mac="${mac}">×</div>
             `;
             

@@ -1041,22 +1041,28 @@ body {
     z-index: 3;
 }
 
-.arranger-node-image {
-    width: 78%;
-    height: 78%;
-    object-fit: contain;
-    opacity: 0.9;
+/* Front-facing schematic screen (3.c): always faces the viewer so the preview
+   aligns regardless of device. The node body (accent border) reads as the bezel. */
+.arranger-node-screen {
+    width: 70%;
+    height: 70%;
+    background: #0a0a0a;
+    border: 2px solid var(--node-accent, var(--secondary));
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.8);
     z-index: 1;
 }
 
 /* Live preview rendered into the device's screen region (pixelated, 1:1). */
 .arranger-node-preview {
-    position: absolute;
-    width: 38%;
-    height: 38%;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     image-rendering: pixelated;
-    border-radius: 2px;
     z-index: 2;
 }
 
