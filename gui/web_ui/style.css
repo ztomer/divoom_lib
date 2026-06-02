@@ -127,6 +127,43 @@ body {
     -webkit-app-region: no-drag;
 }
 
+/* Active device selector + connection indicator in the app bar (area 1). */
+.appbar-device {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 14px;
+    -webkit-app-region: no-drag;
+}
+.appbar-device-select {
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 150px;
+    max-width: 220px;
+    height: 26px;
+    padding: 2px 8px;
+}
+.appbar-device-status {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* "Connecting" state for the shared transport dot (amber pulse). */
+.transport-dot.connecting {
+    background: #f59e0b !important;
+    color: #f59e0b !important;
+    opacity: 1;
+    animation: dot-pulse 1s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 2px currentColor; opacity: 0.6; }
+    50% { box-shadow: 0 0 8px currentColor; opacity: 1; }
+}
+
 .appbar-logo {
     width: 18px;
     height: 18px;
@@ -1048,12 +1085,61 @@ body {
 /* 4. ACTUAL animated Music spectrum bars Overlay */
 .music-cover-preview {
     position: relative;
-    width: 70px;
-    height: 70px;
+    width: 150px;   /* 5.b: at least double the previous 70px */
+    height: 150px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
+
+/* On-device matrix preview (5.d) — the exact pixels the device shows. */
+.device-preview-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+.device-preview-img {
+    width: 64px;
+    height: 64px;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: #000;
+    object-fit: contain;
+}
+
+/* Saved tickers (5.e) */
+.tickers-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+}
+.ticker-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(130, 131, 138, 0.08);
+}
+.ticker-chip-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+    padding: 4px 8px 4px 10px;
+    cursor: pointer;
+}
+.ticker-chip-label:hover { color: var(--primary); }
+.ticker-chip-remove {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 4px 8px;
+    cursor: pointer;
+    border-left: 1px solid var(--border-color);
+}
+.ticker-chip-remove:hover { color: #ef4444; }
 
 .music-cover-preview img {
     width: 100%;

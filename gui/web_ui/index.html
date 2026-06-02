@@ -20,6 +20,16 @@
             <button id="win-min" class="win-btn min" title="MinimizeWindow">—</button>
             <button id="win-max" class="win-btn max" title="ToggleFullscreen">▢</button>
         </div>
+        <!-- Active device selector + connection indicator (area 1). The dot uses
+             the shared transport-status vocabulary (.transport-dot). -->
+        <div class="appbar-device">
+            <span class="transport-dot inactive" id="global-status-dot"
+                  style="background:#22c55e; color:#22c55e;" title="Connection status"></span>
+            <select id="sidebar-device-select" class="custom-select appbar-device-select">
+                <option value="">Select Screen…</option>
+            </select>
+            <span class="appbar-device-status" id="global-status-text">Disconnected</span>
+        </div>
         <div class="appbar-drag-spacer"></div>
         <div class="appbar-brand">
             <img src="assets/app_icon.png" class="appbar-logo" alt="Logo">
@@ -31,13 +41,6 @@
         
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div class="sidebar-device-panel" style="padding: 15px; border-bottom: 1px solid var(--border-color); margin-bottom: 10px;">
-                <label style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.35); margin-bottom: 6px; display: block;">Active Device</label>
-                <select id="sidebar-device-select" class="custom-select" style="width: 100%; font-size: 12px; font-weight: 600;">
-                    <option value="">Select Screen...</option>
-                </select>
-            </div>
-            
             <nav class="nav-menu">
                 <button class="nav-btn active" data-tab="control-panel">
                     <span class="btn-icon">
@@ -408,6 +411,10 @@
                                 <div class="music-track-info">
                                     <h4 id="music-track-name">No Music Playing</h4>
                                     <p id="music-artist-name">Spotify / Apple Music</p>
+                                    <div class="device-preview-wrap">
+                                        <span class="hc-label">On device</span>
+                                        <img id="music-device-preview" class="device-preview-img" alt="" style="display:none;">
+                                    </div>
                                 </div>
                             </div>
                             
@@ -432,10 +439,20 @@
                             <div class="form-group">
                                 <div class="flex-row">
                                     <input type="text" id="stock-symbol-input" placeholder="Symbol e.g. AAPL, BTC-USD" class="text-input" value="BTC-USD">
-                                    <button id="apply-stock-btn" class="glow-btn compact">Display Ticker</button>
+                                    <button id="apply-stock-btn" class="glow-btn compact">Display</button>
+                                    <button id="add-ticker-btn" class="glow-btn compact ghost">+ Save</button>
                                 </div>
                             </div>
-                            
+
+                            <!-- Saved tickers (5.e) — seeded from macOS Stocks -->
+                            <div id="tickers-list" class="tickers-list"></div>
+
+                            <!-- Live on-device preview at the target matrix (5.d) -->
+                            <div class="device-preview-wrap">
+                                <span class="hc-label">On-device preview</span>
+                                <img id="ticker-device-preview" class="device-preview-img" alt="" style="display:none;">
+                            </div>
+
                             <div class="widget-preview-ticker" id="ticker-preview-box">
                                 <div class="mini-canvas-view">
                                     <div class="ticker-arrow-mock">▲</div>

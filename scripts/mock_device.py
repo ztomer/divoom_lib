@@ -17,6 +17,9 @@ class MockBleakClient:
         self._is_connected = False
         self._notify_callbacks = {}
         self._notification_task = None
+        # Record every frame the "device" receives so tests can assert the exact
+        # wire bytes produced by the library (hardware-free end-to-end checks).
+        self.written = []
         logger.info(f"Initialized MockBleakClient for {address}")
 
     @property
@@ -49,6 +52,7 @@ class MockBleakClient:
 
     async def write_gatt_char(self, char_specifier: str, data: bytes | bytearray, response: bool = False) -> None:
         logger.info(f"Write to {char_specifier}: {data.hex()}")
+        self.written.append((char_specifier, bytes(data)))
 
         # Simulate processing delay
         await asyncio.sleep(0.1)

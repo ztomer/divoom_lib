@@ -482,8 +482,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const statusDot = document.getElementById("global-status-dot");
         const statusText = document.getElementById("global-status-text");
         
-        if (statusDot) statusDot.className = "status-indicator connecting";
-        if (statusText) statusText.textContent = "Connecting...";
+        if (statusDot) statusDot.className = "transport-dot connecting";
+        if (statusText) statusText.textContent = "Connecting…";
         
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.connect_single_device(address)
@@ -491,8 +491,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (res) {
                         appConnected = true;
                         showToast(`Successfully connected to ${name}!`, "success");
-                        if (statusDot) statusDot.className = "status-indicator connected";
-                        if (statusText) statusText.textContent = `Connected: ${name}`;
+                        if (statusDot) statusDot.className = "transport-dot active";
+                        if (statusText) statusText.textContent = name;
                         
                         document.getElementById("banner-device-name").textContent = name;
                         document.getElementById("banner-device-mac").textContent = address;
@@ -511,7 +511,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else {
                         appConnected = false;
                         showToast(`Failed to connect to ${name}`, "error");
-                        if (statusDot) statusDot.className = "status-indicator disconnected";
+                        if (statusDot) statusDot.className = "transport-dot inactive";
                         if (statusText) statusText.textContent = "Disconnected";
                         document.getElementById("banner-device-name").textContent = "None";
                         document.getElementById("banner-device-mac").textContent = "None";
@@ -850,6 +850,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             if (info.artwork_url) {
                                 document.getElementById("music-cover-img").src = info.artwork_url;
                             }
+                            // On-device preview: the exact downsampled frame (5.d).
+                            const devPrev = document.getElementById("music-device-preview");
+                            if (devPrev && info.preview) {
+                                devPrev.src = info.preview;
+                                devPrev.style.display = "inline-block";
+                            }
                         }
                     }
                 });
@@ -882,14 +888,13 @@ document.addEventListener("DOMContentLoaded", () => {
                                 if (priceMock) priceMock.textContent = `$${res.price}`;
                                 if (arrowMock) {
                                     arrowMock.textContent = res.change >= 0 ? "▲" : "▼";
-                                    if (res.change >= 0) {
-                                        arrowMock.style.color = "var(--secondary)";
-                                    } else {
-                                        arrowMock.style.color = "red";
-                                    }
+                                    arrowMock.style.color = res.change >= 0 ? "var(--secondary)" : "red";
                                 }
+                                showTickerDevicePreview(res.preview);
                             } else {
-                                showToast(`Failed to fetch/display ${symbol}`, "error");
+                                // 5.a: surface the real reason (e.g. "No device connected").
+                                showToast(res.error || `Failed to display ${symbol}`, "error");
+                                showTickerDevicePreview(res.preview);
                             }
                         } else {
                             showToast("API return error", "error");
@@ -898,6 +903,73 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    function showTickerDevicePreview(dataUrl) {
+        const img = document.getElementById("ticker-device-preview");
+        if (img && dataUrl) {
+            img.src = dataUrl;
+            img.style.display = "inline-block";
+        }
+    }
+
+    // 5.e — multiple saved tickers (persisted, seeded from macOS Stocks).
+    function renderTickers(symbols) {
+        const el = document.getElementById("tickers-list");
+        if (!el) return;
+        el.innerHTML = "";
+        (symbols || []).forEach(sym => {
+            const chip = document.createElement("span");
+            chip.className = "ticker-chip";
+            const label = document.createElement("button");
+            label.className = "ticker-chip-label";
+            label.textContent = sym;
+            label.title = `Display ${sym}`;
+            label.addEventListener("click", () => {
+                const input = document.getElementById("stock-symbol-input");
+                if (input) input.value = sym;
+                document.getElementById("apply-stock-btn")?.click();
+            });
+            const rm = document.createElement("button");
+            rm.className = "ticker-chip-remove";
+            rm.textContent = "×";
+            rm.title = `Remove ${sym}`;
+            rm.addEventListener("click", () => removeTicker(sym));
+            chip.append(label, rm);
+            el.appendChild(chip);
+        });
+    }
+
+    let savedTickers = [];
+    function loadTickers() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_tickers) {
+            window.pywebview.api.get_tickers().then(json => {
+                try { savedTickers = JSON.parse(json) || []; renderTickers(savedTickers); } catch (e) {}
+            });
+        }
+    }
+    function persistTickers() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_tickers) {
+            window.pywebview.api.set_tickers(JSON.stringify(savedTickers));
+        }
+        renderTickers(savedTickers);
+    }
+    function removeTicker(sym) {
+        savedTickers = savedTickers.filter(s => s !== sym);
+        persistTickers();
+    }
+    const addTickerBtn = document.getElementById("add-ticker-btn");
+    if (addTickerBtn) {
+        addTickerBtn.addEventListener("click", () => {
+            const sym = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
+            if (!sym) { showToast("Enter a ticker symbol first.", "error"); return; }
+            if (!savedTickers.includes(sym)) {
+                savedTickers.push(sym);
+                persistTickers();
+                showToast(`Saved ${sym}`, "success");
+            }
+        });
+    }
+    setTimeout(loadTickers, 1500);
 
     // Tab 5: Credentials Settings tab
     const saveCredsBtn = document.getElementById("save-creds-btn");

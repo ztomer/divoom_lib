@@ -213,6 +213,17 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         # Save scanner limits into config.ini for next time
         self.save_scan_settings(timeout, limit)
 
+        # Hardware-free mode: return a deterministic mock device.
+        if os.environ.get("DIVOOM_MOCK_BLE") in ("1", "true", "yes"):
+            mock = [{"name": "Pixoo-Mock", "address": "AA:BB:CC:DD:EE:FF"}]
+            try:
+                cache_file = Path.home() / ".config" / "divoom-control" / "discovered_devices.json"
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(json.dumps(mock), encoding="utf-8")
+            except Exception:
+                pass
+            return json.dumps(mock)
+
         # Scan using Bleak cleanly inside thread-safe asyncio.run context
         try:
             if limit > 0:
@@ -304,7 +315,17 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                         return False
                     connected = True
                 else:
-                    self.current_divoom = Divoom(mac=address, logger=logger, use_ios_le_protocol=False)
+                    client = None
+                    if os.environ.get("DIVOOM_MOCK_BLE") in ("1", "true", "yes"):
+                        # Hardware-free mode: inject a MockBleakClient so the full
+                        # bridge → Divoom → framing pipeline is driveable without
+                        # a real device / Bluetooth permission.
+                        import sys as _sys
+                        _sys.path.append(str(Path(__file__).parent.parent / "scripts"))
+                        from mock_device import MockBleakClient
+                        client = MockBleakClient(address)
+                        logger.info("DIVOOM_MOCK_BLE: using MockBleakClient")
+                    self.current_divoom = Divoom(mac=address, client=client, logger=logger, use_ios_le_protocol=False)
                     self._run_async(self.current_divoom.connect())
                     connected = True
 

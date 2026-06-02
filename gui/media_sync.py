@@ -1,8 +1,10 @@
 import json
 import asyncio
+import base64
 import logging
 import urllib.request
 import struct
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -425,20 +427,22 @@ class MediaSyncMixin:
                         
                         art_url = media_source.fetch_album_art_url(track, artist)
                         if art_url:
-                            size = 16
+                            size = self._active_device_size()
                             out_path = media_source.render_and_downsample_artwork(art_url, size=size)
+                            preview_url = ""
                             if out_path and out_path.exists():
-                                logger.info(f"Music Sync: Push cover art frame: {out_path}")
+                                preview_url = self._frame_to_data_url(out_path)
+                                logger.info(f"Music Sync: Push cover art frame ({size}px): {out_path}")
                                 try:
-                                    if self.wall_slots:
-                                        if self._rebuild_wall_instance(size):
-                                            self._run_async(self.wall_instance.show_image(str(out_path)))
-                                    elif self.current_divoom and self.current_divoom.is_connected:
-                                        self._run_async(self.current_divoom.display.show_image(str(out_path)))
+                                    # Use the shared push (wall or single BLE/LAN) and
+                                    # real device size — fixes art not showing (5.c).
+                                    if not self._push_frame(out_path, size):
+                                        logger.warning("Music Sync: no connected target for cover art")
                                 except Exception as e:
                                     logger.error(f"Failed to stream artwork: {e}")
-                                    
+
                             self.current_track_cache = {
+                                "preview": preview_url,
                                 "track": track,
                                 "artist": artist,
                                 "source": source,
@@ -471,32 +475,145 @@ class MediaSyncMixin:
             return json.dumps(self.current_track_cache)
         return json.dumps({})
 
+    # ── Live widgets: device-size helpers, previews, tickers (area 5) ──────
+
+    def _active_device_size(self, default: int = 16) -> int:
+        """Pixel matrix size of the active target (5.a/5.c: stop hardcoding 16)."""
+        try:
+            if self.wall_slots:
+                sizes = [s.get("size", default) for s in self.wall_slots.values() if isinstance(s, dict)]
+                return min(sizes) if sizes else default
+            dev = self.current_divoom
+            mac = getattr(getattr(dev, "_conn", None), "mac", None) or getattr(dev, "mac", None)
+            if mac:
+                return self._get_device_size(mac)
+        except Exception:
+            pass
+        return default
+
+    def _has_push_target(self) -> bool:
+        dev = self.current_divoom
+        return bool(self.wall_slots) or bool(
+            dev and (getattr(dev, "is_connected", False) or getattr(dev, "lan", None) is not None))
+
+    def _push_frame(self, frame_path, size: int) -> bool:
+        """Push a rendered frame to the wall or the single active (BLE/LAN) device."""
+        if self.wall_slots:
+            if self._rebuild_wall_instance(size):
+                return bool(self._run_async(self.wall_instance.show_image(str(frame_path))))
+            return False
+        dev = self.current_divoom
+        if dev and (getattr(dev, "is_connected", False) or getattr(dev, "lan", None) is not None):
+            return bool(self._run_async(dev.display.show_image(str(frame_path))))
+        return False
+
+    @staticmethod
+    def _frame_to_data_url(frame_path) -> str:
+        """Base64 data URL for a rendered PNG so the UI can show the exact frame."""
+        try:
+            data = Path(frame_path).read_bytes()
+            return "data:image/png;base64," + base64.b64encode(data).decode("ascii")
+        except Exception:
+            return ""
+
+    def get_ticker_preview(self, symbol: str, size: int = 0) -> str:
+        """Render a ticker frame and return it as a data URL (no device needed),
+        so the UI can show a live on-device preview at the target matrix (5.d)."""
+        try:
+            data = media_source.fetch_stock_ticker(symbol)
+            if not data:
+                return json.dumps({"ok": False, "error": "no data"})
+            sz = int(size) if size and int(size) > 0 else self._active_device_size()
+            frame_path = media_source.render_stock_ticker_frame(symbol, data, size=sz)
+            return json.dumps({
+                "ok": True, "size": sz, "symbol": symbol,
+                "preview": self._frame_to_data_url(frame_path),
+                "price": data["price"], "change": data["change"], "pct_change": data["pct_change"],
+            })
+        except Exception as e:
+            logger.error(f"get_ticker_preview failed: {e}")
+            return json.dumps({"ok": False, "error": str(e)})
+
     def apply_stock_ticker(self, symbol: str) -> str:
         logger.info(f"GUI Action: Applying stock ticker for {symbol}...")
         try:
             data = media_source.fetch_stock_ticker(symbol)
             if not data:
-                return json.dumps({"success": False})
-                
-            size = 16
+                return json.dumps({"success": False, "error": "Could not fetch ticker data"})
+            if not self._has_push_target():
+                return json.dumps({"success": False, "error": "No device connected"})
+
+            size = self._active_device_size()
             frame_path = media_source.render_stock_ticker_frame(symbol, data, size=size)
-            
-            res = False
-            if self.wall_slots:
-                if self._rebuild_wall_instance(size):
-                    res = self._run_async(self.wall_instance.show_image(str(frame_path)))
-            elif self.current_divoom and self.current_divoom.is_connected:
-                res = self._run_async(self.current_divoom.display.show_image(str(frame_path)))
-                
+            res = self._push_frame(frame_path, size)
+
             return json.dumps({
                 "success": res,
+                "preview": self._frame_to_data_url(frame_path),
                 "price": data["price"],
                 "change": data["change"],
-                "pct_change": data["pct_change"]
+                "pct_change": data["pct_change"],
             })
         except Exception as e:
             logger.error(f"Failed to apply stock ticker: {e}")
             return json.dumps({"success": False, "error": str(e)})
+
+    # ── Multiple tickers (5.e) ─────────────────────────────────────────────
+
+    def _tickers_path(self):
+        return Path.home() / ".config" / "divoom-control" / "tickers.json"
+
+    def get_tickers(self) -> str:
+        """Return the saved ticker symbols, seeding from macOS Stocks on first use."""
+        path = self._tickers_path()
+        if path.exists():
+            try:
+                return json.dumps(json.loads(path.read_text(encoding="utf-8")))
+            except Exception:
+                pass
+        seed = self._seed_tickers_from_macos()
+        self.set_tickers(json.dumps(seed))
+        return json.dumps(seed)
+
+    def set_tickers(self, *symbols_arg, **kwargs) -> bool:
+        try:
+            symbols = self._coerce_list(symbols_arg, kwargs, "tickers")
+            # de-dupe, upper-case, drop blanks, preserve order
+            seen, clean = set(), []
+            for s in symbols:
+                s = str(s).strip().upper()
+                if s and s not in seen:
+                    seen.add(s)
+                    clean.append(s)
+            path = self._tickers_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(clean, indent=2), encoding="utf-8")
+            return True
+        except Exception as e:
+            logger.error(f"set_tickers failed: {e}")
+            return False
+
+    @staticmethod
+    def _seed_tickers_from_macos() -> list:
+        """Best-effort seed from the macOS Stocks app watchlist; falls back to a
+        sensible default list when it can't be read (sandboxed / not present)."""
+        default = ["AAPL", "GOOGL", "MSFT", "TSLA", "BTC-USD", "ETH-USD"]
+        try:
+            # Stocks stores its symbols in a preferences plist; read it via
+            # `defaults` and scrape ticker-like tokens. Quietly fall back.
+            out = subprocess.run(
+                ["defaults", "read", "com.apple.stocks"],
+                capture_output=True, text=True, timeout=4)
+            import re
+            syms = re.findall(r'"?symbol"?\s*=\s*"?([A-Z][A-Z0-9.\-]{0,9})"?', out.stdout)
+            cleaned = []
+            for s in syms:
+                s = s.upper()
+                if s and s not in cleaned:
+                    cleaned.append(s)
+            return cleaned or default
+        except Exception:
+            return default
 
     def _decode_and_save_preview(self, raw_bytes: bytes, cache_file_png: Path) -> bool:
         try:

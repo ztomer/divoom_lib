@@ -1,0 +1,92 @@
+"""Hardware-free end-to-end tests.
+
+Inject the `MockBleakClient` (which records every frame the "device" receives)
+into a real `Divoom`, drive the high-level Control Center commands, and assert
+the exact wire bytes the library produces. This validates the full
+bridge → Divoom → framing → GATT-write pipeline that real hardware would
+otherwise be needed to confirm — without Bluetooth permission.
+"""
+
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent / "scripts"))
+
+from divoom_lib.divoom import Divoom
+from divoom_lib import models, framing
+from mock_device import MockBleakClient
+
+MAC = "AA:BB:CC:DD:EE:FF"
+WRITE_UUID = "49535343-8841-43f4-a8d4-ecbe34729bb3"
+
+
+async def _connected_divoom():
+    mock = MockBleakClient(MAC)
+    dev = Divoom(mac=MAC, client=mock, use_ios_le_protocol=False)
+    await dev.connect()
+    mock.written.clear()  # drop connection-time chatter
+    return dev, mock
+
+
+def _decoded_frames(mock):
+    """Parse every recorded write with the library's own parser."""
+    out = []
+    for _char, data in mock.written:
+        msgs, _ = framing.parse_basic_protocol_frames(bytearray(data))
+        out.extend(msgs)
+    return out
+
+
+@pytest.mark.asyncio
+async def test_connect_uses_injected_mock():
+    dev, mock = await _connected_divoom()
+    assert dev.is_connected is True
+    assert dev.client is mock  # not replaced by a real BleakClient
+
+
+@pytest.mark.asyncio
+async def test_show_effects_emits_vj_frames():
+    """2.d: VJ effect 9 → set work mode (effects) + set design [9]."""
+    dev, mock = await _connected_divoom()
+    await dev.display.show_effects(number=9)
+    frames = _decoded_frames(mock)
+    cmds = [f["command_id"] for f in frames]
+    assert models.COMMANDS["set work mode"] in cmds
+    assert models.COMMANDS["set design"] in cmds
+    design = next(f for f in frames if f["command_id"] == models.COMMANDS["set design"])
+    assert list(design["payload"]) == [9]
+
+
+@pytest.mark.asyncio
+async def test_show_visualization_emits_eq_frames():
+    """2.c: visualizer 3 → set work mode (visualization) + set design [3]."""
+    dev, mock = await _connected_divoom()
+    await dev.display.show_visualization(number=3)
+    frames = _decoded_frames(mock)
+    design = next(f for f in frames if f["command_id"] == models.COMMANDS["set design"])
+    assert list(design["payload"]) == [3]
+
+
+@pytest.mark.asyncio
+async def test_show_clock_emits_clock_frame():
+    """2.f: clock dial 2 → 'set light mode' frame carrying the dial index."""
+    dev, mock = await _connected_divoom()
+    await dev.display.show_clock(clock=2)
+    frames = _decoded_frames(mock)
+    clock = next(f for f in frames if f["command_id"] == models.COMMANDS["set light mode"])
+    # payload: [00, 24h=01, dial=02, activated=01, weather, temp, calendar]
+    assert clock["payload"][2] == 2
+    assert clock["payload"][3] == 1  # clock activated
+
+
+@pytest.mark.asyncio
+async def test_written_frames_are_valid_framing():
+    """Every emitted frame round-trips through the parser (valid checksum/END)."""
+    dev, mock = await _connected_divoom()
+    await dev.display.show_effects(number=0)
+    assert mock.written, "no frames written"
+    # If any checksum/END were wrong, the parser would yield fewer messages.
+    assert len(_decoded_frames(mock)) >= 2

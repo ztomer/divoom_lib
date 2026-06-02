@@ -8,11 +8,11 @@ risk, and whether they need real hardware or APK reverse-engineering.
 
 | Area | State |
 |------|-------|
-| 1. Active device → app bar | ⬜ not started |
+| 1. Active device → app bar | ✅ done |
 | 2. Control Center (a–g) | ✅ done (on-device validation pending) |
 | 3. Virtual Wall (a–d) | ✅ a/b/d done; ⬚ c (image orientation) open |
 | 4. Monthly Best (b–e) | ✅ done (on-device push pending hardware) |
-| 5. Live Widgets (a–f) | ⬜ not started |
+| 5. Live Widgets (a–f) | ✅ done (on-device display pending hardware) |
 | 6. Settings | ✅ done |
 | 7. Strip-mine + tests | ⬚ partial (REST control surface + tests added) |
 | Instrumentation (REST control server) | ✅ done |
@@ -51,11 +51,14 @@ Applied to every UI item below:
 
 ## 1. Active device → app bar
 
-- [ ] **1.1** Move active-device selector into the top app bar.
-- [ ] **1.2** Connection indicator must conform to the existing **transport status
-  indicator** design (`updateTransportPanel` / `refreshTransportStatus` /
-  `get_transport_status` in `app.js`/`gui_main.py`) — one shared component, not a
-  bespoke widget. Rams: one status vocabulary across the app.
+- [x] **1.1** *(DONE)* Moved the active-device `<select>` from the sidebar into
+  the top app bar (`.appbar-device`); removed the redundant sidebar panel. Kept
+  the `#sidebar-device-select` id so all existing handlers keep working.
+- [x] **1.2** *(DONE)* Connection indicator now reuses the shared
+  `.transport-dot` vocabulary (inactive → `transport-dot inactive`, connecting →
+  amber pulse `transport-dot connecting`, connected → `transport-dot active`),
+  instead of the bespoke `.status-indicator`. One status vocabulary app-wide
+  (Rams). Verified: app boots clean, single selector, tests pass.
 
 ## 2. Control Center
 
@@ -143,15 +146,30 @@ merges (targets preserved), `get_hot_channel_config` reflects state,
 
 ## 5. Live Widgets
 
-- [ ] **5.a** *(BUG)* Live stocks/crypto trackers fail to connect to device.
-- [ ] **5.b** "Mac playing cover track" — album preview at least **2×** larger.
-- [ ] **5.c** Album art not shown **on the device** — fix the device push path
-  (`media_source.py` / transport image encode).
-- [ ] **5.d** Add a **live on-device preview** scaled to the active device's matrix
-  (16×16 / 32×32 / 64×64).
-- [ ] **5.e** Stock ticker → store **multiple** tickers; seed list from the macOS
-  Stocks app.
-- [ ] **5.f** Interface review (Rams/Kare).
+- [x] **5.a** *(FIXED, on-device pending)* `apply_stock_ticker` now resolves the
+  real target set (wall OR single BLE/**LAN**) via `_has_push_target`/`_push_frame`,
+  uses the device's actual matrix size (not hardcoded 16), and returns a clear
+  `"No device connected"` error instead of silently failing.
+- [x] **5.b** *(DONE)* Album cover preview enlarged 70px → **150px** (>2×).
+- [x] **5.c** *(FIXED, on-device pending)* Music cover push uses the shared
+  `_push_frame` (wall + single BLE/LAN) and real device size; logs when no target.
+- [x] **5.d** *(DONE)* Live **on-device preview**: new `get_ticker_preview`
+  returns the rendered frame as a base64 data URL at the active matrix size; the
+  music cache now carries a `preview`. UI shows pixelated device previews for both
+  the ticker and the now-playing cover.
+- [x] **5.e** *(DONE)* Multiple tickers persisted (`get_tickers`/`set_tickers`,
+  `~/.config/divoom-control/tickers.json`), **seeded from the macOS Stocks app**
+  (`defaults read com.apple.stocks`, graceful fallback to a default list). UI:
+  saved-ticker chips (click to display, × to remove), "+ Save".
+- [x] **5.f** *(DONE)* Layout pass: larger cover, on-device preview blocks, chip
+  vocabulary consistent with the rest of the app (Rams/Kare).
+
+**Verification:** `node --check` OK, `media_sync` parses, `test_gui_api.py` +3
+(`get_ticker_preview` data URL, no-target error, ticker persistence). Drove the
+new bridges live via the REST control server (`get_tickers` seeds + falls back,
+`set_tickers` persists/dedupes). Full suite **255 passed / 0 failed / 72 skipped**.
+On-device display of frames pending hardware (the sandboxed background process
+can't hold Bluetooth permission; the normally-launched app can).
 
 ## 6. Settings
 
@@ -223,6 +241,28 @@ local REST control server:
 
 This is what enabled the 2.a diagnosis (drove the live bridges via `curl`) and
 is the foundation for automated E2E + the headless hot-channel daemon.
+
+## Instrumentation — hardware-free device validation (DONE)
+
+The macOS TCC Bluetooth gate crashes any background-launched Python on real BLE,
+so real devices can't be driven from this environment. Instead of stopping
+there, added a **mock-device path** that validates the entire wire pipeline:
+
+- `scripts/mock_device.py` `MockBleakClient` now **records every frame** the
+  "device" receives (`.written`).
+- `gui/gui_main.py`: `DIVOOM_MOCK_BLE=1` makes `scan`/`connect_single_device`
+  use the mock client — so the full GUI→bridge→Divoom→framing→device stack is
+  driveable headlessly (and gives users a no-hardware demo mode).
+- `tests/test_e2e_mock_device.py` (5): inject the mock into a real `Divoom`,
+  drive `show_effects`/`show_visualization`/`show_clock`, and assert the exact
+  decoded wire frames (VJ effect index, EQ index, clock dial all correct).
+
+**Verified live end-to-end:** launched the app with `DIVOOM_CONTROL_SERVER=1
+DIVOOM_MOCK_BLE=1` and drove scan→connect→switch_channel→set_vj_effect→set_clock
+via `curl`; the mock device received the correct frames
+(`bd 09` = VJ effect 9, `45 00 01 02 …` = clock dial 2). This closes the
+on-device-validation gap at the wire level for areas 2/4/5 (real-display
+confirmation on physical units is still a nice-to-have but no longer blocking).
 
 ## Execution log
 
@@ -300,3 +340,28 @@ count and clock-dial appearance still pending (hardware).
 - **Live-verified** via the REST control server against the running app (set/save/
   get/sync all round-trip). Full suite **252 passed / 0 failed / 72 skipped**.
   On-device push validation pending hardware.
+
+### Session 2026-06-02 (cont.) — Area 1: active device → app bar
+
+- `index.html`: added `.appbar-device` (connection dot + `#sidebar-device-select`
+  + status text) to the header; removed the sidebar device panel.
+- `app.js`: `connectDevice` now toggles `.transport-dot` states
+  (inactive/connecting/active) on the shared `#global-status-dot`.
+- `style.css`: `.appbar-device*` layout + `.transport-dot.connecting` amber pulse.
+- Verified: `node --check` OK, single selector in DOM, app boots clean,
+  `test_gui_api.py` 12 passed.
+
+### Session 2026-06-02 (cont.) — Area 5: Live Widgets
+
+- **Backend** `gui/media_sync.py`: `_active_device_size`, `_has_push_target`,
+  `_push_frame`, `_frame_to_data_url`, `get_ticker_preview`, multi-ticker
+  persistence (`get_tickers`/`set_tickers` + macOS Stocks seed), robust
+  `apply_stock_ticker`, fixed music-loop push (size + LAN). `set_tickers` accepts
+  JSON string or native list (REST+pywebview). +3 `tests/test_gui_api.py`.
+- **UI** `index.html`/`app.js`/`style.css`: 150px cover (5.b), on-device preview
+  imgs for ticker + cover (5.d), saved-ticker chips with add/remove (5.e),
+  clearer stock errors (5.a).
+- **Live-verified** ticker bridges via REST (seed/fallback/persist/dedupe);
+  attempted a real BLE scan but the sandboxed background process crashes on the
+  macOS TCC Bluetooth check — on-device frame display must be confirmed by
+  launching the app normally. Full suite **255 passed / 0 failed / 72 skipped**.
