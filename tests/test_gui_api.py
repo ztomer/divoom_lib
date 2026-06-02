@@ -199,6 +199,27 @@ class TestDivoomGuiAPI(unittest.TestCase):
             self.assertTrue(self.api.set_tickers(json.dumps(["aapl", "AAPL", "btc-usd", ""])))
             self.assertEqual(json.loads(self.api.get_tickers()), ["AAPL", "BTC-USD"])
 
+    def test_system_stats_preview_and_apply(self):
+        """Area 7: system-monitor widget renders a frame and reports stats."""
+        from pathlib import Path as _P
+        with patch("divoom_lib.utils.media_source.get_system_stats",
+                   return_value={"cpu": 12, "mem": 43, "battery": 80}), \
+             patch("divoom_lib.utils.media_source.render_system_stats_frame",
+                   return_value=_P("/tmp/sysmon_test.png")), \
+             patch.object(type(self.api), "_frame_to_data_url",
+                          staticmethod(lambda p: "data:image/png;base64,BBB")):
+            prev = json.loads(self.api.get_system_stats_preview(32))
+            self.assertTrue(prev["ok"])
+            self.assertEqual(prev["stats"]["cpu"], 12)
+            self.assertTrue(prev["preview"].startswith("data:image/png;base64,"))
+
+            # apply with no device → clear failure
+            self.api.current_divoom = None
+            self.api.wall_slots = {}
+            res = json.loads(self.api.apply_system_stats())
+            self.assertFalse(res["success"])
+            self.assertEqual(res["error"], "No device connected")
+
     def test_sync_hot_channel_multi(self):
         """4.b: sync_hot_channel pushes every artwork and reports a summary."""
         with patch.object(self.api, "batch_sync_artwork", return_value=True) as m:

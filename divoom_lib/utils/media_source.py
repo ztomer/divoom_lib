@@ -178,3 +178,59 @@ def render_stock_ticker_frame(symbol: str, data: dict, size: int = 16) -> Path:
         
     img.save(out_path)
     return out_path
+
+
+def get_system_stats() -> dict:
+    """Return live host metrics for an on-device system monitor (ported from the
+    Wi-Fi-only Pixoo64-Advanced-Tools concept, rendered to a frame for BLE)."""
+    try:
+        import psutil
+        cpu = psutil.cpu_percent(interval=0.0)
+        mem = psutil.virtual_memory().percent
+        battery = None
+        try:
+            b = psutil.sensors_battery()
+            battery = int(b.percent) if b else None
+        except Exception:
+            battery = None
+        return {"cpu": round(cpu), "mem": round(mem), "battery": battery}
+    except Exception as e:
+        logger.warning(f"get_system_stats failed: {e}")
+        return {"cpu": 0, "mem": 0, "battery": None}
+
+
+def render_system_stats_frame(stats: dict, size: int = 16) -> Path:
+    """Render CPU/RAM (and battery) as two labelled bar gauges sized to the
+    device matrix. Mirrors render_stock_ticker_frame's approach."""
+    scratch_dir = Path(__file__).parent.parent.parent / "scratch"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    out_path = scratch_dir / f"sysmon_{size}.png"
+
+    img = Image.new("RGB", (size, size), (5, 6, 12))
+    draw = ImageDraw.Draw(img)
+
+    def bar(y, frac, color, h):
+        frac = max(0.0, min(1.0, frac / 100.0))
+        w = max(1, int(round((size - 2) * frac)))
+        draw.rectangle([(1, y), (size - 2, y + h)], outline=(40, 42, 54))
+        if w > 0:
+            draw.rectangle([(1, y), (1 + w, y + h)], fill=color)
+
+    cpu = stats.get("cpu", 0)
+    mem = stats.get("mem", 0)
+    cpu_color = (0, 255, 180) if cpu < 70 else (255, 60, 60)
+    mem_color = (90, 170, 255) if mem < 80 else (255, 140, 0)
+
+    if size <= 16:
+        draw.text((1, 0), "C", fill=(255, 255, 255))
+        bar(6, cpu, cpu_color, 2)
+        draw.text((1, 8), "M", fill=(255, 255, 255))
+        bar(13, mem, mem_color, 2)
+    else:
+        draw.text((2, 1), f"CPU {cpu}%", fill=cpu_color)
+        bar(10, cpu, cpu_color, 4)
+        draw.text((2, 17), f"MEM {mem}%", fill=mem_color)
+        bar(26, mem, mem_color, 4)
+
+    img.save(out_path)
+    return out_path

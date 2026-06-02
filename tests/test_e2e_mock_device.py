@@ -83,6 +83,24 @@ async def test_show_clock_emits_clock_frame():
 
 
 @pytest.mark.asyncio
+async def test_show_image_emits_0x44_frames():
+    """Regression: image push must use command 0x44 (was KeyError 'set image',
+    which silently broke album art / gallery / ticker / sysmon on-device)."""
+    from PIL import Image
+    p = Path("/tmp/e2e_img_test.png")
+    Image.new("RGB", (16, 16), (255, 0, 0)).save(p)
+    dev, mock = await _connected_divoom()
+    ok = await dev.display.show_image(str(p))
+    assert ok is True
+    assert mock.written, "no frames written"
+    # A large image is split across multiple GATT writes; reassemble the stream
+    # before parsing the (single) framed message.
+    full = b"".join(data for _char, data in mock.written)
+    msgs, _ = framing.parse_basic_protocol_frames(bytearray(full))
+    assert msgs and msgs[0]["command_id"] == 0x44
+
+
+@pytest.mark.asyncio
 async def test_written_frames_are_valid_framing():
     """Every emitted frame round-trips through the parser (valid checksum/END)."""
     dev, mock = await _connected_divoom()

@@ -907,6 +907,59 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Area 7 — System Monitor widget (CPU/RAM/battery → device).
+    function refreshSysmonPreview() {
+        if (!(window.pywebview && window.pywebview.api && window.pywebview.api.get_system_stats_preview)) return;
+        window.pywebview.api.get_system_stats_preview(0).then(json => {
+            try {
+                const r = JSON.parse(json);
+                if (!r.ok) return;
+                const s = r.stats || {};
+                const cpu = document.getElementById("sysmon-cpu");
+                const mem = document.getElementById("sysmon-mem");
+                const bat = document.getElementById("sysmon-bat");
+                if (cpu) cpu.textContent = `${s.cpu}%`;
+                if (mem) mem.textContent = `${s.mem}%`;
+                if (bat) bat.textContent = s.battery != null ? `${s.battery}%` : "n/a";
+                const img = document.getElementById("sysmon-device-preview");
+                if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
+            } catch (e) { /* ignore */ }
+        });
+    }
+    const sysmonDisplayBtn = document.getElementById("sysmon-display-btn");
+    if (sysmonDisplayBtn) {
+        sysmonDisplayBtn.addEventListener("click", () => {
+            if (!(window.pywebview && window.pywebview.api && window.pywebview.api.apply_system_stats)) return;
+            window.pywebview.api.apply_system_stats().then(json => {
+                try {
+                    const r = JSON.parse(json);
+                    const img = document.getElementById("sysmon-device-preview");
+                    if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
+                    showToast(r.success ? "System monitor on device" : (r.error || "Failed"), r.success ? "success" : "error", "🔵 BLE");
+                } catch (e) { showToast("Failed", "error"); }
+            });
+        });
+    }
+    let sysmonTimer = null;
+    const sysmonLive = document.getElementById("sysmon-live");
+    if (sysmonLive) {
+        sysmonLive.addEventListener("change", (e) => {
+            if (e.target.checked) {
+                refreshSysmonPreview();
+                sysmonTimer = setInterval(() => {
+                    refreshSysmonPreview();
+                    if (window.pywebview && window.pywebview.api && window.pywebview.api.apply_system_stats) {
+                        window.pywebview.api.apply_system_stats();
+                    }
+                }, 5000);
+            } else if (sysmonTimer) {
+                clearInterval(sysmonTimer);
+                sysmonTimer = null;
+            }
+        });
+    }
+    setTimeout(refreshSysmonPreview, 1800);
+
     function showTickerDevicePreview(dataUrl) {
         const img = document.getElementById("ticker-device-preview");
         if (img && dataUrl) {

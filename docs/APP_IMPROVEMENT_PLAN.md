@@ -14,7 +14,7 @@ risk, and whether they need real hardware or APK reverse-engineering.
 | 4. Monthly Best (b–e) | ✅ done (on-device push pending hardware) |
 | 5. Live Widgets (a–f) | ✅ done (on-device display pending hardware) |
 | 6. Settings | ✅ done |
-| 7. Strip-mine + tests | ⬚ partial (REST control surface + tests added) |
+| 7. Strip-mine + tests | ✅ analysis + system-monitor port + 2 real bug fixes |
 | Instrumentation (REST control server) | ✅ done |
 
 Full suite: **243 passed / 0 failed / 72 skipped**. Nothing committed yet.
@@ -185,13 +185,42 @@ can't hold Bluetooth permission; the normally-launched app can).
 
 ## 7. Strip-mine reference projects + testing
 
-Mine for features (replicate Wi-Fi features over BLE where relevant):
-- [ ] **7.1** https://github.com/fabkury/servoom
-- [ ] **7.2** https://github.com/tidyhf/Pixoo64-Advanced-Tools
-- [ ] **7.3** https://github.com/r12f/divoom
-- [ ] **7.g** Full **unit + integration + UI/UX** tests. Mocks where relevant; a
-  real-hardware suite (gated by `--run-hardware`, already established) for device
-  paths.
+Strip-mine analysis (via WebFetch):
+- **7.1 servoom** — cloud archival/transcoding only (formats 9/17/18/26/31/42/43),
+  **no device control**. Value: its multi-format gallery decoders could harden our
+  gallery rendering (we currently special-case 0x43). *Deferred — nice-to-have.*
+- **7.2 Pixoo64-Advanced-Tools** *(HTTP-only)* — GIF/video player, **system
+  monitor**, text scroll, RSS, audio visualizer, Spotify. **Ported the system
+  monitor to BLE** (below); text/RSS scroll are good future ports.
+- **7.3 r12f/divoom** *(Rust, HTTP)* — channel/clock/visualizer (we have),
+  device settings (brightness/rotation/mirror/time), tools (countdown/noise/
+  scoreboard/stopwatch — already in `divoom_lib/tools/`), batch commands.
+  *Mostly already covered.*
+
+Implemented:
+- [x] **System Monitor widget** (ports the Pixoo64 Wi-Fi concept to BLE): renders
+  live CPU/RAM/battery to a device-sized frame and pushes it — exactly the
+  "replicate a Wi-Fi feature over Bluetooth" ask. `media_source.get_system_stats`
+  + `render_system_stats_frame`; bridges `get_system_stats_preview`/
+  `apply_system_stats`; new Live Widgets card with on-device preview + live mode.
+- [x] **7.g** Test pyramid substantially expanded: `test_control_server.py` (7),
+  `test_hotchannel_config.py` (7), `test_e2e_mock_device.py` (6, hardware-free
+  wire-level), plus GUI bridge units. Real-hardware suite remains gated by
+  `--run-hardware`.
+
+### 🐞 Bugs the mock-device E2E surfaced (both fixed)
+
+1. **`show_image` KeyError** — it sent commands `"set image"` / `"set animation
+   frame"` which **did not exist in `COMMANDS`**, so *every* on-device image/GIF
+   push raised `KeyError` and silently failed. This was the real root of **5.c
+   (album not on device)** and broke gallery/monthly-best on-device push and the
+   stock ticker. Fixed by adding the correct `0x44` aliases (verified against
+   node-divoom: image/animation = command 0x44). Now emits valid 0x44 frames.
+2. **Parser checksum not masked** — `parse_basic_protocol_frames` summed without
+   `& 0xFFFF` while the encoder masks, so **large frames (images) were wrongly
+   rejected** (and large device responses would be too). Fixed to mask.
+
+Both are covered by `test_e2e_mock_device.py::test_show_image_emits_0x44_frames`.
 
 ---
 

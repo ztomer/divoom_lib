@@ -23,6 +23,11 @@ COMMANDS = {
     "get alarm time": 0x42,
     "set alarm": 0x43,
     "set light pic": 0x44,
+    # Image/animation upload uses command 0x44 (Timebox Evo); static frames use
+    # frame_id -1, animation frames 0,1,2…  These aliases are what display.show_image
+    # sends — they were previously missing, so every image push raised KeyError.
+    "set image": 0x44,
+    "set animation frame": 0x44,
     "set light mode": 0x45,
     "set channel light": 0x45,
     "get light mode": 0x46,

@@ -1115,6 +1115,29 @@ body {
     object-fit: contain;
 }
 
+/* System monitor widget (area 7) */
+.sysmon-readout {
+    display: flex;
+    gap: 18px;
+    margin-bottom: 8px;
+}
+.sysmon-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.sysmon-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+.sysmon-stat b {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--text-main);
+}
+
 /* Saved tickers (5.e) */
 .tickers-list {
     display: flex;

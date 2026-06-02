@@ -408,6 +408,40 @@ class MediaSyncMixin:
             (synced if ok else failed).append(fid)
         return json.dumps({"ok": len(failed) == 0, "synced": synced, "failed": failed})
 
+    # ── System monitor widget (area 7: ported from Pixoo64 over BLE) ───────
+
+    def get_system_stats_preview(self, size: int = 0) -> str:
+        """Render a CPU/RAM monitor frame and return it as a data URL (5.d-style
+        on-device preview, no device needed)."""
+        try:
+            stats = media_source.get_system_stats()
+            sz = int(size) if size and int(size) > 0 else self._active_device_size()
+            frame_path = media_source.render_system_stats_frame(stats, size=sz)
+            return json.dumps({
+                "ok": True, "size": sz, "stats": stats,
+                "preview": self._frame_to_data_url(frame_path),
+            })
+        except Exception as e:
+            logger.error(f"get_system_stats_preview failed: {e}")
+            return json.dumps({"ok": False, "error": str(e)})
+
+    def apply_system_stats(self) -> str:
+        """Render live CPU/RAM and push it to the active screen(s)."""
+        try:
+            stats = media_source.get_system_stats()
+            if not self._has_push_target():
+                return json.dumps({"success": False, "error": "No device connected", "stats": stats})
+            size = self._active_device_size()
+            frame_path = media_source.render_system_stats_frame(stats, size=size)
+            res = self._push_frame(frame_path, size)
+            return json.dumps({
+                "success": res, "stats": stats,
+                "preview": self._frame_to_data_url(frame_path),
+            })
+        except Exception as e:
+            logger.error(f"apply_system_stats failed: {e}")
+            return json.dumps({"success": False, "error": str(e)})
+
     def _music_sync_loop(self):
         """Background thread polling macOS active playback and streaming artwork."""
         last_track = None

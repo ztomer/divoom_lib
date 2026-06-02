@@ -462,6 +462,28 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- System Monitor (area 7: Pixoo64 concept ported to BLE) -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <h3>System Monitor</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="sysmon-readout">
+                                <div class="sysmon-stat"><span class="sysmon-label">CPU</span><b id="sysmon-cpu">–</b></div>
+                                <div class="sysmon-stat"><span class="sysmon-label">MEM</span><b id="sysmon-mem">–</b></div>
+                                <div class="sysmon-stat"><span class="sysmon-label">BAT</span><b id="sysmon-bat">–</b></div>
+                            </div>
+                            <div class="device-preview-wrap">
+                                <span class="hc-label">On-device preview</span>
+                                <img id="sysmon-device-preview" class="device-preview-img" alt="" style="display:none;">
+                            </div>
+                            <div class="hc-actions">
+                                <button id="sysmon-display-btn" class="glow-btn compact">Display on Device</button>
+                                <label class="hc-toggle"><input type="checkbox" id="sysmon-live"> Live (5s)</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
             

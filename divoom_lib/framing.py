@@ -116,7 +116,10 @@ def parse_basic_protocol_frames(buf: bytearray) -> Tuple[list, bytearray]:
             payload = message[4:-3]
 
         checksum_input = message[1:-3]
-        calculated_checksum = sum(checksum_input)
+        # Mask to 16 bits to match the encoder (encode_basic_payload uses
+        # `& 0xFFFF`); without this, large frames (e.g. images) whose checksum
+        # overflows 16 bits were wrongly rejected.
+        calculated_checksum = sum(checksum_input) & 0xFFFF
         received_checksum = int.from_bytes(bytes(message[-3:-1]), byteorder='little')
         if received_checksum != calculated_checksum:
             continue
