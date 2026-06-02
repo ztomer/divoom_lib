@@ -135,41 +135,39 @@ class MediaSyncMixin:
                         safe_filename = file_id.replace("/", "_")
                         cache_file = cache_dir / safe_filename
                         
-                        has_cached = any(cache_file.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg", ".bin"])
-                        if not has_cached:
+                        has_preview = any(cache_file.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg"])
+                        cache_file_bin = cache_file.with_suffix(".bin")
+                        
+                        if not has_preview:
                             try:
-                                dl_url = f"https://fin.divoom-gz.com/{file_id}"
-                                req_dl = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
-                                with urllib.request.urlopen(req_dl, timeout=5) as dl_resp:
-                                    raw_bytes = dl_resp.read()
-                                    
+                                raw_bytes = None
+                                if cache_file_bin.exists():
+                                    raw_bytes = cache_file_bin.read_bytes()
+                                else:
+                                    dl_url = f"https://fin.divoom-gz.com/{file_id}"
+                                    req_dl = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
+                                    with urllib.request.urlopen(req_dl, timeout=5) as dl_resp:
+                                        raw_bytes = dl_resp.read()
+                                
+                                if raw_bytes:
                                     extracted = self._extract_image_from_magic_43(raw_bytes)
                                     if extracted:
                                         img_bytes, ext = extracted
-                                        cache_file = cache_file.with_suffix(ext)
-                                        cache_file.write_bytes(img_bytes)
+                                        cache_file.with_suffix(ext).write_bytes(img_bytes)
                                         logger.info(f"Gallery Cache: Extracted Magic 43 {ext[1:].upper()} to {cache_file.name}")
                                     elif raw_bytes.startswith(b"GIF89a") or raw_bytes.startswith(b"GIF87a"):
-                                        cache_file = cache_file.with_suffix(".gif")
-                                        cache_file.write_bytes(raw_bytes)
+                                        cache_file.with_suffix(".gif").write_bytes(raw_bytes)
                                         logger.info(f"Gallery Cache: Saved standard GIF to {cache_file.name}")
                                     elif raw_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
-                                        cache_file = cache_file.with_suffix(".png")
-                                        cache_file.write_bytes(raw_bytes)
+                                        cache_file.with_suffix(".png").write_bytes(raw_bytes)
                                         logger.info(f"Gallery Cache: Saved standard PNG to {cache_file.name}")
                                     elif raw_bytes.startswith(b"\xff\xd8"):
-                                        cache_file = cache_file.with_suffix(".jpg")
-                                        cache_file.write_bytes(raw_bytes)
+                                        cache_file.with_suffix(".jpg").write_bytes(raw_bytes)
                                         logger.info(f"Gallery Cache: Saved standard JPEG to {cache_file.name}")
                                     else:
-                                        # Also save the raw binary file for streaming if needed
-                                        cache_file_bin = cache_file.with_suffix(".bin")
                                         if not cache_file_bin.exists():
                                             cache_file_bin.write_bytes(raw_bytes)
-                                        
-                                        # Decode the actual first frame as PNG preview
-                                        cache_file_png = cache_file.with_suffix(".png")
-                                        self._decode_and_save_preview(raw_bytes, cache_file_png)
+                                        self._decode_and_save_preview(raw_bytes, cache_file.with_suffix(".png"))
                             except Exception as dl_err:
                                 logger.warning(f"Failed to cache preview for {file_id}: {dl_err}")
                         
@@ -400,10 +398,35 @@ class MediaSyncMixin:
             if magic == 9:
                 encrypted = raw_bytes[4:]
                 decrypted = decrypt_aes(encrypted)
-                if len(decrypted) >= 768:
-                    img = Image.frombytes("RGB", (16, 16), bytes(decrypted[:768]))
-                    img.resize((128, 128), Image.Resampling.NEAREST).save(cache_file_png)
-                    logger.info(f"Gallery Cache: Decoded Magic 9 16x16 asset to {cache_file_png.name}")
+                total_frames = raw_bytes[1]
+                speed = struct.unpack('>H', raw_bytes[2:4])[0]
+                
+                frames = []
+                for f_idx in range(total_frames):
+                    start = f_idx * 768
+                    end = start + 768
+                    if end > len(decrypted):
+                        break
+                    frame_data = bytes(decrypted[start:end])
+                    img = Image.frombytes("RGB", (16, 16), frame_data)
+                    img_resized = img.resize((128, 128), Image.Resampling.NEAREST)
+                    frames.append(img_resized)
+                
+                if frames:
+                    if len(frames) > 1:
+                        cache_file_gif = cache_file_png.with_suffix(".gif")
+                        frame_duration = speed if speed >= 10 else 100
+                        frames[0].save(
+                            cache_file_gif,
+                            save_all=True,
+                            append_images=frames[1:],
+                            duration=frame_duration,
+                            loop=0
+                        )
+                        logger.info(f"Gallery Cache: Decoded Magic 9 animation with {len(frames)} frames to {cache_file_gif.name}")
+                    else:
+                        frames[0].save(cache_file_png)
+                        logger.info(f"Gallery Cache: Decoded Magic 9 static frame to {cache_file_png.name}")
                     return True
                     
             elif magic == 18 or magic == 26:
@@ -412,17 +435,46 @@ class MediaSyncMixin:
                 encrypted = raw_bytes[6:]
                 decrypted = decrypt_aes(encrypted)
                 
-                frame_size = struct.unpack('>I', decrypted[:4])[0]
-                compressed_frame = decrypted[4 : 4 + frame_size]
-                
-                uncompressed_size = row_count * column_count * 768
                 lzo = lzallright.LZOCompressor()
-                frame_data = lzo.decompress(compressed_frame, uncompressed_size)
+                uncompressed_size = row_count * column_count * 768
                 
-                img = self._compact_tiles(frame_data, row_count, column_count)
-                img.resize((128, 128), Image.Resampling.NEAREST).save(cache_file_png)
-                logger.info(f"Gallery Cache: Decoded Magic {magic} asset to {cache_file_png.name}")
-                return True
+                frames = []
+                pos = 0
+                for f_idx in range(total_frames):
+                    if pos + 4 > len(decrypted):
+                        break
+                    frame_size = struct.unpack('>I', decrypted[pos : pos + 4])[0]
+                    pos += 4
+                    if pos + frame_size > len(decrypted):
+                        break
+                    compressed_frame = decrypted[pos : pos + frame_size]
+                    pos += frame_size
+                    
+                    try:
+                        frame_data = lzo.decompress(compressed_frame, uncompressed_size)
+                        img = self._compact_tiles(frame_data, row_count, column_count)
+                        img_resized = img.resize((128, 128), Image.Resampling.NEAREST)
+                        frames.append(img_resized)
+                    except Exception as frame_err:
+                        logger.warning(f"Failed to decompress frame {f_idx} for magic {magic}: {frame_err}")
+                        break
+                
+                if frames:
+                    if len(frames) > 1:
+                        cache_file_gif = cache_file_png.with_suffix(".gif")
+                        frame_duration = speed if speed >= 10 else 100
+                        frames[0].save(
+                            cache_file_gif,
+                            save_all=True,
+                            append_images=frames[1:],
+                            duration=frame_duration,
+                            loop=0
+                        )
+                        logger.info(f"Gallery Cache: Decoded Magic {magic} animation with {len(frames)} frames to {cache_file_gif.name}")
+                    else:
+                        frames[0].save(cache_file_png)
+                        logger.info(f"Gallery Cache: Decoded Magic {magic} static frame to {cache_file_png.name}")
+                    return True
         except Exception as e:
             logger.warning(f"Failed to transcode preview for Magic {raw_bytes[0] if raw_bytes else 0}: {e}")
         return False
