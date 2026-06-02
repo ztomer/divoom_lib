@@ -1652,3 +1652,37 @@ body.theme-light #widget-device-select {
     }
 }
 
+/* ── WKWebView easy_drag Exclusion Regions ──────────────────────────── */
+.arranger-workspace-free,
+.arranger-node,
+.main-content,
+.sidebar,
+.card,
+.batch-sync-bar,
+button,
+select,
+input,
+textarea,
+a {
+    -webkit-app-region: no-drag !important;
+}
+
+/* ── Susan Kare Retro monochrome dither filter overrides ─────────────── */
+.banner-preview img,
+.arranger-node-image {
+    image-rendering: pixelated;
+    filter: grayscale(100%) contrast(300%) brightness(110%);
+}
+
+body.theme-light .banner-preview img,
+body.theme-light .arranger-node-image {
+    filter: grayscale(100%) contrast(300%) brightness(95%) !important;
+}
+
+@media (prefers-color-scheme: light) {
+    body.theme-system .banner-preview img,
+    body.theme-system .arranger-node-image {
+        filter: grayscale(100%) contrast(300%) brightness(95%) !important;
+    }
+}
+

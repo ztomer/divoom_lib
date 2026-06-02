@@ -86,6 +86,12 @@ class PresetsManagerMixin:
                 except Exception:
                     pass
                     
+            cloud_connected = False
+            cloud_email = ""
+            if self.cached_creds and self.cached_creds.is_valid():
+                cloud_connected = True
+                cloud_email = self.cached_creds.email if (hasattr(self.cached_creds, "email") and self.cached_creds.email) else email
+
             return json.dumps({
                 "email": email,
                 "timeout": timeout,
@@ -93,7 +99,9 @@ class PresetsManagerMixin:
                 "slots": slots,
                 "lan_ip": lan_ip,
                 "lan_token": lan_token,
-                "devices": cached_devices
+                "devices": cached_devices,
+                "cloud_connected": cloud_connected,
+                "cloud_email": cloud_email
             })
         except Exception as e:
             logger.error(f"Failed to load config: {e}")

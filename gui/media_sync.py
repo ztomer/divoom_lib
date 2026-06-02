@@ -21,7 +21,7 @@ class MediaSyncMixin:
                 return 16
         return 16
 
-    def _extract_gif_from_magic_43(self, file_data: bytes) -> bytes | None:
+    def _extract_image_from_magic_43(self, file_data: bytes) -> tuple[bytes, str] | None:
         if len(file_data) < 10 or file_data[0] != 43:
             return None
         try:
@@ -29,22 +29,32 @@ class MediaSyncMixin:
             text_start = 10
             text_end = text_start + text_len
             
-            gif_len_offset = text_end
-            if len(file_data) < gif_len_offset + 4:
+            img_len_offset = text_end
+            if len(file_data) < img_len_offset + 4:
                 return None
                 
-            gif_len = struct.unpack("<I", file_data[gif_len_offset:gif_len_offset+4])[0]
-            gif_start = gif_len_offset + 4
-            gif_end = gif_start + gif_len
+            img_len = struct.unpack("<I", file_data[img_len_offset:img_len_offset+4])[0]
+            img_start = img_len_offset + 4
+            img_end = img_start + img_len
             
-            if gif_end > len(file_data):
-                gif_end = len(file_data)
+            if img_end > len(file_data):
+                img_end = len(file_data)
                 
-            gif_data = file_data[gif_start:gif_end]
-            if gif_data.startswith(b"GIF89a") or gif_data.startswith(b"GIF87a"):
-                return gif_data
+            img_data = file_data[img_start:img_end]
+            if img_data.startswith(b"GIF89a") or img_data.startswith(b"GIF87a"):
+                return img_data, ".gif"
+            elif img_data.startswith(b"\x89PNG\r\n\x1a\n"):
+                return img_data, ".png"
+            elif img_data.startswith(b"\xff\xd8"):
+                return img_data, ".jpg"
         except Exception as e:
-            logger.warning(f"Failed to extract GIF: {e}")
+            logger.warning(f"Failed to extract image from Magic 43: {e}")
+        return None
+
+    def _extract_gif_from_magic_43(self, file_data: bytes) -> bytes | None:
+        res = self._extract_image_from_magic_43(file_data)
+        if res and res[1] == ".gif":
+            return res[0]
         return None
 
     def fetch_gallery(self, classify: int, target_size: int = 16) -> str:
@@ -132,15 +142,24 @@ class MediaSyncMixin:
                                 with urllib.request.urlopen(req_dl, timeout=5) as dl_resp:
                                     raw_bytes = dl_resp.read()
                                     
-                                    extracted_gif = self._extract_gif_from_magic_43(raw_bytes)
-                                    if extracted_gif:
-                                        cache_file = cache_file.with_suffix(".gif")
-                                        cache_file.write_bytes(extracted_gif)
-                                        logger.info(f"Gallery Cache: Extracted Magic 43 GIF to {cache_file.name}")
+                                    extracted = self._extract_image_from_magic_43(raw_bytes)
+                                    if extracted:
+                                        img_bytes, ext = extracted
+                                        cache_file = cache_file.with_suffix(ext)
+                                        cache_file.write_bytes(img_bytes)
+                                        logger.info(f"Gallery Cache: Extracted Magic 43 {ext[1:].upper()} to {cache_file.name}")
                                     elif raw_bytes.startswith(b"GIF89a") or raw_bytes.startswith(b"GIF87a"):
                                         cache_file = cache_file.with_suffix(".gif")
                                         cache_file.write_bytes(raw_bytes)
                                         logger.info(f"Gallery Cache: Saved standard GIF to {cache_file.name}")
+                                    elif raw_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+                                        cache_file = cache_file.with_suffix(".png")
+                                        cache_file.write_bytes(raw_bytes)
+                                        logger.info(f"Gallery Cache: Saved standard PNG to {cache_file.name}")
+                                    elif raw_bytes.startswith(b"\xff\xd8"):
+                                        cache_file = cache_file.with_suffix(".jpg")
+                                        cache_file.write_bytes(raw_bytes)
+                                        logger.info(f"Gallery Cache: Saved standard JPEG to {cache_file.name}")
                                     else:
                                         if pixel_amb_id:
                                             ext_fb = Path(pixel_amb_id).suffix or ".png"
@@ -160,7 +179,7 @@ class MediaSyncMixin:
                             except Exception as dl_err:
                                 logger.warning(f"Failed to cache preview for {file_id}: {dl_err}")
                         
-                        for ext in [".gif", ".png", ".jpg", ".bin"]:
+                        for ext in [".gif", ".png", ".jpg"]:
                             possible_file = cache_file.with_suffix(ext)
                             if possible_file.exists():
                                 preview_url = f"assets/cache_gallery/{possible_file.name}"
@@ -211,11 +230,11 @@ class MediaSyncMixin:
                     return False
                 
                 targets = []
-                if self.wall_slots:
+                if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
                     if not self._rebuild_wall_instance():
                         return False
                     targets = [d for d, _, _, _, _, _ in self.wall_instance.devices]
-                elif self.current_divoom and self.current_divoom.is_connected:
+                elif self.current_divoom and (self.current_divoom.is_connected or getattr(self.current_divoom, "lan", None) is not None):
                     targets = [self.current_divoom]
                 else:
                     return False

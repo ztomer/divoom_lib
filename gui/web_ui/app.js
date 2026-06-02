@@ -169,22 +169,25 @@ document.addEventListener("DOMContentLoaded", () => {
     // Physical sizes specifications mapped to CSS dimensions (pixels)
     function getDeviceDimensions(name) {
         const lowerName = (name || "").toLowerCase();
+        if (lowerName.includes("tivoo-max") || lowerName.includes("tivoo max")) {
+            return { width: 160, height: 140, size: 16, image: "assets/tivoo_max.png" };
+        }
         if (lowerName.includes("timoo")) {
-            return { width: 110, height: 110, size: 16, image: "assets/timoo.png" };
+            return { width: 80, height: 80, size: 16, image: "assets/timoo.png" };
         }
         if (lowerName.includes("ditoo")) {
             return { width: 90, height: 90, size: 16, image: "assets/ditoo.png" };
         }
-        if (lowerName.includes("pixoo") && !lowerName.includes("64")) {
-            return { width: 220, height: 220, size: 16, image: "assets/pixoo.png" };
-        }
-        if (lowerName.includes("pixoo") && lowerName.includes("64")) {
-            return { width: 260, height: 260, size: 64, image: "assets/pixoo.png" }; // larger size
-        }
         if (lowerName.includes("timebox") || lowerName.includes("evo")) {
             return { width: 100, height: 100, size: 16, image: "assets/timebox.png" };
         }
-        return { width: 110, height: 110, size: 16, image: "assets/pixoo.png" }; // default fallback
+        if (lowerName.includes("pixoo") && lowerName.includes("64")) {
+            return { width: 260, height: 260, size: 64, image: "assets/pixoo.png" };
+        }
+        if (lowerName.includes("pixoo")) {
+            return { width: 200, height: 200, size: 16, image: "assets/pixoo.png" };
+        }
+        return { width: 100, height: 100, size: 16, image: "assets/pixoo.png" }; // default fallback
     }
 
     function syncArrangerToPython() {
@@ -293,23 +296,23 @@ document.addEventListener("DOMContentLoaded", () => {
             popup.style.top = "50%";
             popup.style.left = "50%";
             popup.style.transform = "translate(-50%, -50%)";
-            popup.style.background = "rgba(20, 24, 38, 0.98)";
-            popup.style.border = "1px solid var(--secondary)";
+            popup.style.background = "var(--card-bg)";
+            popup.style.border = "1px solid var(--border-color)";
             popup.style.borderRadius = "16px";
             popup.style.padding = "25px";
-            popup.style.boxShadow = "0 10px 40px rgba(0,0,0,0.8)";
+            popup.style.boxShadow = "0 10px 40px rgba(0,0,0,0.25)";
             popup.style.zIndex = "2000";
             popup.style.minWidth = "320px";
             popup.style.backdropFilter = "blur(15px)";
             
             popup.innerHTML = `
-                <h3 style="font-family: var(--font-display); font-size:16px; margin-bottom:15px; color:#fff;">Add Screen to Arranger</h3>
+                <h3 style="font-family: var(--font-display); font-size:16px; margin-bottom:15px; color: var(--text-main);">Add Screen to Arranger</h3>
                 <select id="canvas-add-select" class="custom-select" style="width:100%; margin-bottom:15px;">
                     ${options}
                 </select>
                 <div style="display:flex; gap:10px; justify-content:flex-end;">
-                    <button id="canvas-add-cancel" class="glow-btn compact" style="background:rgba(255,255,255,0.05); color:#fff; box-shadow:none;">Cancel</button>
-                    <button id="canvas-add-confirm" class="glow-btn compact" style="background: var(--primary); color:#fff; border: 1px solid var(--primary); box-shadow:none;">Add Node</button>
+                    <button id="canvas-add-cancel" class="glow-btn compact" style="background:rgba(130,131,138,0.1); border: 1px solid var(--border-color); color: var(--text-main); box-shadow:none;">Cancel</button>
+                    <button id="canvas-add-confirm" class="glow-btn compact" style="background: var(--primary); border: 1px solid var(--primary); color:#fff; box-shadow:none;">Add Node</button>
                 </div>
             `;
             
@@ -320,8 +323,14 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             
             document.getElementById("canvas-add-confirm").addEventListener("click", () => {
-                const addr = document.getElementById("canvas-add-select").value;
+                const selectEl = document.getElementById("canvas-add-select");
+                const addr = selectEl ? selectEl.value : "";
                 popup.remove();
+                
+                if (!addr) {
+                    showToast("No valid device selected!", "error");
+                    return;
+                }
                 
                 if (assignedSlots[addr]) {
                     showToast("Device already placed on canvas!", "error");
@@ -391,8 +400,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         const isSpeaker = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo");
                         document.getElementById("banner-device-speaker").textContent = isSpeaker ? "Yes (Built-in)" : "No";
                         
-                        const bannerSelect = document.getElementById("banner-device-select");
-                        if (bannerSelect) bannerSelect.value = address;
+                        const sidebarSelect = document.getElementById("sidebar-device-select");
+                        if (sidebarSelect) sidebarSelect.value = address;
                         
                         updateSyncTargetList();
                     } else {
@@ -432,71 +441,60 @@ document.addEventListener("DOMContentLoaded", () => {
         updateDeviceSelectorDropdown();
     }
 
-      function updateDeviceSelectorDropdown() {
-        const selectors = [
-            document.getElementById("banner-device-select"),
-            document.getElementById("sidebar-device-select"),
-            document.getElementById("gallery-device-select"),
-            document.getElementById("widget-device-select")
-        ];
+    function updateDeviceSelectorDropdown() {
+        const sel = document.getElementById("sidebar-device-select");
+        if (!sel) return;
+        
+        sel.innerHTML = '<option value="">Select Screen...</option>';
         
         const currentMac = document.getElementById("banner-device-mac")?.textContent || "";
         
-        selectors.forEach(sel => {
-            if (!sel) return;
-            
-            sel.innerHTML = '<option value="">Select Screen...</option>';
-            
-            // Populate BLE devices
-            discoveredDevices.forEach(d => {
-                const opt = document.createElement("option");
-                opt.value = d.address;
-                opt.textContent = `🔵 BLE: ${d.name} (${d.address})`;
-                if (currentMac === d.address) opt.selected = true;
-                sel.appendChild(opt);
-            });
-            
-            // Populate Wi-Fi devices
-            registeredLanDevices.forEach(d => {
-                const opt = document.createElement("option");
-                opt.value = `LAN:${d.ip}`;
-                opt.textContent = `🟢 Wi-Fi: ${d.ip}`;
-                if (currentMac === `LAN:${d.ip}`) opt.selected = true;
-                sel.appendChild(opt);
-            });
+        // Populate BLE devices
+        discoveredDevices.forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = d.address;
+            opt.textContent = `🔵 Bluetooth: ${d.name} (${d.address})`;
+            if (currentMac === d.address) opt.selected = true;
+            sel.appendChild(opt);
         });
+        
+        // Populate Wi-Fi devices
+        registeredLanDevices.forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = `LAN:${d.ip}`;
+            opt.textContent = `🟢 Wi-Fi: ${d.ip}`;
+            if (currentMac === `LAN:${d.ip}`) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        
+        // Append Matrix Wall Grid if slots exist
+        if (Object.keys(assignedSlots || {}).length > 0) {
+            const opt = document.createElement("option");
+            opt.value = "MatrixWall";
+            opt.textContent = "🧱 Matrix Wall Grid";
+            if (currentMac === "MatrixWall") opt.selected = true;
+            sel.appendChild(opt);
+        }
     }
 
-    const selectors = [
-        "banner-device-select",
-        "sidebar-device-select",
-        "gallery-device-select",
-        "widget-device-select"
-    ];
-    selectors.forEach(id => {
-        const sel = document.getElementById(id);
-        if (sel) {
-            sel.addEventListener("change", (e) => {
-                const addr = e.target.value;
-                if (!addr) return;
-                
-                // Keep selectors visually in sync
-                selectors.forEach(otherId => {
-                    const otherSel = document.getElementById(otherId);
-                    if (otherSel) otherSel.value = addr;
-                });
-                
-                if (addr.startsWith("LAN:")) {
-                    const ip = addr.split("LAN:")[1];
-                    connectDevice(`Wi-Fi: ${ip}`, addr);
-                } else {
-                    const dev = discoveredDevices.find(d => d.address === addr);
-                    const name = dev ? dev.name : "BLE Device";
-                    connectDevice(name, addr);
-                }
-            });
-        }
-    });
+    const sidebarSelect = document.getElementById("sidebar-device-select");
+    if (sidebarSelect) {
+        sidebarSelect.addEventListener("change", (e) => {
+            const addr = e.target.value;
+            if (!addr) return;
+            
+            if (addr === "MatrixWall") {
+                connectDevice("Matrix Wall Grid", "MatrixWall");
+            } else if (addr.startsWith("LAN:")) {
+                const ip = addr.split("LAN:")[1];
+                connectDevice(`Wi-Fi: ${ip}`, addr);
+            } else {
+                const dev = discoveredDevices.find(d => d.address === addr);
+                const name = dev ? dev.name : "Bluetooth Device";
+                connectDevice(name, addr);
+            }
+        });
+    }
 
     const scanBtn = document.getElementById("scan-btn");
     const scanSpinner = document.getElementById("scan-spinner");
@@ -651,7 +649,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             
                             item.innerHTML = `
                                 <div class="gallery-item-preview-box">
-                                    <img src="${previewSrc}" alt="${art.name}">
+                                    <img src="${previewSrc}" class="gallery-item-preview" alt="${art.name}">
                                 </div>
                                 <div class="gallery-item-info">
                                     <h5>${art.name}</h5>
@@ -799,8 +797,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     .then(res => {
                         if (res) {
                             showToast("Credentials configured & login cache generated!", "success");
+                            const statusBox = document.getElementById("divoom-cloud-status-box");
+                            if (statusBox) {
+                                statusBox.style.display = "flex";
+                                statusBox.style.background = "rgba(34, 197, 94, 0.15)";
+                                statusBox.style.border = "1px solid rgba(34, 197, 94, 0.3)";
+                                statusBox.style.color = "#22c55e";
+                                statusBox.innerHTML = `<span>🟢 Connected as <b>${email}</b></span>`;
+                            }
                         } else {
                             showToast("Authentication failed. Please verify credentials.", "error");
+                            const statusBox = document.getElementById("divoom-cloud-status-box");
+                            if (statusBox) {
+                                statusBox.style.display = "flex";
+                                statusBox.style.background = "rgba(239, 68, 68, 0.15)";
+                                statusBox.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                                statusBox.style.color = "#ef4444";
+                                statusBox.innerHTML = `<span>🔴 Not connected. Save your credentials to log in.</span>`;
+                            }
                         }
                     });
             }
@@ -831,6 +845,24 @@ document.addEventListener("DOMContentLoaded", () => {
                             discoveredDevices = conf.devices;
                             populateDeviceSelectors(discoveredDevices);
                             renderArrangerCanvas();
+                        }
+                        
+                        // Cloud Connection Status Indicator Card
+                        const statusBox = document.getElementById("divoom-cloud-status-box");
+                        if (statusBox) {
+                            if (conf.cloud_connected) {
+                                statusBox.style.display = "flex";
+                                statusBox.style.background = "rgba(34, 197, 94, 0.15)";
+                                statusBox.style.border = "1px solid rgba(34, 197, 94, 0.3)";
+                                statusBox.style.color = "#22c55e";
+                                statusBox.innerHTML = `<span>🟢 Connected as <b>${conf.cloud_email || conf.email}</b></span>`;
+                            } else {
+                                statusBox.style.display = "flex";
+                                statusBox.style.background = "rgba(239, 68, 68, 0.15)";
+                                statusBox.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                                statusBox.style.color = "#ef4444";
+                                statusBox.innerHTML = `<span>🔴 Not connected. Save your credentials to log in.</span>`;
+                            }
                         }
                     }
                 });

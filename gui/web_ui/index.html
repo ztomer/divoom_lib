@@ -130,9 +130,6 @@
                         <div class="banner-label">Active Target Screen</div>
                         <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
                             <h2 id="banner-device-name" style="margin-bottom:0; font-size:18px;">No Connected Screen</h2>
-                            <select id="banner-device-select" class="custom-select small" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; min-width:160px; font-weight:600;">
-                                <option value="">Select Screen...</option>
-                            </select>
                         </div>
                         <div class="banner-specs">
                             <span>Target: <b id="banner-device-mac">-</b></span>
@@ -389,12 +386,6 @@
                         <div class="batch-sync-bar">
                             <div class="sync-target-info" style="display:flex; align-items:center; gap:15px; flex:1;">
                                 <div style="display:flex; flex-direction:column; gap:4px;">
-                                    <span class="sync-target-title">Sync Target</span>
-                                    <select id="gallery-device-select" class="custom-select small" style="min-width:180px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; font-weight:600;">
-                                        <option value="">Select Screen...</option>
-                                    </select>
-                                </div>
-                                <div style="display:flex; flex-direction:column; gap:4px;">
                                     <span class="sync-target-title">Active Screen Info</span>
                                     <span id="sync-target-list" class="sync-target-list">No active screens</span>
                                 </div>
@@ -407,14 +398,8 @@
             
             <!-- TAB 4: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
             <section id="data-sources" class="tab-content">
-                <div class="header-section" style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="header-section">
                     <h1>Live Widgets &amp; Media Sources</h1>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:11px; font-weight:600; color:rgba(255,255,255,0.45);">Target Screen:</span>
-                        <select id="widget-device-select" class="custom-select small" style="min-width:180px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; font-weight:600;">
-                            <option value="">Select Screen...</option>
-                        </select>
-                    </div>
                 </div>
                 
                 <div class="grid-layout">
@@ -579,6 +564,7 @@
                                     </svg>
                                     Save Credentials
                                 </button>
+                                <div id="divoom-cloud-status-box" style="margin-top: 15px; padding: 12px; border-radius: 6px; font-size: 12px; font-weight: 600; display: none; align-items: center; gap: 8px;"></div>
                             </div>
                         </div>
                     </div>

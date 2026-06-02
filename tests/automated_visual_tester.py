@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""
+automated_visual_tester.py — Automated Visual and E2E Navigation Test Runner.
+Fires up the PyWebView controller, simulates user tab transitions via JS evaluation,
+captures screenshots of the dashboard under test, and logs reports.
+"""
+
+import os
+import sys
+import time
+import subprocess
+import threading
+from pathlib import Path
+import json
+
+# Add project root to path
+sys.path.append(str(Path(__file__).parent.parent))
+from gui.gui_main import DivoomGuiAPI
+import webview
+
+def print_info(message):
+    print(f"[ ==> ] {message}")
+
+def print_ok(message):
+    print(f"[ Ok  ] {message}")
+
+def print_err(message):
+    print(f"[ Err ] {message}")
+
+class HeadlessGuiTester:
+    def __init__(self):
+        self.api = DivoomGuiAPI()
+        self.screenshots_dir = Path(__file__).parent.parent / "test_reports" / "screenshots"
+        self.screenshots_dir.mkdir(parents=True, exist_ok=True)
+        self.test_success = True
+        self.results = []
+
+    def capture_screenshot(self, name: str):
+        """Uses macOS native screencapture to grab a snapshot of the active window area."""
+        output_path = self.screenshots_dir / f"{name}.png"
+        print_info(f"Visual Test: Capturing UI snapshot to {output_path.name}...")
+        try:
+            # We take a standard window screenshot using macOS command line
+            # -x: silent mode, -m: capture main monitor
+            subprocess.run(["screencapture", "-x", "-m", str(output_path)], check=True)
+            print_ok(f"Captured Visual snapshot: {output_path.name}")
+            self.results.append({"step": name, "status": "Success", "screenshot": str(output_path.relative_to(Path(__file__).parent.parent))})
+        except Exception as e:
+            print_err(f"Failed to capture screenshot: {e}")
+            self.results.append({"step": name, "status": "Failed", "error": str(e)})
+
+    def run_e2e_cycle(self, window):
+        """Clicks through tabs, evaluates visual states, and saves snapshots."""
+        try:
+            print_info("Visual Test: Starting automated tab cycle...")
+            time.sleep(3.0)  # Wait for WKWebView layout engine to stabilize
+
+            # Step 1: Control Center View
+            window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'control-panel\']").click();')
+            time.sleep(1.0)
+            self.capture_screenshot("1_control_center")
+
+            # Step 2: Virtual Wall Arranger View
+            window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'display-wall\']").click();')
+            time.sleep(1.0)
+            self.capture_screenshot("2_virtual_wall")
+
+            # Step 3: Monthly Best Gallery View
+            window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'monthly-best\']").click();')
+            time.sleep(1.0)
+            self.capture_screenshot("3_monthly_best_gallery")
+
+            # Step 4: Live Widgets View
+            window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'data-sources\']").click();')
+            time.sleep(1.0)
+            self.capture_screenshot("4_live_widgets")
+
+            # Step 5: Settings / Devices View
+            window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'settings\']").click();')
+            time.sleep(1.0)
+            self.capture_screenshot("5_settings_devices")
+
+            # Step 6: Settings / Divoom Cloud View
+            window.evaluate_js('document.querySelector(".settings-tab-btn[data-settings-tab=\'settings-divoom\']").click();')
+            time.sleep(1.0)
+            self.capture_screenshot("6_settings_divoom_cloud")
+
+            # Step 7: Settings / Appearance View
+            window.evaluate_js('document.querySelector(".settings-tab-btn[data-settings-tab=\'settings-appearance\']").click();')
+            time.sleep(1.0)
+            self.capture_screenshot("7_settings_appearance")
+
+            print_ok("E2E Visual transitions completed successfully!")
+        except Exception as e:
+            print_err(f"E2E navigation failed: {e}")
+            self.test_success = False
+        finally:
+            # Terminate testing session
+            print_info("Visual Test: Visual test cycles completed, tearing down...")
+            time.sleep(1.0)
+            window.destroy()
+
+    def start(self):
+        web_ui_dir = Path(__file__).parent.parent / "gui" / "web_ui"
+        index_html = web_ui_dir / "index.html"
+
+        # Start visual cycle thread
+        window = webview.create_window(
+            title="Divoom Visual Regression Tester",
+            url=str(index_html),
+            js_api=self.api,
+            width=1024,
+            height=768,
+            resizable=True,
+            frameless=True,
+            easy_drag=True,
+            background_color="#0a0b10"
+        )
+        self.api.window = window
+
+        # Launch background runner thread
+        tester_thread = threading.Thread(target=self.run_e2e_cycle, args=(window,), daemon=True)
+        tester_thread.start()
+
+        # Start pywebview loop
+        webview.start()
+        
+        # Write JSON Test outcomes report
+        report_file = Path(__file__).parent.parent / "test_reports" / "visual_test_report.json"
+        report_file.parent.mkdir(parents=True, exist_ok=True)
+        report_file.write_text(json.dumps({
+            "test_success": self.test_success,
+            "results": self.results,
+            "timestamp": time.time()
+        }, indent=2), encoding="utf-8")
+        print_ok(f"Visual Report saved successfully to {report_file.name}")
+
+if __name__ == "__main__":
+    tester = HeadlessGuiTester()
+    tester.start()
+    if tester.test_success:
+        sys.exit(0)
+    else:
+        sys.exit(1)

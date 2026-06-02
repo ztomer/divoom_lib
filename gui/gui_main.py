@@ -16,12 +16,14 @@ from pathlib import Path
 from bleak import BleakScanner
 
 # Add divoom-control paths
+sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent.parent / "api_scraper"))
 
 from divoom_lib.divoom import Divoom
 from divoom_lib.utils import discovery
 from divoom_lib.wall import DivoomWall
+from divoom_lib import divoom_auth
 
 # Import mixins for modularity and <= 500 LOC compliance
 from presets_manager import PresetsManagerMixin
@@ -62,6 +64,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         self.music_sync_active = False
         self.music_thread = None
         self.current_track_cache = None
+        self.current_target_mode = "single"
 
         # Load credentials on startup
         try:
@@ -89,54 +92,37 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
     # ── Transport Status (4-badge panel) ──────────────────────────────────────
 
     def get_transport_status(self) -> str:
-        """
-        Return live status of all four transport layers as JSON.
-        """
-        ble_connected = bool(
-            self.current_divoom and self.current_divoom.is_connected
-        )
-        lan_ip = None
-        lan_ok = False
-        if self.current_divoom and self.current_divoom.lan:
-            lan_ip = self.current_divoom.lan.device_ip
-            lan_ok = True
-
+        """Return live status of all four transport layers as JSON."""
+        ble_connected = bool(self.current_divoom and self.current_divoom.is_connected)
+        lan_ip = self.current_divoom.lan.device_ip if (self.current_divoom and self.current_divoom.lan) else None
         cloud_ok = bool(self.cached_creds and self.cached_creds.is_valid())
-
         return json.dumps({
-            "ble":  {
-                "available":   ble_connected,
-                "label":       "BLE",
-                "badge":       "🔵",
-                "color":       "#3b82f6",
-                "description": "Bluetooth — 100 % local, never leaves your device.",
-                "detail":      self.current_divoom._conn.mac if ble_connected and self.current_divoom else None,
+            "ble": {
+                "available": ble_connected,
+                "label": "BLE", "badge": "🔵", "color": "#3b82f6",
+                "description": "Bluetooth — 100% local, never leaves your device.",
+                "detail": self.current_divoom._conn.mac if ble_connected and self.current_divoom else None,
             },
             "lan": {
-                "available":   lan_ok,
-                "label":       "LAN",
-                "badge":       "🟢",
-                "color":       "#22c55e",
-                "description": "Wi-Fi HTTP :9000 — 100 % local, WiFi-capable devices only.",
-                "detail":      f"{lan_ip}:9000" if lan_ip else "No device IP configured",
+                "available": bool(lan_ip),
+                "label": "LAN", "badge": "🟢", "color": "#22c55e",
+                "description": "Wi-Fi HTTP :9000 — 100% local, WiFi-capable devices only.",
+                "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured",
             },
             "cloud": {
-                "available":   cloud_ok,
-                "label":       "Divoom Cloud",
-                "badge":       "🟡",
-                "color":       "#f59e0b",
+                "available": cloud_ok,
+                "label": "Divoom Cloud", "badge": "🟡", "color": "#f59e0b",
                 "description": "appin.divoom-gz.com — Divoom's servers, requires account.",
-                "detail":      "Authenticated" if cloud_ok else "Not authenticated",
+                "detail": "Authenticated" if cloud_ok else "Not authenticated",
             },
             "external": {
-                "available":   True,
-                "label":       "External",
-                "badge":       "🔴",
-                "color":       "#ef4444",
+                "available": True,
+                "label": "External", "badge": "🔴", "color": "#ef4444",
                 "description": "3rd-party APIs (weather, stocks) — no login required.",
-                "detail":      "Available",
+                "detail": "Available",
             },
         })
+
 
     def save_lan_config(self, device_ip: str, local_token: int) -> bool:
         """
@@ -288,6 +274,12 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Establishes connection to a single BLE or Wi-Fi (LAN) screen."""
         logger.info(f"GUI Action: Connecting to single device {address}...")
         try:
+            if address == "MatrixWall":
+                self.current_target_mode = "wall"
+                logger.info("Switched to multi-screen display wall mode.")
+                return True
+                
+            self.current_target_mode = "single"
             if self.current_divoom and self.current_divoom.is_connected:
                 self._run_async(self.current_divoom.disconnect())
                 
@@ -382,7 +374,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Sets ambient solid lighting across active screen(s) / display wall."""
         logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness})...")
         try:
-            if self.wall_slots:
+            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.set_light(color, brightness))
@@ -402,7 +394,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Sets clock display channel across active screen(s) / display wall."""
         logger.info(f"GUI Action: Applying clock style {style}...")
         try:
-            if self.wall_slots:
+            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.show_clock(clock=style))
@@ -420,15 +412,36 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Switches display active channel mode (Clock, Visualizer, VJ, Design)."""
         logger.info(f"GUI Action: Switching channel to {channel}...")
         try:
+            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
+                if not self._rebuild_wall_instance():
+                    return False
+                tasks = []
+                for divoom, _, _, _, _, _ in self.wall_instance.devices:
+                    is_divoom_lan = bool(divoom and divoom.lan)
+                    if is_divoom_lan:
+                        mapping = {"clock": 0, "vj": 1, "visualizer": 2, "design": 3}
+                        val = mapping.get(channel, 0)
+                        tasks.append(divoom.lan.set_channel(val))
+                    else:
+                        if channel == "clock":
+                            tasks.append(divoom.display.show_clock())
+                        elif channel == "visualizer":
+                            tasks.append(divoom.display.show_visualization(number=0))
+                        elif channel == "vj":
+                            tasks.append(divoom.display.show_effects(number=0))
+                        elif channel == "design":
+                            tasks.append(divoom.display.show_design())
+                
+                async def run_switch():
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    return all(res is True or isinstance(res, dict) for res in results)
+                
+                return self._run_async(run_switch())
+
             target = self.current_divoom
             is_lan = bool(target and target.lan)
             if not target or (not target.is_connected and not is_lan):
-                if self.wall_slots:
-                    if not self._rebuild_wall_instance():
-                        return False
-                    target = self.wall_instance.devices[0][0]
-                else:
-                    return False
+                return False
             
             if is_lan:
                 mapping = {"clock": 0, "vj": 1, "visualizer": 2, "design": 3}
@@ -475,7 +488,7 @@ def main():
         height=768,
         resizable=True,
         frameless=True,  # Integrated custom Appbar
-        easy_drag=False,  # Prevents dragging canvas from moving window
+        easy_drag=True,  # Titlebar movement (blocked on panels/elements via CSS)
         background_color="#0a0b10"
     )
     api.window = window
