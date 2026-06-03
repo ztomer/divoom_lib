@@ -107,7 +107,8 @@ class DivoomConnection:
         elif self.logger.isEnabledFor(logging.INFO):
             self.logger.info("Raw notification data: %s", data.hex())
 
-        if self.use_ios_le_protocol:
+        # Protocol-agnostic notification handling based on actual packet structure
+        if len(data) >= 4 and data[0:4] == bytes(models.IOS_LE_HEADER):
             self._handle_ios_le_notification(data)
         else:
             self._handle_basic_protocol_notification(data)
