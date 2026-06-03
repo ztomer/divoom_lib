@@ -24,7 +24,7 @@ graph TD
 
 ## Communication Protocols
 
-Divoom devices use two distinct protocols over BLE. The library attempts to support both.
+Divoom devices use two distinct protocols over BLE, as well as a local HTTP API over Wi-Fi. The library supports all these transports.
 
 ### 1. Basic Protocol (Timebox Evo / SPP-like)
 Used by older devices or specific modes.
@@ -37,6 +37,16 @@ Used by newer devices (Pixoo, Ditoo) for more reliable BLE communication.
 *   **Structure**: `HEADER` (4 bytes) + `Length` (2 bytes) + `Command` (1 byte) + `Packet Num` (4 bytes) + `Payload` + `Checksum` (2 bytes).
 *   **Header**: `0xfe 0xef 0xaa 0x55` (defined in `models.IOS_LE_MESSAGE_HEADER`).
 *   **No Escaping**: The payload is sent raw within the frame.
+
+### 3. Mixed Protocol & Agnostic Parsing
+Many modern Divoom BLE firmwares require commands to be written in the **iOS LE Protocol** format, but emit acknowledgements or response payloads in the **Basic Protocol** format. 
+*   To resolve this, the library utilizes **Protocol-Agnostic Response Parsing** inside `DivoomConnection._notification_handler()`. It dynamically inspects incoming message headers to correctly unpack Basic or iOS LE response frames on the fly.
+
+### 4. Local Wi-Fi HTTP Protocol (LAN)
+WiFi-capable models (e.g. Pixoo 64) expose a stateless REST server over the local network:
+*   **Structure**: JSON POST requests on `http://<ip>:9000/divoom_api`.
+*   **Fields**: `{"Command": "<action>", "LocalToken": 0, ...}`
+*   **Transport Abstraction**: The library uses `divoom_lib/transport.py` to route calls transparently via BLE, LAN, Cloud (remote Divoom server), or External (3rd-party APIs) based on command configurations.
 
 ## Architectural Principles (Linus & Uncle Bob)
 

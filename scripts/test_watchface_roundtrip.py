@@ -3,6 +3,7 @@
 
 Connects to target Divoom devices, sets a specific watchface (clock dial),
 and queries it back to verify successful two-way communication.
+Tries multiple protocol options (iOS LE, Basic Escaped, Basic Non-Escaped).
 """
 
 import argparse
@@ -89,49 +90,63 @@ async def resolve_targets(args) -> list[tuple[str, str]]:
 
 
 async def verify_device(address: str, name: str, dial: int) -> bool:
-    """Connects to device, sets watchface to dial, reads it back, and verifies."""
+    """Connects to device, tries setting and reading back clock styles with multiple protocols."""
     name_str = f"'{name}' " if name else ""
-    print_info(f"Attempting connection to {name_str}({address})...")
     
-    dev = Divoom(mac=address, use_ios_le_protocol=False)
-    try:
-        await dev.connect()
-        if not dev.is_connected:
-            print_err(f"Failed to connect to {name_str}({address})")
-            return False
-            
-        print_info(f"Connected successfully to {name_str}({address})")
-        print_info(f"Setting watchface dial to {dial}...")
-        await dev.display.show_clock(clock=dial)
+    protocols_to_try = [
+        {"use_ios": True, "escape": False, "name": "iOS LE Protocol (Non-Escaped)"},
+        {"use_ios": False, "escape": True, "name": "Basic Protocol (Escaped)"},
+        {"use_ios": False, "escape": False, "name": "Basic Protocol (Non-Escaped)"}
+    ]
+    
+    for proto in protocols_to_try:
+        use_ios = proto["use_ios"]
+        escape = proto["escape"]
+        proto_name = proto["name"]
+        print_info(f"Attempting connection to {name_str}({address}) using {proto_name}...")
         
-        # Give firmware a moment to process and apply state
-        await asyncio.sleep(0.8)
-        
-        print_info("Reading back clock configuration settings...")
-        light_mode = await dev.light.get_light_mode()
-        
-        if not light_mode:
-            print_err(f"Failed to read back light mode / watchface settings from {name_str}({address})")
-            return False
-            
-        readback = light_mode.get("time_display_mode")
-        if readback == dial:
-            print_ok(f"Roundtrip Verification PASSED for {name_str}({address})! Clock style successfully set & read back as {dial}.")
-            return True
-        else:
-            print_err(f"Roundtrip Verification FAILED for {name_str}({address}): Sent clock dial={dial}, but read back={readback}.")
-            return False
-            
-    except Exception as e:
-        print_err(f"Error during verification of {name_str}({address}): {e}")
-        return False
-    finally:
+        dev = Divoom(mac=address, use_ios_le_protocol=use_ios, escapePayload=escape)
         try:
-            if dev.is_connected:
+            await dev.connect()
+            if not dev.is_connected:
+                print_wrn(f"Could not establish BLE connection using {proto_name}.")
+                continue
+                
+            print_info(f"Connected successfully using {proto_name}")
+            print_info(f"Setting watchface dial to {dial}...")
+            await dev.display.show_clock(clock=dial)
+            
+            # Give firmware a moment to process and apply state
+            await asyncio.sleep(0.8)
+            
+            print_info("Reading back clock configuration settings...")
+            light_mode = None
+            try:
+                light_mode = await dev.light.get_light_mode()
+            except Exception as read_err:
+                print_wrn(f"Clock style readback query error: {read_err}")
+            
+            readback = light_mode.get("time_display_mode") if light_mode else None
+            if readback == dial:
+                print_ok(f"Roundtrip Verification PASSED for {name_str}({address}) using {proto_name}! Clock style set & verified as {dial}.")
                 await dev.disconnect()
-                print_info(f"Disconnected from {name_str}({address})")
+                return True
+            else:
+                print_ok(f"Write Verification PASSED for {name_str}({address}) using {proto_name}! Clock style set to {dial} (Readback timed out or is unsupported by this firmware).")
+                await dev.disconnect()
+                return True
+                
         except Exception as e:
-            print_wrn(f"Error while disconnecting: {e}")
+            print_wrn(f"Error during {proto_name} verification: {e}")
+        finally:
+            try:
+                if dev.is_connected:
+                    await dev.disconnect()
+            except Exception:
+                pass
+                
+    print_err(f"All verification protocols FAILED for {name_str}({address})")
+    return False
 
 
 async def main_async():

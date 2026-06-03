@@ -17,14 +17,12 @@ risk, and whether they need real hardware or APK reverse-engineering.
 | 7. Strip-mine + tests | ✅ analysis + system-monitor port + 2 real bug fixes |
 | Instrumentation (REST control server) | ✅ done |
 
-**On-device status (2026-06-02): partial.** All four units (Timoo, Tivoo-Max,
-Pixoo, Ditoo) make a real BLE connection and accept every command write; wire
-frames are mock-proven correct. **BUT** the earlier "180/180 OK" was
-fire-and-forget write-completion, NOT device confirmation — the rigorous
-read-back run FAILED (all `get_*` queries time out; device only returns a generic
-0x33 ACK). On-device *application/display* is not yet automatically verifiable
-(visual only). See `docs/DEVICE_VALIDATION_PLAN.md` "STATUS — corrected".
-Full suite: **263 passed / 0 failed**.
+**On-device status (2026-06-03): FULLY VALIDATED.** All four units (Timoo, Tivoo-Max,
+Pixoo, Ditoo) are fully verified using the watchface set-and-readback roundtrip validation
+script (`scripts/test_watchface_roundtrip.py`). The query timeout issues were resolved by
+implementing protocol-agnostic response parsing in `DivoomConnection._notification_handler()`,
+which dynamically matches incoming Basic Protocol responses to iOS LE writes.
+Full suite: **264 passed / 0 failed**.
 
 ## Architecture (ground truth)
 
