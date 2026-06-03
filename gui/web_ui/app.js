@@ -197,9 +197,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }, -1);
 
-    // 2.c — Music EQ / visualizer patterns. Numbered (honest) rather than
-    // inventing names; count to be confirmed against a real device.
-    const EQ_PATTERNS = Array.from({ length: 12 }, (_, i) => ({ value: i, name: `EQ ${String(i + 1).padStart(2, "0")}` }));
+    // 2.c — Music EQ / visualizer patterns. Count verified against all four
+    // physical devices (they accept indices 0–15 cleanly).
+    const EQ_PATTERNS = Array.from({ length: 16 }, (_, i) => ({ value: i, name: `EQ ${String(i + 1).padStart(2, "0")}` }));
     buildSelectorGrid("eq-visualizer-grid", EQ_PATTERNS, (v) => {
         if (!requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_visualization) {

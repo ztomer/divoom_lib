@@ -28,6 +28,8 @@ import inspect
 import json
 import logging
 import os
+import socket
+import socketserver
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -147,6 +149,87 @@ def serve_in_background(api, host: str = "127.0.0.1", port: int = 8787, token: s
     thread = threading.Thread(target=httpd.serve_forever, daemon=True, name="divoom-control")
     thread.start()
     return httpd, thread
+
+
+class _UnixHTTPServer(socketserver.ThreadingUnixStreamServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def get_request(self):
+        # BaseHTTPRequestHandler expects a (host, port)-style client address.
+        request, _ = super().get_request()
+        return request, ("unix", 0)
+
+
+def serve_unix(api, socket_path: str, token: str | None = None):
+    """Serve the same control API over a Unix domain socket. Returns the server."""
+    if token is None:
+        token = os.environ.get("DIVOOM_CONTROL_TOKEN") or None
+    if os.path.exists(socket_path):
+        os.unlink(socket_path)
+    httpd = _UnixHTTPServer(socket_path, make_handler(api, token))
+    logger.info("Divoom control server listening on unix:%s", socket_path)
+    return httpd
+
+
+def serve_unix_in_background(api, socket_path: str, token: str | None = None):
+    httpd = serve_unix(api, socket_path, token)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True, name="divoom-control-unix")
+    thread.start()
+    return httpd, thread
+
+
+class _UnixHTTPConnection:
+    """Minimal HTTP-over-unix-socket client (no external deps)."""
+
+    def __init__(self, path):
+        import http.client
+
+        class _Conn(http.client.HTTPConnection):
+            def connect(_self):
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.connect(path)
+                _self.sock = s
+
+        self._conn = _Conn("localhost")
+
+    def request(self, method, url, body=None, headers=None):
+        return self._conn.request(method, url, body, headers or {})
+
+    def getresponse(self):
+        return self._conn.getresponse()
+
+
+def call(method: str, *args, base_url: str | None = None, socket_path: str | None = None,
+         token: str | None = None, timeout: float = 30.0, **kwargs):
+    """Invoke a control-server method over TCP (base_url) or a unix socket.
+
+    Pass either positional ``*args`` (sent as a JSON array) or ``**kwargs`` (sent
+    as a JSON object). Returns the decoded ``result`` (raising on error)."""
+    import http.client
+
+    payload = json.dumps(kwargs if kwargs else list(args)).encode()
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    path = f"/api/{method}"
+
+    if socket_path:
+        conn = _UnixHTTPConnection(socket_path)
+        conn.request("POST", path, payload, headers)
+        resp = conn.getresponse()
+        data = json.loads(resp.read())
+    else:
+        url = (base_url or "http://127.0.0.1:8787").rstrip("/")
+        host = url.split("://", 1)[1]
+        conn = http.client.HTTPConnection(host, timeout=timeout)
+        conn.request("POST", path, payload, headers)
+        resp = conn.getresponse()
+        data = json.loads(resp.read())
+
+    if not data.get("ok"):
+        raise RuntimeError(data.get("error", "control call failed"))
+    return data.get("result")
 
 
 def _build_api():

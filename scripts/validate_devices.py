@@ -29,12 +29,14 @@ HIGHEST visualizer/EQ index (step "viz N") that shows a real pattern.
 import argparse
 import asyncio
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 sys.path.append(str(ROOT))
+sys.path.append(str(ROOT / "gui"))
 
 from divoom_lib.divoom import Divoom              # noqa: E402
 from divoom_lib.utils import discovery             # noqa: E402
@@ -120,6 +122,47 @@ def _guess_size(name):
     return 16
 
 
+async def validate_via_server(address, name, dwell, quick, conn):
+    """Drive the matrix through a *running* app's control server (REST or unix
+    socket). The app process — which has Bluetooth permission — does the BLE;
+    this just orchestrates and records. `conn` is a dict of call() kwargs."""
+    import control_server as cs
+
+    print(f"\n=== {name or 'device'} ({address}) via control server ===")
+    entry = {"address": address, "name": name, "connected": False, "steps": []}
+
+    def step(label, method, *args):
+        print(f"    → {label} ...", end=" ", flush=True)
+        try:
+            res = cs.call(method, *args, **conn)
+            ok = res is not False and not (isinstance(res, dict) and res.get("success") is False)
+            entry["steps"].append({"step": label, "ok": bool(ok),
+                                   "error": (res.get("error") if isinstance(res, dict) else None)})
+            print("ok" if ok else f"failed ({res})")
+            return ok
+        except Exception as e:
+            entry["steps"].append({"step": label, "ok": False, "error": str(e)})
+            print(f"ERROR: {e}")
+            return False
+
+    if not step("connect", "connect_single_device", address):
+        return entry
+    entry["connected"] = True
+    time.sleep(dwell)
+
+    for cname, hexv in (("red", "FF0000"), ("green", "00FF00"), ("blue", "0000FF")):
+        step(f"light {cname}", "set_solid_light", hexv, 100); time.sleep(dwell)
+    for n in range(6):
+        step(f"clock dial {n}", "set_clock", n); time.sleep(dwell)
+    for n in (range(0, 16, 4) if quick else range(16)):
+        step(f"vj effect {n}", "set_vj_effect", n); time.sleep(dwell)
+    for n in (range(0, 16, 2) if quick else range(16)):
+        step(f"viz {n}", "set_visualization", n); time.sleep(dwell)
+    step("image: ticker", "apply_stock_ticker", "BTC-USD"); time.sleep(dwell + 1)
+    step("image: sysmon", "apply_system_stats"); time.sleep(dwell + 1)
+    return entry
+
+
 async def _resolve_targets(args):
     if args.addresses:
         return [(a.strip(), None) for a in args.addresses.split(",") if a.strip()]
@@ -142,9 +185,22 @@ async def main_async(args):
     print(f"Validating {len(targets)} device(s): "
           + ", ".join(f"{n or '?'}({a})" for a, n in targets))
 
+    use_socket = args.socket or os.environ.get("DIVOOM_CONTROL_SOCKET")
+    use_server = args.server or os.environ.get("DIVOOM_CONTROL_SERVER_URL")
+    
     report = {"devices": [], "summary": {}}
     for address, name in targets:
-        report["devices"].append(await validate_device(address, name, args.dwell, args.quick))
+        if use_socket or use_server:
+            conn = {}
+            if use_socket:
+                conn["socket_path"] = use_socket
+            if use_server:
+                conn["base_url"] = use_server
+            if args.token or os.environ.get("DIVOOM_CONTROL_TOKEN"):
+                conn["token"] = args.token or os.environ.get("DIVOOM_CONTROL_TOKEN")
+            report["devices"].append(await validate_via_server(address, name, args.dwell, args.quick, conn))
+        else:
+            report["devices"].append(await validate_device(address, name, args.dwell, args.quick))
 
     total_steps = sum(len(d["steps"]) for d in report["devices"])
     ok_steps = sum(1 for d in report["devices"] for s in d["steps"] if s["ok"])
@@ -183,6 +239,9 @@ def main():
     p.add_argument("--dwell", type=float, default=2.5, help="seconds per visual step")
     p.add_argument("--quick", action="store_true", help="shorter 0..15 sweeps")
     p.add_argument("--report", default=str(ROOT / "test_reports" / "device_validation.json"))
+    p.add_argument("--socket", help="path to UNIX domain socket for validation via running app")
+    p.add_argument("--server", help="URL to HTTP control server for validation via running app")
+    p.add_argument("--token", help="optional auth token for control server")
     args = p.parse_args()
     raise SystemExit(asyncio.run(main_async(args)))
 

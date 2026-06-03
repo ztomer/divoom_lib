@@ -113,3 +113,24 @@ def test_lists_real_api_surface():
         assert expected in names, f"{expected} not exposed"
     # window controls are denylisted
     assert "close_window" not in names
+
+
+def test_unix_socket_server():
+    """Serve over a Unix domain socket and invoke via cs.call client utility."""
+    import os
+    import control_server as cs
+
+    sock_path = "/tmp/t_div.sock"
+    api = FakeApi()
+    
+    # Start server in background
+    httpd, thread = cs.serve_unix_in_background(api, sock_path)
+    try:
+        # Call via UNIX socket client connection
+        res = cs.call("set_vj_effect", 42, socket_path=sock_path)
+        assert res is True
+        assert api.last_vj == 42
+    finally:
+        httpd.shutdown()
+        if os.path.exists(sock_path):
+            os.unlink(sock_path)

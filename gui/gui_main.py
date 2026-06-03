@@ -563,6 +563,16 @@ def main():
         except Exception as e:
             logger.warning(f"Failed to start control server: {e}")
 
+    # Optional Unix-domain-socket control surface (DIVOOM_CONTROL_SOCKET=/path).
+    sock_path = os.environ.get("DIVOOM_CONTROL_SOCKET")
+    if sock_path:
+        try:
+            from control_server import serve_unix_in_background
+            serve_unix_in_background(api, sock_path)
+            logger.info(f"Control server enabled on unix:{sock_path}")
+        except Exception as e:
+            logger.warning(f"Failed to start unix control server: {e}")
+
     logger.info("Starting Divoom Desktop GUI window in frameless mode...")
     
     window = webview.create_window(
