@@ -138,10 +138,10 @@ body {
 .appbar-device-select {
     font-size: 12px;
     font-weight: 600;
-    min-width: 150px;
-    max-width: 220px;
+    min-width: 170px;
+    max-width: 250px;
     height: 26px;
-    padding: 2px 8px;
+    padding: 2px 28px 2px 8px;
 }
 .appbar-device-status {
     font-size: 11px;
@@ -1169,6 +1169,10 @@ body {
     background: rgba(130, 131, 138, 0.08);
 }
 .ticker-chip-label {
+    background: none;
+    border: none;
+    outline: none;
+    font-family: inherit;
     font-size: 12px;
     font-weight: 600;
     color: var(--text-main);
@@ -1177,6 +1181,10 @@ body {
 }
 .ticker-chip-label:hover { color: var(--primary); }
 .ticker-chip-remove {
+    background: none;
+    border: none;
+    outline: none;
+    font-family: inherit;
     font-size: 13px;
     color: var(--text-muted);
     padding: 4px 8px;
@@ -2061,5 +2069,269 @@ body.theme-light .arranger-node-image {
 }
 .selector-cell.active .cell-label {
     color: var(--primary);
+}
+
+/* --- Three Column Grid Layout --- */
+.grid-layout.three-cols {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* --- VJ & EQ Graphical Previews --- */
+.vj-preview-box {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    background: #000;
+    position: relative;
+    overflow: hidden;
+    margin: 0 auto 6px auto;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.vj-preview-box.sparkles::before,
+.vj-preview-box.sparkles::after {
+    content: '';
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 10px 5px #0ff, -8px 12px #ff0, 5px 15px #f0f, -12px -5px #0f0, 8px -10px #f00;
+    animation: vj-sparkle 1.5s infinite ease-in-out;
+}
+.vj-preview-box.sparkles::after {
+    animation-delay: 0.75s;
+    transform: rotate(45deg);
+}
+
+.vj-preview-box.lava::before {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    background: radial-gradient(circle, #ff3300 0%, transparent 70%);
+    border-radius: 50%;
+    animation: vj-lava 3s infinite ease-in-out;
+}
+
+.vj-preview-box.rainbow-vert {
+    background: linear-gradient(to bottom, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff);
+    background-size: 100% 200%;
+    animation: vj-rainbow-scroll 3s infinite linear;
+}
+
+.vj-preview-box.drops::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(transparent 50%, #00ffff 50%);
+    background-size: 100% 8px;
+    animation: vj-drops 1s infinite linear;
+}
+
+.vj-preview-box.swirl {
+    background: conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+    animation: vj-swirl 2.5s infinite linear;
+}
+
+.vj-preview-box.cmy-fade {
+    background: #0ff;
+    animation: vj-cmy-fade 4s infinite ease-in-out;
+}
+
+.vj-preview-box.rainbow-lava {
+    background: radial-gradient(circle at 50% 50%, #ff00ff, #00ffff, #ffff00);
+    background-size: 200% 200%;
+    animation: vj-lava-rainbow 4s infinite ease-in-out;
+}
+
+.vj-preview-box.pastel {
+    background: linear-gradient(45deg, #ffb3ba, #ffdfba, #ffffba, #baffc9, #bae1ff);
+    background-size: 250% 250%;
+    animation: vj-pastel 4s infinite ease-in-out;
+}
+
+.vj-preview-box.cmy-wave::before {
+    content: '';
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    top: -10px;
+    left: -10px;
+    border: 3px solid #ff00ff;
+    border-radius: 40%;
+    animation: vj-wave 3s infinite linear;
+}
+
+.vj-preview-box.fire {
+    background: linear-gradient(to top, #ff3300, #ffcc00, transparent);
+    background-size: 100% 300%;
+    animation: vj-fire 2s infinite ease-in-out;
+}
+
+.vj-preview-box.countdown::before {
+    content: '5';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #00ffcc;
+    font-weight: bold;
+    font-family: monospace;
+    font-size: 18px;
+    animation: vj-countdown 3s infinite steps(5);
+}
+
+.vj-preview-box.pink-blue-fade {
+    background: linear-gradient(45deg, #ff007f, #00f0ff);
+    background-size: 200% 200%;
+    animation: vj-pink-blue 3s infinite ease-in-out;
+}
+
+.vj-preview-box.rainbow-poly::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #00ffcc;
+    top: 9px;
+    left: 9px;
+    transform: rotate(45deg);
+    animation: vj-poly 2s infinite ease-in-out;
+}
+
+.vj-preview-box.pink-blue-wave::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, #ff007f 20%, #00f0ff 80%);
+    animation: vj-lava 2s infinite alternate ease-in-out;
+}
+
+.vj-preview-box.rainbow-cross::before,
+.vj-preview-box.rainbow-cross::after {
+    content: '';
+    position: absolute;
+    background: #00ffcc;
+    animation: vj-swirl 3s infinite linear;
+}
+.vj-preview-box.rainbow-cross::before {
+    width: 4px;
+    height: 24px;
+    top: 8px;
+    left: 18px;
+}
+.vj-preview-box.rainbow-cross::after {
+    width: 24px;
+    height: 4px;
+    top: 18px;
+    left: 8px;
+}
+
+.vj-preview-box.rainbow-shapes::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 3px double #ff007f;
+    top: 9px;
+    left: 9px;
+    animation: vj-poly 2.5s infinite ease-in-out;
+}
+
+/* EQ Previews */
+.eq-preview-box {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    background: #0a0b10;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    padding: 4px;
+    box-sizing: border-box;
+    margin: 0 auto 6px auto;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.eq-preview-bar {
+    width: 4px;
+    height: 100%;
+    border-radius: 2px 2px 0 0;
+    transform-origin: bottom;
+    animation: eq-bounce 1s infinite ease-in-out alternate;
+}
+
+.eq-preview-box.style1 .eq-preview-bar { background: #00ffcc; }
+.eq-preview-box.style2 .eq-preview-bar { background: #ff007f; }
+.eq-preview-box.style3 .eq-preview-bar { background: #00f0ff; }
+.eq-preview-box.style4 .eq-preview-bar { background: #ffff00; }
+.eq-preview-box.style5 .eq-preview-bar { background: linear-gradient(to top, #00ff00, #ffff00, #ff0000); }
+
+/* Animation Keyframes */
+@keyframes vj-sparkle {
+    0%, 100% { opacity: 0.2; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+@keyframes vj-lava {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(6px, 6px) scale(1.2); }
+}
+@keyframes vj-rainbow-scroll {
+    0% { background-position-y: 0%; }
+    100% { background-position-y: 200%; }
+}
+@keyframes vj-drops {
+    0% { background-position-y: 0; }
+    100% { background-position-y: 16px; }
+}
+@keyframes vj-swirl {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+@keyframes vj-cmy-fade {
+    0%, 100% { background: #0ff; }
+    33% { background: #f0f; }
+    66% { background: #ff0; }
+}
+@keyframes vj-lava-rainbow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+@keyframes vj-pastel {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+@keyframes vj-wave {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+@keyframes vj-fire {
+    0% { background-position-y: 0%; }
+    100% { background-position-y: 100%; }
+}
+@keyframes vj-countdown {
+    0% { content: '5'; }
+    20% { content: '4'; }
+    40% { content: '3'; }
+    60% { content: '2'; }
+    80% { content: '1'; }
+}
+@keyframes vj-pink-blue {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+@keyframes vj-poly {
+    0%, 100% { transform: rotate(0deg) scale(0.8); }
+    50% { transform: rotate(180deg) scale(1.2); }
+}
+@keyframes eq-bounce {
+    0% { transform: scaleY(0.15); }
+    100% { transform: scaleY(0.95); }
 }
 

@@ -22,3 +22,11 @@ test_reports/
 .coverage
 *.log
 
+# Caches and editor settings
+.pytest_cache/
+.mypy_cache/
+.claude/
+mock_cache_dir/
+.DS_Store
+.divoom_last_working_char.json
+

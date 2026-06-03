@@ -62,6 +62,7 @@ class PresetsManagerMixin:
             lan_token = 0
             
             last_connected_device = ""
+            last_detected_count = 0
             
             if config_file.exists():
                 cfg.read(config_file)
@@ -69,6 +70,7 @@ class PresetsManagerMixin:
                 timeout = int(cfg.get("gui", "timeout", fallback="15"))
                 limit = int(cfg.get("gui", "limit", fallback="4"))
                 last_connected_device = cfg.get("gui", "last_connected_device", fallback="")
+                last_detected_count = int(cfg.get("gui", "last_detected_count", fallback="0"))
                 lan_ip = cfg.get("lan", "device_ip", fallback="")
                 lan_token = int(cfg.get("lan", "local_token", fallback="0"))
                 
@@ -112,7 +114,8 @@ class PresetsManagerMixin:
                 "lan_token": lan_token,
                 "devices": cached_devices,
                 "cloud_connected": cloud_connected,
-                "cloud_email": cloud_email
+                "cloud_email": cloud_email,
+                "last_detected_count": last_detected_count
             })
         except Exception as e:
             logger.error(f"Failed to load config: {e}")

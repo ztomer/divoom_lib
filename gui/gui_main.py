@@ -273,8 +273,20 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 cache_file.parent.mkdir(parents=True, exist_ok=True)
                 cache_file.write_text(json.dumps(results, indent=2), encoding="utf-8")
                 logger.info(f"Scanner: Cached {len(results)} discovered devices to discovered_devices.json")
+                
+                # Save the number of detected screens to config.ini for the next session
+                import configparser
+                config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
+                cfg = configparser.ConfigParser()
+                if config_file.exists():
+                    cfg.read(config_file)
+                if "gui" not in cfg:
+                    cfg["gui"] = {}
+                cfg["gui"]["last_detected_count"] = str(len(results))
+                with open(config_file, "w") as f:
+                    cfg.write(f)
             except Exception as ce:
-                logger.warning(f"Failed to cache discovered devices: {ce}")
+                logger.warning(f"Failed to cache discovered devices or count: {ce}")
             return json.dumps(results)
         except Exception as e:
             logger.error(f"Device scan failed: {e}")

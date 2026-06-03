@@ -269,6 +269,24 @@ document.addEventListener("DOMContentLoaded", () => {
         "CMY Fade", "Rainbow Lava", "Pastel Patterns", "CMY Wave", "Fire", "Countdown",
         "Pink/Blue Fade", "Rainbow Polygons", "Pink/Blue Wave", "Rainbow Cross", "Rainbow Shapes"]
         .map((name, i) => ({ value: i, name }));
+    const VJ_PREVIEWS = {
+        0: `<div class="vj-preview-box sparkles"></div>`,
+        1: `<div class="vj-preview-box lava"></div>`,
+        2: `<div class="vj-preview-box rainbow-vert"></div>`,
+        3: `<div class="vj-preview-box drops"></div>`,
+        4: `<div class="vj-preview-box swirl"></div>`,
+        5: `<div class="vj-preview-box cmy-fade"></div>`,
+        6: `<div class="vj-preview-box rainbow-lava"></div>`,
+        7: `<div class="vj-preview-box pastel"></div>`,
+        8: `<div class="vj-preview-box cmy-wave"></div>`,
+        9: `<div class="vj-preview-box fire"></div>`,
+        10: `<div class="vj-preview-box countdown"></div>`,
+        11: `<div class="vj-preview-box pink-blue-fade"></div>`,
+        12: `<div class="vj-preview-box rainbow-poly"></div>`,
+        13: `<div class="vj-preview-box pink-blue-wave"></div>`,
+        14: `<div class="vj-preview-box rainbow-cross"></div>`,
+        15: `<div class="vj-preview-box rainbow-shapes"></div>`
+    };
     buildSelectorGrid("vj-effects-grid", VJ_EFFECTS, (v) => {
         if (!requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_vj_effect) {
@@ -276,11 +294,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 showToast(res ? "VJ effect applied" : "Failed to apply VJ effect", res ? "success" : "error", "🔵 Bluetooth");
             });
         }
-    }, -1);
+    }, -1, VJ_PREVIEWS);
 
     // 2.c — Music EQ / visualizer patterns. Count verified against all four
     // physical devices (they accept indices 0–15 cleanly).
     const EQ_PATTERNS = Array.from({ length: 16 }, (_, i) => ({ value: i, name: `EQ ${String(i + 1).padStart(2, "0")}` }));
+    const EQ_PREVIEWS = {};
+    for (let i = 0; i < 16; i++) {
+        const styleNum = (i % 5) + 1;
+        const delay1 = (0.1 + (i * 0.13) % 0.5).toFixed(2);
+        const delay2 = (0.2 + (i * 0.17) % 0.5).toFixed(2);
+        const delay3 = (0.3 + (i * 0.23) % 0.5).toFixed(2);
+        const delay4 = (0.4 + (i * 0.29) % 0.5).toFixed(2);
+        const dur1 = (0.5 + (i * 0.07) % 0.4).toFixed(2);
+        const dur2 = (0.5 + (i * 0.11) % 0.4).toFixed(2);
+        const dur3 = (0.5 + (i * 0.13) % 0.4).toFixed(2);
+        const dur4 = (0.5 + (i * 0.17) % 0.4).toFixed(2);
+        EQ_PREVIEWS[i] = `<div class="eq-preview-box style${styleNum}">
+            <div class="eq-preview-bar" style="animation-delay: -${delay1}s; animation-duration: ${dur1}s;"></div>
+            <div class="eq-preview-bar" style="animation-delay: -${delay2}s; animation-duration: ${dur2}s;"></div>
+            <div class="eq-preview-bar" style="animation-delay: -${delay3}s; animation-duration: ${dur3}s;"></div>
+            <div class="eq-preview-bar" style="animation-delay: -${delay4}s; animation-duration: ${dur4}s;"></div>
+        </div>`;
+    }
     buildSelectorGrid("eq-visualizer-grid", EQ_PATTERNS, (v) => {
         if (!requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_visualization) {
@@ -288,7 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 showToast(res ? "EQ pattern applied" : "Failed to apply EQ", res ? "success" : "error", "🔵 Bluetooth");
             });
         }
-    }, -1);
+    }, -1, EQ_PREVIEWS);
 
     // 2.b — Ambient color, now a channel selection.
     const applyAmbientBtn = document.getElementById("apply-ambient-btn");
@@ -726,32 +762,34 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    if (scanBtn) {
-        scanBtn.addEventListener("click", () => {
-            const timeout = parseInt(document.getElementById("scan-timeout")?.value) || 15;
-            const limit = parseInt(document.getElementById("scan-limit")?.value) || 0;
+    function runBleScan() {
+        const timeout = parseInt(document.getElementById("scan-timeout")?.value) || 15;
+        const limit = parseInt(document.getElementById("scan-limit")?.value) || 0;
 
-            if (scanSpinner) scanSpinner.style.display = "inline-block";
-            scanBtn.disabled = true;
-            
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.scan_devices_with_config(timeout, limit)
-                    .then(devicesJson => {
-                        if (scanSpinner) scanSpinner.style.display = "none";
-                        scanBtn.disabled = false;
-                        
-                        const devices = JSON.parse(devicesJson);
-                        discoveredDevices = devices;
-                        populateDeviceSelectors(devices);
-                        showToast(`Discovered ${devices.length} screens!`, "success");
-                        renderArrangerCanvas(); 
-                    });
-            } else {
-                if (scanSpinner) scanSpinner.style.display = "none";
-                scanBtn.disabled = false;
-                showToast("Web interface API unavailable.", "error");
-            }
-        });
+        if (scanSpinner) scanSpinner.style.display = "inline-block";
+        if (scanBtn) scanBtn.disabled = true;
+        
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.scan_devices_with_config(timeout, limit)
+                .then(devicesJson => {
+                    if (scanSpinner) scanSpinner.style.display = "none";
+                    if (scanBtn) scanBtn.disabled = false;
+                    
+                    const devices = JSON.parse(devicesJson);
+                    discoveredDevices = devices;
+                    populateDeviceSelectors(devices);
+                    showToast(`Discovered ${devices.length} screens!`, "success");
+                    renderArrangerCanvas(); 
+                });
+        } else {
+            if (scanSpinner) scanSpinner.style.display = "none";
+            if (scanBtn) scanBtn.disabled = false;
+            showToast("Web interface API unavailable.", "error");
+        }
+    }
+
+    if (scanBtn) {
+        scanBtn.addEventListener("click", runBleScan);
     }
     
     // Light Controls Apply
@@ -859,41 +897,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         loadedArtworks = artworks;
                         selectedArtworkIndex = null;
-                        if (galleryContainer) galleryContainer.innerHTML = "";
-                        
-                        if (artworks.length === 0) {
-                            if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">No gallery items found for classification.</div>`;
-                            return;
-                        }
-                        
-                        artworks.forEach((art, idx) => {
-                            const item = document.createElement("div");
-                            item.className = "gallery-item";
-                            
-                            // Beautiful visual gif cover animation
-                            const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
-                            
-                            item.innerHTML = `
-                                <div class="gallery-item-preview-box">
-                                    <img src="${previewSrc}" class="gallery-item-preview" alt="${art.name}">
-                                </div>
-                                <div class="gallery-item-info">
-                                    <h5>${art.name}</h5>
-                                    <span>❤️ ${art.likes}</span>
-                                </div>
-                            `;
-                            
-                            item.addEventListener("click", () => {
-                                const items = galleryContainer.querySelectorAll(".gallery-item");
-                                items.forEach(it => it.classList.remove("active"));
-                                item.classList.add("active");
-                                selectedArtworkIndex = idx;
-                            });
-                            
-                            if (galleryContainer) galleryContainer.appendChild(item);
-                        });
-                        
-                        showToast("Gallery fetched", "success", "🟡 Divoom Cloud");
+                        renderGallery(artworks);
+                        showToast("Gallery loaded from cache", "success", "🟡 Divoom Cloud");
                     });
             }
         });
@@ -1215,6 +1220,13 @@ document.addEventListener("DOMContentLoaded", () => {
                             setTimeout(() => {
                                 connectDevice(name, addr);
                             }, 500);
+                        }
+
+                        if (conf.last_detected_count && conf.last_detected_count > 0) {
+                            setTimeout(() => {
+                                showToast("Resuming session: Auto-scanning screens...", "success");
+                                runBleScan();
+                            }, 1000);
                         }
                         
                         // Cloud Connection Status Indicator Card
@@ -1580,6 +1592,66 @@ document.addEventListener("DOMContentLoaded", () => {
         updateSyncTargetList();
         loadHotChannelSchedule();
     }, 1500);
+
+    function renderGallery(artworks) {
+        if (galleryContainer) galleryContainer.innerHTML = "";
+        
+        if (!artworks || artworks.length === 0) {
+            if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">No gallery items found for classification.</div>`;
+            return;
+        }
+        
+        artworks.forEach((art, idx) => {
+            const item = document.createElement("div");
+            item.className = "gallery-item";
+            
+            const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
+            
+            item.innerHTML = `
+                <div class="gallery-item-preview-box">
+                    <img src="${previewSrc}" class="gallery-item-preview" alt="${art.name}">
+                </div>
+                <div class="gallery-item-info">
+                    <h5>${art.name}</h5>
+                    <span>❤️ ${art.likes}</span>
+                </div>
+            `;
+            
+            item.addEventListener("click", () => {
+                const items = galleryContainer.querySelectorAll(".gallery-item");
+                items.forEach(it => it.classList.remove("active"));
+                item.classList.add("active");
+                selectedArtworkIndex = idx;
+            });
+            
+            if (galleryContainer) galleryContainer.appendChild(item);
+        });
+    }
+
+    window.onGalleryBackgroundFetched = function(classify, targetSize, b64Data) {
+        try {
+            const rawJson = atob(b64Data);
+            const artworks = JSON.parse(rawJson);
+            
+            const currentClassify = parseInt(document.getElementById("gallery-classify")?.value || "18");
+            let currentTargetSize = 16;
+            const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
+            if (bannerResText.includes("64")) {
+                currentTargetSize = 64;
+            } else if (bannerResText.includes("32")) {
+                currentTargetSize = 32;
+            }
+            
+            if (currentClassify === classify && currentTargetSize === targetSize) {
+                loadedArtworks = artworks;
+                selectedArtworkIndex = null;
+                renderGallery(artworks);
+                showToast("Gallery updated with latest monthly best! 🟡", "success");
+            }
+        } catch (e) {
+            console.error("Failed to process background gallery fetch:", e);
+        }
+    };
 
 });
 

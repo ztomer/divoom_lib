@@ -21,6 +21,7 @@ class Display:
         if hot:
             return await self.communicator.send_command("set hot", [])
         
+        clock = to_int_if_str(clock)
         args = [constants.BOOLEAN_FALSE]
         args += [bool_to_byte(twentyfour)]
         if clock >= 0 and clock <= 15:
@@ -31,9 +32,12 @@ class Display:
         args += [bool_to_byte(weather)]
         args += [bool_to_byte(temp)]
         args += [bool_to_byte(calendar)]
-        if color:
-            rgb = self.communicator.convert_color(color)
-            args += [rgb[0], rgb[1], rgb[2]]
+        
+        # Always append color payload to guarantee full 10-byte environmental packet format.
+        # This prevents the clock face channel from getting stuck or failing to switch styles.
+        color_val = color or "#ffffff"
+        rgb = self.communicator.convert_color(color_val)
+        args += [rgb[0], rgb[1], rgb[2]]
         return await self.communicator.send_command("set light mode", args)
 
     async def _set_work_mode(self, mode: int, sub_command_args: list | None = None) -> bool:

@@ -253,11 +253,26 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.api.cached_creds.user_id = 99
         self.api.cached_creds.is_valid.return_value = True
 
-        gallery_json = self.api.fetch_gallery(classify=1)
-        gallery = json.loads(gallery_json)
-        self.assertEqual(len(gallery), 1)
-        self.assertEqual(gallery[0]["name"], "NeonSkull")
-        self.assertEqual(gallery[0]["file_id"], "9999")
+        # Pre-seed cached data for the offline cache loader check
+        cached_items = [
+            {"name": "NeonSkull", "file_id": "9999", "likes": 1500, "magic": 5, "preview_url": "data:image/png;base64,..."}
+        ]
+
+        import threading
+        import time
+
+        with patch("pathlib.Path.exists", return_value=True), \
+             patch("pathlib.Path.read_text", return_value=json.dumps(cached_items)):
+            gallery_json = self.api.fetch_gallery(classify=1)
+            gallery = json.loads(gallery_json)
+            self.assertEqual(len(gallery), 1)
+            self.assertEqual(gallery[0]["name"], "NeonSkull")
+            self.assertEqual(gallery[0]["file_id"], "9999")
+
+            # Wait for background fetch worker to finish executing under mocked Path
+            for t in threading.enumerate():
+                if t.name == "DivoomGalleryFetch":
+                    t.join(timeout=5.0)
 
         # Mock the stream_raw_bin_payload monthly best sync routine
         mock_stream = MagicMock()
