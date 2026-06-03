@@ -17,9 +17,14 @@ risk, and whether they need real hardware or APK reverse-engineering.
 | 7. Strip-mine + tests | ✅ analysis + system-monitor port + 2 real bug fixes |
 | Instrumentation (REST control server) | ✅ done |
 
-**On-device validated 2026-06-02** on all four units (Timoo, Tivoo-Max, Pixoo,
-Ditoo): clock/VJ/EQ/image all 180/180 OK, 0 failures — see
-`docs/DEVICE_VALIDATION_PLAN.md`. Full suite: **263 passed / 0 failed**.
+**On-device status (2026-06-02): partial.** All four units (Timoo, Tivoo-Max,
+Pixoo, Ditoo) make a real BLE connection and accept every command write; wire
+frames are mock-proven correct. **BUT** the earlier "180/180 OK" was
+fire-and-forget write-completion, NOT device confirmation — the rigorous
+read-back run FAILED (all `get_*` queries time out; device only returns a generic
+0x33 ACK). On-device *application/display* is not yet automatically verifiable
+(visual only). See `docs/DEVICE_VALIDATION_PLAN.md` "STATUS — corrected".
+Full suite: **263 passed / 0 failed**.
 
 ## Architecture (ground truth)
 

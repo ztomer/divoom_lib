@@ -122,6 +122,88 @@ def _guess_size(name):
     return 16
 
 
+async def validate_device_rigorous(address, name, dwell):
+    """Real device-CONFIRMED validation (not just "the BLE write returned").
+
+    Uses set→read-back round-trips and query responses, so a pass means the
+    device actually received, applied, and reported the state — proving genuine
+    two-way communication, not a fire-and-forget ack.
+    """
+    print(f"\n=== {name or 'device'} ({address}) [RIGOROUS] ===")
+    entry = {"address": address, "name": name, "connected": False, "steps": []}
+    dev = Divoom(mac=address, use_ios_le_protocol=False)
+
+    def record(label, ok, detail=None):
+        entry["steps"].append({"step": label, "ok": bool(ok), "error": None if ok else detail})
+        print(f"    {'PASS' if ok else 'FAIL'}  {label}" + (f"  ({detail})" if detail else ""))
+
+    try:
+        await dev.connect()
+        entry["connected"] = bool(dev.is_connected)
+    except Exception as e:
+        entry["error"] = f"connect failed: {e}"
+        print(f"  CONNECT FAILED: {e}")
+        return entry
+    record("connect", entry["connected"])
+
+    # 1. Device responds to a query (real two-way round-trip).
+    try:
+        nm = await dev.device.get_device_name()
+        record("query device name (round-trip)", nm is not None, f"name={nm!r}")
+    except Exception as e:
+        record("query device name (round-trip)", False, str(e))
+
+    # 2. DEFINITIVE: set brightness, read it back, compare.
+    for target in (25, 90):
+        try:
+            await dev.device.set_brightness(target)
+            await asyncio.sleep(0.6)
+            readback = await dev.device.get_brightness()
+            ok = readback is not None and abs(int(readback) - target) <= 2
+            record(f"brightness set {target} → read {readback}", ok, f"read={readback}")
+        except Exception as e:
+            record(f"brightness round-trip {target}", False, str(e))
+        await asyncio.sleep(dwell)
+
+    # 3. Work-mode read-back after switching to VJ effects.
+    try:
+        await dev.display.show_effects(number=0)
+        await asyncio.sleep(0.6)
+        wm = await dev.device.get_work_mode()
+        record("work mode after show_effects (read-back)", wm is not None, f"work_mode={wm}")
+    except Exception as e:
+        record("work mode read-back", False, str(e))
+
+    # 4. Visual commands: sent, then a liveness query proves the device didn't
+    #    desync/choke (display correctness is the watcher's eyes).
+    visual = []
+    for n in range(6):
+        try:
+            await dev.display.show_clock(clock=n); visual.append(True)
+        except Exception:
+            visual.append(False)
+        await asyncio.sleep(dwell * 0.5)
+    record("clock dials 0-5 sent", all(visual), f"{sum(visual)}/6")
+
+    try:
+        size = _guess_size(name)
+        frame = media_source.render_stock_ticker_frame(
+            "BTC", {"price": 64000, "change": 1.0, "pct_change": 1.0}, size=size)
+        await dev.display.show_image(str(frame))
+        await asyncio.sleep(1.0)
+        # Liveness: device still answers a query after the (chunked) image push.
+        alive = await dev.device.get_brightness()
+        record("image push + device still responsive", alive is not None, f"brightness={alive}")
+    except Exception as e:
+        record("image push + responsive", False, str(e))
+
+    try:
+        await dev.disconnect()
+    except Exception:
+        pass
+    return entry
+
+
 async def validate_via_server(address, name, dwell, quick, conn):
     """Drive the matrix through a *running* app's control server (REST or unix
     socket). The app process — which has Bluetooth permission — does the BLE;
@@ -199,6 +281,8 @@ async def main_async(args):
             if args.token or os.environ.get("DIVOOM_CONTROL_TOKEN"):
                 conn["token"] = args.token or os.environ.get("DIVOOM_CONTROL_TOKEN")
             report["devices"].append(await validate_via_server(address, name, args.dwell, args.quick, conn))
+        elif args.rigorous:
+            report["devices"].append(await validate_device_rigorous(address, name, args.dwell))
         else:
             report["devices"].append(await validate_device(address, name, args.dwell, args.quick))
 
@@ -238,6 +322,8 @@ def main():
     p.add_argument("--scan-timeout", type=float, default=10.0)
     p.add_argument("--dwell", type=float, default=2.5, help="seconds per visual step")
     p.add_argument("--quick", action="store_true", help="shorter 0..15 sweeps")
+    p.add_argument("--rigorous", action="store_true",
+                   help="device-CONFIRMED checks (brightness read-back, query round-trips)")
     p.add_argument("--report", default=str(ROOT / "test_reports" / "device_validation.json"))
     p.add_argument("--socket", help="path to UNIX domain socket for validation via running app")
     p.add_argument("--server", help="URL to HTTP control server for validation via running app")
