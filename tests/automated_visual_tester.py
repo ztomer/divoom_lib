@@ -72,7 +72,29 @@ class HeadlessGuiTester:
             # Trigger Fetch Gallery button click
             print_info("E2E Test: Triggering 'Fetch Gallery' click...")
             window.evaluate_js('document.getElementById("load-gallery-btn").click();')
-            time.sleep(4.0)  # Wait for cloud API, file download, AES decryption/LZO transcoding to complete
+            
+            # Poll until gallery items are rendered to handle cold caches or slower network/decoding
+            print_info("E2E Test: Polling for gallery items to render...")
+            max_wait = 25.0
+            poll_interval = 0.5
+            elapsed = 0.0
+            rendered = False
+            while elapsed < max_wait:
+                count_val = window.evaluate_js('document.querySelectorAll(".gallery-item-preview").length')
+                try:
+                    count = int(count_val) if count_val is not None else 0
+                except (ValueError, TypeError):
+                    count = 0
+                if count > 0:
+                    rendered = True
+                    print_info(f"E2E Test: Gallery rendered {count} items after {elapsed:.1f}s.")
+                    time.sleep(1.5)  # Short stabilization wait for images to load
+                    break
+                time.sleep(poll_interval)
+                elapsed += poll_interval
+
+            if not rendered:
+                raise AssertionError("Timed out waiting for gallery items to render")
             
             # Assert correct previews are rendered
             js_assert = """
