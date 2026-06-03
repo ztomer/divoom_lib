@@ -4,9 +4,20 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Gemini specific files
+# Stale agent/session planning files
 progress.md
 set_hot_pick.py
+GEMINI.md
+plan.md
+todo.md
+
+# Runtime temp / scratch output (rendered frames, downloaded media) & debug scripts
+scratch/
+debug/
+
+# Local validation launchers / sockets
+*.command
+*.sock
 
 # Credentials / secrets — never commit
 config.ini
