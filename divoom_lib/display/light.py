@@ -66,7 +66,7 @@ class Light:
         
         # Set the command we are waiting for and send it with the correct protocol
         self.communicator._expected_response_command = command_id
-        async with self.communicator._framing_context(use_ios=True, escape=False):
+        async with self.communicator._framing_context(use_ios=self.communicator.use_ios_le_protocol, escape=False):
             await self.communicator.send_command(command_id, [])
 
         # Wait for the response using the default (Basic) protocol

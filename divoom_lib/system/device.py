@@ -56,7 +56,7 @@ class Device(DeviceSettings):
         command_id = COMMANDS["get light mode"]
         self.communicator._expected_response_command = command_id
         
-        async with self.communicator._framing_context(use_ios=True, escape=False):
+        async with self.communicator._framing_context(use_ios=self.communicator.use_ios_le_protocol, escape=False):
             await self.communicator.send_command(command_id, [])
 
         response_payload = await self.communicator.wait_for_response(command_id)

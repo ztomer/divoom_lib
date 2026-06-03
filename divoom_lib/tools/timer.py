@@ -55,7 +55,7 @@ class Timer:
         
         # Set the command we are waiting for and send it with the correct protocol
         self._divoom._expected_response_command = command_id
-        async with self._divoom._framing_context(use_ios=True, escape=False):
+        async with self._divoom._framing_context(use_ios=self._divoom.use_ios_le_protocol, escape=False):
             await self._divoom.send_command(command_id, args)
 
         # Wait for the response using the default (Basic) protocol
