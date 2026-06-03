@@ -121,3 +121,22 @@ async def test_clock_dial_set_and_read_back_roundtrip():
     assert light_mode is not None
     assert light_mode["time_display_mode"] == 4
 
+
+@pytest.mark.asyncio
+async def test_watchface_roundtrip_script_e2e(monkeypatch):
+    """Verify that verify_device in the watchface roundtrip script successfully
+    interacts with the Divoom facade using MockBleakClient."""
+    from scripts.test_watchface_roundtrip import verify_device
+    
+    original_divoom_init = Divoom.__init__
+    
+    def mock_divoom_init(self, *args, **kwargs):
+        kwargs["client"] = MockBleakClient(kwargs.get("mac", "AA:BB:CC:DD:EE:FF"))
+        original_divoom_init(self, *args, **kwargs)
+        
+    monkeypatch.setattr(Divoom, "__init__", mock_divoom_init)
+    
+    success = await verify_device("AA:BB:CC:DD:EE:FF", "MockDevice", dial=3)
+    assert success is True
+
+
