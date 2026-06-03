@@ -174,6 +174,19 @@ async def validate_device_rigorous(address, name, dwell):
     except Exception as e:
         record("work mode read-back", False, str(e))
 
+    # 3.b Clock dial round-trip (set dial, read back light settings and compare dial index)
+    for target_dial in (1, 4):
+        try:
+            await dev.display.show_clock(clock=target_dial)
+            await asyncio.sleep(0.6)
+            light_mode = await dev.light.get_light_mode()
+            readback = light_mode.get("time_display_mode") if light_mode else None
+            ok = readback == target_dial
+            record(f"clock dial set {target_dial} → read {readback}", ok, f"read={readback}")
+        except Exception as e:
+            record(f"clock dial round-trip {target_dial}", False, str(e))
+        await asyncio.sleep(dwell)
+
     # 4. Visual commands: sent, then a liveness query proves the device didn't
     #    desync/choke (display correctness is the watcher's eyes).
     visual = []

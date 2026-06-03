@@ -108,3 +108,16 @@ async def test_written_frames_are_valid_framing():
     assert mock.written, "no frames written"
     # If any checksum/END were wrong, the parser would yield fewer messages.
     assert len(_decoded_frames(mock)) >= 2
+
+
+@pytest.mark.asyncio
+async def test_clock_dial_set_and_read_back_roundtrip():
+    """Verify that we can set the clock style and read it back from mock device."""
+    dev, mock = await _connected_divoom()
+    # Set to clock dial 4
+    await dev.display.show_clock(clock=4)
+    # Read it back using get_light_mode
+    light_mode = await dev.light.get_light_mode()
+    assert light_mode is not None
+    assert light_mode["time_display_mode"] == 4
+

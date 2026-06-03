@@ -20,6 +20,8 @@ class MockBleakClient:
         # Record every frame the "device" receives so tests can assert the exact
         # wire bytes produced by the library (hardware-free end-to-end checks).
         self.written = []
+        self.clock_style = 0
+        self.brightness = 100
         logger.info(f"Initialized MockBleakClient for {address}")
 
     @property
@@ -77,12 +79,25 @@ class MockBleakClient:
                 cmd = payload[0]
                 logger.debug(f"Received Basic Protocol CMD: 0x{cmd:02x}")
 
-                # Example: Get Settings (0x46) -> Respond with dummy settings
+                # Example: Get Settings (0x46) -> Respond with stateful settings
                 if cmd == 0x46:
-                    # Response frame: 04 46 55 <payload>
-                    # Let's return a simple payload: 01 00 (Brightness 100?)
-                    response_payload = bytes.fromhex("0446550100")
-                    return self._frame_basic_response(response_payload)
+                    resp_payload = bytearray(23)
+                    resp_payload[0:3] = b'\x04\x46\x55'
+                    resp_payload[3 + 6] = self.brightness
+                    resp_payload[3 + 15] = self.clock_style
+                    return self._frame_basic_response(bytes(resp_payload))
+
+                elif cmd == 0x45:
+                    if len(payload) >= 4 and payload[1] == 0x00:
+                        self.clock_style = payload[3]
+                        logger.debug(f"MockDevice: Set clock style to {self.clock_style}")
+                    return self._frame_basic_response(bytes([0x04, 0x45, 0x55, 0x00]))
+
+                elif cmd == 0x74:
+                    if len(payload) >= 2:
+                        self.brightness = payload[1]
+                        logger.debug(f"MockDevice: Set brightness to {self.brightness}")
+                    return self._frame_basic_response(bytes([0x04, 0x74, 0x55, 0x00]))
 
             except Exception as e:
                 logger.error(f"Failed to parse Basic Protocol packet: {e}")
@@ -92,15 +107,27 @@ class MockBleakClient:
              try:
                 # Header (4) + Len (2) + Cmd (1)
                 cmd = data[6]
+                payload = data[11:-2] # Exclude header, len, cmd, packetnum, crc
                 logger.debug(f"Received iOS LE Protocol CMD: 0x{cmd:02x}")
 
                 if cmd == 0x46: # Get Settings
-                     # Construct a valid iOS LE response
-                     # Header + Len + Cmd + PacketNum + Payload + CRC
-                     # For simplicity, let's just return a generic ACK for now or a dummy payload
-                     # Payload: 01 (Brightness)
-                     payload = b'\x01'
-                     return self._frame_ios_response(cmd, payload)
+                     # Respond with 20-byte payload in iOS LE format
+                     resp_payload = bytearray(20)
+                     resp_payload[6] = self.brightness
+                     resp_payload[15] = self.clock_style
+                     return self._frame_ios_response(cmd, bytes(resp_payload))
+
+                elif cmd == 0x45:
+                     if len(payload) >= 4 and payload[1] == 0x00:
+                         self.clock_style = payload[3]
+                         logger.debug(f"MockDevice: Set clock style to {self.clock_style}")
+                     return self._frame_ios_response(cmd, b'\x00')
+
+                elif cmd == 0x74:
+                     if len(payload) >= 2:
+                         self.brightness = payload[1]
+                         logger.debug(f"MockDevice: Set brightness to {self.brightness}")
+                     return self._frame_ios_response(cmd, b'\x00')
 
              except Exception as e:
                 logger.error(f"Failed to parse iOS LE packet: {e}")
