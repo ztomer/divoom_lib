@@ -331,7 +331,7 @@ async def _push_items_to_target(target_addr, name_substring, items_to_display, l
             target_addr = device_addr
 
         print_info(f"Connecting to BLE device at {target_addr}...")
-        divoom = Divoom(mac=target_addr, logger=logger, use_ios_le_protocol=False)
+        divoom = Divoom(mac=target_addr, logger=logger, use_ios_le_protocol=True)
         await divoom.connect()
         print_ok(f"Connected to {target_addr} successfully!")
 

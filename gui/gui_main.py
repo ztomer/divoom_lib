@@ -98,10 +98,10 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         lan_ip = self.current_divoom.lan.device_ip if (self.current_divoom and self.current_divoom.lan) else None
         cloud_ok = bool(self.cached_creds and self.cached_creds.is_valid())
         return json.dumps({
-            "ble": {"available": ble_connected, "label": "BLE", "badge": "🔵", "color": "#3b82f6", "description": "Bluetooth — 100% local, never leaves your device.", "detail": self.current_divoom._conn.mac if ble_connected and self.current_divoom else None},
-            "lan": {"available": bool(lan_ip), "label": "LAN", "badge": "🟢", "color": "#22c55e", "description": "Wi-Fi HTTP :9000 — 100% local, WiFi-capable devices only.", "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured"},
-            "cloud": {"available": cloud_ok, "label": "Divoom Cloud", "badge": "🟡", "color": "#f59e0b", "description": "appin.divoom-gz.com — Divoom's servers, requires account.", "detail": "Authenticated" if cloud_ok else "Not authenticated"},
-            "external": {"available": True, "label": "External", "badge": "🔴", "color": "#ef4444", "description": "3rd-party APIs (weather, stocks) — no login required.", "detail": "Available"}
+            "ble": {"available": ble_connected, "label": "Bluetooth", "badge": "🔵", "color": "#3b82f6", "description": "Bluetooth — 100% local, never leaves your machine.", "detail": self.current_divoom._conn.mac if ble_connected and self.current_divoom else None},
+            "lan": {"available": bool(lan_ip), "label": "Local Network", "badge": "🟢", "color": "#22c55e", "description": "Local Network — 100% local, WiFi-capable devices only.", "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured"},
+            "cloud": {"available": cloud_ok, "label": "Divoom Cloud", "badge": "🟡", "color": "#f59e0b", "description": "Divoom Cloud — appin.divoom-gz.com, Divoom's servers, requires account.", "detail": "Authenticated" if cloud_ok else "Not authenticated"},
+            "external": {"available": True, "label": "Public Cloud", "badge": "🔴", "color": "#ef4444", "description": "Public Cloud — 3rd-party APIs (weather, stocks), no login required.", "detail": "Available"}
         })
 
 
@@ -175,6 +175,14 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 time.sleep(0.1)
                 self.window.destroy()
             threading.Thread(target=_destroy, daemon=True).start()
+
+    def drag_window(self, delta_x: int, delta_y: int) -> None:
+        """Move the window relatively by delta_x and delta_y."""
+        if self.window:
+            try:
+                self.window.move(self.window.x + int(delta_x), self.window.y + int(delta_y))
+            except Exception as e:
+                logger.error(f"Failed to drag window: {e}")
 
     # ── Device Scanner Core (asyncio.run Thread-Safe) ──────────────────────────────
 
@@ -325,7 +333,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                         from mock_device import MockBleakClient
                         client = MockBleakClient(address)
                         logger.info("DIVOOM_MOCK_BLE: using MockBleakClient")
-                    self.current_divoom = Divoom(mac=address, client=client, logger=logger, use_ios_le_protocol=False)
+                    self.current_divoom = Divoom(mac=address, client=client, logger=logger, use_ios_le_protocol=True)
                     self._run_async(self.current_divoom.connect())
                     connected = True
 
@@ -414,7 +422,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 self._run_async(self.current_divoom.lan.set_ambient_light(brightness, r, g, b))
                 return True
             elif self.current_divoom and self.current_divoom.is_connected:
-                return self._run_async(self.current_divoom.display.show_light(color, brightness))
+                return self._run_async(self.current_divoom.display.show_light(color, brightness, True))
             return False
         except Exception as e:
             logger.error(f"Light setting failed: {e}")

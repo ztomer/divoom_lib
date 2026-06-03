@@ -30,6 +30,37 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Frameless window dragging relative movement via python API
+    let isDragging = false;
+    let lastScreenX = 0;
+    let lastScreenY = 0;
+    const appbar = document.querySelector(".integrated-appbar");
+    if (appbar) {
+        appbar.addEventListener("mousedown", (e) => {
+            if (e.button !== 0 || e.target.closest("button") || e.target.closest("select") || e.target.closest("input")) return;
+            isDragging = true;
+            lastScreenX = e.screenX;
+            lastScreenY = e.screenY;
+        });
+
+        window.addEventListener("mousemove", (e) => {
+            if (!isDragging) return;
+            const deltaX = e.screenX - lastScreenX;
+            const deltaY = e.screenY - lastScreenY;
+            lastScreenX = e.screenX;
+            lastScreenY = e.screenY;
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.drag_window) {
+                if (deltaX !== 0 || deltaY !== 0) {
+                    window.pywebview.api.drag_window(deltaX, deltaY);
+                }
+            }
+        });
+
+        window.addEventListener("mouseup", () => {
+            isDragging = false;
+        });
+    }
+
     // ── 2. TAB NAVIGATION ──
     const navButtons = document.querySelectorAll(".nav-btn");
     const tabContents = document.querySelectorAll(".tab-content");
@@ -121,6 +152,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function showChannelPanel(channel) {
         channelPanels.forEach(p => p.classList.toggle("active", p.id === `panel-${channel}`));
+        const titleEl = document.getElementById("channel-options-title");
+        if (titleEl) {
+            const channelNames = {
+                "clock": "Clock Mode Options",
+                "visualizer": "Music EQ Options",
+                "vj": "VJ Effects Options",
+                "design": "Custom Art Options",
+                "ambient": "Ambient Color Options"
+            };
+            titleEl.textContent = channelNames[channel] || "Channel Options";
+        }
     }
 
     channelCards.forEach(card => {
@@ -135,7 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!requireDevice()) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.switch_channel) {
                 window.pywebview.api.switch_channel(activeChannel).then(res => {
-                    if (res) showToast("Switched channel", "success", "🔵 BLE");
+                    if (res) showToast("Switched channel", "success", "🔵 Bluetooth");
                     else showToast("Failed to switch channel", "error");
                 });
             }
@@ -143,7 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Generic selector-grid builder. `activeIndex < 0` => no pre-selection.
-    function buildSelectorGrid(containerId, items, onSelect, activeIndex = 0) {
+    function buildSelectorGrid(containerId, items, onSelect, activeIndex = 0, previewMap = null) {
         const grid = document.getElementById(containerId);
         if (!grid) return;
         grid.innerHTML = "";
@@ -151,7 +193,18 @@ document.addEventListener("DOMContentLoaded", () => {
             const cell = document.createElement("button");
             cell.className = "selector-cell" + (i === activeIndex ? " active" : "");
             cell.setAttribute("data-value", it.value);
-            cell.textContent = it.name;
+            
+            if (previewMap && previewMap[it.value] !== undefined) {
+                const previewWrapper = document.createElement("div");
+                previewWrapper.innerHTML = previewMap[it.value];
+                cell.appendChild(previewWrapper.firstChild);
+            }
+            
+            const label = document.createElement("div");
+            label.className = "cell-label";
+            label.textContent = it.name;
+            cell.appendChild(label);
+            
             cell.addEventListener("click", () => {
                 grid.querySelectorAll(".selector-cell").forEach(c => c.classList.remove("active"));
                 cell.classList.add("active");
@@ -168,8 +221,28 @@ document.addEventListener("DOMContentLoaded", () => {
         { value: 2, name: "With Box" }, { value: 3, name: "Analog Square" },
         { value: 4, name: "Full Screen Neg" }, { value: 5, name: "Analog Round" },
     ];
+    const CLOCK_PREVIEWS = {
+        0: `<div class="clock-preview-box digital-full">12:00</div>`,
+        1: `<div class="clock-preview-box digital-rainbow">12:00</div>`,
+        2: `<div class="clock-preview-box digital-box"><span>12:00</span></div>`,
+        3: `<div class="clock-preview-box analog-square">
+                <svg class="mini-clock-svg" viewBox="0 0 40 40">
+                    <rect x="2" y="2" width="36" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <line x1="20" y1="20" x2="20" y2="10" stroke="currentColor" stroke-width="2"/>
+                    <line x1="20" y1="20" x2="30" y2="20" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+            </div>`,
+        4: `<div class="clock-preview-box digital-neg">12:00</div>`,
+        5: `<div class="clock-preview-box analog-round">
+                <svg class="mini-clock-svg" viewBox="0 0 40 40">
+                    <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <line x1="20" y1="20" x2="20" y2="10" stroke="currentColor" stroke-width="2"/>
+                    <line x1="20" y1="20" x2="28" y2="25" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+            </div>`
+    };
     let selectedClockStyle = 0;
-    buildSelectorGrid("clock-faces-grid", CLOCK_FACES, (v) => { selectedClockStyle = v; }, 0);
+    buildSelectorGrid("clock-faces-grid", CLOCK_FACES, (v) => { selectedClockStyle = v; }, 0, CLOCK_PREVIEWS);
 
     const applyClockBtn = document.getElementById("apply-clock-btn");
     if (applyClockBtn) {
@@ -177,7 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!requireDevice()) return;
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.set_clock(selectedClockStyle).then(res => {
-                    showToast(res ? "Clock face applied" : "Failed to apply clock", res ? "success" : "error", "🔵 BLE");
+                    showToast(res ? "Clock face applied" : "Failed to apply clock", res ? "success" : "error", "🔵 Bluetooth");
                 });
             }
         });
@@ -192,7 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_vj_effect) {
             window.pywebview.api.set_vj_effect(v).then(res => {
-                showToast(res ? "VJ effect applied" : "Failed to apply VJ effect", res ? "success" : "error", "🔵 BLE");
+                showToast(res ? "VJ effect applied" : "Failed to apply VJ effect", res ? "success" : "error", "🔵 Bluetooth");
             });
         }
     }, -1);
@@ -204,7 +277,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_visualization) {
             window.pywebview.api.set_visualization(v).then(res => {
-                showToast(res ? "EQ pattern applied" : "Failed to apply EQ", res ? "success" : "error", "🔵 BLE");
+                showToast(res ? "EQ pattern applied" : "Failed to apply EQ", res ? "success" : "error", "🔵 Bluetooth");
             });
         }
     }, -1);
@@ -218,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const brightness = parseInt(document.getElementById("ambient-brightness")?.value) || 80;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.set_solid_light) {
                 window.pywebview.api.set_solid_light(color, brightness).then(res => {
-                    showToast(res ? "Ambient color applied" : "Failed to apply ambient", res ? "success" : "error", "🔵 BLE");
+                    showToast(res ? "Ambient color applied" : "Failed to apply ambient", res ? "success" : "error", "🔵 Bluetooth");
                 });
             }
         });
@@ -485,7 +558,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const statusDot = document.getElementById("global-status-dot");
         const statusText = document.getElementById("global-status-text");
         
-        if (statusDot) statusDot.className = "transport-dot connecting";
+        if (statusDot) {
+            statusDot.className = "transport-dot connecting";
+            statusDot.removeAttribute("style");
+        }
         if (statusText) statusText.textContent = "Connecting…";
         
         if (window.pywebview && window.pywebview.api) {
@@ -493,8 +569,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 .then(res => {
                     if (res) {
                         appConnected = true;
-                        showToast(`Successfully connected to ${name}!`, "success");
-                        if (statusDot) statusDot.className = "transport-dot active";
+                        let typeClass = "ble";
+                        let transportLabel = "🔵 Bluetooth";
+                        if (address === "MatrixWall") {
+                            typeClass = "wall";
+                            transportLabel = "🧱 Matrix Wall";
+                        } else if (address.startsWith("LAN:")) {
+                            typeClass = "lan";
+                            transportLabel = "🟢 Local Network";
+                        }
+                        showToast(`Successfully connected to ${name}!`, "success", transportLabel);
+                        if (statusDot) {
+                            statusDot.className = `transport-dot active ${typeClass}`;
+                            statusDot.removeAttribute("style");
+                        }
                         if (statusText) statusText.textContent = name;
                         
                         document.getElementById("banner-device-name").textContent = name;
@@ -514,7 +602,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else {
                         appConnected = false;
                         showToast(`Failed to connect to ${name}`, "error");
-                        if (statusDot) statusDot.className = "transport-dot inactive";
+                        if (statusDot) {
+                            statusDot.className = "transport-dot inactive";
+                            statusDot.removeAttribute("style");
+                        }
                         if (statusText) statusText.textContent = "Disconnected";
                         document.getElementById("banner-device-name").textContent = "None";
                         document.getElementById("banner-device-mac").textContent = "None";
@@ -535,8 +626,12 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 devices.forEach(d => {
                     const li = document.createElement("li");
+                    const color = deviceColor(d.address);
                     li.innerHTML = `
-                        <span>${d.name}</span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="device-accent-dot" style="background:${color}; box-shadow:0 0 6px ${color};"></span>
+                            <span>${d.name}</span>
+                        </div>
                         <span class="device-mac">${d.address}</span>
                     `;
                     li.addEventListener("click", () => {
@@ -659,7 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.set_solid_light(selectedColor, brightness)
                     .then(res => {
-                        if (res) showToast("Ambient light applied", "success", "🔵 BLE");
+                        if (res) showToast("Ambient light applied", "success", "🔵 Bluetooth");
                         else showToast("Failed to apply ambient light", "error");
                     });
             }
@@ -687,7 +782,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.apply_wall_image(path, cellSize)
                     .then(res => {
-                        if (res) showToast("Synchronized display wall", "success", "🔵 BLE");
+                        if (res) showToast("Synchronized display wall", "success", "🔵 Bluetooth");
                         else showToast("Failed to split and push wall image", "error");
                     });
             }
@@ -790,7 +885,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             if (galleryContainer) galleryContainer.appendChild(item);
                         });
                         
-                        showToast("Gallery fetched", "success", "🟡 Cloud");
+                        showToast("Gallery fetched", "success", "🟡 Divoom Cloud");
                     });
             }
         });
@@ -811,7 +906,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.batch_sync_artwork(JSON.stringify(artwork))
                     .then(res => {
-                        if (res) showToast(`'${artwork.name}' synced`, "success", "🔵 BLE");
+                        if (res) showToast(`'${artwork.name}' synced`, "success", "🔵 Bluetooth");
                         else showToast("Failed to batch sync artwork", "error");
                     });
             }
@@ -882,7 +977,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (resJson) {
                             const res = JSON.parse(resJson);
                             if (res.success) {
-                                showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Ext");
+                                showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Public Cloud");
                                 const priceMock = document.querySelector(".ticker-price-mock");
                                 const arrowMock = document.querySelector(".ticker-arrow-mock");
                                 const nameMock = document.querySelector(".ticker-name-mock");
@@ -935,7 +1030,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const r = JSON.parse(json);
                     const img = document.getElementById("sysmon-device-preview");
                     if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
-                    showToast(r.success ? "System monitor on device" : (r.error || "Failed"), r.success ? "success" : "error", "🔵 BLE");
+                    showToast(r.success ? "System monitor on device" : (r.error || "Failed"), r.success ? "success" : "error", "🔵 Bluetooth");
                 } catch (e) { showToast("Failed", "error"); }
             });
         });
@@ -1384,13 +1479,21 @@ document.addEventListener("DOMContentLoaded", () => {
             cb.value = c.address;
             cb.checked = !!c.selected;
             cb.addEventListener("change", persistSyncTargets);
+            
+            const color = deviceColor(c.address);
+            const accent = document.createElement("span");
+            accent.className = "device-accent-dot";
+            accent.style.background = color;
+            accent.style.boxShadow = `0 0 6px ${color}`;
+            accent.style.marginRight = "6px";
+            
             const name = document.createElement("span");
             name.className = "target-name";
             name.textContent = c.name;
             const addr = document.createElement("span");
             addr.className = "target-addr";
             addr.textContent = c.address;
-            row.append(cb, name, addr);
+            row.append(cb, accent, name, addr);
             el.appendChild(row);
         });
     }

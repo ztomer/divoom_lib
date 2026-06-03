@@ -69,7 +69,7 @@ class DivoomWall:
                 width = config.get("width", 120)
                 height = config.get("height", 120)
                 
-                divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=False)
+                divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=True)
                 # Store absolute bounding box: (divoom, x, y, size, width, height)
                 self.devices.append((divoom, x, y, size, width, height))
         else:
@@ -82,7 +82,7 @@ class DivoomWall:
                 y = config.get("y", 0)
                 size = config.get("size", 16)
                 
-                divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=False)
+                divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=True)
                 self.devices.append((divoom, x, y, size, 0, 0)) # Mock width, height
                 
                 if x + 1 > max_x_slot:

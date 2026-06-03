@@ -86,7 +86,7 @@ class HeadlessGuiTester:
                         src: img.src,
                         is_mockup: img.src.includes("assets/pixoo.png"),
                         is_badge: img.src.includes("eEwpPWIfSLqEFi3ZAAAAAEVtmrs365"),
-                        is_cached: img.src.includes("assets/cache_gallery/")
+                        is_cached: img.src.startsWith("data:image/") || img.src.includes("assets/cache_gallery/")
                     });
                 });
                 return JSON.stringify({error: null, items: list});

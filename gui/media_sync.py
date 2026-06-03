@@ -124,7 +124,7 @@ class MediaSyncMixin:
                 data = json.loads(resp.read().decode("utf-8"))
                 file_list = data.get("FileList", [])
                 
-                cache_dir = Path(__file__).parent / "web_ui" / "assets" / "cache_gallery"
+                cache_dir = Path.home() / ".config" / "divoom-control" / "cache_gallery"
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 
                 results = []
@@ -176,7 +176,13 @@ class MediaSyncMixin:
                         for ext in [".gif", ".png", ".jpg"]:
                             possible_file = cache_file.with_suffix(ext)
                             if possible_file.exists():
-                                preview_url = f"assets/cache_gallery/{possible_file.name}"
+                                try:
+                                    mime_type = "image/gif" if ext == ".gif" else ("image/jpeg" if ext == ".jpg" else "image/png")
+                                    img_data = possible_file.read_bytes()
+                                    b64_str = base64.b64encode(img_data).decode("utf-8")
+                                    preview_url = f"data:{mime_type};base64,{b64_str}"
+                                except Exception as b64_err:
+                                    logger.warning(f"Failed to base64 encode {possible_file.name}: {b64_err}")
                                 break
                     
                     results.append({

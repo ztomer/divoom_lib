@@ -23,8 +23,7 @@
         <!-- Active device selector + connection indicator (area 1). The dot uses
              the shared transport-status vocabulary (.transport-dot). -->
         <div class="appbar-device">
-            <span class="transport-dot inactive" id="global-status-dot"
-                  style="background:#22c55e; color:#22c55e;" title="Connection status"></span>
+            <span class="transport-dot inactive" id="global-status-dot" title="Connection status"></span>
             <select id="sidebar-device-select" class="custom-select appbar-device-select">
                 <option value="">Select Screen…</option>
             </select>
@@ -90,25 +89,25 @@
             </nav>
             
             <div class="transport-status-panel">
-                <div class="panel-title">Transport Status</div>
-                <div class="transport-row" id="tr-ble" title="Bluetooth Low Energy — 100% local">
+                <div class="panel-title">Connection Type</div>
+                <div class="transport-row" id="tr-ble" title="Bluetooth — 100% local, never leaves your machine.">
                     <div class="transport-dot inactive" id="tr-ble-dot" style="background:#3b82f6; color:#3b82f6;"></div>
-                    <span class="transport-row-label">BLE</span>
+                    <span class="transport-row-label">Bluetooth</span>
                     <span class="transport-row-detail" id="tr-ble-detail">Disconnected</span>
                 </div>
-                <div class="transport-row" id="tr-lan" title="Wi-Fi HTTP :9000 — 100% local">
+                <div class="transport-row" id="tr-lan" title="Local Network — 100% local, WiFi-capable devices only.">
                     <div class="transport-dot inactive" id="tr-lan-dot" style="background:#22c55e; color:#22c55e;"></div>
-                    <span class="transport-row-label">LAN</span>
+                    <span class="transport-row-label">Local Network</span>
                     <span class="transport-row-detail" id="tr-lan-detail">No IP set</span>
                 </div>
-                <div class="transport-row" id="tr-cloud" title="appin.divoom-gz.com — Divoom's servers">
+                <div class="transport-row" id="tr-cloud" title="Divoom Cloud — appin.divoom-gz.com, Divoom's servers">
                     <div class="transport-dot inactive" id="tr-cloud-dot" style="background:#f59e0b; color:#f59e0b;"></div>
-                    <span class="transport-row-label">Cloud</span>
+                    <span class="transport-row-label">Divoom Cloud</span>
                     <span class="transport-row-detail" id="tr-cloud-detail">Not signed in</span>
                 </div>
-                <div class="transport-row" id="tr-ext" title="3rd-party APIs — no login required">
+                <div class="transport-row" id="tr-ext" title="Public Cloud — 3rd-party APIs, no login required.">
                     <div class="transport-dot active" id="tr-ext-dot" style="background:#ef4444; color:#ef4444;"></div>
-                    <span class="transport-row-label">External</span>
+                    <span class="transport-row-label">Public Cloud</span>
                     <span class="transport-row-detail" id="tr-ext-detail">Available</span>
                 </div>
             </div>
@@ -124,7 +123,7 @@
                         <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
                             <path d="M5,4 L11,9.5 L8,12 L8,1 L11,3.5 L5,9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter"/>
                         </svg>
-                        BLE
+                        Bluetooth
                     </span>
                     <div class="banner-preview">
                         <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
@@ -143,7 +142,7 @@
                 </div>
                 
                 <div class="grid-layout">
-                    <!-- Channels (Ambient is now one of the channel selections, 2.b) -->
+                    <!-- Channels (Left: Channel selection) -->
                     <div class="card glass-card">
                         <div class="card-header">
                             <h3>Channels</h3>
@@ -202,9 +201,16 @@
                                     <h4>Ambient</h4>
                                 </button>
                             </div>
+                        </div>
+                    </div>
 
-                            <!-- Channel sub-selection panels (shown based on active channel) -->
-                            <div class="channel-panels" style="margin-top: 25px;">
+                    <!-- Channel sub-selection panels (Right: Dynamic options) -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <h3 id="channel-options-title">Clock Mode Options</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="channel-panels">
                                 <!-- Clock faces (real built-in dial types) -->
                                 <div class="channel-panel active" id="panel-clock">
                                     <div class="panel-title">Clock Face</div>
@@ -317,64 +323,75 @@
                     <h1>Batch Monthly Best</h1>
                 </div>
                 
-                <div class="card glass-card">
-                    <div class="card-header flex-header">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <h3>Gallery</h3>
-                            <span class="transport-badge cloud" style="position:static; margin-left: 0;">
-                                <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
-                                    <path d="M4,11 C2.5,11 1,9.5 1,8 C1,6.5 2.5,5 4,5 C4.5,3 6.5,2 9,2 C12,2 14.5,4.5 14.5,7.5 C14.5,9.5 13,11 11,11 Z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                                Cloud
-                            </span>
+                <div class="monthly-best-layout">
+                    <!-- Left: Gallery Card -->
+                    <div class="card glass-card" style="display:flex; flex-direction:column; height: 100%;">
+                        <div class="card-header flex-header">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <h3>Gallery</h3>
+                                <span class="transport-badge cloud" style="position:static; margin-left: 0;">
+                                    <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                                        <path d="M4,11 C2.5,11 1,9.5 1,8 C1,6.5 2.5,5 4,5 C4.5,3 6.5,2 9,2 C12,2 14.5,4.5 14.5,7.5 C14.5,9.5 13,11 11,11 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                    Divoom Cloud
+                                </span>
+                            </div>
+                            <div class="header-actions">
+                                <select id="gallery-classify" class="custom-select small">
+                                    <option value="18">Recommend</option>
+                                    <option value="3">Cartoon</option>
+                                    <option value="9">Creative</option>
+                                    <option value="6">Nature</option>
+                                </select>
+                                <button id="load-gallery-btn" class="glow-btn compact">Fetch Gallery</button>
+                            </div>
                         </div>
-                        <div class="header-actions">
-                            <select id="gallery-classify" class="custom-select small">
-                                <option value="18">Recommend</option>
-                                <option value="3">Cartoon</option>
-                                <option value="9">Creative</option>
-                                <option value="6">Nature</option>
-                            </select>
-                            <button id="load-gallery-btn" class="glow-btn compact">Fetch Gallery</button>
+                        <div class="card-body" style="flex:1; overflow:hidden; min-height:0; display:flex; flex-direction:column;">
+                            <!-- Dynamic Grid with preview covers -->
+                            <div class="gallery-grid" id="gallery-container" style="flex:1; overflow-y:auto; min-height:0;">
+                                <div class="empty-list">Click "Fetch Gallery" to load public artworks.</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <!-- Dynamic Grid with preview covers -->
-                        <div class="gallery-grid" id="gallery-container">
-                            <div class="empty-list">Click "Fetch Gallery" to load public artworks.</div>
+
+                    <!-- Right: Sync Controls Card -->
+                    <div class="card glass-card" style="display:flex; flex-direction:column;">
+                        <div class="card-header">
+                            <h3>Sync Controls</h3>
                         </div>
-                        
-                        <!-- Sync targets (4.c): explicit device multi-select -->
-                        <div class="hot-channel">
-                            <div class="hc-row">
-                                <div class="hc-label">Sync Targets</div>
-                                <button id="refresh-targets-btn" class="glow-btn compact ghost">Refresh</button>
-                            </div>
-                            <div id="sync-targets-list" class="sync-targets-list">
-                                <span class="empty-list">No devices — scan under Settings, or add a Wi-Fi screen.</span>
-                            </div>
+                        <div class="card-body" style="overflow-y:auto;">
+                            <!-- Sync targets (4.c): explicit device multi-select -->
+                            <div class="hot-channel" style="margin-top: 0; padding-top: 0; border-top: none;">
+                                <div class="hc-row">
+                                    <div class="hc-label">Sync Targets</div>
+                                    <button id="refresh-targets-btn" class="glow-btn compact ghost">Refresh</button>
+                                </div>
+                                <div id="sync-targets-list" class="sync-targets-list">
+                                    <span class="empty-list">No devices — scan under Settings, or add a Wi-Fi screen.</span>
+                                </div>
 
-                            <div class="hc-actions">
-                                <button id="batch-sync-btn" class="glow-btn">Sync Selected Art</button>
-                                <button id="sync-all-btn" class="glow-btn pulse-glow">Sync All → Targets</button>
-                            </div>
+                                <div class="hc-actions">
+                                    <button id="batch-sync-btn" class="glow-btn">Sync Selected Art</button>
+                                    <button id="sync-all-btn" class="glow-btn pulse-glow">Sync All → Targets</button>
+                                </div>
 
-                            <!-- Automatic hot-channel schedule (4.d) -->
-                            <div class="hc-schedule">
-                                <div class="hc-label">Automatic Hot-Channel Schedule</div>
-                                <label class="hc-toggle">
-                                    <input type="checkbox" id="hc-enabled"> Enable scheduled sync (runs headless)
-                                </label>
-                                <label class="slider-label">Sync every
-                                    <select id="hc-interval" class="custom-select small">
-                                        <option value="3600">1 hour</option>
-                                        <option value="21600">6 hours</option>
-                                        <option value="43200">12 hours</option>
-                                        <option value="86400">24 hours</option>
-                                    </select>
-                                </label>
-                                <button id="hc-save-schedule-btn" class="glow-btn compact">Save Schedule</button>
-                                <span id="hc-schedule-status" class="panel-hint"></span>
+                                <!-- Automatic hot-channel schedule (4.d) -->
+                                <div class="hc-schedule">
+                                    <div class="hc-label">Automatic Hot-Channel Schedule</div>
+                                    <label class="hc-toggle">
+                                        <input type="checkbox" id="hc-enabled"> Enable scheduled sync (runs headless)
+                                    </label>
+                                    <label class="slider-label">Sync every
+                                        <select id="hc-interval" class="custom-select small">
+                                            <option value="3600">1 hour</option>
+                                            <option value="21600">6 hours</option>
+                                            <option value="43200">12 hours</option>
+                                            <option value="86400">24 hours</option>
+                                        </select>
+                                    </label>
+                                    <button id="hc-save-schedule-btn" class="glow-btn compact">Save Schedule</button>
+                                    <span id="hc-schedule-status" class="panel-hint"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -555,6 +572,41 @@
                                     <ul id="lan-device-list" class="device-list">
                                         <li class="empty-list">No Wi-Fi screens registered.</li>
                                     </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Connectivity & Privacy Legend -->
+                    <div style="margin-top:24px;">
+                        <h3 style="font-size:13px; margin-bottom:12px; color:rgba(255,255,255,0.6);">Connectivity & Privacy</h3>
+                        <div class="connectivity-legend">
+                            <div class="connectivity-legend-row">
+                                <div class="connectivity-legend-badge"><span class="transport-badge ble">🔵 Bluetooth</span></div>
+                                <div class="connectivity-legend-text">
+                                    <strong>Bluetooth</strong>
+                                    <span>100% local. Commands go directly to the device over Bluetooth. Nothing ever leaves your machine.</span>
+                                </div>
+                            </div>
+                            <div class="connectivity-legend-row">
+                                <div class="connectivity-legend-badge"><span class="transport-badge lan">🟢 Local Network</span></div>
+                                <div class="connectivity-legend-text">
+                                    <strong>Local Network</strong>
+                                    <span>100% local. Talks directly to the device's built-in HTTP server. No internet, no account. WiFi-capable devices only.</span>
+                                </div>
+                            </div>
+                            <div class="connectivity-legend-row">
+                                <div class="connectivity-legend-badge"><span class="transport-badge cloud">🟡 Divoom Cloud</span></div>
+                                <div class="connectivity-legend-text">
+                                    <strong>Divoom Cloud</strong>
+                                    <span>Sends commands to Divoom's servers. Required for: gallery browsing, clock face store, community features. Requires a Divoom account.</span>
+                                </div>
+                            </div>
+                            <div class="connectivity-legend-row">
+                                <div class="connectivity-legend-badge"><span class="transport-badge ext">🔴 Public Cloud</span></div>
+                                <div class="connectivity-legend-text">
+                                    <strong>Public Cloud</strong>
+                                    <span>Used for weather, stock prices, album art lookups. 3rd-party services — no Divoom account required. Data is anonymous.</span>
                                 </div>
                             </div>
                         </div>
