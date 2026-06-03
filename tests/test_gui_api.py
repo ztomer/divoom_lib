@@ -105,6 +105,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
         slots = {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16, "width": 120, "height": 120}}
         self.api.update_wall_slots(json.dumps(slots))
         self.assertEqual(self.api.wall_slots, slots)
+        self.api.current_target_mode = "wall"
 
         # Apply solid color setting
         light_success = self.api.set_solid_light("00FFCC", 100)
@@ -130,6 +131,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.api.update_wall_slots(json.dumps(
             {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16, "width": 120, "height": 120}}
         ))
+        self.api.current_target_mode = "wall"
 
         self.assertTrue(self.api.set_vj_effect(5))
         mock_wall.show_effects.assert_called_with(number=5)

@@ -241,18 +241,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 </svg>
             </div>`
     };
-    let selectedClockStyle = 0;
-    buildSelectorGrid("clock-faces-grid", CLOCK_FACES, (v) => { selectedClockStyle = v; }, 0, CLOCK_PREVIEWS);
+    function applyClockStyle(style) {
+        if (!requireDevice()) return;
+        const color = document.getElementById("clock-color-input")?.value || "#ffffff";
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.set_clock(style, color).then(res => {
+                showToast(res ? "Clock style applied" : "Failed to apply clock", res ? "success" : "error", "🔵 Bluetooth");
+            });
+        }
+    }
 
-    const applyClockBtn = document.getElementById("apply-clock-btn");
-    if (applyClockBtn) {
-        applyClockBtn.addEventListener("click", () => {
-            if (!requireDevice()) return;
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.set_clock(selectedClockStyle).then(res => {
-                    showToast(res ? "Clock face applied" : "Failed to apply clock", res ? "success" : "error", "🔵 Bluetooth");
-                });
-            }
+    let selectedClockStyle = 0;
+    buildSelectorGrid("clock-faces-grid", CLOCK_FACES, (v) => {
+        selectedClockStyle = v;
+        applyClockStyle(v);
+    }, 0, CLOCK_PREVIEWS);
+
+    const clockColorInput = document.getElementById("clock-color-input");
+    if (clockColorInput) {
+        clockColorInput.addEventListener("input", () => {
+            applyClockStyle(selectedClockStyle);
         });
     }
 
@@ -583,7 +591,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             statusDot.className = `transport-dot active ${typeClass}`;
                             statusDot.removeAttribute("style");
                         }
-                        if (statusText) statusText.textContent = name;
+                        if (statusText) statusText.textContent = "Connected";
                         
                         document.getElementById("banner-device-name").textContent = name;
                         document.getElementById("banner-device-mac").textContent = address;
@@ -665,7 +673,7 @@ document.addEventListener("DOMContentLoaded", () => {
         registeredLanDevices.forEach(d => {
             const opt = document.createElement("option");
             opt.value = `LAN:${d.ip}`;
-            opt.textContent = `🟢 Wi-Fi: ${d.ip}`;
+            opt.textContent = `🟢 Local Network: ${d.ip}`;
             if (currentMac === `LAN:${d.ip}`) opt.selected = true;
             sel.appendChild(opt);
         });
@@ -690,7 +698,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 connectDevice("Matrix Wall Grid", "MatrixWall");
             } else if (addr.startsWith("LAN:")) {
                 const ip = addr.split("LAN:")[1];
-                connectDevice(`Wi-Fi: ${ip}`, addr);
+                connectDevice(`Local Network: ${ip}`, addr);
             } else {
                 const dev = discoveredDevices.find(d => d.address === addr);
                 const name = dev ? dev.name : "Bluetooth Device";
@@ -1380,11 +1388,11 @@ document.addEventListener("DOMContentLoaded", () => {
             li.style.justifyContent = "space-between";
             li.style.alignItems = "center";
             li.innerHTML = `
-                <span style="font-weight:600; cursor:pointer;">🟢 Wi-Fi Device (${d.ip})</span>
+                <span style="font-weight:600; cursor:pointer;">🟢 Local Network Device (${d.ip})</span>
                 <button class="glow-btn compact" style="margin:0; background:rgba(255, 68, 68, 0.15); border-color:#ef4444; color:#ef4444;" data-ip="${d.ip}">Delete</button>
             `;
             li.querySelector("span").addEventListener("click", () => {
-                connectDevice(`Wi-Fi: ${d.ip}`, `LAN:${d.ip}`);
+                connectDevice(`Local Network: ${d.ip}`, `LAN:${d.ip}`);
             });
             li.querySelector("button").addEventListener("click", (e) => {
                 e.stopPropagation();

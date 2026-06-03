@@ -31,6 +31,9 @@ class Display:
         args += [bool_to_byte(weather)]
         args += [bool_to_byte(temp)]
         args += [bool_to_byte(calendar)]
+        if color:
+            rgb = self.communicator.convert_color(color)
+            args += [rgb[0], rgb[1], rgb[2]]
         return await self.communicator.send_command("set light mode", args)
 
     async def _set_work_mode(self, mode: int, sub_command_args: list | None = None) -> bool:
@@ -42,16 +45,14 @@ class Display:
         return result
 
     async def show_design(self, number: int | None = None) -> bool:
-        """Show design on the Divoom device"""
-        sub_command_args = None
-        if number is not None:  # additionally change design tab
-            number = to_int_if_str(number)
-            sub_command_args = [constants.SUB_COMMAND_SET_DESIGN, number]
-        return await self._set_work_mode(constants.WORK_MODE_DESIGN, sub_command_args)
+        """Show custom art / design channel on the Divoom device"""
+        # Under protocol.md: Animation channel is command 0x45, payload [0x05]
+        return await self.communicator.send_command("set light mode", [0x05])
 
     async def show_effects(self, number: int) -> bool:
         """Show VJ effects on the Divoom device"""
-        return await self._set_work_mode(constants.WORK_MODE_EFFECTS, [number])
+        # Under protocol.md: VJ effects is command 0x45, payload [0x03, int(number)]
+        return await self.communicator.send_command("set light mode", [0x03, int(number)])
 
     async def show_image(self, file: str, time: int | None = None) -> bool:
         """Show image or animation on the Divoom device"""
@@ -114,6 +115,7 @@ class Display:
         if number is None:
             return False
         number = to_int_if_str(number)
-        return await self._set_work_mode(constants.WORK_MODE_VISUALIZATION, [number])
+        # Under protocol.md: Visualization is command 0x45, payload [0x04, number]
+        return await self.communicator.send_command("set light mode", [0x04, number])
 
 __all__ = ["Display", "Light", "Drawing", "Animation", "Text"]

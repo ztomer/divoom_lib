@@ -412,7 +412,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Sets ambient solid lighting across active screen(s) / display wall."""
         logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness})...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
+            if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.set_light(color, brightness))
@@ -428,11 +428,11 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
             logger.error(f"Light setting failed: {e}")
             return False
 
-    def set_clock(self, style: int) -> bool:
+    def set_clock(self, style: int, color: str = None) -> bool:
         """Sets clock display channel across active screen(s) / display wall."""
-        logger.info(f"GUI Action: Applying clock style {style}...")
+        logger.info(f"GUI Action: Applying clock style {style} with color {color}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
+            if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.show_clock(clock=style))
@@ -440,7 +440,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 self._run_async(self.current_divoom.lan.set_clock(style))
                 return True
             elif self.current_divoom and self.current_divoom.is_connected:
-                return self._run_async(self.current_divoom.display.show_clock(clock=style))
+                return self._run_async(self.current_divoom.display.show_clock(clock=style, color=color))
             return False
         except Exception as e:
             logger.error(f"Clock setting failed: {e}")
@@ -450,7 +450,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Switches display active channel mode (Clock, Visualizer, VJ, Design)."""
         logger.info(f"GUI Action: Switching channel to {channel}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
+            if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
                 tasks = []
@@ -507,7 +507,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """
         logger.info(f"GUI Action: Applying VJ effect {number}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
+            if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.show_effects(number=int(number)))
@@ -528,7 +528,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
         """Select a specific Music EQ / visualizer pattern on the active screen(s)/wall."""
         logger.info(f"GUI Action: Applying visualizer {number}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
+            if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.show_visualization(number=int(number)))
