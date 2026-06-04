@@ -173,10 +173,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }, -1, VJ_PREVIEWS);
 
     // ── 5. MUSIC EQ GRID ──
-    const EQ_PATTERNS = Array.from({ length: 16 }, (_, i) => ({ value: i, name: `EQ ${String(i + 1).padStart(2, "0")}` }));
+    const EQ_MAPPING = [1, 6, 3, 5, 10, 13, 4, 14, 9, 2, 11, 12];
+    const EQ_PATTERNS = EQ_MAPPING.map((eqId, idx) => ({ value: idx, name: `EQ ${String(idx + 1).padStart(2, "0")}` }));
     const EQ_PREVIEWS = {};
-    for (let i = 0; i < 16; i++) {
-        const eqIndex = i + 1; // maps python 0-15 to EQ index 1-16
+    for (let i = 0; i < EQ_MAPPING.length; i++) {
+        const eqIndex = EQ_MAPPING[i];
         let inactiveSrc, activeSrc;
         
         if ([1, 2, 3, 4, 5, 6, 9, 10].includes(eqIndex)) {
@@ -186,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
             inactiveSrc = `assets/icon_eq_${eqIndex}_n.webp`;
             activeSrc = `assets/icon_eq_${eqIndex}_y.webp`;
         } else {
-            inactiveSrc = `assets/icon_eq_default_n_3x.webp`;
+            inactiveSrc = `assets/icon_eq_unkonow_n.webp`;
             activeSrc = `assets/icon_eq_unkonow_y.webp`;
         }
         

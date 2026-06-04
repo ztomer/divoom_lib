@@ -2,6 +2,7 @@
 
 .arranger-card {
     border-color: rgba(157, 78, 221, 0.15);
+    width: 100%;
 }
 
 .arranger-workspace-free {

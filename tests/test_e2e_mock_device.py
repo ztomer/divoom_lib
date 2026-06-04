@@ -49,14 +49,29 @@ async def test_connect_uses_injected_mock():
 
 @pytest.mark.asyncio
 async def test_show_effects_emits_vj_frames():
-    """2.d: VJ effect 9 → set light mode [3, 9]."""
+    """2.d: VJ effect 9 → set light mode [3, 10] due to 1-indexed offset."""
     dev, mock = await _connected_divoom()
     await dev.display.show_effects(number=9)
     frames = _decoded_frames(mock)
     cmds = [f["command_id"] for f in frames]
     assert models.COMMANDS["set light mode"] in cmds
     vj_cmd = next(f for f in frames if f["command_id"] == models.COMMANDS["set light mode"])
-    assert list(vj_cmd["payload"]) == [3, 9]
+    assert list(vj_cmd["payload"]) == [3, 10]
+
+
+@pytest.mark.asyncio
+async def test_show_effects_lan_unsupported():
+    """VJ effects should return False and warn on LAN devices."""
+    mock = MockBleakClient(MAC)
+    # Instantiate with a dummy lan_ip to simulate a Wi-Fi/LAN device
+    dev = Divoom(mac=MAC, client=mock, lan_ip="192.168.1.100", use_ios_le_protocol=False)
+    assert dev.display.communicator.lan is not None
+    
+    ok = await dev.display.show_effects(number=5)
+    assert ok is False
+    
+    ok_switch = await dev.display.switch_channel("vj")
+    assert ok_switch is False
 
 
 @pytest.mark.asyncio

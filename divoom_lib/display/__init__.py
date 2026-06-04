@@ -63,10 +63,10 @@ class Display:
     async def show_effects(self, number: int) -> bool:
         """Show VJ effects on the Divoom device"""
         if self.communicator.lan:
-            await self.communicator.lan.set_channel(1)
-            return True
-        # Under protocol.md: VJ effects is command 0x45, payload [0x03, int(number)]
-        return await self.communicator.send_command("set light mode", [0x03, int(number)])
+            self.logger.warning("VJ effects are not supported on Wi-Fi (LAN) devices.")
+            return False
+        # VJ effects are 1-indexed (1-16) on BLE hardware
+        return await self.communicator.send_command("set light mode", [0x03, int(number) + 1])
 
     async def show_image(self, file: str, time: int | None = None) -> bool:
         """Show image or animation on the Divoom device"""
@@ -145,8 +145,13 @@ class Display:
         """Switches display active channel mode (Clock, Visualizer, VJ, Design)."""
         channel_lower = channel.lower()
         if self.communicator.lan:
-            mapping = {"clock": 0, "vj": 1, "visualizer": 2, "design": 3}
-            val = mapping.get(channel_lower, 0)
+            if channel_lower == "vj":
+                self.logger.warning("VJ effects are not supported on Wi-Fi (LAN) devices.")
+                return False
+            mapping = {"clock": 0, "visualizer": 2, "design": 3}
+            if channel_lower not in mapping:
+                return False
+            val = mapping[channel_lower]
             await self.communicator.lan.set_channel(val)
             return True
 

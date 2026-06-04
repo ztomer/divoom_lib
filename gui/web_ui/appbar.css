@@ -32,8 +32,8 @@
 .appbar-device-select {
     font-size: 12px;
     font-weight: 600;
-    min-width: 170px;
-    max-width: 250px;
+    min-width: 200px;
+    max-width: 320px;
     height: 26px;
     padding: 2px 28px 2px 8px;
 }

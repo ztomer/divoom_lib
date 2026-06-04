@@ -199,6 +199,67 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    window.onGalleryItemLoaded = function(classify, targetSize, index, total, itemB64) {
+        try {
+            const currentClassify = parseInt(document.getElementById("gallery-classify")?.value || "18");
+            let currentTargetSize = 16;
+            const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
+            if (bannerResText.includes("64")) {
+                currentTargetSize = 64;
+            } else if (bannerResText.includes("32")) {
+                currentTargetSize = 32;
+            }
+            
+            if (currentClassify !== classify || currentTargetSize !== targetSize) return;
+            
+            const rawJson = atob(itemB64);
+            const art = JSON.parse(rawJson);
+            
+            if (index === 0) {
+                if (galleryContainer) galleryContainer.innerHTML = "";
+                window.DivoomState.loadedArtworks = [];
+            }
+            
+            window.DivoomState.loadedArtworks.push(art);
+            
+            const item = document.createElement("div");
+            item.className = "gallery-item";
+            const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
+            
+            item.innerHTML = `
+                <div class="gallery-item-preview-box">
+                    <img src="${previewSrc}" class="gallery-item-preview" alt="${art.name}">
+                </div>
+                <div class="gallery-item-info">
+                    <h5>${art.name}</h5>
+                    <span>❤️ ${art.likes}</span>
+                </div>
+            `;
+            
+            const currentIdx = window.DivoomState.loadedArtworks.length - 1;
+            item.addEventListener("click", () => {
+                const items = galleryContainer.querySelectorAll(".gallery-item");
+                items.forEach(it => it.classList.remove("active"));
+                item.classList.add("active");
+                window.DivoomState.selectedArtworkIndex = currentIdx;
+            });
+            
+            if (galleryContainer) {
+                galleryContainer.appendChild(item);
+                
+                const loadBtn = document.getElementById("load-gallery-btn");
+                if (loadBtn) {
+                    loadBtn.textContent = `📡 Loading ${index + 1}/${total}...`;
+                    if (index + 1 === total) {
+                        loadBtn.textContent = "📡 Fetch Gallery";
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Failed to render progressive gallery item:", e);
+        }
+    };
+
     window.onGalleryBackgroundFetched = function(classify, targetSize, b64Data) {
         try {
             const rawJson = atob(b64Data);
@@ -218,6 +279,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.DivoomState.selectedArtworkIndex = null;
                 renderGallery(artworks);
                 window.showToast("Gallery updated with latest monthly best! 🟡", "success");
+                const loadBtn = document.getElementById("load-gallery-btn");
+                if (loadBtn) loadBtn.textContent = "📡 Fetch Gallery";
             }
         } catch (e) {
             console.error("Failed to process background gallery fetch:", e);

@@ -85,7 +85,7 @@ def fetch_album_art_url(track: str, artist: str) -> str | None:
 
 
 def render_and_downsample_artwork(artwork_url: str, size: int = 16) -> Path | None:
-    """Downloads an artwork cover and downsamples it to Divoom grid resolution."""
+    """Downloads an artwork cover and downsamples it to Divoom grid resolution using a SOTA pipeline."""
     try:
         scratch_dir = Path(__file__).parent.parent.parent / "scratch"
         scratch_dir.mkdir(parents=True, exist_ok=True)
@@ -95,11 +95,38 @@ def render_and_downsample_artwork(artwork_url: str, size: int = 16) -> Path | No
         with urllib.request.urlopen(req, timeout=8) as resp:
             raw_img_data = resp.read()
             
-            # Use Pillow to downsample
             from io import BytesIO
+            from PIL import ImageEnhance, ImageFilter
             img = Image.open(BytesIO(raw_img_data))
-            resized_img = img.resize((size, size), Image.NEAREST)
-            resized_img.save(out_path)
+            
+            # 1. Pre-process original high-res image (convert to RGB, enhance contrast & sharpness)
+            img_rgb = img.convert("RGB")
+            contrast_enhancer = ImageEnhance.Contrast(img_rgb)
+            img_enhanced = contrast_enhancer.enhance(1.2)
+            sharpness_enhancer = ImageEnhance.Sharpness(img_enhanced)
+            img_enhanced = sharpness_enhancer.enhance(1.3)
+            
+            # 2. Smooth downscale using LANCZOS
+            try:
+                resample_filter = Image.Resampling.LANCZOS
+            except AttributeError:
+                try:
+                    resample_filter = Image.LANCZOS
+                except AttributeError:
+                    resample_filter = Image.ANTIALIAS
+            
+            resized_img = img_enhanced.resize((size, size), resample_filter)
+            
+            # 3. Post-downscale sharpening
+            sharpened_img = resized_img.filter(ImageFilter.SHARPEN)
+            
+            # 4. Quantize to adaptive 64-color palette with dithering for retro pixel-art look
+            dither_val = Image.Dither.FLOYDSTEINBERG if hasattr(Image, 'Dither') else 1
+            quantized_img = sharpened_img.quantize(colors=64, dither=dither_val)
+            
+            # 5. Convert back to RGB for device/display compatibility
+            final_img = quantized_img.convert("RGB")
+            final_img.save(out_path)
             return out_path
     except Exception as e:
         logger.error(f"Downsampling artwork failed: {e}")

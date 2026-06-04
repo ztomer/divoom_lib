@@ -86,7 +86,7 @@ class GallerySyncMixin:
                     cache_dir.mkdir(parents=True, exist_ok=True)
                     
                     results = []
-                    for item in file_list:
+                    for idx, item in enumerate(file_list):
                         file_id = item.get("FileId")
                         preview_url = ""
                         
@@ -138,13 +138,23 @@ class GallerySyncMixin:
                                         logger.warning(f"Failed to base64 encode {possible_file.name}: {b64_err}")
                                     break
                         
-                        results.append({
+                        art_item = {
                             "name": item.get("FileName", "unnamed"),
                             "file_id": file_id,
                             "likes": item.get("LikeCnt", 0),
                             "magic": item.get("FileType", 3),
                             "preview_url": preview_url
-                        })
+                        }
+                        results.append(art_item)
+                        
+                        if self.window:
+                            try:
+                                item_json = json.dumps(art_item)
+                                b64_item_data = base64.b64encode(item_json.encode("utf-8")).decode("utf-8")
+                                js_code = f"if (window.onGalleryItemLoaded) {{ window.onGalleryItemLoaded({classify}, {target_size}, {idx}, {len(file_list)}, '{b64_item_data}'); }}"
+                                self.window.evaluate_js(js_code)
+                            except Exception as js_err:
+                                logger.warning(f"Failed to send progressive gallery item: {js_err}")
                     
                     try:
                         cache_file.parent.mkdir(parents=True, exist_ok=True)
