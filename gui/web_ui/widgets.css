@@ -407,25 +407,9 @@ input:checked + .slider-round:before {
         #ff3333 80%, #ff3333 100%
     );
     background-size: 100% 4px; /* retro pixel segments! */
-    height: 4px;
+    height: 0%;
     border-radius: 1px;
-}
-
-.widget-active .winamp-bar:nth-child(1) .winamp-fill { animation: winampBounce 0.9s ease-in-out infinite alternate; }
-.widget-active .winamp-bar:nth-child(2) .winamp-fill { animation: winampBounce 0.7s ease-in-out infinite alternate 0.1s; }
-.widget-active .winamp-bar:nth-child(3) .winamp-fill { animation: winampBounce 1.2s ease-in-out infinite alternate 0.2s; }
-.widget-active .winamp-bar:nth-child(4) .winamp-fill { animation: winampBounce 0.5s ease-in-out infinite alternate 0.05s; }
-.widget-active .winamp-bar:nth-child(5) .winamp-fill { animation: winampBounce 1.0s ease-in-out infinite alternate 0.15s; }
-.widget-active .winamp-bar:nth-child(6) .winamp-fill { animation: winampBounce 0.8s ease-in-out infinite alternate 0.25s; }
-.widget-active .winamp-bar:nth-child(7) .winamp-fill { animation: winampBounce 1.1s ease-in-out infinite alternate 0.08s; }
-.widget-active .winamp-bar:nth-child(8) .winamp-fill { animation: winampBounce 0.6s ease-in-out infinite alternate 0.18s; }
-.widget-active .winamp-bar:nth-child(9) .winamp-fill { animation: winampBounce 1.3s ease-in-out infinite alternate 0.03s; }
-.widget-active .winamp-bar:nth-child(10) .winamp-fill { animation: winampBounce 0.75s ease-in-out infinite alternate 0.22s; }
-
-@keyframes winampBounce {
-    0% { height: 10%; }
-    50% { height: 75%; }
-    100% { height: 100%; }
+    transition: height 0.05s ease;
 }
 
 /* ── Active Widget Card Indicator (Braun & Kare inspired) ───────────── */

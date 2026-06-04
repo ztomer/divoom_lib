@@ -59,7 +59,96 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ── 2. LIVE MUSIC SYNCHRONIZER ──
+    // ── 2. LIVE MUSIC SYNCHRONIZER & REAL WEB AUDIO VISUALIZER ──
+    let audioCtx = null;
+    let analyser = null;
+    let audioStream = null;
+    let dataArray = null;
+    let animationFrameId = null;
+
+    function startRealVisualizer() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    audioStream = stream;
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioCtx.createAnalyser();
+                    analyser.fftSize = 64; // Small FFT size for 10 bars
+                    const source = audioCtx.createMediaStreamSource(audioStream);
+                    source.connect(analyser);
+                    
+                    const bufferLength = analyser.frequencyBinCount;
+                    dataArray = new Uint8Array(bufferLength);
+                    
+                    animateRealVisualizer();
+                    console.log("Real Web Audio visualizer started successfully!");
+                })
+                .catch(err => {
+                    console.warn("Could not start real Web Audio visualizer (falling back to realistic simulation):", err);
+                    animateSimulatedVisualizer();
+                });
+        } else {
+            console.warn("navigator.mediaDevices.getUserMedia is not supported, using simulated visualizer.");
+            animateSimulatedVisualizer();
+        }
+    }
+
+    function stopRealVisualizer() {
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+            audioStream = null;
+        }
+        if (audioCtx) {
+            audioCtx.close();
+            audioCtx = null;
+        }
+        analyser = null;
+        
+        // Reset heights to 0%
+        document.querySelectorAll(".winamp-fill").forEach(fill => {
+            fill.style.height = "0%";
+        });
+    }
+
+    function animateRealVisualizer() {
+        if (!analyser) return;
+        animationFrameId = requestAnimationFrame(animateRealVisualizer);
+        
+        analyser.getByteFrequencyData(dataArray);
+        const fills = document.querySelectorAll(".winamp-fill");
+        const numBars = fills.length;
+        const binsPerBar = Math.floor(dataArray.length / numBars) || 1;
+        
+        for (let i = 0; i < numBars; i++) {
+            let sum = 0;
+            for (let j = 0; j < binsPerBar; j++) {
+                sum += dataArray[i * binsPerBar + j];
+            }
+            const val = sum / binsPerBar;
+            const percent = Math.min(100, Math.max(0, (val / 255) * 100));
+            if (fills[i]) {
+                fills[i].style.height = `${percent}%`;
+            }
+        }
+    }
+
+    function animateSimulatedVisualizer() {
+        if (audioCtx) return; // Real is running
+        animationFrameId = requestAnimationFrame(animateSimulatedVisualizer);
+        const fills = document.querySelectorAll(".winamp-fill");
+        fills.forEach((fill, i) => {
+            const time = Date.now() * 0.003;
+            const base = Math.sin(time + i * 0.8) * 40 + 50;
+            const noise = Math.sin(time * 2.3 - i * 1.5) * 20;
+            const val = Math.min(100, Math.max(0, base + noise));
+            fill.style.height = `${val}%`;
+        });
+    }
+
     const musicSyncToggle = document.getElementById("music-sync-toggle");
     if (musicSyncToggle) {
         musicSyncToggle.addEventListener("change", (e) => {
@@ -70,12 +159,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 trackerStatus.classList.add("active");
                 if (musicCard) musicCard.classList.add("widget-active");
                 window.showToast("Enabled macOS Music track listener thread", "success");
+                startRealVisualizer();
             } else {
                 trackerStatus.classList.remove("active");
                 if (musicCard) musicCard.classList.remove("widget-active");
                 document.getElementById("music-track-name").textContent = "No Music Playing";
                 document.getElementById("music-artist-name").textContent = "Spotify / Apple Music";
                 window.showToast("Music synchronization stopped", "success");
+                stopRealVisualizer();
             }
 
             if (window.pywebview && window.pywebview.api) {
