@@ -54,7 +54,7 @@ async def test_divoom_init_detailed(mock_divoom_instance):
     assert divoom.READ_CHARACTERISTIC_UUID == "49535343-1e4d-4bd9-ba61-23c647249616"
     assert divoom.SPP_CHARACTERISTIC_UUID == "49535343-6daa-4d02-abf6-19569aca69fe"
     assert divoom.escapePayload is False
-    assert divoom.use_ios_le_protocol is False
+    assert divoom.use_ios_le_protocol is None
     assert divoom.device_name is None
 
 @pytest.mark.asyncio

@@ -53,7 +53,7 @@ class Divoom:
                 read_characteristic_uuid=kwargs.get('read_characteristic_uuid', "49535343-1e4d-4bd9-ba61-23c647249616"),
                 spp_characteristic_uuid=kwargs.get('spp_characteristic_uuid'),
                 escapePayload=kwargs.get('escapePayload', False),
-                use_ios_le_protocol=kwargs.get('use_ios_le_protocol', False),
+                use_ios_le_protocol=kwargs.get('use_ios_le_protocol', None),
                 device_name=kwargs.get('device_name'),
                 client=kwargs.get('client')
             )

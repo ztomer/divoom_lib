@@ -34,7 +34,7 @@ class DivoomConnection:
         self.READ_CHARACTERISTIC_UUID = cfg.read_characteristic_uuid
         self.SPP_CHARACTERISTIC_UUID = cfg.spp_characteristic_uuid if cfg.spp_characteristic_uuid else models.DEFAULT_SPP_CHARACTERISTIC_UUID
         self.escapePayload = cfg.escapePayload
-        self.use_ios_le_protocol = bool(cfg.use_ios_le_protocol)
+        self.use_ios_le_protocol = cfg.use_ios_le_protocol
         
         if cfg.client:
             self.client = cfg.client
@@ -53,6 +53,8 @@ class DivoomConnection:
         self._use_spp = False
         self._spp_client = None
         self._spp_rx_task = None
+        self._write_lock = asyncio.Lock()
+        self._last_write_time = 0.0
 
     @property
     def is_connected(self) -> bool:
@@ -215,6 +217,44 @@ class DivoomConnection:
 
         await asyncio.sleep(1.0)
 
+        # Dynamic Auto-Probing of BLE Protocol
+        if self.use_ios_le_protocol is None and not self._use_spp:
+            self.logger.info("use_ios_le_protocol not set. Probing BLE protocol format...")
+            
+            # 1. Try iOS-LE probe
+            self.use_ios_le_protocol = True
+            self.escapePayload = False
+            self._expected_response_command = 0x46
+            payload_bytes = [0x46]
+            
+            try:
+                if await self._send_ios_le_payload(payload_bytes, write_with_response=True):
+                    resp = await self.wait_for_response(0x46, timeout=1.5)
+                    if resp is not None:
+                        self.logger.info("Protocol probe succeeded: Detected iOS-LE Protocol BLE!")
+                        return
+            except Exception as e:
+                self.logger.debug(f"iOS-LE probe write raised: {e}")
+            
+            # 2. Try Basic Protocol probe
+            self.use_ios_le_protocol = False
+            self.escapePayload = False
+            self._expected_response_command = 0x46
+            
+            try:
+                if await self._send_basic_protocol_payload(payload_bytes, write_with_response=True):
+                    resp = await self.wait_for_response(0x46, timeout=1.5)
+                    if resp is not None:
+                        self.logger.info("Protocol probe succeeded: Detected Basic Protocol BLE!")
+                        return
+            except Exception as e:
+                self.logger.debug(f"Basic probe write raised: {e}")
+            
+            # Default fallback if both fail
+            self.logger.info("Both BLE protocol probes failed. Defaulting to BLE Basic Protocol.")
+            self.use_ios_le_protocol = False
+            self.escapePayload = False
+
     async def disconnect(self) -> None:
         if self._use_spp:
             if hasattr(self, "_spp_rx_task") and self._spp_rx_task:
@@ -365,6 +405,20 @@ class DivoomConnection:
         return await self._divoom._send_payload(payload_bytes, max_retries=max_retries, **kwargs)
 
     async def _send_payload(self, payload_bytes: list, max_retries: int = 3, retry_delay: float = 0.1, write_with_response: bool = False) -> bool:
+        async with self._write_lock:
+            # Rate limit: Ensure at least 50ms (0.05s) between commands
+            now = time.time()
+            elapsed = now - self._last_write_time
+            if elapsed < 0.05:
+                await asyncio.sleep(0.05 - elapsed)
+            
+            try:
+                res = await self._send_payload_locked(payload_bytes, max_retries, retry_delay, write_with_response)
+                return res
+            finally:
+                self._last_write_time = time.time()
+
+    async def _send_payload_locked(self, payload_bytes: list, max_retries: int = 3, retry_delay: float = 0.1, write_with_response: bool = False) -> bool:
         for attempt in range(max_retries):
             backoff = retry_delay * (2 ** attempt)
             if not self.is_connected:

@@ -10,7 +10,7 @@ class DivoomConfig:
         read_characteristic_uuid: str = "49535343-1e4d-4bd9-ba61-23c647249616",
         spp_characteristic_uuid: str | None = None,
         escapePayload: bool = False,
-        use_ios_le_protocol: bool = False,
+        use_ios_le_protocol: bool | None = None,
         device_name: str | None = None,
         client: object | None = None
     ):
