@@ -50,15 +50,143 @@ class DivoomConnection:
         self.reconnect_delay = models.DEFAULT_RECONNECT_DELAY
         self.logger = divoom.logger
 
+        self._use_spp = False
+        self._spp_client = None
+        self._spp_rx_task = None
+
     @property
     def is_connected(self) -> bool:
+        if self._use_spp:
+            return bool(self._spp_client and self._spp_client.is_connected)
         return bool(self.client and self.client.is_connected)
+
+    def _resolve_classic_mac(self, name: str, mac_or_uuid: str) -> str | None:
+        if mac_or_uuid and len(mac_or_uuid) == 17 and ("-" in mac_or_uuid or ":" in mac_or_uuid):
+            return mac_or_uuid.replace(":", "-")
+        try:
+            from IOBluetooth import IOBluetoothDevice
+            paired = IOBluetoothDevice.pairedDevices() or []
+            if name:
+                for dev in paired:
+                    dev_name = dev.getName()
+                    if dev_name and dev_name.lower() == name.lower():
+                        return dev.getAddressString()
+            if name:
+                for dev in paired:
+                    dev_name = dev.getName()
+                    if dev_name and (name.lower() in dev_name.lower() or dev_name.lower() in name.lower()):
+                        return dev.getAddressString()
+            if name:
+                base_name = name.split("-")[0].split(" ")[0].lower()
+                for dev in paired:
+                    dev_name = dev.getName()
+                    if dev_name and base_name in dev_name.lower():
+                        return dev.getAddressString()
+        except Exception as e:
+            self.logger.warning(f"Failed to resolve Classic MAC address via IOBluetooth: {e}")
+        return None
+
+    async def _read_spp_notifications_loop(self) -> None:
+        while self.is_connected:
+            try:
+                notif = await self._spp_client.read_notification(timeout=1.0)
+                response_payload = {
+                    'command_id': notif.command_id,
+                    'payload': bytearray(notif.payload)
+                }
+                expected_cmd = self._expected_response_command
+                is_expected_response = expected_cmd is not None and notif.command_id == expected_cmd
+                is_generic_ack = expected_cmd is not None and notif.command_id == models.GENERIC_ACK_COMMAND_ID and expected_cmd in models.GENERIC_ACK_COMMANDS
+                
+                if is_expected_response or is_generic_ack:
+                    self.notification_queue.put_nowait(response_payload)
+                    self._expected_response_command = None
+                else:
+                    self.notification_queue.put_nowait(response_payload)
+            except asyncio.TimeoutError:
+                continue
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                self.logger.error(f"Error in SPP notification loop: {e}")
+                break
 
     async def connect(self) -> None:
         if not self.mac:
             self.logger.error("No MAC address provided or discovered. Cannot connect.")
             raise DeviceAddressMissingError("No MAC address provided or discovered. Cannot connect.")
 
+        import os
+        is_mock = (self.client and "MockBleakClient" in self.client.__class__.__name__) or os.environ.get("DIVOOM_MOCK_BLE") in ("1", "true", "yes")
+
+        # Dynamically resolve device name if not set
+        if not is_mock and not self.device_name:
+            if len(self.mac) == 17 and ("-" in self.mac or ":" in self.mac):
+                try:
+                    from IOBluetooth import IOBluetoothDevice
+                    dev = IOBluetoothDevice.deviceWithAddressString_(self.mac.replace(":", "-"))
+                    if dev:
+                        self.device_name = dev.getName()
+                except Exception:
+                    pass
+            if not self.device_name:
+                try:
+                    import json
+                    from pathlib import Path
+                    cache_file = Path.home() / ".config" / "divoom-control" / "discovered_devices.json"
+                    if cache_file.exists():
+                        devices = json.loads(cache_file.read_text(encoding="utf-8"))
+                        for d in devices:
+                            if d.get("address") == self.mac:
+                                self.device_name = d.get("name")
+                                break
+                except Exception as e:
+                    self.logger.debug(f"Failed to load device name from cache: {e}")
+
+        # Check if it is a classic device and configure SPP transport
+        if not is_mock and self.device_name and not self.use_ios_le_protocol:
+            name_lower = self.device_name.lower()
+            if any(kw in name_lower for kw in ["timoo", "tivoo", "ditoo", "pixoo", "timebox", "divoom"]):
+                if "pixoo 64" not in name_lower and "pixoo-64" not in name_lower:
+                    self._use_spp = True
+
+        if self._use_spp:
+            if not self._spp_client:
+                from .bt_spp_transport import BTSppTransport
+                classic_mac = self._resolve_classic_mac(self.device_name, self.mac)
+                if classic_mac:
+                    name_lower = self.device_name.lower()
+                    device_kind = "default"
+                    if "pixoo" in name_lower:
+                        device_kind = "pixoo"
+                    elif "timoo" in name_lower:
+                        device_kind = "timoo"
+                    elif "ditoo" in name_lower:
+                        device_kind = "ditoo"
+                    elif "tivoo" in name_lower:
+                        device_kind = "tivoo"
+                    self._spp_client = BTSppTransport(mac_address=classic_mac, device_kind=device_kind, logger=self.logger, device_name=self.device_name)
+                    self.logger.info(f"Initialized BTSppTransport for {self.device_name} with classic MAC {classic_mac} (kind: {device_kind})")
+                else:
+                    self.logger.warning(f"Could not resolve Bluetooth Classic MAC for {self.device_name} (address: {self.mac}). Falling back to BLE.")
+                    self._use_spp = False
+
+        if self._use_spp:
+            self.use_ios_le_protocol = False
+            self.escapePayload = True
+            if self._spp_client.is_connected:
+                self.logger.info(f"SPP Client already connected to {self._spp_client.mac_address}. Skipping.")
+                return
+            try:
+                await self._spp_client.connect()
+                self.logger.info(f"Connected to Divoom device via BT Classic SPP at {self._spp_client.mac_address}")
+                self._spp_rx_task = asyncio.create_task(self._read_spp_notifications_loop())
+            except Exception as e:
+                self.logger.error(f"Failed to connect via SPP to {self._spp_client.mac_address}: {e}")
+                raise DeviceConnectionError(f"Failed to connect via SPP to {self._spp_client.mac_address}: {e}")
+            return
+
+        # BLE path validation
         if not all([self.WRITE_CHARACTERISTIC_UUID, self.NOTIFY_CHARACTERISTIC_UUID, self.READ_CHARACTERISTIC_UUID]):
             self.logger.error("Characteristic UUIDs not fully set. Cannot connect.")
             raise CharacteristicConfigError("Characteristic UUIDs not fully set. Cannot connect.")
@@ -88,6 +216,22 @@ class DivoomConnection:
         await asyncio.sleep(1.0)
 
     async def disconnect(self) -> None:
+        if self._use_spp:
+            if hasattr(self, "_spp_rx_task") and self._spp_rx_task:
+                self._spp_rx_task.cancel()
+                try:
+                    await self._spp_rx_task
+                except asyncio.CancelledError:
+                    pass
+                self._spp_rx_task = None
+            if self._spp_client:
+                try:
+                    await self._spp_client.disconnect()
+                    self.logger.info("Disconnected from Divoom device via BT Classic SPP.")
+                except Exception as e:
+                    self.logger.error(f"Error disconnecting SPP: {e}")
+            return
+
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
@@ -185,7 +329,7 @@ class DivoomConnection:
         return None
 
     async def send_command_and_wait_for_response(self, command: int | str, args: list | None = None, timeout: float = 10.0) -> bytes | None:
-        if self.client is None or not self.client.is_connected:
+        if not self.is_connected:
             self.logger.error(f"Cannot send command '{command}': Not connected to a Divoom device.")
             return None
 
@@ -223,13 +367,13 @@ class DivoomConnection:
     async def _send_payload(self, payload_bytes: list, max_retries: int = 3, retry_delay: float = 0.1, write_with_response: bool = False) -> bool:
         for attempt in range(max_retries):
             backoff = retry_delay * (2 ** attempt)
-            if self.client is None or not self.client.is_connected:
+            if not self.is_connected:
                 self.logger.warning(f"Attempt {attempt + 1}: Not connected to a Divoom device. Retrying in {backoff}s...")
                 await asyncio.sleep(backoff)
-                if not self.client or not self.client.is_connected:
+                if not self.is_connected:
                     try:
                         await self._divoom.connect()
-                        self.logger.info(f"Attempt {attempt + 1}: Reconnected to Divoom device at {self.mac}")
+                        self.logger.info(f"Attempt {attempt + 1}: Reconnected to Divoom device")
                     except Exception as e:
                         self.logger.error(f"Attempt {attempt + 1}: Failed to reconnect: {e}")
                         if attempt == max_retries - 1:
@@ -252,6 +396,16 @@ class DivoomConnection:
         return False
 
     async def _send_ios_le_payload(self, payload_bytes: list, write_with_response: bool) -> bool:
+        if self._use_spp:
+            try:
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug("PAYLOAD OUT (SPP iOS LE): %s", bytes(payload_bytes).hex())
+                await self._spp_client.send(payload_bytes, framing=self._spp_client.FRAMING_IOS_LE)
+                return True
+            except Exception as e:
+                self.logger.error(f"Error sending iOS LE SPP payload: {e}")
+                return False
+
         message_bytes = self._divoom._make_message_ios_le(payload_bytes)
         try:
             if self.logger.isEnabledFor(logging.DEBUG):
@@ -263,6 +417,16 @@ class DivoomConnection:
             return False
 
     async def _send_basic_protocol_payload(self, payload_bytes: list, write_with_response: bool) -> bool:
+        if self._use_spp:
+            try:
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug("PAYLOAD OUT (SPP Basic): %s", bytes(payload_bytes).hex())
+                await self._spp_client.send(payload_bytes, framing=self._spp_client.FRAMING_BASIC)
+                return True
+            except Exception as e:
+                self.logger.error(f"Error sending Basic SPP payload: {e}")
+                return False
+
         full_message = self._divoom._make_message(payload_bytes)
         chunk_size = models.DEFAULT_CHUNK_SIZE
 
@@ -404,7 +568,7 @@ class DivoomConnection:
 
             # Try diagnostic color payload
             r, g, b = colors[idx % len(colors)]
-            args_payload = [0x01, r, g, b, 100, 0x00, 0x01]
+            args_payload = [0x01, r, g, b, 100, 0x00, 0x01, 0x00, 0x00, 0x00]
             if await self._send_diagnostic_payload(uuid, args_payload, cached_data, cache_dir, device_id, cache_mod):
                 return uuid
 
@@ -436,7 +600,7 @@ class DivoomConnection:
     async def set_canonical_light(self, cache_dir: str, device_id: str, cache_mod: Any = None, rgb: list = None):
         cache_mod = _get_cache_module(cache_mod)
         rgb = rgb or [0xFF, 0xFF, 0xFF]
-        args = [0x01] + rgb + [100, 0x00, 0x01]
+        args = [0x01] + rgb + [100, 0x00, 0x01, 0x00, 0x00, 0x00]
 
         # 1. Try SPP
         resp = await self._divoom._try_send_command_with_framing(0x45, args, timeout=3.0, use_ios=False, escape=True)

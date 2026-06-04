@@ -75,10 +75,29 @@ Divoom devices support a wide range of commands to control their features. These
 -   **System Settings:** Setting brightness, time, temperature, etc.
 -   **Display Control:** Showing images, animations, and text.
 -   **Channel Switching:** Changing the active display mode (e.g., clock, VJ effects, scoreboard).
+-   **Light Mode Control (0x45 / 0x46):**
+    *   **Set Light Mode (`0x45`)**: Expects a strict 10-byte payload (excluding the command header itself):
+        `[0x01 (Light Mode), R, G, B, Brightness (0-100), Effect Mode (0x00), On/Off Switch (0x01), 0x00, 0x00, 0x00]`
+        If the payload is shorter (e.g. 7 or 8 bytes), the device's internal parser will ignore the packet and the color change will not apply. The device returns a single-byte ACK payload `0x01` on success.
+    *   **Get Light Mode (`0x46`)**: Expects no payload arguments. The device responds with command ID `0x46` and a detailed 15-byte status payload containing the current mode, light effect mode, RGB colors, brightness, temperature units, and time formats.
 -   **Music and Audio:** Controlling music playback and volume.
 -   **Tools:** Using tools like the stopwatch or noise meter.
 
 A comprehensive list of command codes can be found in the [`divoom_lib/models.py`](../divoom_lib/models.py) file.
+
+### Virtual Serial Port (SPP) Connection Stabilization
+When communicating with the device's virtual serial port (e.g. `/dev/cu.Timoo-audio-4` on macOS) via `pyserial`:
+1.  **Stabilization Delay**: Immediately after opening the serial port, a **2.0-second stabilization delay** (`time.sleep(2.0)`) must be introduced before sending any commands. Otherwise, initial packets are dropped by the link layer.
+2.  **macOS Daemon Recovery**: If the virtual serial port stops responding (connection succeeds but reads/writes time out), the macOS DriverKit daemon `bluetoothd` has hung. The recovery sequence is:
+    ```bash
+    sudo pkill bluetoothd
+    sleep 3  # Allow daemon to respawn and device to auto-reconnect
+    ```
+
+### BLE iOS-LE vs. Forced Classic SPP (macOS)
+1. **The SPP Override Trap**: The library originally auto-routed all classic Divoom devices (names containing `timoo`, `tivoo`, `ditoo`, etc.) to use Classic Bluetooth serial mode (`_use_spp = True`) by default.
+2. **Tahoe Emulation Driver Issues**: On macOS, DriverKit serial emulation `/dev/cu.*` is highly unstable, drops writes on sudden disconnects, and fails to retrieve query responses.
+3. **The Solution**: We updated `divoom_lib/connection.py` to respect explicit BLE configurations. If `use_ios_le_protocol` is explicitly requested by the client (such as in the GUI or daemons), the library does not override the connection with Classic SPP transport. It connects over BLE using the highly reliable iOS-LE protocol, which works perfectly for visual debugging and two-way verification on all physical devices.
 
 ## Image and Animation Data
 

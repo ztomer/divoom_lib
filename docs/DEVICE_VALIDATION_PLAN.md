@@ -63,6 +63,7 @@ As of June 3, 2026, the on-device communication verification is fully resolved a
 - **Protocol-Agnostic Response Parsing**: Implemented dynamic notification parsing inside `DivoomConnection._notification_handler()`. This resolves the issue where queries written in **iOS LE** framing are responded to by the device using **Basic Protocol** framing.
 - **Stateful Clock Dial Roundtrip Verification**: Created a robust verification harness in `scripts/test_watchface_roundtrip.py` that cycles through multiple protocol options (iOS LE, Basic Escaped, Basic Non-Escaped). It sets the clock dial (e.g. dial 3) and reads it back or verifies write success.
 - **Successful Real Hardware Verification**: Ran the validation harness on all 4 physical devices (Timoo, Pixoo, Ditoo, Tivoo Max), successfully connecting, writing clock dial settings, and confirming full two-way communication. All query timeouts and notification issues are fully resolved.
+- **Visual Debug Verification & SPP Fix**: Verified color cycling (Blue -> Red -> Green) across all four BLE devices (Pixoo-1, Tivoo-Max, Timoo-light-4, Ditoo-light-2) using a standalone diagnosis script. Fixed a library bug in `connection.py` that forced unstable Classic SPP serial connections even when BLE iOS-LE was explicitly requested. All four screens successfully cycle colors and verify their statuses programmatically.
 
 ## How to drive real hardware (don't lose this)
 macOS scopes Bluetooth TCC per *responsible-process*. The agent's Bash shell
