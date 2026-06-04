@@ -156,15 +156,15 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             except Exception as e:
                 logger.error(f"Failed to drag window: {e}")
 
-    def set_solid_light(self, color: str, brightness: int) -> bool:
-        logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness})...")
+    def set_solid_light(self, color: str, brightness: int, mode_type: int = 0) -> bool:
+        logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness}, mode_type={mode_type})...")
         try:
             if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.set_light(color, brightness))
             elif self.current_divoom:
-                return self._run_async(self.current_divoom.display.show_light(color, brightness, True))
+                return self._run_async(self.current_divoom.display.show_light(color, brightness, True, mode_type))
             return False
         except Exception as e:
             logger.error(f"Light setting failed: {e}")

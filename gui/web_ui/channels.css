@@ -214,10 +214,13 @@
 }
 
 .clock-preview-box.digital-neg {
-    background: #e8e9eb;
-    color: #121316;
-    border-color: #ccd0d8;
-    box-shadow: none;
+    background: #a4b39e;
+    color: #1a2318;
+    border-color: #7d8b77;
+    background-image: radial-gradient(rgba(0, 0, 0, 0.18) 1px, transparent 1px);
+    background-size: 3px 3px;
+    box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+    text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.2);
 }
 
 .mini-clock-svg {
@@ -227,7 +230,7 @@
 }
 
 .clock-preview-box.digital-neg .mini-clock-svg {
-    color: #121316;
+    color: #1a2318;
 }
 
 .cell-label {
@@ -289,4 +292,48 @@
 }
 .cache-thumb-item:active {
     transform: scale(0.95);
+}
+
+/* Ambient swatches layout and active markers */
+.ambient-swatches-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.ambient-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    position: relative;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.ambient-swatch:hover {
+    transform: scale(1.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.ambient-swatch.active {
+    border-color: #ffffff;
+    box-shadow: 0 0 8px currentColor;
+    transform: scale(1.1);
+}
+
+.ambient-swatch.active::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
 }

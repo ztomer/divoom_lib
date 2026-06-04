@@ -212,13 +212,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // ── 6. AMBIENT COLOR TRIGGERS ──
     const applyAmbientBtn = document.getElementById("apply-ambient-btn");
     const ambientColorInput = document.getElementById("ambient-color-input");
+    const ambientModeSelect = document.getElementById("ambient-mode-select");
+    const ambientSwatches = document.querySelectorAll(".ambient-swatch");
     
     window.applyAmbientColor = function(color) {
         if (!window.requireDevice()) return;
         const brightness = parseInt(document.getElementById("global-brightness-slider")?.value) || 80;
+        const modeType = parseInt(ambientModeSelect?.value) || 0;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_solid_light) {
-            window.pywebview.api.set_solid_light(color, brightness).then(res => {
-                window.showToast(res ? "Ambient color applied" : "Failed to apply ambient", res ? "success" : "🔵 BLE");
+            window.pywebview.api.set_solid_light(color, brightness, modeType).then(res => {
+                window.showToast(res ? "Ambient mode applied" : "Failed to apply ambient", res ? "success" : "🔵 BLE");
             });
         }
     }
@@ -230,13 +233,37 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
     
-    document.querySelectorAll(".ambient-swatch").forEach(swatch => {
+    if (ambientModeSelect) {
+        ambientModeSelect.addEventListener("change", () => {
+            const color = ambientColorInput?.value || "#00ffcc";
+            window.applyAmbientColor(color);
+        });
+    }
+    
+    ambientSwatches.forEach(swatch => {
         swatch.addEventListener("click", () => {
+            ambientSwatches.forEach(s => s.classList.remove("active"));
+            swatch.classList.add("active");
             const color = swatch.getAttribute("data-color");
             if (ambientColorInput) ambientColorInput.value = color;
             window.applyAmbientColor(color);
         });
     });
+
+    if (ambientColorInput) {
+        ambientColorInput.addEventListener("input", (e) => {
+            ambientSwatches.forEach(s => s.classList.remove("active"));
+            const color = e.target.value.toLowerCase();
+            ambientSwatches.forEach(s => {
+                if (s.getAttribute("data-color").toLowerCase() === color) {
+                    s.classList.add("active");
+                }
+            });
+        });
+        ambientColorInput.addEventListener("change", (e) => {
+            window.applyAmbientColor(e.target.value);
+        });
+    }
 
     // ── 7. DYNAMIC VJ EFFECTS TOGGLE & GALLERY CACHE SELECTOR ──
     window.updateChannelButtonsVisibility = function(name) {

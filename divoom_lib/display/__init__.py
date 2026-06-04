@@ -96,7 +96,7 @@ class Display:
             result = await self.communicator.send_command("set image", frame)
         return result
 
-    async def show_light(self, color: str, brightness: int | None = None, power: bool | None = None) -> bool:
+    async def show_light(self, color: str, brightness: int | None = None, power: bool | None = None, lightning_type: int | None = None) -> bool:
         """Show light on the Divoom device in the color"""
         if power is None:
             power = True
@@ -115,8 +115,8 @@ class Display:
         # Channel number for Lightning is 0x01
         channel_number = constants.LIGHTNING_CHANNEL_NUMBER
         
-        # Type of Lightning: 0x00 for Plain color
-        type_of_lightning = constants.LIGHTNING_TYPE_PLAIN_COLOR
+        # Type of Lightning: 0x00 for Plain color by default
+        type_of_lightning = to_int_if_str(lightning_type) if lightning_type is not None else constants.LIGHTNING_TYPE_PLAIN_COLOR
 
         # Power state: 0x01 for on, 0x00 for off
         power_state = bool_to_byte(power)

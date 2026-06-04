@@ -255,19 +255,30 @@
                                                 <span style="font-size:12px; color:var(--text-muted);">Pick Custom Color</span>
                                             </div>
                                             
+                                            <div class="form-group" style="margin-top: 4px; margin-bottom: 4px; width: 100%;">
+                                                <label class="form-label" style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom: 6px;">Ambient Effect Mode:</label>
+                                                <select id="ambient-mode-select" class="custom-select" style="width: 100%;">
+                                                    <option value="0">Plain Color</option>
+                                                    <option value="1">Love (Heartbeat pulse)</option>
+                                                    <option value="2">Plants (Nature pattern)</option>
+                                                    <option value="3">No Mosquitto (Insect repellent)</option>
+                                                    <option value="4">Sleeping (Sunset glow)</option>
+                                                </select>
+                                            </div>
+                                            
                                             <!-- Color Swatches Grid -->
-                                            <div class="ambient-swatches-grid" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
-                                                <button class="ambient-swatch" style="background:#ff0000; width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); cursor:pointer;" data-color="#ff0000" title="Red"></button>
-                                                <button class="ambient-swatch" style="background:#00ff00; width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); cursor:pointer;" data-color="#00ff00" title="Green"></button>
-                                                <button class="ambient-swatch" style="background:#0000ff; width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); cursor:pointer;" data-color="#0000ff" title="Blue"></button>
-                                                <button class="ambient-swatch" style="background:#ffff00; width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); cursor:pointer;" data-color="#ffff00" title="Yellow"></button>
-                                                <button class="ambient-swatch" style="background:#ff7700; width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); cursor:pointer;" data-color="#ff7700" title="Orange"></button>
-                                                <button class="ambient-swatch" style="background:#00ffcc; width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); cursor:pointer;" data-color="#00ffcc" title="Cyan"></button>
-                                                <button class="ambient-swatch" style="background:#ff00ff; width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); cursor:pointer;" data-color="#ff00ff" title="Magenta"></button>
-                                                <button class="ambient-swatch" style="background:#ffffff; width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); cursor:pointer;" data-color="#ffffff" title="White"></button>
+                                            <div class="ambient-swatches-grid">
+                                                <button class="ambient-swatch" style="background:#ff0000;" data-color="#ff0000" title="Red"></button>
+                                                <button class="ambient-swatch" style="background:#00ff00;" data-color="#00ff00" title="Green"></button>
+                                                <button class="ambient-swatch" style="background:#0000ff;" data-color="#0000ff" title="Blue"></button>
+                                                <button class="ambient-swatch" style="background:#ffff00;" data-color="#ffff00" title="Yellow"></button>
+                                                <button class="ambient-swatch" style="background:#ff7700;" data-color="#ff7700" title="Orange"></button>
+                                                <button class="ambient-swatch" style="background:#00ffcc;" data-color="#00ffcc" title="Cyan"></button>
+                                                <button class="ambient-swatch" style="background:#ff00ff;" data-color="#ff00ff" title="Magenta"></button>
+                                                <button class="ambient-swatch" style="background:#ffffff;" data-color="#ffffff" title="White"></button>
                                             </div>
                                         </div>
-                                        <button id="apply-ambient-btn" class="glow-btn" style="margin-top: 16px;">Apply Ambient Color</button>
+                                        <button id="apply-ambient-btn" class="glow-btn" style="margin-top: 12px;">Apply Ambient Color</button>
                                     </div>
                                 </div>
                             </div>
