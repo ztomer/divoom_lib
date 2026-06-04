@@ -64,7 +64,7 @@ def decode_and_save_preview(raw_bytes: bytes, cache_file_png: Path) -> bool:
             speed = struct.unpack('>H', raw_bytes[2:4])[0]
             
             frames = []
-            for f_idx in range(min(total_frames, 1)):
+            for f_idx in range(min(total_frames, 24)):
                 start = f_idx * 768
                 end = start + 768
                 if end > len(decrypted):
@@ -75,6 +75,8 @@ def decode_and_save_preview(raw_bytes: bytes, cache_file_png: Path) -> bool:
                 frames.append(img_resized)
             
             if frames:
+                # Save static first frame placeholder
+                frames[0].save(cache_file_png)
                 if len(frames) > 1:
                     cache_file_gif = cache_file_png.with_suffix(".gif")
                     frame_duration = speed if speed >= 10 else 100
@@ -102,7 +104,7 @@ def decode_and_save_preview(raw_bytes: bytes, cache_file_png: Path) -> bool:
             
             frames = []
             pos = 0
-            for f_idx in range(min(total_frames, 1)):
+            for f_idx in range(min(total_frames, 24)):
                 if pos + 4 > len(decrypted):
                     break
                 frame_size = struct.unpack('>I', decrypted[pos : pos + 4])[0]
@@ -122,6 +124,8 @@ def decode_and_save_preview(raw_bytes: bytes, cache_file_png: Path) -> bool:
                     break
             
             if frames:
+                # Save static first frame placeholder
+                frames[0].save(cache_file_png)
                 if len(frames) > 1:
                     cache_file_gif = cache_file_png.with_suffix(".gif")
                     frame_duration = speed if speed >= 10 else 100

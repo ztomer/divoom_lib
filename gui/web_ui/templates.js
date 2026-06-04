@@ -78,22 +78,29 @@ window.DivoomTemplates = {
                     <!-- macOS Music Tracker -->
                     <div class="card glass-card" id="widget-card-music">
                         <div class="card-header flex-header">
-                            <h3>Mac playing cover track</h3>
+                            <h3>Live cover art</h3>
                             <span class="active-indicator">● Active</span>
                         </div>
                         <div class="card-body">
-                            <div class="music-tracker-card" id="music-track-status">
-                                <div class="music-previews-container">
-                                    <div class="music-cover-preview">
-                                        <div class="cover-vinyl"></div>
-                                        <img id="music-cover-img" src="assets/pixoo.png" alt="Vinyl Cover">
-                                    </div>
-                                    <div class="music-device-preview-wrap">
-                                        <img id="music-device-preview" class="device-preview-img" alt="Device Preview" style="display:none;">
-                                        <span class="hc-label">On Device</span>
-                                    </div>
+                            <!-- Loopback Warning/Tip Banner -->
+                            <div id="audio-loopback-tip" style="display:none; color:var(--transport-ext); background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); padding:8px; border-radius:6px; margin-bottom:12px; font-size:10px; line-height:1.4;">
+                                ⚠️ Capturing audio via microphone. For clean system audio loopback sync, install the free <b>BlackHole</b> audio driver.
+                            </div>
+                            <!-- Preview on top -->
+                            <div class="music-previews-container" style="margin-bottom: 12px;">
+                                <div class="music-cover-preview">
+                                    <div class="cover-vinyl"></div>
+                                    <img id="music-cover-img" src="assets/pixoo.png" alt="Vinyl Cover">
                                 </div>
-                                <div class="music-track-info">
+                                <div class="music-device-preview-wrap">
+                                    <img id="music-device-preview" class="device-preview-img" alt="Device Preview" style="display:none;">
+                                    <span class="hc-label">On Device</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Track Info & Visualizer below -->
+                            <div class="music-tracker-card active" id="music-track-status" style="display:flex; flex-direction:column; gap:8px;">
+                                <div class="music-track-info" style="margin-top: 0;">
                                     <h4 id="music-track-name">No Music Playing</h4>
                                     <p id="music-artist-name">Spotify / Apple Music</p>
                                     <!-- Winamp Retro pixelated spectrum visualizer -->
@@ -111,16 +118,6 @@ window.DivoomTemplates = {
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="toggle-control-bar" style="margin-top: 20px;">
-                                <div class="toggle-control">
-                                    <label class="switch">
-                                        <input type="checkbox" id="music-sync-toggle">
-                                        <span class="slider-round"></span>
-                                    </label>
-                                    <span style="font-weight: 500;">Enable Live Song Sync</span>
-                                </div>
-                            </div>
                         </div>
                     </div>
                     
@@ -131,6 +128,22 @@ window.DivoomTemplates = {
                             <span class="active-indicator">● Active</span>
                         </div>
                         <div class="card-body">
+                            <!-- Preview on top -->
+                            <div style="display:flex; gap:12px; margin-bottom:12px; align-items:center;">
+                                <div class="device-preview-wrap" style="flex:1; margin:0;">
+                                    <span class="hc-label">On-device preview</span>
+                                    <img id="ticker-device-preview" class="device-preview-img" alt="" style="display:none;">
+                                </div>
+                                <div class="widget-preview-ticker" id="ticker-preview-box" style="flex:1; margin:0;">
+                                    <div class="mini-canvas-view">
+                                        <div class="ticker-arrow-mock">▲</div>
+                                        <div class="ticker-price-mock">$64,285</div>
+                                        <div class="ticker-name-mock">BTC</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Input below -->
                             <div class="form-group">
                                 <div class="flex-row">
                                     <input type="text" id="stock-symbol-input" placeholder="Symbol e.g. AAPL, BTC-USD" class="text-input" value="BTC-USD">
@@ -140,19 +153,6 @@ window.DivoomTemplates = {
                             </div>
 
                             <div id="tickers-list" class="tickers-list"></div>
-
-                            <div class="device-preview-wrap">
-                                <span class="hc-label">On-device preview</span>
-                                <img id="ticker-device-preview" class="device-preview-img" alt="" style="display:none;">
-                            </div>
-
-                            <div class="widget-preview-ticker" id="ticker-preview-box">
-                                <div class="mini-canvas-view">
-                                    <div class="ticker-arrow-mock">▲</div>
-                                    <div class="ticker-price-mock">$64,285</div>
-                                    <div class="ticker-name-mock">BTC</div>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -163,43 +163,21 @@ window.DivoomTemplates = {
                             <span class="active-indicator">● Active</span>
                         </div>
                         <div class="card-body">
-                            <div class="sysmon-readout">
+                            <!-- Preview on top -->
+                            <div class="device-preview-wrap" style="margin-bottom:12px;">
+                                <span class="hc-label">On-device preview</span>
+                                <img id="sysmon-device-preview" class="device-preview-img" alt="" style="display:none;">
+                            </div>
+                            
+                            <!-- Stats below -->
+                            <div class="sysmon-readout" style="margin-bottom:10px;">
                                 <div class="sysmon-stat"><span class="sysmon-label">CPU</span><b id="sysmon-cpu">–</b></div>
                                 <div class="sysmon-stat"><span class="sysmon-label">MEM</span><b id="sysmon-mem">–</b></div>
                                 <div class="sysmon-stat"><span class="sysmon-label">BAT</span><b id="sysmon-bat">–</b></div>
                             </div>
-                            <div class="device-preview-wrap">
-                                <span class="hc-label">On-device preview</span>
-                                <img id="sysmon-device-preview" class="device-preview-img" alt="" style="display:none;">
-                            </div>
-                            <div class="hc-actions">
-                                <button id="sysmon-display-btn" class="glow-btn compact">Display on Device</button>
-                                <label class="hc-toggle"><input type="checkbox" id="sysmon-live"> Live (5s)</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Notification Center Widget Card -->
-                    <div class="card glass-card" id="widget-card-notif">
-                        <div class="card-header flex-header">
-                            <h3>Notification Center</h3>
-                            <span class="active-indicator">● Active</span>
-                        </div>
-                        <div class="card-body">
-                            <p class="panel-hint" style="margin-top: 0; margin-bottom: 12px;">Trigger simulated alerts or monitor incoming notifications on screen.</p>
-                            
-                            <div class="form-group">
-                                <label class="form-label">Simulate App Alert</label>
-                                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                                        <button class="glow-btn compact ghost notif-trigger-btn" data-app="Mail"><img src="assets/mail_pixel.png" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; image-rendering:pixelated;">Mail</button>
-                                        <button class="glow-btn compact ghost notif-trigger-btn" data-app="WhatsApp"><img src="assets/whatsapp_pixel.png" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; image-rendering:pixelated;">WhatsApp</button>
-                                        <button class="glow-btn compact ghost notif-trigger-btn" data-app="Telegram"><img src="assets/telegram_pixel.png" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; image-rendering:pixelated;">Telegram</button>
-                                    </div>
-                            </div>
-                            
-                            <div class="device-preview-wrap">
-                                <span class="hc-label">On-device preview</span>
-                                <img id="notif-device-preview" class="device-preview-img" alt="" style="display:none;">
+                            <div class="hc-actions" style="display:flex; gap:10px; align-items:center;">
+                                <button id="sysmon-display-btn" class="glow-btn compact" style="margin:0;">Display on Device</button>
+                                <label class="hc-toggle" style="margin:0;"><input type="checkbox" id="sysmon-live" checked> Live (5s)</label>
                             </div>
                         </div>
                     </div>

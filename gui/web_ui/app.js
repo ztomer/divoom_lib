@@ -323,8 +323,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.pywebview.api.open_file_dialog().then(path => {
                     if (path) {
                         if (customArtPathInput) customArtPathInput.value = path;
-                        if (customArtPreviewImg) customArtPreviewImg.src = "file://" + path;
-                        if (customArtPreviewContainer) customArtPreviewContainer.style.display = "flex";
                     }
                 });
             }
@@ -338,7 +336,15 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!path) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.display_custom_art) {
                 window.pywebview.api.display_custom_art(path).then(res => {
-                    window.showToast(res ? "Custom artwork displayed!" : "Failed to display", res ? "success" : "error", "🔵 BLE");
+                    if (res) {
+                        window.showToast("Custom artwork displayed!", "success", "🔵 BLE");
+                        const filename = path.split("/").pop();
+                        if (window.addCustomArtToHistory) {
+                            window.addCustomArtToHistory(filename, path, "file://" + path);
+                        }
+                    } else {
+                        window.showToast("Failed to display", "error");
+                    }
                 });
             }
         });

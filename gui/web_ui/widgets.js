@@ -59,145 +59,116 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ── 2. LIVE MUSIC SYNCHRONIZER & REAL WEB AUDIO VISUALIZER ──
-    let audioCtx = null;
-    let analyser = null;
-    let audioStream = null;
-    let dataArray = null;
-    let animationFrameId = null;
+    // ── 2. LIVE MUSIC SYNCHRONIZER & AUDIO VISUALIZER POLLING ──
+    let visualizerTimer = null;
+    let simulatedVisualizerFrameId = null;
+    let trackTimer = null;
+    let sysmonTimer = null;
+    let stockTimer = null;
 
-    function startRealVisualizer() {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    audioStream = stream;
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    analyser = audioCtx.createAnalyser();
-                    analyser.fftSize = 64; // Small FFT size for 10 bars
-                    const source = audioCtx.createMediaStreamSource(audioStream);
-                    source.connect(analyser);
-                    
-                    const bufferLength = analyser.frequencyBinCount;
-                    dataArray = new Uint8Array(bufferLength);
-                    
-                    animateRealVisualizer();
-                    console.log("Real Web Audio visualizer started successfully!");
-                })
-                .catch(err => {
-                    console.warn("Could not start real Web Audio visualizer (falling back to realistic simulation):", err);
-                    animateSimulatedVisualizer();
-                });
+    function pollVisualizerLevels() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_audio_levels) {
+            window.pywebview.api.get_audio_levels().then(resJson => {
+                try {
+                    const res = JSON.parse(resJson);
+                    if (res && res.levels) {
+                        if (simulatedVisualizerFrameId) {
+                            cancelAnimationFrame(simulatedVisualizerFrameId);
+                            simulatedVisualizerFrameId = null;
+                        }
+                        
+                        const fills = document.querySelectorAll(".winamp-fill");
+                        fills.forEach((fill, i) => {
+                            const val = res.levels[i] || 0;
+                            fill.style.height = `${val}%`;
+                        });
+                        
+                        const tip = document.getElementById("audio-loopback-tip");
+                        if (tip) {
+                            tip.style.display = res.loopback_active ? "none" : "block";
+                        }
+                    }
+                } catch (e) {
+                    startSimulatedVisualizer();
+                }
+            }).catch(() => {
+                startSimulatedVisualizer();
+            });
         } else {
-            console.warn("navigator.mediaDevices.getUserMedia is not supported, using simulated visualizer.");
-            animateSimulatedVisualizer();
+            startSimulatedVisualizer();
         }
     }
 
-    function stopRealVisualizer() {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
+    function startVisualizerPolling() {
+        if (visualizerTimer) return;
+        pollVisualizerLevels();
+        visualizerTimer = setInterval(pollVisualizerLevels, 50); // 20 FPS
+    }
+
+    function stopVisualizerPolling() {
+        if (visualizerTimer) {
+            clearInterval(visualizerTimer);
+            visualizerTimer = null;
         }
-        if (audioStream) {
-            audioStream.getTracks().forEach(track => track.stop());
-            audioStream = null;
+        if (simulatedVisualizerFrameId) {
+            cancelAnimationFrame(simulatedVisualizerFrameId);
+            simulatedVisualizerFrameId = null;
         }
-        if (audioCtx) {
-            audioCtx.close();
-            audioCtx = null;
-        }
-        analyser = null;
-        
-        // Reset heights to 0%
         document.querySelectorAll(".winamp-fill").forEach(fill => {
             fill.style.height = "0%";
         });
     }
 
-    function animateRealVisualizer() {
-        if (!analyser) return;
-        animationFrameId = requestAnimationFrame(animateRealVisualizer);
-        
-        analyser.getByteFrequencyData(dataArray);
-        const fills = document.querySelectorAll(".winamp-fill");
-        const numBars = fills.length;
-        const binsPerBar = Math.floor(dataArray.length / numBars) || 1;
-        
-        for (let i = 0; i < numBars; i++) {
-            let sum = 0;
-            for (let j = 0; j < binsPerBar; j++) {
-                sum += dataArray[i * binsPerBar + j];
-            }
-            const val = sum / binsPerBar;
-            const percent = Math.min(100, Math.max(0, (val / 255) * 100));
-            if (fills[i]) {
-                fills[i].style.height = `${percent}%`;
-            }
+    function startSimulatedVisualizer() {
+        if (simulatedVisualizerFrameId) return;
+        function animate() {
+            simulatedVisualizerFrameId = requestAnimationFrame(animate);
+            const fills = document.querySelectorAll(".winamp-fill");
+            fills.forEach((fill, i) => {
+                const time = Date.now() * 0.003;
+                const base = Math.sin(time + i * 0.8) * 40 + 50;
+                const noise = Math.sin(time * 2.3 - i * 1.5) * 20;
+                const val = Math.min(100, Math.max(0, base + noise));
+                fill.style.height = `${val}%`;
+            });
         }
+        animate();
     }
 
-    function animateSimulatedVisualizer() {
-        if (audioCtx) return; // Real is running
-        animationFrameId = requestAnimationFrame(animateSimulatedVisualizer);
-        const fills = document.querySelectorAll(".winamp-fill");
-        fills.forEach((fill, i) => {
-            const time = Date.now() * 0.003;
-            const base = Math.sin(time + i * 0.8) * 40 + 50;
-            const noise = Math.sin(time * 2.3 - i * 1.5) * 20;
-            const val = Math.min(100, Math.max(0, base + noise));
-            fill.style.height = `${val}%`;
-        });
-    }
-
-    const musicSyncToggle = document.getElementById("music-sync-toggle");
-    if (musicSyncToggle) {
-        musicSyncToggle.addEventListener("change", (e) => {
-            const enable = e.target.checked;
-            const trackerStatus = document.getElementById("music-track-status");
-            const musicCard = document.getElementById("widget-card-music");
-            if (enable) {
-                trackerStatus.classList.add("active");
-                if (musicCard) musicCard.classList.add("widget-active");
-                window.showToast("Enabled macOS Music track listener thread", "success");
-                startRealVisualizer();
-            } else {
-                trackerStatus.classList.remove("active");
-                if (musicCard) musicCard.classList.remove("widget-active");
-                document.getElementById("music-track-name").textContent = "No Music Playing";
-                document.getElementById("music-artist-name").textContent = "Spotify / Apple Music";
-                window.showToast("Music synchronization stopped", "success");
-                stopRealVisualizer();
-            }
-
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.toggle_music_sync(enable);
-            }
-        });
-    }
-
-    // Poll live track info from backend every 3 seconds
-    setInterval(() => {
-        if (musicSyncToggle && musicSyncToggle.checked && window.pywebview && window.pywebview.api) {
-            window.pywebview.api.get_current_track_info()
-                .then(infoJson => {
-                    if (infoJson) {
-                        const info = JSON.parse(infoJson);
-                        if (info && info.track) {
-                            document.getElementById("music-track-name").textContent = info.track;
-                            document.getElementById("music-artist-name").textContent = `${info.artist} (${info.source})`;
-                            if (info.artwork_url) {
-                                document.getElementById("music-cover-img").src = info.artwork_url;
-                            }
-                            const devPrev = document.getElementById("music-device-preview");
-                            if (devPrev && info.preview) {
-                                devPrev.src = info.preview;
-                                devPrev.style.display = "inline-block";
-                            }
+    function pollTrackInfo() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_current_track_info) {
+            window.pywebview.api.get_current_track_info().then(infoJson => {
+                if (infoJson) {
+                    const info = JSON.parse(infoJson);
+                    if (info && info.track) {
+                        document.getElementById("music-track-name").textContent = info.track;
+                        document.getElementById("music-artist-name").textContent = `${info.artist} (${info.source})`;
+                        if (info.artwork_url) {
+                            document.getElementById("music-cover-img").src = info.artwork_url;
+                        }
+                        const devPrev = document.getElementById("music-device-preview");
+                        if (devPrev && info.preview) {
+                            devPrev.src = info.preview;
+                            devPrev.style.display = "inline-block";
                         }
                     }
-                });
+                }
+            });
         }
-    }, 3000);
+    }
+
+    function startTrackPolling() {
+        if (trackTimer) return;
+        pollTrackInfo();
+        trackTimer = setInterval(pollTrackInfo, 3000);
+    }
+
+    function stopTrackPolling() {
+        if (trackTimer) {
+            clearInterval(trackTimer);
+            trackTimer = null;
+        }
+    }
 
     // ── 3. YAHOO STOCKS TICKER WIDGET ──
     const applyStockBtn = document.getElementById("apply-stock-btn");
@@ -211,36 +182,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
             window.showToast(`Fetching Yahoo price data for ${symbol}...`, "success");
             if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.apply_stock_ticker(symbol)
-                    .then(resJson => {
-                        if (resJson) {
-                            const res = JSON.parse(resJson);
-                            if (res.success) {
-                                const stockCard = document.getElementById("widget-card-stock");
-                                if (stockCard) stockCard.classList.add("widget-active");
-                                window.showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Ext");
-                                const priceMock = document.querySelector(".ticker-price-mock");
-                                const arrowMock = document.querySelector(".ticker-arrow-mock");
-                                const nameMock = document.querySelector(".ticker-name-mock");
+                window.pywebview.api.apply_stock_ticker(symbol).then(resJson => {
+                    if (resJson) {
+                        const res = JSON.parse(resJson);
+                        if (res.success) {
+                            const stockCard = document.getElementById("widget-card-stock");
+                            if (stockCard) stockCard.classList.add("widget-active");
+                            window.showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Ext");
+                            const priceMock = document.querySelector(".ticker-price-mock");
+                            const arrowMock = document.querySelector(".ticker-arrow-mock");
+                            const nameMock = document.querySelector(".ticker-name-mock");
 
-                                if (nameMock) nameMock.textContent = symbol;
-                                if (priceMock) priceMock.textContent = `$${res.price}`;
-                                if (arrowMock) {
-                                    arrowMock.textContent = res.change >= 0 ? "▲" : "▼";
-                                    arrowMock.style.color = res.change >= 0 ? "var(--secondary)" : "red";
-                                }
-                                showTickerDevicePreview(res.preview);
-                            } else {
-                                const stockCard = document.getElementById("widget-card-stock");
-                                if (stockCard) stockCard.classList.remove("widget-active");
-                                window.showToast(res.error || `Failed to display ${symbol}`, "error");
-                                showTickerDevicePreview(res.preview);
+                            if (nameMock) nameMock.textContent = symbol;
+                            if (priceMock) priceMock.textContent = `$${res.price}`;
+                            if (arrowMock) {
+                                arrowMock.textContent = res.change >= 0 ? "▲" : "▼";
+                                arrowMock.style.color = res.change >= 0 ? "var(--secondary)" : "red";
+                            }
+                            showTickerDevicePreview(res.preview);
+                            
+                            // Re-trigger/update active stocks background sync
+                            if (window.pywebview.api.toggle_stocks_sync) {
+                                window.pywebview.api.toggle_stocks_sync(true, symbol);
                             }
                         } else {
-                            window.showToast("API return error", "error");
+                            const stockCard = document.getElementById("widget-card-stock");
+                            if (stockCard) stockCard.classList.remove("widget-active");
+                            window.showToast(res.error || `Failed to display ${symbol}`, "error");
+                            showTickerDevicePreview(res.preview);
                         }
-                    });
+                    }
+                });
             }
+        });
+    }
+
+    function refreshStockPreview() {
+        const symbol = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
+        if (!symbol || !(window.pywebview && window.pywebview.api && window.pywebview.api.get_ticker_preview)) return;
+        window.pywebview.api.get_ticker_preview(symbol).then(resJson => {
+            try {
+                if (!resJson) return;
+                const res = JSON.parse(resJson);
+                if (res.ok) {
+                    const priceMock = document.querySelector(".ticker-price-mock");
+                    const arrowMock = document.querySelector(".ticker-arrow-mock");
+                    const nameMock = document.querySelector(".ticker-name-mock");
+
+                    if (nameMock) nameMock.textContent = symbol;
+                    if (priceMock) priceMock.textContent = `$${res.price}`;
+                    if (arrowMock) {
+                        arrowMock.textContent = res.change >= 0 ? "▲" : "▼";
+                        arrowMock.style.color = res.change >= 0 ? "var(--secondary)" : "red";
+                    }
+                    showTickerDevicePreview(res.preview);
+                }
+            } catch (e) {}
         });
     }
 
@@ -252,7 +249,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Saved stock tickers persistence
     function renderTickers(symbols) {
         const el = document.getElementById("tickers-list");
         if (!el) return;
@@ -347,20 +343,20 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    let sysmonTimer = null;
     const sysmonLive = document.getElementById("sysmon-live");
     if (sysmonLive) {
         sysmonLive.addEventListener("change", (e) => {
+            const active = e.target.checked && document.getElementById("data-sources").classList.contains("active");
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_sysmon_sync) {
+                window.pywebview.api.toggle_sysmon_sync(active);
+            }
             const sysmonCard = document.getElementById("widget-card-sysmon");
-            if (e.target.checked) {
+            if (active) {
                 if (sysmonCard) sysmonCard.classList.add("widget-active");
                 refreshSysmonPreview();
-                sysmonTimer = setInterval(() => {
-                    refreshSysmonPreview();
-                    if (window.pywebview && window.pywebview.api && window.pywebview.api.apply_system_stats) {
-                        window.pywebview.api.apply_system_stats();
-                    }
-                }, 5000);
+                if (!sysmonTimer) {
+                    sysmonTimer = setInterval(refreshSysmonPreview, 5000);
+                }
             } else {
                 if (sysmonCard) sysmonCard.classList.remove("widget-active");
                 if (sysmonTimer) {
@@ -371,39 +367,86 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Delegated listener for simulated Notification triggers
-    document.addEventListener("click", (e) => {
-        const btn = e.target.closest(".notif-trigger-btn");
-        if (btn) {
-            const app = btn.getAttribute("data-app");
-            const notifCard = document.getElementById("widget-card-notif");
-            if (notifCard) notifCard.classList.add("widget-active");
-            
-            window.showToast(`Sending ${app} alert...`, "success");
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.trigger_notification) {
-                window.pywebview.api.trigger_notification(app).then(resJson => {
-                    if (resJson) {
-                        const res = JSON.parse(resJson);
-                        if (res.success) {
-                            window.showToast(`${app} alert displayed!`, "success", "🔵 BLE");
-                        } else {
-                            window.showToast(res.error || "Failed to trigger alert", "error");
-                        }
-                        const prev = document.getElementById("notif-device-preview");
-                        if (prev && res.preview) {
-                            prev.src = res.preview;
-                            prev.style.display = "inline-block";
-                        }
-                    }
-                    setTimeout(() => {
-                        if (notifCard) notifCard.classList.remove("widget-active");
-                    }, 3000);
-                });
+    // ── 5. TAB-CHANGED AUTOMATIC WIDGET WORKER CONTROL ──
+    window.addEventListener("tab-changed", (e) => {
+        const tab = e.detail.tab;
+        if (tab === "data-sources") {
+            // Start Cover Art/Music sync
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.toggle_music_sync(true);
+                if (window.pywebview.api.toggle_audio_visualizer) {
+                    window.pywebview.api.toggle_audio_visualizer(true);
+                }
             }
+            startTrackPolling();
+            startVisualizerPolling();
+
+            // Start Sysmon sync if checkbox is checked
+            const sysmonLiveChecked = sysmonLive ? sysmonLive.checked : true;
+            if (sysmonLiveChecked) {
+                const sysmonCard = document.getElementById("widget-card-sysmon");
+                if (sysmonCard) sysmonCard.classList.add("widget-active");
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_sysmon_sync) {
+                    window.pywebview.api.toggle_sysmon_sync(true);
+                }
+                refreshSysmonPreview();
+                if (!sysmonTimer) {
+                    sysmonTimer = setInterval(refreshSysmonPreview, 5000);
+                }
+            }
+
+            // Start Stocks sync if symbol is configured
+            const symbol = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
+            if (symbol) {
+                const stockCard = document.getElementById("widget-card-stock");
+                if (stockCard) stockCard.classList.add("widget-active");
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_stocks_sync) {
+                    window.pywebview.api.toggle_stocks_sync(true, symbol);
+                }
+                refreshStockPreview();
+                if (!stockTimer) {
+                    stockTimer = setInterval(refreshStockPreview, 15000);
+                }
+            }
+        } else {
+            // Stop everything to conserve resources and device bandwidth
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.toggle_music_sync(false);
+                if (window.pywebview.api.toggle_sysmon_sync) {
+                    window.pywebview.api.toggle_sysmon_sync(false);
+                }
+                if (window.pywebview.api.toggle_stocks_sync) {
+                    window.pywebview.api.toggle_stocks_sync(false);
+                }
+                if (window.pywebview.api.toggle_audio_visualizer) {
+                    window.pywebview.api.toggle_audio_visualizer(false);
+                }
+            }
+            stopTrackPolling();
+            stopVisualizerPolling();
+            if (sysmonTimer) {
+                clearInterval(sysmonTimer);
+                sysmonTimer = null;
+            }
+            if (stockTimer) {
+                clearInterval(stockTimer);
+                stockTimer = null;
+            }
+
+            const sysmonCard = document.getElementById("widget-card-sysmon");
+            if (sysmonCard) sysmonCard.classList.remove("widget-active");
+            const stockCard = document.getElementById("widget-card-stock");
+            if (stockCard) stockCard.classList.remove("widget-active");
         }
     });
 
     // Startup Delay Inits
     setTimeout(loadTickers, 1500);
-    setTimeout(refreshSysmonPreview, 1800);
+    setTimeout(() => {
+        if (document.getElementById("data-sources")?.classList.contains("active")) {
+            window.dispatchEvent(new CustomEvent("tab-changed", { detail: { tab: "data-sources" } }));
+        } else {
+            refreshSysmonPreview();
+        }
+    }, 1800);
 });

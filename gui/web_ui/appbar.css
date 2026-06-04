@@ -141,6 +141,7 @@ select.appbar-device-select {
     border-radius: 50%;
     transition: opacity 0.2s, box-shadow 0.2s;
     cursor: help;
+    position: relative;
 }
 
 .appbar-transports .transport-dot.inactive {
@@ -151,6 +152,29 @@ select.appbar-device-select {
 .appbar-transports .transport-dot.active {
     opacity: 1;
     box-shadow: 0 0 6px currentColor;
+}
+
+/* Custom Styled Tooltips using title attribute */
+.appbar-transports .transport-dot:hover::after {
+    content: attr(title);
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: rgba(20, 21, 26, 0.95);
+    color: var(--text-main);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    pointer-events: none;
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+    text-transform: none;
+    opacity: 0.95;
 }
 
 /* Appbar Global Brightness Slider styling */

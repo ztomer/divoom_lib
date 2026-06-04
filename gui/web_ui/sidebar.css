@@ -60,7 +60,11 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    margin-bottom: auto;
+    flex: 1;
+}
+
+.nav-btn[data-tab="settings"] {
+    margin-top: auto;
 }
 
 .nav-btn {

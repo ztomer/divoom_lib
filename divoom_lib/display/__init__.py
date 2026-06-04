@@ -58,7 +58,9 @@ class Display:
             await self.communicator.lan.set_channel(3)
             return True
         # Under protocol.md: Animation channel is command 0x45, payload [0x05]
-        return await self.communicator.send_command("set light mode", [0x05])
+        # Pad payload to 10 bytes to ensure the device switches channels successfully
+        args = [0x05] + [0x00] * 9
+        return await self.communicator.send_command("set light mode", args)
 
     async def show_effects(self, number: int) -> bool:
         """Show VJ effects on the Divoom device"""
@@ -66,7 +68,9 @@ class Display:
             self.logger.warning("VJ effects are not supported on Wi-Fi (LAN) devices.")
             return False
         # VJ effects are 1-indexed (1-16) on BLE hardware
-        return await self.communicator.send_command("set light mode", [0x03, int(number) + 1])
+        # Pad payload to 10 bytes to ensure the device switches channels successfully
+        args = [0x03, int(number) + 1] + [0x00] * 8
+        return await self.communicator.send_command("set light mode", args)
 
     async def show_image(self, file: str, time: int | None = None) -> bool:
         """Show image or animation on the Divoom device"""
@@ -140,7 +144,9 @@ class Display:
             return False
         number = to_int_if_str(number)
         # Under protocol.md: Visualization is command 0x45, payload [0x04, number]
-        return await self.communicator.send_command("set light mode", [0x04, number])
+        # Pad payload to 10 bytes to ensure the device switches channels successfully
+        args = [0x04, number] + [0x00] * 8
+        return await self.communicator.send_command("set light mode", args)
 
     async def switch_channel(self, channel: str) -> bool:
         """Switches display active channel mode (Clock, Visualizer, VJ, Design)."""

@@ -2,6 +2,19 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     const galleryContainer = document.getElementById("gallery-container");
+
+    function lazyLoadAnimatedPreview(item, fileId, index) {
+        if (fileId && window.pywebview && window.pywebview.api && window.pywebview.api.get_animated_preview) {
+            setTimeout(() => {
+                window.pywebview.api.get_animated_preview(fileId).then(gifUrl => {
+                    if (gifUrl) {
+                        const img = item.querySelector(".gallery-item-preview");
+                        if (img) img.src = gifUrl;
+                    }
+                });
+            }, 50 * index);
+        }
+    }
     
     // ── 1. CLOUD GALLERY FETCH AND SYNC ──
     const loadGalleryBtn = document.getElementById("load-gallery-btn");
@@ -72,7 +85,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.DivoomState.selectedArtworkIndex = idx;
             });
             
-            if (galleryContainer) galleryContainer.appendChild(item);
+            if (galleryContainer) {
+                galleryContainer.appendChild(item);
+                lazyLoadAnimatedPreview(item, art.file_id, idx);
+            }
         });
     }
 
@@ -248,6 +264,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (galleryContainer) {
                 galleryContainer.appendChild(item);
+                lazyLoadAnimatedPreview(item, art.file_id, currentIdx);
                 
                 const loadBtn = document.getElementById("load-gallery-btn");
                 if (loadBtn) {

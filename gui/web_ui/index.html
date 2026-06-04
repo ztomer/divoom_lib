@@ -226,19 +226,24 @@
                                 <!-- Custom art -->
                                 <div class="channel-panel" id="panel-design">
                                     <p class="panel-hint" style="margin-top: 0; margin-bottom: 12px;">Display your own custom art/GIFs on the device's "Custom" channel.</p>
-                                    <div class="custom-art-upload-section" style="display:flex; flex-direction:column; gap:12px; max-width:400px;">
+                                    <div class="custom-art-upload-section" style="display:flex; flex-direction:column; gap:12px; max-width:100%;">
                                         <div style="display:flex; gap:10px; align-items:center;">
                                             <button id="browse-custom-art-btn" class="glow-btn compact" style="margin:0; white-space:nowrap;">Browse File...</button>
                                             <input type="text" id="custom-art-path-input" placeholder="No file selected" class="text-input" style="flex:1;" readonly>
                                         </div>
-                                        <div id="custom-art-preview-container" style="display:none; align-items:center; justify-content:center; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05); text-align:center;">
-                                            <img id="custom-art-preview-img" src="" alt="Custom Art Preview" style="max-width:120px; max-height:120px; border-radius:4px; object-fit:contain; border:1px solid rgba(255,255,255,0.1); image-rendering:pixelated;">
+                                        
+                                        <!-- Last 5 Selected Items filmstrip preview -->
+                                        <div id="custom-art-history-container" style="display:flex; flex-direction:column; gap:6px; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
+                                            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:2px;">Last 5 Selected Items:</label>
+                                            <div id="custom-art-history-filmstrip" style="display:flex; gap:8px; overflow-x:auto; padding:2px; min-height:60px;">
+                                                <div class="empty-list" style="font-size:11px;">No design pushed yet.</div>
+                                            </div>
                                         </div>
                                         
                                         <!-- Gallery Cache Selection Grid -->
                                         <div class="gallery-cache-selector" style="margin-top: 4px;">
                                             <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Select from Gallery Cache:</label>
-                                            <div class="selector-grid" id="custom-art-cache-grid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; max-height: 120px; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-sizing:border-box;">
+                                            <div class="selector-grid" id="custom-art-cache-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap:8px; max-height: 120px; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
                                                 <div class="empty-list" style="grid-column: 1/-1;">No cached gallery files.</div>
                                             </div>
                                         </div>
@@ -250,24 +255,16 @@
                                 <div class="channel-panel" id="panel-ambient">
                                     <div class="ambient-controls">
                                         <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
-                                            <div style="display: flex; align-items: center; gap: 15px;">
-                                                <input type="color" id="ambient-color-input" value="#00ffcc" class="color-input-large" style="width: 64px; height: 36px; padding:0; border:none; background:none; cursor:pointer;">
-                                                <span style="font-size:12px; color:var(--text-muted);">Pick Custom Color</span>
-                                            </div>
-                                            
                                             <div class="form-group" style="margin-top: 4px; margin-bottom: 4px; width: 100%;">
                                                 <label class="form-label" style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom: 6px;">Ambient Effect Mode:</label>
-                                                <select id="ambient-mode-select" class="custom-select" style="width: 100%;">
-                                                    <option value="0">Plain Color</option>
-                                                    <option value="1">Love (Heartbeat pulse)</option>
-                                                    <option value="2">Plants (Nature pattern)</option>
-                                                    <option value="3">No Mosquitto (Insect repellent)</option>
-                                                    <option value="4">Sleeping (Sunset glow)</option>
-                                                </select>
+                                                <div class="selector-grid" id="ambient-mode-grid" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; width: 100%;"></div>
                                             </div>
                                             
-                                            <!-- Color Swatches Grid -->
-                                            <div class="ambient-swatches-grid">
+                                            <!-- Color Picker and Swatches Grid -->
+                                            <div class="ambient-swatches-grid" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                                                <div class="color-picker-wrapper" style="position:relative; width:28px; height:28px; border-radius:50%; overflow:hidden; border:2px solid rgba(255,255,255,0.1); cursor:pointer; flex-shrink:0;">
+                                                    <input type="color" id="ambient-color-input" value="#00ffcc" style="position:absolute; top:-4px; left:-4px; width:36px; height:36px; border:none; background:none; cursor:pointer; padding:0;">
+                                                </div>
                                                 <button class="ambient-swatch" style="background:#ff0000;" data-color="#ff0000" title="Red"></button>
                                                 <button class="ambient-swatch" style="background:#00ff00;" data-color="#00ff00" title="Green"></button>
                                                 <button class="ambient-swatch" style="background:#0000ff;" data-color="#0000ff" title="Blue"></button>
@@ -276,9 +273,9 @@
                                                 <button class="ambient-swatch" style="background:#00ffcc;" data-color="#00ffcc" title="Cyan"></button>
                                                 <button class="ambient-swatch" style="background:#ff00ff;" data-color="#ff00ff" title="Magenta"></button>
                                                 <button class="ambient-swatch" style="background:#ffffff;" data-color="#ffffff" title="White"></button>
+                                                <span style="font-size:11px; color:var(--text-muted); margin-left:4px;">Pick Custom Color</span>
                                             </div>
                                         </div>
-                                        <button id="apply-ambient-btn" class="glow-btn" style="margin-top: 12px;">Apply Ambient Color</button>
                                     </div>
                                 </div>
                             </div>

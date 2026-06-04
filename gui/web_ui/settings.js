@@ -14,6 +14,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const targetTab = btn.getAttribute("data-tab");
             const el = document.getElementById(targetTab);
             if (el) el.classList.add("active");
+
+            // Dispatch custom event to notify other scripts (e.g. widgets or gallery)
+            window.dispatchEvent(new CustomEvent("tab-changed", { detail: { tab: targetTab } }));
         });
     });
 
@@ -229,18 +232,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // ── 5. TRANSPORT POLLING STATUS PANEL ──
     function updateTransportPanel(status) {
         const transports = [
-            { key: 'ble',      dotId: 'tr-ble-dot',   detailId: 'tr-ble-detail' },
-            { key: 'lan',      dotId: 'tr-lan-dot',   detailId: 'tr-lan-detail' },
-            { key: 'cloud',    dotId: 'tr-cloud-dot', detailId: 'tr-cloud-detail' },
-            { key: 'external', dotId: 'tr-ext-dot',   detailId: 'tr-ext-detail' },
+            { name: 'Bluetooth (BLE)', key: 'ble',      dotId: 'tr-ble-dot',   detailId: 'tr-ble-detail' },
+            { name: 'Local Network (LAN)', key: 'lan',      dotId: 'tr-lan-dot',   detailId: 'tr-lan-detail' },
+            { name: 'Divoom Cloud', key: 'cloud',    dotId: 'tr-cloud-dot', detailId: 'tr-cloud-detail' },
+            { name: 'Public Cloud', key: 'external', dotId: 'tr-ext-dot',   detailId: 'tr-ext-detail' },
         ];
-        transports.forEach(({ key, dotId, detailId }) => {
+        transports.forEach(({ name, key, dotId, detailId }) => {
             const t = status[key];
             if (!t) return;
             const dot    = document.getElementById(dotId);
             const detail = document.getElementById(detailId);
             if (dot) {
                 dot.className = `transport-dot ${t.available ? 'active' : 'inactive'}`;
+                if (t.detail) {
+                    dot.setAttribute("title", `${name}: ${t.detail}`);
+                }
             }
             if (detail && t.detail) {
                 detail.textContent = t.detail;

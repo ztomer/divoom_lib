@@ -183,7 +183,7 @@ class GallerySyncMixin:
                             safe_filename = file_id.replace("/", "_")
                             cache_file_item = cache_dir / safe_filename
                             
-                            for ext in [".gif", ".png", ".jpg", ".jpeg"]:
+                            for ext in [".png", ".jpg", ".jpeg", ".gif"]:
                                 possible_file = cache_file_item.with_suffix(ext)
                                 if possible_file.exists():
                                     try:
@@ -406,3 +406,18 @@ class GallerySyncMixin:
                 logger.error(f"hot-channel sync of {fid} failed: {e}")
             (synced if ok else failed).append(fid)
         return json.dumps({"ok": len(failed) == 0, "synced": synced, "failed": failed})
+
+    def get_animated_preview(self, file_id: str) -> str:
+        """Helper to retrieve base64 encoded animated GIF for progressive loading."""
+        logger.info(f"GUI Action: Fetching animated preview for {file_id}")
+        try:
+            safe_filename = file_id.replace("/", "_")
+            cache_dir = Path.home() / ".config" / "divoom-control" / "cache_gallery"
+            cache_file_gif = cache_dir / f"{safe_filename}.gif"
+            if cache_file_gif.exists():
+                img_data = cache_file_gif.read_bytes()
+                b64_str = base64.b64encode(img_data).decode("utf-8")
+                return f"data:image/gif;base64,{b64_str}"
+        except Exception as e:
+            logger.warning(f"get_animated_preview failed for {file_id}: {e}")
+        return ""

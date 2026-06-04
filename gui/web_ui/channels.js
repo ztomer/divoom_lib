@@ -48,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (channel === "design") {
             loadCustomArtCacheGrid();
+            renderCustomArtHistory();
         }
     }
 
@@ -210,15 +211,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }, -1, EQ_PREVIEWS);
 
     // ── 6. AMBIENT COLOR TRIGGERS ──
-    const applyAmbientBtn = document.getElementById("apply-ambient-btn");
     const ambientColorInput = document.getElementById("ambient-color-input");
-    const ambientModeSelect = document.getElementById("ambient-mode-select");
     const ambientSwatches = document.querySelectorAll(".ambient-swatch");
     
+    const AMBIENT_EFFECTS = [
+        { value: 0, name: "Plain Color" },
+        { value: 1, name: "Love (Pulse)" },
+        { value: 2, name: "Plants (Breathe)" },
+        { value: 3, name: "Sleeping (Fade)" },
+        { value: 4, name: "No Mosquitto" }
+    ];
+    const AMBIENT_PREVIEWS = {
+        0: `<div class="ambient-preview plain" style="background:#00ffcc; height:40px; border-radius:4px; box-shadow: 0 0 10px rgba(0,255,204,0.3);"></div>`,
+        1: `<div class="ambient-preview love" style="background:#ff3366; height:40px; border-radius:4px; animation: heartbeat 1.2s infinite ease-in-out;"></div>`,
+        2: `<div class="ambient-preview plants" style="background:#33cc66; height:40px; border-radius:4px; animation: breathe 3s infinite ease-in-out;"></div>`,
+        3: `<div class="ambient-preview sleeping" style="background:#9933ff; height:40px; border-radius:4px; animation: sleeping-fade 4s infinite ease-in-out;"></div>`,
+        4: `<div class="ambient-preview mosquito" style="background:#ffcc00; height:40px; border-radius:4px; animation: repeller-strobe 0.2s infinite steps(2);"></div>`
+    };
+
+    let selectedAmbientMode = 0;
+
     window.applyAmbientColor = function(color) {
         if (!window.requireDevice()) return;
         const brightness = parseInt(document.getElementById("global-brightness-slider")?.value) || 80;
-        const modeType = parseInt(ambientModeSelect?.value) || 0;
+        const modeType = selectedAmbientMode;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_solid_light) {
             window.pywebview.api.set_solid_light(color, brightness, modeType).then(res => {
                 window.showToast(res ? "Ambient mode applied" : "Failed to apply ambient", res ? "success" : "🔵 BLE");
@@ -226,19 +242,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    if (applyAmbientBtn) {
-        applyAmbientBtn.addEventListener("click", () => {
-            const color = ambientColorInput?.value || "#00ffcc";
-            window.applyAmbientColor(color);
-        });
-    }
-    
-    if (ambientModeSelect) {
-        ambientModeSelect.addEventListener("change", () => {
-            const color = ambientColorInput?.value || "#00ffcc";
-            window.applyAmbientColor(color);
-        });
-    }
+    buildSelectorGrid("ambient-mode-grid", AMBIENT_EFFECTS, (v) => {
+        selectedAmbientMode = parseInt(v);
+        const color = ambientColorInput?.value || "#00ffcc";
+        window.applyAmbientColor(color);
+    }, 0, AMBIENT_PREVIEWS);
     
     ambientSwatches.forEach(swatch => {
         swatch.addEventListener("click", () => {
@@ -259,6 +267,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     s.classList.add("active");
                 }
             });
+            // Update preview color for the Plain mode in the selector grid
+            const plainPrev = document.querySelector(".ambient-preview.plain");
+            if (plainPrev) {
+                plainPrev.style.backgroundColor = color;
+                plainPrev.style.boxShadow = `0 0 10px ${color}4d`;
+            }
         });
         ambientColorInput.addEventListener("change", (e) => {
             window.applyAmbientColor(e.target.value);
@@ -321,16 +335,74 @@ document.addEventListener("DOMContentLoaded", () => {
                         item.style.borderColor = "var(--primary)";
                         
                         const pathInput = document.getElementById("custom-art-path-input");
-                        const previewImg = document.getElementById("custom-art-preview-img");
-                        const previewCont = document.getElementById("custom-art-preview-container");
-                        
                         if (pathInput) pathInput.value = f.path;
-                        if (previewImg) previewImg.src = f.preview_url;
-                        if (previewCont) previewCont.style.display = "flex";
                     });
                     grid.appendChild(item);
                 });
             });
         }
     }
+
+    function renderCustomArtHistory() {
+        const filmstrip = document.getElementById("custom-art-history-filmstrip");
+        if (!filmstrip) return;
+        
+        let history = [];
+        try {
+            history = JSON.parse(localStorage.getItem("divoom_custom_art_history") || "[]");
+        } catch (e) {
+            history = [];
+        }
+        
+        if (history.length === 0) {
+            filmstrip.innerHTML = '<div class="empty-list" style="font-size:11px;">No design pushed yet.</div>';
+            return;
+        }
+        
+        filmstrip.innerHTML = "";
+        history.slice(0, 5).forEach(itemData => {
+            const item = document.createElement("button");
+            item.className = "cache-thumb-item";
+            item.style.background = "rgba(0,0,0,0.3)";
+            item.style.border = "1px solid rgba(255,255,255,0.1)";
+            item.style.borderRadius = "4px";
+            item.style.padding = "4px";
+            item.style.cursor = "pointer";
+            item.style.display = "flex";
+            item.style.alignItems = "center";
+            item.style.justifyContent = "center";
+            item.style.aspectRatio = "1/1";
+            item.style.width = "48px";
+            item.style.height = "48px";
+            item.style.flexShrink = "0";
+            item.title = itemData.name || "History Item";
+            
+            const src = itemData.preview_url || "assets/pixoo.png";
+            item.innerHTML = `<img src="${src}" style="width:100%; height:100%; object-fit:contain; image-rendering:pixelated; border-radius:2px;">`;
+            
+            item.addEventListener("click", () => {
+                const pathInput = document.getElementById("custom-art-path-input");
+                if (pathInput) pathInput.value = itemData.path;
+            });
+            
+            filmstrip.appendChild(item);
+        });
+    }
+    
+    window.addCustomArtToHistory = function(name, path, preview_url) {
+        let history = [];
+        try {
+            history = JSON.parse(localStorage.getItem("divoom_custom_art_history") || "[]");
+        } catch (e) {
+            history = [];
+        }
+        history = history.filter(h => h.path !== path);
+        history.unshift({ name, path, preview_url });
+        history = history.slice(0, 5);
+        localStorage.setItem("divoom_custom_art_history", JSON.stringify(history));
+        renderCustomArtHistory();
+    };
+
+    // Load initial history
+    setTimeout(renderCustomArtHistory, 1500);
 });

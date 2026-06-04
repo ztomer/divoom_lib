@@ -56,7 +56,7 @@ async def test_show_effects_emits_vj_frames():
     cmds = [f["command_id"] for f in frames]
     assert models.COMMANDS["set light mode"] in cmds
     vj_cmd = next(f for f in frames if f["command_id"] == models.COMMANDS["set light mode"])
-    assert list(vj_cmd["payload"]) == [3, 10]
+    assert list(vj_cmd["payload"])[:2] == [3, 10]
 
 
 @pytest.mark.asyncio
@@ -83,7 +83,7 @@ async def test_show_visualization_emits_eq_frames():
     cmds = [f["command_id"] for f in frames]
     assert models.COMMANDS["set light mode"] in cmds
     eq_cmd = next(f for f in frames if f["command_id"] == models.COMMANDS["set light mode"])
-    assert list(eq_cmd["payload"]) == [4, 3]
+    assert list(eq_cmd["payload"])[:2] == [4, 3]
 
 
 @pytest.mark.asyncio
