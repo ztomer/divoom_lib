@@ -17,6 +17,15 @@ try:
             ctypes.POINTER(ctypes.c_ubyte)   # unsigned char* out_msg
         ]
         lib.encode_basic_payload.restype = ctypes.c_int
+
+        lib.encode_ios_le_payload.argtypes = [
+            ctypes.POINTER(ctypes.c_ubyte),  # const unsigned char* payload
+            ctypes.c_int,                    # int payload_len
+            ctypes.c_int,                    # int packet_number
+            ctypes.POINTER(ctypes.c_ubyte)   # unsigned char* out_msg
+        ]
+        lib.encode_ios_le_payload.restype = ctypes.c_int
+
 except Exception:
     pass
 
@@ -100,6 +109,21 @@ def encode_ios_le_payload(payload_bytes: list, packet_number: int = 0x00000000) 
     """
     if not payload_bytes:
         raise ValueError("payload_bytes must contain at least the command id")
+
+    if lib is not None:
+        try:
+            payload_data = bytes(payload_bytes)
+            n = len(payload_data)
+            out_size = n + 10
+            out_buf = (ctypes.c_ubyte * out_size)()
+            in_buf = (ctypes.c_ubyte * n).from_buffer_copy(payload_data)
+            
+            written = lib.encode_ios_le_payload(in_buf, n, packet_number, out_buf)
+            if written > 0:
+                return bytes(out_buf[:written])
+        except Exception:
+            pass
+
     command_identifier = payload_bytes[0]
     data_bytes = payload_bytes[1:]
 
@@ -128,6 +152,7 @@ def encode_ios_le_payload(payload_bytes: list, packet_number: int = 0x00000000) 
         + [models.MESSAGE_END_BYTE]
     )
     return bytes(wire)
+
 
 
 def parse_ios_le_notification(data: bytes) -> dict | None:
