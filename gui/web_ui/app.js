@@ -51,9 +51,7 @@ window.getDeviceDimensions = function(name) {
 window.connectDevice = function(name, address) {
     window.showToast(`Connecting to ${name}...`, "success");
     const statusDot = document.getElementById("global-status-dot");
-    const statusText = document.getElementById("global-status-text");
     if (statusDot) { statusDot.className = "transport-dot connecting"; statusDot.removeAttribute("style"); }
-    if (statusText) statusText.textContent = "Connecting…";
     
     if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.connect_single_device(address).then(res => {
@@ -63,7 +61,6 @@ window.connectDevice = function(name, address) {
                 const label = type === "wall" ? "🧱 Wall" : (type === "lan" ? "🟢 LAN" : "🔵 BLE");
                 window.showToast(`Connected to ${name}!`, "success", label);
                 if (statusDot) { statusDot.className = `transport-dot active ${type}`; statusDot.removeAttribute("style"); }
-                if (statusText) statusText.textContent = "Connected";
                 
                 document.getElementById("banner-device-name").textContent = name;
                 document.getElementById("banner-device-mac").textContent = address;
@@ -75,14 +72,15 @@ window.connectDevice = function(name, address) {
                 const sidebarSelect = document.getElementById("sidebar-device-select");
                 if (sidebarSelect) sidebarSelect.value = address;
                 if (window.updateSyncTargetList) window.updateSyncTargetList();
+                if (window.updateChannelButtonsVisibility) window.updateChannelButtonsVisibility(name);
             } else {
                 window.DivoomState.appConnected = false;
                 window.showToast(`Failed to connect to ${name}`, "error");
                 if (statusDot) { statusDot.className = "transport-dot inactive"; statusDot.removeAttribute("style"); }
-                if (statusText) statusText.textContent = "Disconnected";
                 document.getElementById("banner-device-name").textContent = "None";
                 document.getElementById("banner-device-mac").textContent = "None";
                 if (window.updateSyncTargetList) window.updateSyncTargetList();
+                if (window.updateChannelButtonsVisibility) window.updateChannelButtonsVisibility("None");
             }
         });
     }
@@ -189,6 +187,18 @@ window.renderArrangerCanvas = function() {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+    // Force styling on sidebar-device-select to prevent WebKit rendering constraints
+    const sidebarSelect = document.getElementById("sidebar-device-select");
+    if (sidebarSelect) {
+        sidebarSelect.style.setProperty("width", "300px", "important");
+        sidebarSelect.style.setProperty("min-width", "300px", "important");
+        sidebarSelect.style.setProperty("height", "32px", "important");
+        sidebarSelect.style.setProperty("padding", "0 28px 0 12px", "important");
+        sidebarSelect.style.setProperty("line-height", "30px", "important");
+        sidebarSelect.style.setProperty("box-sizing", "border-box", "important");
+        sidebarSelect.style.setProperty("flex-shrink", "0", "important");
+    }
+
     // Inject HTML Templates
     if (document.getElementById('monthly-best') && window.DivoomTemplates?.monthlyBest) {
         document.getElementById('monthly-best').innerHTML = window.DivoomTemplates.monthlyBest;
@@ -388,9 +398,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    const sidebarSelect = document.getElementById("sidebar-device-select");
-    if (sidebarSelect) {
-        sidebarSelect.addEventListener("change", (e) => {
+    const appbarSelect = document.getElementById("sidebar-device-select");
+    if (appbarSelect) {
+        appbarSelect.addEventListener("change", (e) => {
             const addr = e.target.value;
             if (!addr) return;
             if (addr === "MatrixWall") {

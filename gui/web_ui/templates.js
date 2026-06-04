@@ -76,25 +76,17 @@ window.DivoomTemplates = {
     widgets: `
                 <div class="grid-layout three-cols">
                     <!-- macOS Music Tracker -->
-                    <div class="card glass-card">
-                        <div class="card-header">
+                    <div class="card glass-card" id="widget-card-music">
+                        <div class="card-header flex-header">
                             <h3>Mac playing cover track</h3>
+                            <span class="active-indicator">● Active</span>
                         </div>
                         <div class="card-body">
-                            <!-- Premium Animated EQ Spectrum Visualizer Cover -->
                             <div class="music-tracker-card" id="music-track-status">
                                 <div class="music-previews-container">
                                     <div class="music-cover-preview">
                                         <div class="cover-vinyl"></div>
                                         <img id="music-cover-img" src="assets/pixoo.png" alt="Vinyl Cover">
-                                        
-                                        <!-- Neon Spectrum bars overlay -->
-                                        <div class="neon-eq-bars">
-                                            <div class="eq-bar bar1"></div>
-                                            <div class="eq-bar bar2"></div>
-                                            <div class="eq-bar bar3"></div>
-                                            <div class="eq-bar bar4"></div>
-                                        </div>
                                     </div>
                                     <div class="music-device-preview-wrap">
                                         <img id="music-device-preview" class="device-preview-img" alt="Device Preview" style="display:none;">
@@ -104,6 +96,19 @@ window.DivoomTemplates = {
                                 <div class="music-track-info">
                                     <h4 id="music-track-name">No Music Playing</h4>
                                     <p id="music-artist-name">Spotify / Apple Music</p>
+                                    <!-- Winamp Retro pixelated spectrum visualizer -->
+                                    <div class="winamp-visualizer">
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -120,9 +125,10 @@ window.DivoomTemplates = {
                     </div>
                     
                     <!-- Stock Prices Widget -->
-                    <div class="card glass-card">
-                        <div class="card-header">
+                    <div class="card glass-card" id="widget-card-stock">
+                        <div class="card-header flex-header">
                             <h3>Live Stocks &amp; Crypto Tickers</h3>
+                            <span class="active-indicator">● Active</span>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
@@ -133,10 +139,8 @@ window.DivoomTemplates = {
                                 </div>
                             </div>
 
-                            <!-- Saved tickers (5.e) — seeded from macOS Stocks -->
                             <div id="tickers-list" class="tickers-list"></div>
 
-                            <!-- Live on-device preview at the target matrix (5.d) -->
                             <div class="device-preview-wrap">
                                 <span class="hc-label">On-device preview</span>
                                 <img id="ticker-device-preview" class="device-preview-img" alt="" style="display:none;">
@@ -152,10 +156,11 @@ window.DivoomTemplates = {
                         </div>
                     </div>
 
-                    <!-- System Monitor (area 7: Pixoo64 concept ported to BLE) -->
-                    <div class="card glass-card">
-                        <div class="card-header">
+                    <!-- System Monitor -->
+                    <div class="card glass-card" id="widget-card-sysmon">
+                        <div class="card-header flex-header">
                             <h3>System Monitor</h3>
+                            <span class="active-indicator">● Active</span>
                         </div>
                         <div class="card-body">
                             <div class="sysmon-readout">
@@ -170,6 +175,31 @@ window.DivoomTemplates = {
                             <div class="hc-actions">
                                 <button id="sysmon-display-btn" class="glow-btn compact">Display on Device</button>
                                 <label class="hc-toggle"><input type="checkbox" id="sysmon-live"> Live (5s)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notification Center Widget Card -->
+                    <div class="card glass-card" id="widget-card-notif">
+                        <div class="card-header flex-header">
+                            <h3>Notification Center</h3>
+                            <span class="active-indicator">● Active</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="panel-hint" style="margin-top: 0; margin-bottom: 12px;">Trigger simulated alerts or monitor incoming notifications on screen.</p>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Simulate App Alert</label>
+                                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                                        <button class="glow-btn compact ghost notif-trigger-btn" data-app="Mail"><img src="assets/mail_pixel.png" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; image-rendering:pixelated;">Mail</button>
+                                        <button class="glow-btn compact ghost notif-trigger-btn" data-app="WhatsApp"><img src="assets/whatsapp_pixel.png" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; image-rendering:pixelated;">WhatsApp</button>
+                                        <button class="glow-btn compact ghost notif-trigger-btn" data-app="Telegram"><img src="assets/telegram_pixel.png" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; image-rendering:pixelated;">Telegram</button>
+                                    </div>
+                            </div>
+                            
+                            <div class="device-preview-wrap">
+                                <span class="hc-label">On-device preview</span>
+                                <img id="notif-device-preview" class="device-preview-img" alt="" style="display:none;">
                             </div>
                         </div>
                     </div>

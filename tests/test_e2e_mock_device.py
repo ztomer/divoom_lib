@@ -113,7 +113,8 @@ async def test_show_image_emits_0x44_frames():
     # before parsing the (single) framed message.
     full = b"".join(data for _char, data in mock.written)
     msgs, _ = framing.parse_basic_protocol_frames(bytearray(full))
-    assert msgs and msgs[0]["command_id"] == 0x44
+    cmds = [m["command_id"] for m in msgs]
+    assert 0x44 in cmds
 
 
 @pytest.mark.asyncio

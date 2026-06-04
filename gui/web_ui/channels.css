@@ -277,3 +277,16 @@
 .selector-cell:hover .apk-preview-img.inactive-img {
     display: none;
 }
+
+/* Custom Art Gallery Cache Selector */
+.cache-thumb-item {
+    transition: all 0.2s ease;
+}
+.cache-thumb-item:hover {
+    border-color: var(--primary) !important;
+    transform: scale(1.05);
+    background-color: rgba(255, 90, 31, 0.05) !important;
+}
+.cache-thumb-item:active {
+    transform: scale(0.95);
+}

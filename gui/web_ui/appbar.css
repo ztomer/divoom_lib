@@ -25,28 +25,38 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-left: 14px;
+    margin-left: 24px;
     -webkit-app-region: no-drag;
+    flex-shrink: 0 !important;
 }
 
-.appbar-device-select {
-    font-size: 12px;
-    font-weight: 600;
-    min-width: 200px;
-    max-width: 320px;
-    height: 26px;
-    padding: 2px 28px 2px 8px;
+select.appbar-device-select {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 380px !important;
+    height: 32px !important;
+    padding: 0 28px 0 12px !important;
+    line-height: 30px !important;
+    box-sizing: border-box !important;
 }
 
-.appbar-device-status {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-muted);
-    max-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+#global-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transition: background 0.3s, box-shadow 0.3s;
+    background-color: #6b7280;
+    box-shadow: none;
+    display: inline-block;
+    flex-shrink: 0;
 }
+#global-status-dot.active.ble { background-color: var(--transport-ble, #3b82f6) !important; color: var(--transport-ble, #3b82f6) !important; box-shadow: 0 0 8px var(--transport-ble, #3b82f6) !important; opacity: 1; }
+#global-status-dot.active.lan { background-color: var(--transport-lan, #22c55e) !important; color: var(--transport-lan, #22c55e) !important; box-shadow: 0 0 8px var(--transport-lan, #22c55e) !important; opacity: 1; }
+#global-status-dot.active.wall { background-color: #8b5cf6 !important; color: #8b5cf6 !important; box-shadow: 0 0 8px #8b5cf6 !important; opacity: 1; }
+#global-status-dot.connecting { background-color: #f59e0b !important; color: #f59e0b !important; box-shadow: 0 0 8px #f59e0b !important; opacity: 1; animation: dot-pulse 1s ease-in-out infinite; }
+#global-status-dot.inactive { background-color: #6b7280 !important; color: #6b7280 !important; opacity: 0.3; box-shadow: none !important; }
 
 /* "Connecting" state for the shared transport dot (amber pulse) */
 .transport-dot.connecting {

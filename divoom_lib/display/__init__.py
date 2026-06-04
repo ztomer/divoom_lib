@@ -70,6 +70,7 @@ class Display:
 
     async def show_image(self, file: str, time: int | None = None) -> bool:
         """Show image or animation on the Divoom device"""
+        await self.show_design()
         frames, framesCount = process_image(file, time=time)
 
         result = None

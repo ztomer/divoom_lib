@@ -330,9 +330,15 @@ body {
     grid-template-columns: 190px 1fr;
 }
 
-/* --- Three Column Grid Layout --- */
+/* --- Responsive Widget Grid Layout --- */
 .grid-layout.three-cols {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: stretch;
+}
+
+/* Align scanner and Wi-Fi card heights to stretch in Settings tab */
+#settings-devices .grid-layout {
+    align-items: stretch;
 }
 
 /* ── Susan Kare Retro monochrome dither filter overrides ─────────────── */

@@ -117,22 +117,25 @@ document.addEventListener("DOMContentLoaded", () => {
         if (deviceListUl) {
             deviceListUl.innerHTML = "";
             if (devices.length === 0) {
-                deviceListUl.innerHTML = `<li class="empty-list">No BLE screens found.</li>`;
+                deviceListUl.innerHTML = `<tr><td colspan="2" class="empty-list">No BLE screens found.</td></tr>`;
             } else {
                 devices.forEach(d => {
-                    const li = document.createElement("li");
+                    const tr = document.createElement("tr");
+                    tr.style.cursor = "pointer";
                     const color = window.deviceColor(d.address);
-                    li.innerHTML = `
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span class="device-accent-dot" style="background:${color}; box-shadow:0 0 6px ${color};"></span>
-                            <span>${d.name}</span>
-                        </div>
-                        <span class="device-mac">${d.address}</span>
+                    tr.innerHTML = `
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span class="device-accent-dot" style="background:${color}; box-shadow:0 0 6px ${color}; width:8px; height:8px; border-radius:50%; display:inline-block;"></span>
+                                <span>${d.name}</span>
+                            </div>
+                        </td>
+                        <td><span class="device-mac">${d.address}</span></td>
                     `;
-                    li.addEventListener("click", () => {
+                    tr.addEventListener("click", () => {
                         window.connectDevice(d.name, d.address);
                     });
-                    deviceListUl.appendChild(li);
+                    deviceListUl.appendChild(tr);
                 });
             }
         }
@@ -156,26 +159,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderLanDevicesList() {
-        const ul = document.getElementById("lan-device-list");
-        if (!ul) return;
-        ul.innerHTML = "";
+        const tbody = document.getElementById("lan-device-list");
+        if (!tbody) return;
+        tbody.innerHTML = "";
         if (window.DivoomState.registeredLanDevices.length === 0) {
-            ul.innerHTML = '<li class="empty-list">No Wi-Fi screens registered.</li>';
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-list">No Wi-Fi screens registered.</td></tr>';
             return;
         }
         window.DivoomState.registeredLanDevices.forEach(d => {
-            const li = document.createElement("li");
-            li.style.display = "flex";
-            li.style.justifyContent = "space-between";
-            li.style.alignItems = "center";
-            li.innerHTML = `
-                <span style="font-weight:600; cursor:pointer;">🟢 Local Network Device (${d.ip})</span>
-                <button class="glow-btn compact" style="margin:0; background:rgba(255, 68, 68, 0.15); border-color:#ef4444; color:#ef4444;" data-ip="${d.ip}">Delete</button>
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td style="font-weight:600; cursor:pointer;" class="lan-connect-cell">🟢 ${d.ip}</td>
+                <td>${d.token || 0}</td>
+                <td>
+                    <button class="glow-btn compact delete-lan-btn" style="margin:0; background:rgba(255, 68, 68, 0.15); border-color:#ef4444; color:#ef4444; padding: 4px 8px; font-size: 11px;" data-ip="${d.ip}">Delete</button>
+                </td>
             `;
-            li.querySelector("span").addEventListener("click", () => {
+            tr.querySelector(".lan-connect-cell").addEventListener("click", () => {
                 window.connectDevice(`Local Network: ${d.ip}`, `LAN:${d.ip}`);
             });
-            li.querySelector("button").addEventListener("click", (e) => {
+            tr.querySelector(".delete-lan-btn").addEventListener("click", (e) => {
                 e.stopPropagation();
                 const ip = e.target.getAttribute("data-ip");
                 if (window.pywebview && window.pywebview.api) {
@@ -188,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         });
                 }
             });
-            ul.appendChild(li);
+            tbody.appendChild(tr);
         });
     }
 

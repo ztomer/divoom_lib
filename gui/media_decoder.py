@@ -64,7 +64,7 @@ def decode_and_save_preview(raw_bytes: bytes, cache_file_png: Path) -> bool:
             speed = struct.unpack('>H', raw_bytes[2:4])[0]
             
             frames = []
-            for f_idx in range(total_frames):
+            for f_idx in range(min(total_frames, 1)):
                 start = f_idx * 768
                 end = start + 768
                 if end > len(decrypted):
@@ -102,7 +102,7 @@ def decode_and_save_preview(raw_bytes: bytes, cache_file_png: Path) -> bool:
             
             frames = []
             pos = 0
-            for f_idx in range(total_frames):
+            for f_idx in range(min(total_frames, 1)):
                 if pos + 4 > len(decrypted):
                     break
                 frame_size = struct.unpack('>I', decrypted[pos : pos + 4])[0]

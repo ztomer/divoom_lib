@@ -370,3 +370,98 @@ input:checked + .slider-round:before {
     padding: 1px 4px;
     border-radius: 2px;
 }
+
+/* ── Winamp Retro Pixelated Visualizer ───────────────────────────────── */
+.winamp-visualizer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    width: 100%;
+    height: 32px;
+    background: #000000;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    padding: 3px 6px;
+    box-sizing: border-box;
+    margin-top: 12px;
+    opacity: 0.15;
+    transition: opacity 0.3s ease;
+}
+
+.widget-active .winamp-visualizer {
+    opacity: 0.95;
+}
+
+.winamp-bar {
+    width: 8%;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+}
+
+.winamp-fill {
+    width: 100%;
+    background: linear-gradient(to top, 
+        #00ff66 0%, #00ff66 50%, 
+        #ffcc00 50%, #ffcc00 80%, 
+        #ff3333 80%, #ff3333 100%
+    );
+    background-size: 100% 4px; /* retro pixel segments! */
+    height: 4px;
+    border-radius: 1px;
+}
+
+.widget-active .winamp-bar:nth-child(1) .winamp-fill { animation: winampBounce 0.9s ease-in-out infinite alternate; }
+.widget-active .winamp-bar:nth-child(2) .winamp-fill { animation: winampBounce 0.7s ease-in-out infinite alternate 0.1s; }
+.widget-active .winamp-bar:nth-child(3) .winamp-fill { animation: winampBounce 1.2s ease-in-out infinite alternate 0.2s; }
+.widget-active .winamp-bar:nth-child(4) .winamp-fill { animation: winampBounce 0.5s ease-in-out infinite alternate 0.05s; }
+.widget-active .winamp-bar:nth-child(5) .winamp-fill { animation: winampBounce 1.0s ease-in-out infinite alternate 0.15s; }
+.widget-active .winamp-bar:nth-child(6) .winamp-fill { animation: winampBounce 0.8s ease-in-out infinite alternate 0.25s; }
+.widget-active .winamp-bar:nth-child(7) .winamp-fill { animation: winampBounce 1.1s ease-in-out infinite alternate 0.08s; }
+.widget-active .winamp-bar:nth-child(8) .winamp-fill { animation: winampBounce 0.6s ease-in-out infinite alternate 0.18s; }
+.widget-active .winamp-bar:nth-child(9) .winamp-fill { animation: winampBounce 1.3s ease-in-out infinite alternate 0.03s; }
+.widget-active .winamp-bar:nth-child(10) .winamp-fill { animation: winampBounce 0.75s ease-in-out infinite alternate 0.22s; }
+
+@keyframes winampBounce {
+    0% { height: 10%; }
+    50% { height: 75%; }
+    100% { height: 100%; }
+}
+
+/* ── Active Widget Card Indicator (Braun & Kare inspired) ───────────── */
+.card.widget-active {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 15px var(--primary-glow), inset 0 0 8px var(--primary-glow) !important;
+    position: relative;
+}
+
+.active-indicator {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    user-select: none;
+}
+
+.card.widget-active .active-indicator {
+    display: inline-flex;
+}
+
+.active-indicator::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background-color: var(--primary);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--primary);
+    animation: activePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes activePulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.1); }
+}

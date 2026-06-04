@@ -9,6 +9,8 @@ document.addEventListener("DOMContentLoaded", () => {
         loadGalleryBtn.addEventListener("click", () => {
             const classify = parseInt(document.getElementById("gallery-classify")?.value || "18");
             if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">Fetching public community gallery...</div>`;
+            window.DivoomState.loadedArtworks = [];
+            window.DivoomState.selectedArtworkIndex = null;
             
             let targetSize = 16;
             const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
@@ -249,9 +251,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 const loadBtn = document.getElementById("load-gallery-btn");
                 if (loadBtn) {
-                    loadBtn.textContent = `📡 Loading ${index + 1}/${total}...`;
+                    loadBtn.textContent = `Loading ${index + 1}/${total}...`;
                     if (index + 1 === total) {
-                        loadBtn.textContent = "📡 Fetch Gallery";
+                        loadBtn.textContent = "Fetch Gallery";
                     }
                 }
             }
@@ -280,10 +282,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 renderGallery(artworks);
                 window.showToast("Gallery updated with latest monthly best! 🟡", "success");
                 const loadBtn = document.getElementById("load-gallery-btn");
-                if (loadBtn) loadBtn.textContent = "📡 Fetch Gallery";
+                if (loadBtn) loadBtn.textContent = "Fetch Gallery";
             }
         } catch (e) {
             console.error("Failed to process background gallery fetch:", e);
+        }
+    };
+
+    window.loadCachedGalleryOnStartup = function() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.load_cached_gallery) {
+            window.pywebview.api.load_cached_gallery().then(artworksJson => {
+                if (artworksJson && artworksJson !== "[]") {
+                    try {
+                        const artworks = JSON.parse(artworksJson);
+                        window.DivoomState.loadedArtworks = artworks;
+                        window.DivoomState.selectedArtworkIndex = null;
+                        renderGallery(artworks);
+                    } catch (e) {
+                        console.error("Failed to parse cached gallery on startup:", e);
+                    }
+                }
+            });
         }
     };
 
@@ -291,5 +310,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
         window.updateSyncTargetList();
         window.loadHotChannelSchedule();
+        window.loadCachedGalleryOnStartup();
     }, 1500);
 });

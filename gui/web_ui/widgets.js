@@ -65,11 +65,14 @@ document.addEventListener("DOMContentLoaded", () => {
         musicSyncToggle.addEventListener("change", (e) => {
             const enable = e.target.checked;
             const trackerStatus = document.getElementById("music-track-status");
+            const musicCard = document.getElementById("widget-card-music");
             if (enable) {
                 trackerStatus.classList.add("active");
+                if (musicCard) musicCard.classList.add("widget-active");
                 window.showToast("Enabled macOS Music track listener thread", "success");
             } else {
                 trackerStatus.classList.remove("active");
+                if (musicCard) musicCard.classList.remove("widget-active");
                 document.getElementById("music-track-name").textContent = "No Music Playing";
                 document.getElementById("music-artist-name").textContent = "Spotify / Apple Music";
                 window.showToast("Music synchronization stopped", "success");
@@ -122,6 +125,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (resJson) {
                             const res = JSON.parse(resJson);
                             if (res.success) {
+                                const stockCard = document.getElementById("widget-card-stock");
+                                if (stockCard) stockCard.classList.add("widget-active");
                                 window.showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Ext");
                                 const priceMock = document.querySelector(".ticker-price-mock");
                                 const arrowMock = document.querySelector(".ticker-arrow-mock");
@@ -135,6 +140,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                 }
                                 showTickerDevicePreview(res.preview);
                             } else {
+                                const stockCard = document.getElementById("widget-card-stock");
+                                if (stockCard) stockCard.classList.remove("widget-active");
                                 window.showToast(res.error || `Failed to display ${symbol}`, "error");
                                 showTickerDevicePreview(res.preview);
                             }
@@ -253,7 +260,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const sysmonLive = document.getElementById("sysmon-live");
     if (sysmonLive) {
         sysmonLive.addEventListener("change", (e) => {
+            const sysmonCard = document.getElementById("widget-card-sysmon");
             if (e.target.checked) {
+                if (sysmonCard) sysmonCard.classList.add("widget-active");
                 refreshSysmonPreview();
                 sysmonTimer = setInterval(() => {
                     refreshSysmonPreview();
@@ -261,12 +270,47 @@ document.addEventListener("DOMContentLoaded", () => {
                         window.pywebview.api.apply_system_stats();
                     }
                 }, 5000);
-            } else if (sysmonTimer) {
-                clearInterval(sysmonTimer);
-                sysmonTimer = null;
+            } else {
+                if (sysmonCard) sysmonCard.classList.remove("widget-active");
+                if (sysmonTimer) {
+                    clearInterval(sysmonTimer);
+                    sysmonTimer = null;
+                }
             }
         });
     }
+
+    // Delegated listener for simulated Notification triggers
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".notif-trigger-btn");
+        if (btn) {
+            const app = btn.getAttribute("data-app");
+            const notifCard = document.getElementById("widget-card-notif");
+            if (notifCard) notifCard.classList.add("widget-active");
+            
+            window.showToast(`Sending ${app} alert...`, "success");
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.trigger_notification) {
+                window.pywebview.api.trigger_notification(app).then(resJson => {
+                    if (resJson) {
+                        const res = JSON.parse(resJson);
+                        if (res.success) {
+                            window.showToast(`${app} alert displayed!`, "success", "🔵 BLE");
+                        } else {
+                            window.showToast(res.error || "Failed to trigger alert", "error");
+                        }
+                        const prev = document.getElementById("notif-device-preview");
+                        if (prev && res.preview) {
+                            prev.src = res.preview;
+                            prev.style.display = "inline-block";
+                        }
+                    }
+                    setTimeout(() => {
+                        if (notifCard) notifCard.classList.remove("widget-active");
+                    }, 3000);
+                });
+            }
+        }
+    });
 
     // Startup Delay Inits
     setTimeout(loadTickers, 1500);

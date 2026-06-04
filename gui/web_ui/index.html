@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <script>
+        window.__js_errors = [];
+        window.onerror = function(message, source, lineno, colno, error) {
+            window.__js_errors.push({message: message, source: source, line: lineno, col: colno, stack: error ? error.stack : ""});
+            return false;
+        };
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Divoom Desktop Controller & Wall Dashboard</title>
     <!-- Modern Premium Fonts -->
@@ -22,11 +29,10 @@
         </div>
         <!-- Active device selector + connection indicator -->
         <div class="appbar-device">
-            <span class="transport-dot inactive" id="global-status-dot" title="Connection status"></span>
-            <select id="sidebar-device-select" class="custom-select appbar-device-select">
+            <select id="sidebar-device-select" class="custom-select appbar-device-select" style="width: 300px !important; min-width: 300px !important; height: 32px !important; padding: 0 28px 0 12px !important; line-height: 30px !important; box-sizing: border-box !important; flex-shrink: 0 !important;">
                 <option value="">Select Screen…</option>
             </select>
-            <span class="appbar-device-status" id="global-status-text">Disconnected</span>
+            <span class="transport-dot inactive" id="global-status-dot" title="Connection status" style="width: 10px; height: 10px; border-radius: 50%;"></span>
         </div>
         
         <!-- Global Brightness Slider in Appbar -->
@@ -119,7 +125,7 @@
                         <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
                     </div>
                     <div class="banner-info">
-                        <div class="banner-label">Active Target Screen</div>
+                        <div class="banner-label">Active Device</div>
                         <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
                             <h2 id="banner-device-name" style="margin-bottom:0; font-size:18px;">No Connected Screen</h2>
                         </div>
@@ -229,6 +235,15 @@
                                         <div id="custom-art-preview-container" style="display:none; align-items:center; justify-content:center; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05); text-align:center;">
                                             <img id="custom-art-preview-img" src="" alt="Custom Art Preview" style="max-width:120px; max-height:120px; border-radius:4px; object-fit:contain; border:1px solid rgba(255,255,255,0.1); image-rendering:pixelated;">
                                         </div>
+                                        
+                                        <!-- Gallery Cache Selection Grid -->
+                                        <div class="gallery-cache-selector" style="margin-top: 4px;">
+                                            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Select from Gallery Cache:</label>
+                                            <div class="selector-grid" id="custom-art-cache-grid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; max-height: 120px; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-sizing:border-box;">
+                                                <div class="empty-list" style="grid-column: 1/-1;">No cached gallery files.</div>
+                                            </div>
+                                        </div>
+
                                         <button id="apply-custom-art-btn" class="glow-btn" style="margin:0;">Push to Device</button>
                                     </div>
                                 </div>

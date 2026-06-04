@@ -46,6 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
             };
             titleEl.textContent = channelNames[channel] || "Channel Options";
         }
+        if (channel === "design") {
+            loadCustomArtCacheGrid();
+        }
     }
 
     channelCards.forEach(card => {
@@ -234,4 +237,73 @@ document.addEventListener("DOMContentLoaded", () => {
             window.applyAmbientColor(color);
         });
     });
+
+    // ── 7. DYNAMIC VJ EFFECTS TOGGLE & GALLERY CACHE SELECTOR ──
+    window.updateChannelButtonsVisibility = function(name) {
+        const vjCard = document.querySelector('.channel-card[data-channel="vj"]');
+        if (!vjCard) return;
+        
+        const n = (name || "").toLowerCase();
+        // Timebox Evo supports VJ effects
+        const supportsVJ = n.includes("timebox") || n.includes("evo");
+        if (supportsVJ) {
+            vjCard.style.display = "";
+        } else {
+            vjCard.style.display = "none";
+            // Auto-switch to clock mode if active channel was VJ
+            if (window.DivoomState.activeChannel === "vj") {
+                const clockCard = document.querySelector('.channel-card[data-channel="clock"]');
+                if (clockCard) clockCard.click();
+            }
+        }
+    };
+    
+    // Hide VJ by default
+    window.updateChannelButtonsVisibility("");
+
+    function loadCustomArtCacheGrid() {
+        const grid = document.getElementById("custom-art-cache-grid");
+        if (!grid) return;
+        grid.innerHTML = '<div class="empty-list" style="grid-column: 1/-1;">Loading offline cache...</div>';
+        
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_cached_gallery_files) {
+            window.pywebview.api.get_cached_gallery_files().then(json => {
+                const files = JSON.parse(json);
+                grid.innerHTML = "";
+                if (!files || files.length === 0) {
+                    grid.innerHTML = '<div class="empty-list" style="grid-column: 1/-1;">No cached gallery files. Download them in Monthly Best first!</div>';
+                    return;
+                }
+                files.forEach(f => {
+                    const item = document.createElement("button");
+                    item.className = "cache-thumb-item";
+                    item.style.background = "rgba(0,0,0,0.3)";
+                    item.style.border = "1px solid rgba(255,255,255,0.1)";
+                    item.style.borderRadius = "4px";
+                    item.style.padding = "4px";
+                    item.style.cursor = "pointer";
+                    item.style.display = "flex";
+                    item.style.alignItems = "center";
+                    item.style.justifyContent = "center";
+                    item.style.aspectRatio = "1/1";
+                    item.title = f.name;
+                    
+                    item.innerHTML = `<img src="${f.preview_url}" style="width:100%; height:100%; object-fit:contain; image-rendering:pixelated; border-radius:2px;">`;
+                    item.addEventListener("click", () => {
+                        grid.querySelectorAll(".cache-thumb-item").forEach(c => c.style.borderColor = "rgba(255,255,255,0.1)");
+                        item.style.borderColor = "var(--primary)";
+                        
+                        const pathInput = document.getElementById("custom-art-path-input");
+                        const previewImg = document.getElementById("custom-art-preview-img");
+                        const previewCont = document.getElementById("custom-art-preview-container");
+                        
+                        if (pathInput) pathInput.value = f.path;
+                        if (previewImg) previewImg.src = f.preview_url;
+                        if (previewCont) previewCont.style.display = "flex";
+                    });
+                    grid.appendChild(item);
+                });
+            });
+        }
+    }
 });

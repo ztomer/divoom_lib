@@ -50,9 +50,11 @@ def main():
 
     logger.info("Starting Divoom Desktop GUI window in frameless mode...")
     
+    import time
+    url_str = f"{index_html.as_uri()}?t={int(time.time())}"
     window = webview.create_window(
         title="Divoom Control Center",
-        url=str(index_html),
+        url=url_str,
         js_api=api,
         width=1024,
         height=768,

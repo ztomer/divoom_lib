@@ -40,9 +40,28 @@ class HeadlessGuiTester:
         output_path = self.screenshots_dir / f"{name}.png"
         print_info(f"Visual Test: Capturing UI snapshot to {output_path.name}...")
         try:
-            # We take a standard window screenshot using macOS command line
-            # -x: silent mode, -m: capture main monitor
-            subprocess.run(["screencapture", "-x", "-m", str(output_path)], check=True)
+            # Retrieve the window ID of the regression tester window via Quartz API
+            window_id = ""
+            try:
+                import Quartz
+                window_list = Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements, 0)
+                for window in window_list:
+                    win_name = window.get("kCGWindowName", "")
+                    win_num = window.get("kCGWindowNumber", "")
+                    if "Divoom Visual Regression Tester" in win_name or "Divoom Control Center" in win_name:
+                        window_id = str(win_num)
+                        break
+            except Exception as e:
+                print_info(f"Quartz window ID lookup failed: {e}")
+            
+            if window_id and window_id.isdigit():
+                print_info(f"Visual Test: Found window ID {window_id}, capturing single window...")
+                # -x: mute sound, -o: no shadow, -l: window ID
+                subprocess.run(["screencapture", "-x", "-o", "-l", window_id, str(output_path)], check=True)
+            else:
+                print_info("Visual Test: Window ID not found, falling back to full monitor capture...")
+                subprocess.run(["screencapture", "-x", "-m", str(output_path)], check=True)
+                
             print_ok(f"Captured Visual snapshot: {output_path.name}")
             self.results.append({"step": name, "status": "Success", "screenshot": str(output_path.relative_to(Path(__file__).parent.parent))})
         except Exception as e:
@@ -54,6 +73,14 @@ class HeadlessGuiTester:
         try:
             print_info("Visual Test: Starting automated tab cycle...")
             time.sleep(3.0)  # Wait for WKWebView layout engine to stabilize
+
+            # Debug prints
+            js_errors = window.evaluate_js('window.__js_errors ? JSON.stringify(window.__js_errors) : "[]"')
+            templates_exist = window.evaluate_js('window.DivoomTemplates ? Object.keys(window.DivoomTemplates).join(",") : "none"')
+            monthly_best_html_len = window.evaluate_js('document.getElementById("monthly-best") ? document.getElementById("monthly-best").innerHTML.length : "null_elem"')
+            load_btn_exists = window.evaluate_js('document.getElementById("load-gallery-btn") ? "yes" : "no"')
+            print_info(f"DEBUG E2E: js_errors={js_errors}")
+            print_info(f"DEBUG E2E: templates_exist={templates_exist}, monthly_best_html_len={monthly_best_html_len}, load_btn_exists={load_btn_exists}")
 
             # Step 1: Control Center View
             window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'control-panel\']").click();')
@@ -168,9 +195,10 @@ class HeadlessGuiTester:
         index_html = web_ui_dir / "index.html"
 
         # Start visual cycle thread
+        url_str = f"{index_html.as_uri()}?t={int(time.time())}"
         window = webview.create_window(
             title="Divoom Visual Regression Tester",
-            url=str(index_html),
+            url=url_str,
             js_api=self.api,
             width=1024,
             height=768,

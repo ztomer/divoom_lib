@@ -279,3 +279,39 @@ class MediaSyncMixin(GallerySyncMixin):
             return cleaned or default
         except Exception:
             return default
+
+    def trigger_notification(self, app_name: str) -> str:
+        try:
+            import asyncio
+            if not self._has_push_target():
+                return json.dumps({"success": False, "error": "No device connected"})
+            
+            size = self._active_device_size()
+            frame_path = media_source.render_notification_frame(app_name, size=size)
+            
+            # Trigger BLE hardware alert in the background
+            if self.current_divoom and not self.current_divoom.lan:
+                mapping = {"kakao": 1, "instagram": 2, "facebook": 4, "whatsapp": 6, "mail": 7, "telegram": 13}
+                code = mapping.get(app_name.lower(), 7)
+                color_map = {"whatsapp": [34, 197, 94], "mail": [255, 255, 255], "telegram": [14, 165, 233]}
+                rgb = color_map.get(app_name.lower(), [255, 90, 31])
+                try:
+                    if self.current_divoom.device:
+                        async def send_hw_notif():
+                            try:
+                                await self.current_divoom.device.send_command(0x60, [code, rgb[0], rgb[1], rgb[2]])
+                            except Exception:
+                                pass
+                        asyncio.run_coroutine_threadsafe(send_hw_notif(), self.loop_thread.loop)
+                except Exception:
+                    pass
+            
+            # Push pixel art frame (which switches BLE device to design channel automatically)
+            res = self._push_frame(frame_path, size)
+            return json.dumps({
+                "success": res,
+                "preview": self._frame_to_data_url(frame_path),
+            })
+        except Exception as e:
+            logger.error(f"trigger_notification failed: {e}")
+            return json.dumps({"success": False, "error": str(e)})
