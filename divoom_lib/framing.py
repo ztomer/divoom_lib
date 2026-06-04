@@ -1,6 +1,24 @@
 from typing import List, Tuple
+import ctypes
+from pathlib import Path
 
 from . import models
+
+# Dynamically load native C shared library for fast payload escaping/framing if available
+lib = None
+try:
+    lib_path = Path(__file__).parent.parent / "gui" / "libdivoom_compact.dylib"
+    if lib_path.exists():
+        lib = ctypes.CDLL(str(lib_path))
+        lib.encode_basic_payload.argtypes = [
+            ctypes.POINTER(ctypes.c_ubyte),  # const unsigned char* payload
+            ctypes.c_int,                    # int payload_len
+            ctypes.c_int,                    # int escape
+            ctypes.POINTER(ctypes.c_ubyte)   # unsigned char* out_msg
+        ]
+        lib.encode_basic_payload.restype = ctypes.c_int
+except Exception:
+    pass
 
 
 def int2hexlittle(value: int) -> str:
@@ -29,6 +47,20 @@ def get_checksum(data_bytes: list) -> str:
 
 
 def encode_basic_payload(payload_bytes: list, escape: bool = False) -> bytes:
+    if lib is not None:
+        try:
+            payload_data = bytes(payload_bytes)
+            n = len(payload_data)
+            out_size = 2 * n + 6
+            out_buf = (ctypes.c_ubyte * out_size)()
+            in_buf = (ctypes.c_ubyte * n).from_buffer_copy(payload_data)
+            
+            written = lib.encode_basic_payload(in_buf, n, 1 if escape else 0, out_buf)
+            if written > 0:
+                return bytes(out_buf[:written])
+        except Exception:
+            pass
+
     working_payload = payload_bytes
     if escape:
         working_payload = escape_payload(payload_bytes)
@@ -45,6 +77,7 @@ def encode_basic_payload(payload_bytes: list, escape: bool = False) -> bytes:
     message += checksum.to_bytes(2, byteorder='little')
     message.append(models.MESSAGE_END_BYTE)
     return bytes(message)
+
 
 
 def encode_ios_le_payload(payload_bytes: list, packet_number: int = 0x00000000) -> bytes:
