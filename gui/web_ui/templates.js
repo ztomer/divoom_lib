@@ -48,7 +48,7 @@ window.DivoomTemplates = {
 
                                 <div class="hc-actions">
                                     <button id="batch-sync-btn" class="glow-btn">Sync Selected Art</button>
-                                    <button id="sync-all-btn" class="glow-btn pulse-glow">Sync All → Targets</button>
+                                    <button id="sync-all-btn" class="glow-btn secondary">Sync All → Targets</button>
                                 </div>
 
                                 <!-- Automatic hot-channel schedule (4.d) -->
@@ -270,7 +270,7 @@ window.DivoomTemplates = {
                                         <input type="number" id="lan-token-input" class="text-input" value="0" min="0">
                                     </div>
                                     <div style="display:flex; align-items:flex-end;">
-                                        <button id="add-lan-btn" class="glow-btn compact" style="margin-bottom:0; height:32px;">Add</button>
+                                        <button id="add-lan-btn" class="glow-btn compact" style="margin-bottom:0; height:38px;">Add</button>
                                     </div>
                                 </div>
                                 <div class="lan-probe-result" id="lan-probe-result" style="margin-bottom:10px;"></div>

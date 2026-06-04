@@ -235,6 +235,17 @@ body {
     background: #e04e17;
 }
 
+.glow-btn.secondary {
+    background: transparent;
+    border: 1px solid var(--input-border);
+    color: var(--text-main);
+    box-shadow: none;
+}
+
+.glow-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
 /* Inputs & Form Groups */
 .form-group {
     margin-bottom: 15px;

@@ -252,3 +252,54 @@
     display: inline-block;
     flex-shrink: 0;
 }
+
+/* ── Gallery Card Item Info and Ellipsis ────────────────────────────── */
+.gallery-item-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.gallery-item-info h5 {
+    font-size: 11px;
+    font-weight: 600;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-main);
+}
+.gallery-item-info span {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    display: block;
+}
+
+/* ── Custom Target Checkbox Styling ─────────────────────────────────── */
+.target-checkbox {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--input-border);
+    border-radius: 3px;
+    background: var(--input-bg);
+    outline: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    margin: 0;
+    flex-shrink: 0;
+}
+.target-checkbox:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+.target-checkbox:checked::after {
+    content: "✓";
+    font-size: 10px;
+    color: #fff;
+    font-weight: 700;
+}
