@@ -234,3 +234,21 @@ class DivoomWall:
             tasks.append(divoom.display.show_clock(clock=clock))
         results = await asyncio.gather(*tasks)
         return all(results)
+
+    async def show_effects(self, number: int = 0) -> bool:
+        """Displays VJ effect style on all screens in the wall."""
+        self.logger.info(f"Displaying VJ effect {number} across all screens...")
+        tasks = []
+        for divoom, x, y, size, width, height in self.devices:
+            tasks.append(divoom.display.show_effects(number=number))
+        results = await asyncio.gather(*tasks)
+        return all(results)
+
+    async def show_visualization(self, number: int = 0) -> bool:
+        """Displays visualization EQ style on all screens in the wall."""
+        self.logger.info(f"Displaying visualization EQ {number} across all screens...")
+        tasks = []
+        for divoom, x, y, size, width, height in self.devices:
+            tasks.append(divoom.display.show_visualization(number=number))
+        results = await asyncio.gather(*tasks)
+        return all(results)

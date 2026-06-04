@@ -1,0 +1,243 @@
+/* sidebar.css — Sidebar navigation menu and basic structural grids */
+
+.app-container {
+    display: flex;
+    height: calc(100vh - 48px);
+    width: 100vw;
+    backdrop-filter: blur(8px);
+    -webkit-app-region: no-drag;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 12px;
+    z-index: 10;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 45px;
+}
+
+.logo-icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 8px;
+    box-shadow: 0 0 15px var(--primary-glow);
+    position: relative;
+}
+
+.logo-area h2 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text-main);
+}
+
+/* Susan Kare Retro Icon Elements */
+.kare-icon {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  vertical-align: middle;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.btn-icon .kare-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: auto;
+}
+
+.nav-btn {
+    width: 100%;
+    padding: 10px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.nav-btn.active {
+    color: var(--primary);
+    background: rgba(255, 90, 31, 0.08);
+    border-color: rgba(255, 90, 31, 0.3);
+    box-shadow: none;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-indicator.disconnected {
+    background-color: #ef4444;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+.status-indicator.connected {
+    background-color: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.status-indicator.connecting {
+    background-color: var(--accent);
+    box-shadow: 0 0 10px rgba(255, 158, 0, 0.6);
+    animation: pulse 1.5s infinite alternate;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.9); opacity: 0.6; }
+    100% { transform: scale(1.1); opacity: 1; }
+}
+
+.spinner {
+    display: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.main-content {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+    width: calc(100% - var(--sidebar-width));
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.4s ease;
+}
+
+.tab-content.active {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.header-section h1 {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+}
+
+.header-section p {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.device-banner {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    padding: 20px;
+}
+
+.banner-preview {
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    border: 2px solid var(--border-color);
+    padding: 8px;
+    flex-shrink: 0;
+}
+
+.banner-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: grayscale(100%) contrast(300%) brightness(110%);
+}
+
+.banner-info {
+    flex: 1;
+}
+
+.banner-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.banner-info h2 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.banner-specs {
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.banner-specs b {
+    color: var(--text-main);
+}

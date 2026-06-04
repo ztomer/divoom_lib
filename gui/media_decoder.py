@@ -1,0 +1,157 @@
+# gui/media_decoder.py
+
+import struct
+import logging
+from pathlib import Path
+
+logger = logging.getLogger("divoom_gui")
+
+def extract_image_from_magic_43(file_data: bytes) -> tuple[bytes, str] | None:
+    """Extracts raw GIF/PNG/JPG from Divoom Magic 43 payload."""
+    if len(file_data) < 10 or file_data[0] != 43:
+        return None
+    try:
+        text_len = struct.unpack("<I", file_data[6:10])[0]
+        text_start = 10
+        text_end = text_start + text_len
+        
+        img_len_offset = text_end
+        if len(file_data) < img_len_offset + 4:
+            return None
+            
+        img_len = struct.unpack("<I", file_data[img_len_offset:img_len_offset+4])[0]
+        img_start = img_len_offset + 4
+        img_end = img_start + img_len
+        
+        if img_end > len(file_data):
+            img_end = len(file_data)
+            
+        img_data = file_data[img_start:img_end]
+        if img_data.startswith(b"GIF89a") or img_data.startswith(b"GIF87a"):
+            return img_data, ".gif"
+        elif img_data.startswith(b"\x89PNG\r\n\x1a\n"):
+            return img_data, ".png"
+        elif img_data.startswith(b"\xff\xd8"):
+            return img_data, ".jpg"
+    except Exception as e:
+        logger.warning(f"Failed to extract image from Magic 43: {e}")
+    return None
+
+def extract_gif_from_magic_43(file_data: bytes) -> bytes | None:
+    """Helper to extract pure GIF from Magic 43 payload."""
+    res = extract_image_from_magic_43(file_data)
+    if res and res[1] == ".gif":
+        return res[0]
+    return None
+
+def decode_and_save_preview(raw_bytes: bytes, cache_file_png: Path) -> bool:
+    """Decrypts AES-CBC encrypted Divoom images and saves them as PNG/GIF."""
+    try:
+        from Crypto.Cipher import AES
+        from PIL import Image
+        
+        magic = raw_bytes[0]
+        key = '78hrey23y28ogs89'.encode('utf-8')
+        iv = '1234567890123456'.encode('utf-8')
+        
+        def decrypt_aes(data):
+            return AES.new(key, AES.MODE_CBC, iv).decrypt(data)
+
+        if magic == 9:
+            encrypted = raw_bytes[4:]
+            decrypted = decrypt_aes(encrypted)
+            total_frames = raw_bytes[1]
+            speed = struct.unpack('>H', raw_bytes[2:4])[0]
+            
+            frames = []
+            for f_idx in range(total_frames):
+                start = f_idx * 768
+                end = start + 768
+                if end > len(decrypted):
+                    break
+                frame_data = bytes(decrypted[start:end])
+                img = Image.frombytes("RGB", (16, 16), frame_data)
+                img_resized = img.resize((128, 128), Image.Resampling.NEAREST)
+                frames.append(img_resized)
+            
+            if frames:
+                if len(frames) > 1:
+                    cache_file_gif = cache_file_png.with_suffix(".gif")
+                    frame_duration = speed if speed >= 10 else 100
+                    frames[0].save(
+                        cache_file_gif,
+                        save_all=True,
+                        append_images=frames[1:],
+                        duration=frame_duration,
+                        loop=0
+                    )
+                    logger.info(f"Gallery Cache: Decoded Magic 9 animation with {len(frames)} frames to {cache_file_gif.name}")
+                else:
+                    frames[0].save(cache_file_png)
+                    logger.info(f"Gallery Cache: Decoded Magic 9 static frame to {cache_file_png.name}")
+                return True
+                
+        elif magic == 18 or magic == 26:
+            import lzallright
+            total_frames, speed, row_count, column_count = struct.unpack('>BHBB', raw_bytes[1:6])
+            encrypted = raw_bytes[6:]
+            decrypted = decrypt_aes(encrypted)
+            
+            lzo = lzallright.LZOCompressor()
+            uncompressed_size = row_count * column_count * 768
+            
+            frames = []
+            pos = 0
+            for f_idx in range(total_frames):
+                if pos + 4 > len(decrypted):
+                    break
+                frame_size = struct.unpack('>I', decrypted[pos : pos + 4])[0]
+                pos += 4
+                if pos + frame_size > len(decrypted):
+                    break
+                compressed_frame = decrypted[pos : pos + frame_size]
+                pos += frame_size
+                
+                try:
+                    frame_data = lzo.decompress(compressed_frame, uncompressed_size)
+                    img = _compact_tiles(frame_data, row_count, column_count)
+                    img_resized = img.resize((128, 128), Image.Resampling.NEAREST)
+                    frames.append(img_resized)
+                except Exception as frame_err:
+                    logger.warning(f"Failed to decompress frame {f_idx} for magic {magic}: {frame_err}")
+                    break
+            
+            if frames:
+                if len(frames) > 1:
+                    cache_file_gif = cache_file_png.with_suffix(".gif")
+                    frame_duration = speed if speed >= 10 else 100
+                    frames[0].save(
+                        cache_file_gif,
+                        save_all=True,
+                        append_images=frames[1:],
+                        duration=frame_duration,
+                        loop=0
+                    )
+                    logger.info(f"Gallery Cache: Decoded Magic {magic} animation with {len(frames)} frames to {cache_file_gif.name}")
+                else:
+                    frames[0].save(cache_file_png)
+                    logger.info(f"Gallery Cache: Decoded Magic {magic} static frame to {cache_file_png.name}")
+                return True
+    except Exception as e:
+        logger.warning(f"Failed to transcode preview for Magic {raw_bytes[0] if raw_bytes else 0}: {e}")
+    return False
+
+def _compact_tiles(frame_data: bytes, row_count: int, column_count: int):
+    from PIL import Image
+    width, height = column_count * 16, row_count * 16
+    img = Image.new("RGB", (width, height))
+    pixels = img.load()
+    pos = 0
+    for grid_y in range(row_count):
+        for grid_x in range(column_count):
+            for y in range(16):
+                for x in range(16):
+                    if pos + 3 <= len(frame_data):
+                        pixels[grid_x * 16 + x, grid_y * 16 + y] = (frame_data[pos], frame_data[pos+1], frame_data[pos+2])
+                        pos += 3
+    return img

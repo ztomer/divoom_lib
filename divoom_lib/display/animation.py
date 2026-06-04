@@ -89,7 +89,7 @@ class Animation(AnimationUserDefine):
         ANSGC_CONTROL_TERMINATE_SENDING: _handle_ansgc_terminate_sending,
     }
 
-    async def app_new_send_gif_cmd(self, control_word: int, **kwargs) -> bool:
+    async def app_new_send_gif_cmd(self, control_word: int, write_with_response: bool = False, **kwargs) -> bool:
         """
         Send a new GIF animation to the device using the upgraded protocol.
         """
@@ -109,7 +109,7 @@ class Animation(AnimationUserDefine):
                 f"Unknown control word for app_new_send_gif_cmd: {control_word}")
             return False
 
-        return await self.communicator.send_command(COMMANDS["app new send gif cmd"], args)
+        return await self.communicator.send_command(COMMANDS["app new send gif cmd"], args, write_with_response=write_with_response)
 
     async def set_rhythm_gif(self, pos: int, total_length: int, gif_id: int, data: list) -> bool:
         """

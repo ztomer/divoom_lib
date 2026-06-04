@@ -200,7 +200,7 @@ def get_system_stats() -> dict:
 
 
 def render_system_stats_frame(stats: dict, size: int = 16) -> Path:
-    """Render CPU/RAM (and battery) as two labelled bar gauges sized to the
+    """Render CPU, RAM, and Battery as three labeled bar gauges sized to the
     device matrix. Mirrors render_stock_ticker_frame's approach."""
     scratch_dir = Path(__file__).parent.parent.parent / "scratch"
     scratch_dir.mkdir(parents=True, exist_ok=True)
@@ -209,28 +209,58 @@ def render_system_stats_frame(stats: dict, size: int = 16) -> Path:
     img = Image.new("RGB", (size, size), (5, 6, 12))
     draw = ImageDraw.Draw(img)
 
-    def bar(y, frac, color, h):
-        frac = max(0.0, min(1.0, frac / 100.0))
-        w = max(1, int(round((size - 2) * frac)))
-        draw.rectangle([(1, y), (size - 2, y + h)], outline=(40, 42, 54))
-        if w > 0:
-            draw.rectangle([(1, y), (1 + w, y + h)], fill=color)
+    def draw_gauge(x, y, w_max, h, value, color):
+        draw.rectangle([(x, y), (x + w_max - 1, y + h - 1)], outline=(40, 42, 54))
+        frac = max(0.0, min(1.0, value / 100.0))
+        w_fill = max(1, int(round((w_max - 2) * frac)))
+        if w_fill > 0:
+            draw.rectangle([(x + 1, y + 1), (x + w_fill, y + h - 2)], fill=color)
 
     cpu = stats.get("cpu", 0)
     mem = stats.get("mem", 0)
+    bat = stats.get("battery")
+    if bat is None:
+        bat = 100
+
     cpu_color = (0, 255, 180) if cpu < 70 else (255, 60, 60)
     mem_color = (90, 170, 255) if mem < 80 else (255, 140, 0)
+    bat_color = (0, 255, 100) if bat > 25 else (255, 60, 60)
 
     if size <= 16:
-        draw.text((1, 0), "C", fill=(255, 255, 255))
-        bar(6, cpu, cpu_color, 2)
-        draw.text((1, 8), "M", fill=(255, 255, 255))
-        bar(13, mem, mem_color, 2)
+        # CPU Label + Bar at y=1
+        draw.text((1, -1), "C", fill=(255, 255, 255))
+        draw_gauge(6, 1, 9, 3, cpu, cpu_color)
+        # MEM Label + Bar at y=6
+        draw.text((1, 4), "M", fill=(255, 255, 255))
+        draw_gauge(6, 6, 9, 3, mem, mem_color)
+        # BAT Label + Bar at y=11
+        draw.text((1, 9), "B", fill=(255, 255, 255))
+        draw_gauge(6, 11, 9, 3, bat, bat_color)
     else:
-        draw.text((2, 1), f"CPU {cpu}%", fill=cpu_color)
-        bar(10, cpu, cpu_color, 4)
-        draw.text((2, 17), f"MEM {mem}%", fill=mem_color)
-        bar(26, mem, mem_color, 4)
+        # Larger layouts (e.g. 32x32, 64x64)
+        scale = size / 32.0
+        
+        y_cpu_text = int(round(0 * scale))
+        y_cpu_bar = int(round(6 * scale))
+        y_mem_text = int(round(10 * scale))
+        y_mem_bar = int(round(16 * scale))
+        y_bat_text = int(round(20 * scale))
+        y_bat_bar = int(round(26 * scale))
+        
+        bar_w = int(round(28 * scale))
+        bar_h = int(round(3 * scale))
+        
+        if bar_h < 3:
+            bar_h = 3
+            
+        draw.text((2, y_cpu_text), f"CPU {cpu}%", fill=cpu_color)
+        draw_gauge(2, y_cpu_bar, bar_w, bar_h, cpu, cpu_color)
+        
+        draw.text((2, y_mem_text), f"MEM {mem}%", fill=mem_color)
+        draw_gauge(2, y_mem_bar, bar_w, bar_h, mem, mem_color)
+        
+        draw.text((2, y_bat_text), f"BAT {bat}%", fill=bat_color)
+        draw_gauge(2, y_bat_bar, bar_w, bar_h, bat, bat_color)
 
     img.save(out_path)
     return out_path

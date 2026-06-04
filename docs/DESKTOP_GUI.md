@@ -6,7 +6,22 @@ The `divoom-control` library includes a modern, high-performance Desktop Dashboa
 
 ## 1. Desktop GUI Dashboard
 
-The Desktop Dashboard is built using an embedded HTML/CSS/JS viewport via **PyWebView** powered by a robust, thread-safe Python backend bridge ([gui_main.py](file:///Users/ztomer/Projects/divoom-control/gui/gui_main.py)).
+The Desktop Dashboard is built using an embedded HTML/CSS/JS viewport via **PyWebView** powered by a robust, thread-safe Python backend bridge ([gui_main.py](file:///Users/ztomer/Projects/divoom-control/gui/gui_main.py)). To ensure code maintainability and meet strict size constraints (no file over 500 lines of code), the frontend codebase is fully modularized:
+
+*   **Stylesheets (`gui/web_ui/style.css`)**: Uses CSS `@import` statements to load distinct styling domains recursively:
+    *   `appbar.css` (custom titlebar controls & global brightness sliders)
+    *   `sidebar.css` (sidebar navigations, logos, transport states)
+    *   `channels.css` (color pickers, swatches, built-in clock & VJ grids)
+    *   `wall.css` (free-form canvas drag arranger & presets select)
+    *   `widgets.css` (live music sync covers, vinyl, stocks, sysmon meters)
+    *   `settings.css` (sub-tabs menus, Braun-style tables, legends)
+    *   `gallery.css` (cloud grids, batch sync bars, hot-channel target panels)
+*   **Scripts (`gui/web_ui/app.js`)**: Linked sequentially to share state cleanly in the browser context via `window.DivoomState`:
+    *   `channels.js` (channel selection buttons, dials, color inputs)
+    *   `widgets.js` (frameless window buttons, macOS cover art trackers, stocks APIs, 3-bar system stats)
+    *   `settings.js` (sub-tabs buttons toggles, BLE scanner table, Wi-Fi device manager)
+    *   `gallery.js` (cloud community gallery fetch, targets checklist, schedules config)
+    *   `app.js` (overall coordinator loading settings, display wall arranger canvas, custom file browse previews)
 
 ### Capabilities
 - **Active Bluetooth Scanner**: Discovery tool scanning nearby BLE devices and identifying them by known Divoom signatures, with support for custom devices limit and scan timeouts.

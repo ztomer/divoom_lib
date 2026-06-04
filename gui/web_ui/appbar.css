@@ -1,0 +1,197 @@
+/* appbar.css — Custom frameless window titlebar styling */
+
+.integrated-appbar {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    background: var(--win-appbar-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 15px;
+    z-index: 1000;
+    position: relative;
+    user-select: none;
+    -webkit-app-region: drag; /* Allows moving window by dragging titlebar */
+}
+
+.appbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+}
+
+/* Active device selector + connection indicator in the app bar */
+.appbar-device {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 14px;
+    -webkit-app-region: no-drag;
+}
+
+.appbar-device-select {
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 170px;
+    max-width: 250px;
+    height: 26px;
+    padding: 2px 28px 2px 8px;
+}
+
+.appbar-device-status {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* "Connecting" state for the shared transport dot (amber pulse) */
+.transport-dot.connecting {
+    background: #f59e0b !important;
+    color: #f59e0b !important;
+    opacity: 1;
+    animation: dot-pulse 1s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 2px currentColor; opacity: 0.6; }
+    50% { box-shadow: 0 0 8px currentColor; opacity: 1; }
+}
+
+.appbar-logo {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+.appbar-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-main);
+    letter-spacing: 0.2px;
+}
+
+.appbar-drag-spacer {
+    flex: 1;
+    height: 100%;
+}
+
+.appbar-window-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    -webkit-app-region: no-drag; /* Excludes control buttons from window drags */
+}
+
+.win-btn {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 0; /* Hide text, style as macOS traffic lights */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: transparent;
+    font-weight: 700;
+}
+
+.win-btn.close { background-color: #ff5f56; }
+.win-btn.min { background-color: #ffbd2e; }
+.win-btn.max { background-color: #27c93f; }
+
+.win-btn:hover {
+    font-size: 9px;
+    color: rgba(0, 0, 0, 0.75);
+}
+
+.win-btn.close:hover { background-color: #ff4a40; }
+.win-btn.min:hover { background-color: #ffaa14; }
+.win-btn.max:hover { background-color: #1cc033; }
+
+/* Appbar Transports Indicator block */
+.appbar-transports {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: 15px;
+    -webkit-app-region: no-drag;
+}
+
+.appbar-transports .transport-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: opacity 0.2s, box-shadow 0.2s;
+    cursor: help;
+}
+
+.appbar-transports .transport-dot.inactive {
+    opacity: 0.2;
+    box-shadow: none !important;
+}
+
+.appbar-transports .transport-dot.active {
+    opacity: 1;
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* Appbar Global Brightness Slider styling */
+.appbar-brightness {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 20px;
+    padding: 3px 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    -webkit-app-region: no-drag;
+}
+
+.appbar-brightness .kare-icon {
+    width: 12px;
+    height: 12px;
+    color: var(--text-muted);
+}
+
+.appbar-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 90px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.appbar-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 4px var(--primary-glow);
+    transition: transform 0.1s ease;
+}
+
+.appbar-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+#global-brightness-value {
+    font-size: 10px;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    min-width: 28px;
+    text-align: right;
+}

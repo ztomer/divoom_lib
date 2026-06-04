@@ -104,6 +104,14 @@ async def stream_raw_bin_payload(divoom: Divoom, file_data: bytes) -> bool:
         
     await asyncio.sleep(0.5)  # Let the device allocate buffers
     
+    # Determine transport type
+    is_lan = getattr(divoom, "lan", None) is not None
+    is_spp = getattr(divoom, "use_spp", False)
+    is_ble = not is_lan and not is_spp
+    
+    write_with_response = is_ble
+    delay = 0.01 if is_ble else 0.0
+    
     # 2. Transmit data in chunks (Control Word 1)
     chunk_size = 200  # Safe BLE transfer chunk size
     offset_id = 0
@@ -115,13 +123,15 @@ async def stream_raw_bin_payload(divoom: Divoom, file_data: bytes) -> bool:
             control_word=ANSGC_CONTROL_SENDING_DATA,
             file_size=file_size,
             file_offset_id=offset_id,
-            file_data=chunk
+            file_data=chunk,
+            write_with_response=write_with_response
         )
         if not success:
             print_err(f"Failed to send chunk {offset_id}")
             return False
         offset_id += 1
-        await asyncio.sleep(0.1)  # Brief sleep to avoid GATT congestion
+        if delay > 0:
+            await asyncio.sleep(delay)  # Brief sleep to avoid GATT congestion
         
     # 3. Terminate sending (Control Word 2)
     print_info("Terminating chunked BLE transfer...")

@@ -1,0 +1,254 @@
+/* gallery.css — Cloud Community Gallery and Monthly Best layouts */
+
+/* Gallery grid lists */
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+.gallery-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.25s ease;
+}
+
+.gallery-item:hover {
+    border-color: rgba(157, 78, 221, 0.3);
+    background: rgba(157, 78, 221, 0.02);
+}
+
+.gallery-item.active {
+    border-color: var(--primary);
+    background: rgba(255, 90, 31, 0.06);
+}
+
+.gallery-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gallery-item-preview-box {
+    width: 100%;
+    height: 0;
+    padding-bottom: 100%;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--border-color);
+}
+
+.gallery-item-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.gallery-item-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+.gallery-item-magic {
+    font-family: monospace;
+    font-size: 9px;
+    background: rgba(255,255,255,0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* ── Sticky Flex Monthly Best & Scrollable Grid ─────────────────────── */
+#monthly-best.active {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 40px - var(--header-height) - 40px); /* Fit cleanly inside main viewport */
+    min-height: 0;
+}
+
+#monthly-best .card.glass-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#monthly-best .card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#monthly-best .gallery-grid {
+    flex: 1;
+    max-height: none;
+    overflow-y: auto;
+    min-height: 0;
+    margin-bottom: 0;
+    padding-bottom: 20px;
+}
+
+.batch-sync-bar {
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 16px 20px;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    border-radius: 0 0 6px 6px;
+    margin-left: -20px;
+    margin-right: -20px;
+    margin-bottom: -20px;
+}
+
+/* ── Hot-channel: target multi-select + schedule (area 4) ──────────── */
+.hot-channel {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.hc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.hc-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.sync-targets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.target-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+}
+
+.target-row:hover { background: rgba(130, 131, 138, 0.08); }
+
+.target-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 110px;
+}
+
+.target-addr {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: monospace;
+    margin-left: auto;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 110px;
+}
+
+.hc-actions { display: flex; gap: 10px; }
+
+.hc-schedule {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.hc-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-main);
+    cursor: pointer;
+}
+
+/* ── Sync Target Info Elements ─────────────────────────────────────── */
+.sync-target-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sync-target-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.sync-target-list {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ── Monthly Best 2-Column Layout ──────────────────────────────────── */
+.monthly-best-layout {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 20px;
+    height: calc(100vh - 160px);
+}
+
+.device-accent-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}

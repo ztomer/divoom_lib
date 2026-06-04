@@ -1,0 +1,372 @@
+/* widgets.css — Live Widgets (Music vinyls, stocks, system status readouts) and notifications */
+
+.music-cover-preview {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.music-cover-preview img {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.cover-vinyl {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background: radial-gradient(circle, #333 40%, #111 41%, #000 100%);
+    border-radius: 50%;
+    right: -15px;
+    top: 5px;
+    z-index: -1;
+    animation: rotateVinyl 8s linear infinite;
+    animation-play-state: paused;
+}
+
+.music-tracker-card.active .cover-vinyl {
+    animation-play-state: running;
+}
+
+@keyframes rotateVinyl {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.music-track-info {
+    flex: 1;
+}
+
+.music-track-info h4 {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.music-track-info p {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.neon-eq-bars {
+    position: absolute;
+    bottom: 5px;
+    left: 10px;
+    right: 10px;
+    height: 25px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.music-track-status.active .neon-eq-bars,
+.music-tracker-card.active .neon-eq-bars {
+    opacity: 0.95;
+}
+
+.eq-bar {
+    width: 6px;
+    background-color: var(--primary);
+    box-shadow: 0 0 8px var(--primary-glow);
+    border-radius: 3px;
+    height: 3px;
+}
+
+.music-tracker-card.active .bar1 { animation: bounceBar 1.2s ease-in-out infinite alternate; }
+.music-tracker-card.active .bar2 { animation: bounceBar 0.8s ease-in-out infinite alternate 0.2s; }
+.music-tracker-card.active .bar3 { animation: bounceBar 1.5s ease-in-out infinite alternate 0.1s; }
+.music-tracker-card.active .bar4 { animation: bounceBar 1.0s ease-in-out infinite alternate 0.3s; }
+
+@keyframes bounceBar {
+    0% { height: 4px; }
+    100% { height: 22px; }
+}
+
+.device-preview-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.device-preview-img {
+    width: 64px;
+    height: 64px;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: #000;
+    object-fit: contain;
+}
+
+/* System monitor stats (CPU/MEM/BAT) */
+.sysmon-readout {
+    display: flex;
+    gap: 18px;
+    margin-bottom: 8px;
+}
+
+.sysmon-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sysmon-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.sysmon-stat b {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--text-main);
+}
+
+/* Saved stock tickers */
+.tickers-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+}
+
+.ticker-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(130, 131, 138, 0.08);
+}
+
+.ticker-chip-label {
+    background: none;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+    padding: 4px 8px 4px 10px;
+    cursor: pointer;
+}
+
+.ticker-chip-label:hover { color: var(--primary); }
+
+.ticker-chip-remove {
+    background: none;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 4px 8px;
+    cursor: pointer;
+    border-left: 1px solid var(--border-color);
+}
+
+.ticker-chip-remove:hover { color: #ef4444; }
+
+/* Switch toggles */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 22px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider-round {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255,255,255,0.1);
+    transition: .4s;
+    border-radius: 34px;
+    border: 1px solid var(--border-color);
+}
+
+.slider-round:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider-round {
+    background-color: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+input:checked + .slider-round:before {
+    transform: translateX(22px);
+}
+
+.toggle-control-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.02);
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.toggle-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Stock ticker panel preview mockups */
+.widget-preview-ticker {
+    background: #000;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    aspect-ratio: 2 / 1;
+}
+
+.ticker-arrow-mock {
+    font-size: 18px;
+    color: var(--primary);
+    text-shadow: 0 0 8px var(--primary-glow);
+}
+
+.ticker-price-mock {
+    font-size: 11px;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.ticker-name-mock {
+    font-size: 8px;
+    color: #fff;
+    opacity: 0.6;
+    margin-top: 4px;
+}
+
+/* Toast popup notifications */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: rgba(20, 24, 38, 0.95);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px 24px;
+    color: var(--text-main);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.toast.success { border-color: var(--primary); }
+.toast.error { border-color: #ef4444; }
+
+.toast-transport {
+  font-size: 10px;
+  opacity: 0.75;
+  margin-left: 6px;
+}
+
+/* macOS Music widget side-by-side previews */
+.music-previews-container {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 15px;
+}
+
+.music-previews-container .music-cover-preview {
+    width: 120px;
+    height: 120px;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.music-previews-container .music-cover-preview img {
+    border-radius: 6px;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.music-device-preview-wrap {
+    width: 120px;
+    height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+}
+
+.music-device-preview-wrap .device-preview-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+    background: transparent;
+    border: none;
+    margin: 0;
+    border-radius: 6px;
+}
+
+.music-device-preview-wrap .hc-label {
+    position: absolute;
+    bottom: 4px;
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1px 4px;
+    border-radius: 2px;
+}
