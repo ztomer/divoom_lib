@@ -36,17 +36,25 @@ This is the main class for interacting with a Divoom device.
 *   **`countdown`**: An instance of `divoom_lib.tools.countdown.Countdown` for the countdown tool.
 *   **`noise`**: An instance of `divoom_lib.tools.noise.Noise` for the noise tool.
 
-### `divoom_lib.protocol.DivoomProtocol`
+### Connection & Command Transmission (`divoom_lib.Divoom`)
 
-This class handles the low-level communication with the Divoom device.
+The low-level connection and raw command methods are exposed directly on the main `Divoom` facade orchestrator (delegated to the internal `DivoomConnection` manager):
 
 **Methods:**
 
-*   **`async connect()`**: Connects to the Divoom device.
-*   **`async disconnect()`**: Disconnects from the Divoom device.
-*   **`is_connected`**: Property to check if the device is connected.
-*   **`async send_command(command, args)`**: Sends a command to the device.
-*   **`async send_command_and_wait_for_response(command, args)`**: Sends a command and waits for a response.
+*   **`async connect()`**: Connects to the device (automatically routing via BLE, Classic SPP, or local Wi-Fi LAN depending on target address and configuration).
+*   **`async disconnect()`**: Disconnects from the device.
+*   **`is_connected`**: Property to check if the device is currently connected.
+*   **`async send_command(command, args)`**: Sends a raw command to the device.
+*   **`async send_command_and_wait_for_response(command, args)`**: Sends a command and blocks/waits for its parsed notification response.
+
+### `divoom_lib.protocol.DivoomProtocol`
+
+A backward-compatibility subclass of `Divoom`. It behaves identically to `Divoom` but is kept to support legacy client code that explicitly imports and instantiates the old duplicate interface.
+
+**Attributes:**
+
+*   **`protocol`**: Backwards-compatibility property returning `self` (allowing legacy calls like `divoom.protocol.connect()` to still execute correctly).
 
 ### `divoom_lib.utils.discovery`
 

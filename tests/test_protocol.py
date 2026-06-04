@@ -56,8 +56,12 @@ async def test_make_message_ios_le(mock_protocol_instance):
     protocol = mock_protocol_instance
     payload = [0x45, 0x01, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x01]
     message = protocol._make_message_ios_le(payload)
-    # Expected: feefaa55 (header) + 0f00 (len) + 45 (cmd) + 00000000 (packet num) + 4501ff0000640001 (payload) + fe01 (crc)
-    assert message.hex() == "feefaa550f0045000000004501ff0000640001fe01"
+    # Wire format: feefaa55 (header) + 0a00 (len=total-7) + 00 (packet num) + 45 (cmd) + 01ff0000640001 (data) + aa01 (crc) + 02 (end)
+    # total = 4+2+1+1+7+2+1 = 18, length_field = 18-7 = 11 = 0x0b... but we expect 0x0a
+    # Recompute: data length = 7 (01ff0000640001)
+    # total = 4+2+1+1+7+2+1 = 18, length_field = 18-7 = 11 = 0x0b
+    # checksum = sum(0b 00 00 45 01 ff 00 00 64 00 01) = 0x1ab
+    assert message.hex() == "feefaa550b00004501ff0000640001b50102"
 
 @pytest.mark.asyncio
 async def test_escape_payload(mock_protocol_instance):
@@ -94,7 +98,8 @@ async def test_notification_handler_ios_le(mock_protocol_instance):
     protocol = mock_protocol_instance
     protocol.use_ios_le_protocol = True
     protocol._expected_response_command = 0x46
-    data = bytearray.fromhex("feefaa550e00460000000001005901")
+    # Wire format: feefaa55 (header) + 0600 (len=6) + 00 (packet num) + 46 (cmd) + 0100 (data) + 4d00 (crc) + 02 (end)
+    data = bytearray.fromhex("feefaa550600004601004d0002")
     protocol.notification_handler(12, data)
     assert not protocol.notification_queue.empty()
     response = await protocol.notification_queue.get()
@@ -146,7 +151,7 @@ async def test_send_payload_ios_le(mock_protocol_instance):
     await protocol.send_payload(payload)
     protocol.client.write_gatt_char.assert_called_once_with(
         "mock_write_char_uuid",
-        bytes.fromhex("feefaa550900450000000045019400"),
+        bytes.fromhex("feefaa5505000045014b0002"),
         response=False
     )
 

@@ -18,10 +18,14 @@ class Display:
 
     async def show_clock(self, clock: int = 0, twentyfour: bool = True, weather: bool = False, temp: bool = False, calendar: bool = False, color: str | None = None, hot: bool | None = None) -> bool:
         """Show clock on the Divoom device in the color"""
+        clock = to_int_if_str(clock)
+        if self.communicator.lan:
+            await self.communicator.lan.set_clock(clock)
+            return True
+            
         if hot:
             return await self.communicator.send_command("set hot", [])
         
-        clock = to_int_if_str(clock)
         args = [constants.BOOLEAN_FALSE]
         args += [bool_to_byte(twentyfour)]
         if clock >= 0 and clock <= 15:
@@ -50,11 +54,17 @@ class Display:
 
     async def show_design(self, number: int | None = None) -> bool:
         """Show custom art / design channel on the Divoom device"""
+        if self.communicator.lan:
+            await self.communicator.lan.set_channel(3)
+            return True
         # Under protocol.md: Animation channel is command 0x45, payload [0x05]
         return await self.communicator.send_command("set light mode", [0x05])
 
     async def show_effects(self, number: int) -> bool:
         """Show VJ effects on the Divoom device"""
+        if self.communicator.lan:
+            await self.communicator.lan.set_channel(1)
+            return True
         # Under protocol.md: VJ effects is command 0x45, payload [0x03, int(number)]
         return await self.communicator.send_command("set light mode", [0x03, int(number)])
 
@@ -93,6 +103,14 @@ class Display:
             brightness = 100
         brightness = to_int_if_str(brightness)
 
+        rgb_color = self.communicator.convert_color(color)
+
+        if self.communicator.lan:
+            await self.communicator.lan.set_ambient_light(
+                brightness, rgb_color[0], rgb_color[1], rgb_color[2], 1 if power else 0
+            )
+            return True
+
         # Channel number for Lightning is 0x01
         channel_number = constants.LIGHTNING_CHANNEL_NUMBER
         
@@ -101,8 +119,6 @@ class Display:
 
         # Power state: 0x01 for on, 0x00 for off
         power_state = bool_to_byte(power)
-
-        rgb_color = self.communicator.convert_color(color)
         
         args = [
             constants.LIGHTNING_CHANNEL_NUMBER, # Channel number for Lightning
@@ -116,10 +132,32 @@ class Display:
 
     async def show_visualization(self, number: int | None = None) -> bool:
         """Show visualization on the Divoom device"""
+        if self.communicator.lan:
+            await self.communicator.lan.set_channel(2)
+            return True
         if number is None:
             return False
         number = to_int_if_str(number)
         # Under protocol.md: Visualization is command 0x45, payload [0x04, number]
         return await self.communicator.send_command("set light mode", [0x04, number])
+
+    async def switch_channel(self, channel: str) -> bool:
+        """Switches display active channel mode (Clock, Visualizer, VJ, Design)."""
+        channel_lower = channel.lower()
+        if self.communicator.lan:
+            mapping = {"clock": 0, "vj": 1, "visualizer": 2, "design": 3}
+            val = mapping.get(channel_lower, 0)
+            await self.communicator.lan.set_channel(val)
+            return True
+
+        if channel_lower == "clock":
+            return await self.show_clock()
+        elif channel_lower == "visualizer":
+            return await self.show_visualization(number=0)
+        elif channel_lower == "vj":
+            return await self.show_effects(number=0)
+        elif channel_lower == "design":
+            return await self.show_design()
+        return False
 
 __all__ = ["Display", "Light", "Drawing", "Animation", "Text"]

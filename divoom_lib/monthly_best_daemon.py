@@ -323,15 +323,17 @@ async def _push_items_to_target(target_addr, name_substring, items_to_display, l
     push every downloaded artwork to it, then disconnect."""
     divoom = None
     try:
+        device_name = None
         if not target_addr:
             print_info(f"Discovering BLE device with name containing {name_substring!r}...")
             ble_device, device_addr = await discovery.discover_device(name_substring=name_substring, address=None)
             if not ble_device:
                 raise RuntimeError(f"No Divoom device found with name substring {name_substring!r}")
             target_addr = device_addr
+            device_name = ble_device.name if hasattr(ble_device, "name") else None
 
         print_info(f"Connecting to BLE device at {target_addr}...")
-        divoom = Divoom(mac=target_addr, logger=logger, use_ios_le_protocol=True)
+        divoom = Divoom(mac=target_addr, logger=logger, use_ios_le_protocol=True, device_name=device_name)
         await divoom.connect()
         print_ok(f"Connected to {target_addr} successfully!")
 

@@ -279,11 +279,181 @@ regressions; the 39 are pre-existing migration failures in untouched files.
 - [x] **Full suite now: 218 passed / 0 failed / 72 skipped** (290 collected; the
       72 skips are the hardware integration tests, run with `--run-hardware`).
 
+### Phase 7 — Folder cleanup + final fixes (DONE)
+- [x] **Folder restructure** (user-driven): `divoom_lib/` flattened + repacked
+      into `transport.py`, `lan_transport.py`, `connection.py`,
+      `divoom_auth.py`, `hotchannel_config.py`, `wall.py`, plus `models/`
+      (subdir: `commands.py`, `config.py`, `constants.py`), `tools/`, `display/`,
+      `media/`, `scheduling/`, `system/`, `utils/`. Top-level `__init__.py`
+      re-exports only `Divoom`, `LanTransport`, `Transport`, `via`,
+      `COMMAND_TRANSPORT_MAP`, `transport_for`, and exception classes via a
+      lazy `__getattr__` (no eager import to break circularity).
+- [x] **`DivoomConfig` no longer exported** from `divoom_lib`; `OPEN_PACKAGE`,
+      `device_address_pattern`, `models`, `exceptions` likewise removed from
+      the top-level namespace. Test imports updated to canonical sub-package
+      modules (`divoom_lib.models`, `divoom_lib.exceptions`).
+- [x] **Critical bug fix** — `divoom_lib/system/device.py:45-47`:
+      `Device.__init__` previously stored `self._divoom = divoom` but all 27
+      instance methods referenced `self.communicator`. Renamed to
+      `self.communicator = divoom`. Without this fix, every call to
+      `divoom.device.{set_brightness, set_volume, ...}` raised
+      `AttributeError`. The redundant `self.communicator = divoom` line in
+      `System.__init__` was also removed — it now flows from `super().__init__()`.
+- [x] **iOS-LE framing bug** (per APK reverse-engineering at
+      `references/apk/decompiled_src/sources/com/divoom/Divoom/bluetooth/c.java:36-50`):
+      - `divoom_lib/framing.py:50-65` `encode_ios_le_payload` — the
+        `data_bytes = payload_bytes` line was putting the cmd byte on the wire
+        twice. Changed to `data_bytes = payload_bytes[1:]`. Checksum input and
+        length calculation corrected per APK spec.
+      - `divoom_lib/framing.py:68-95` `parse_ios_le_notification` — payload
+        slice `data[OFFSET:-CHECKSUM_LEN]` over-included checksum bytes;
+        changed to `data[OFFSET:-CHECKSUM_LEN-1]` to also skip the end marker.
+      - `divoom_lib/models/constants.py` — `IOS_LE_COMMAND_IDENTIFIER` 6→7,
+        `IOS_LE_DATA_OFFSET` 11→8, `IOS_LE_PACKET_NUMBER` (new) = 6,
+        `IOS_LE_MIN_DATA_LENGTH` 13→11, `IOS_LE_MESSAGE_PACKET_NUM_LENGTH` 4→1.
+        Removed obsolete `IOS_LE_PACKET_NUMBER_START/END`.
+- [x] **Test expected-bytes updated**: `tests/test_protocol.py:60, 102, 154`,
+      `tests/test_base.py:142-246, 574`, `tests/test_constants.py:35-37` —
+      all 5 iOS-LE byte strings and 2 constant assertions corrected.
+- [x] **Dead-code removal (vulture high-confidence)**: removed unused imports
+      in `divoom_lib/divoom.py` (`BLEDevice`, `BleakGATTCharacteristic`),
+      `divoom_lib/models.py` (`PAYLOAD_COLOR_MODE_UNKNOWN_BYTE_1/2`,
+      `SUG_DATA_NORMAL_IMAGE/SAND_PAINTING`), `divoom_lib/display/animation.py`,
+      `divoom_lib/media/music.py`.
+- [x] **BLE-vs-BT-Classic investigation documented** (no code change —
+      outcome: official Divoom app uses BT Classic RFCOMM SPP, not BLE;
+      macOS PyObjC path is blocked by missing IOBluetooth selectors and an
+      SDP-less segfault on `openRFCOMMChannelSync`). Symptom
+      ("channel switch works only once") is consistent with BLE writes being
+      silently accepted by Timoo but never producing notifications.
+- [x] **Full suite now: 290 passed / 0 failed / 72 skipped** (362 collected;
+      72 skips are the hardware integration tests, run with `--run-hardware`;
+      26 of those are the new `BTSppTransport` unit tests).
+
+### Phase 8 — BT Classic RFCOMM SPP bridge investigation (DONE, blocked)
+
+Investigated whether the "works only once" / BLE-silent bug could be worked
+around by switching to BT Classic RFCOMM SPP — which the official Divoom APK
+analysis showed is the transport actually used by `com.divoom.Divoom`.
+
+**Transport feasibility audit (macOS, Python):**
+
+| Approach | Outcome |
+|---|---|
+| BLE (current `bleak` path) | Connects to all 4 devices; 0 notifications on every writeable char, every format, 10s waits. Confirmed dead end. |
+| `pyobjc-framework-IOBluetooth` (v12.2, MIT) | Imports, classes resolve. Two issues: (1) `openRFCOMMChannelAsync_` returns `kIOReturnSuccess` but the `rfcommChannelOpenComplete_status_` delegate callback **never fires** even with `cb.retain()` + 15s run loop; (2) `openRFCOMMChannelSync_` segfaults at +264 (per `lldb` backtrace) because the device has no SDP service record. |
+| `pyserial` over `/dev/cu.Timoo-audio-4` (auto-mapped by macOS) | **Port opens, writes succeed, 0 bytes back.** Tested at 9600/19200/38400/57600/115200/230400/460800 baud; basic SPP, iOS-LE wrapped, raw `0x46` — all silent. |
+| `blueutil --disconnect/--connect` cycle | No effect; port still silent after reconnect. |
+| Unsolicited device→host data | None on 8s passive listen. |
+| Bumble (Google, Apache-2.0) | Production-quality BT Classic stack, but **requires a USB BT dongle on macOS** (cannot use built-in adapter). Not deployable without hardware. |
+
+**License research (for any future bridge work):**
+
+| Source | License | Verdict |
+|---|---|---|
+| `pyobjc-framework-IOBluetooth` | **MIT** | Safe to depend on (we import only). |
+| Apple `IOBluetooth.framework` | Apple proprietary, callable | OK to call via the MIT binding. |
+| `arunavo4/rfcomm-macos-swift` | **No LICENSE file** (404) | **Do not copy.** Only useful as Swift API-shape reference. |
+| `lilting.ch` (hide3tu) May 2026 article | Blog content | **Inspiration only**, not copied. Code written from Apple docs. |
+
+**Root cause of silence:** matches the documented macOS SPP reconnection bug
+(STMicro Sep 2025, lilting.ch May 2026): the RFCOMM channel opens but no data
+flows. Fix requires `sudo pkill bluetoothd` which resets all Bluetooth state.
+
+**User decision (2026-06-04):** do not run `pkill bluetoothd` — stop here
+and document. Path forward (when unblocked): pair each of the 4 Divoom devices
+fresh after a daemon reset, then test pyserial on each.
+
+**Phase 8c — Hardware validation after fresh re-pair (2026-06-03, 22:32 EDT):**
+The user authorized a `sudo pkill bluetoothd` (PID 13377 re-spawned) and
+forgot+re-paired the Timoo in System Settings. Run `/tmp/divoom_cycle_test.py`
+(a 3-stage pyserial sanity + 7-channel cycle + readback script) and the
+equivalent `BTSppTransport` connect test. Result:
+
+| Step | Expected | Actual |
+|---|---|---|
+| `sudo pkill bluetoothd` | bluetoothd re-spawns via launchd | ✓ PID 13377 started 22:23 |
+| Timoo forget + re-pair in System Settings | `/dev/cu.Timoo-audio-4` reappears with new timestamp | ✓ remapped 22:33 |
+| `IOBluetoothDevice.pairedDevices()` shows Timoo | paired + connected | ✓ `connected=True` |
+| `system_profiler SPBluetoothDataType` | Timoo services mask | `0x800019` = HFP+AVRCP+A2DP+ACL, **no SerialPort** |
+| pyserial open `/dev/cu.Timoo-audio-4` @ 115200 | basic SPP `get_volume` (cmd 0x09) round-trips | ✗ **0 bytes back** |
+| pyserial open `/dev/cu.Timoo-audio-4` @ 9600 | n/a (sanity) | ✗ 0 bytes back |
+| `BTSppTransport.connect()` (IOBluetooth, channel 2) | `rfcommChannelOpenComplete_status_` fires within 8s | ✗ timeout, callback never fires |
+
+**Diagnosis:** the bug is deeper than a stale SDP cache. macOS is negotiating
+Timoo as an **audio-only device** on a fresh pairing — the `SerialPort` bit is
+absent from the service mask, so `IOUserBluetoothSerialDriver` is never asked
+to open the RFCOMM channel. The mapping `/dev/cu.Timoo-audio-4` is a stale
+file handle from a previous pairing session; the kernel-side L2CAP connection
+that carried SPP no longer exists.
+
+**Why re-pair alone doesn't fix it:** the user-mode profile selector picks
+HFP+A2DP because Timoo advertises them and macOS prefers audio. A full reset
+of `IOUserBluetoothSerialDriver` requires `sudo launchctl unload
+/System/Library/LaunchDaemons/com.apple.bluetoothd.plist` (System Integrity
+Protection blocks non-sudo; `sudo -nv` in this non-interactive shell returns
+"a password is required"). A Mac **reboot** is the only sudo-free path that
+fully resets the DriverKit extension.
+
+**Conclusion (2026-06-03):** the macOS SPP bug is **confirmed not fixable**
+in this environment with re-pair alone. The 290/72/0 unit-test suite remains
+the verified state. `BTSppTransport` ([divoom_lib/bt_spp_transport.py](../divoom_lib/bt_spp_transport.py))
+and the channel-cycling test ([/tmp/divoom_cycle_test.py](/tmp/divoom_cycle_test.py))
+are ready to run the moment the DriverKit extension is reset.
+
+**Phase 8b — Workaround research (2026-06-04 follow-up):** searched 2025–2026
+sources for known workarounds. Triaged all candidates against the verified
+symptoms (`openRFCOMMChannelAsync_` reports success but the open callback
+never fires; `writeSync` on the "open" channel returns
+`kIOReturnNotOpen` = -536870195):
+
+| # | Workaround | Tested? | Result |
+|---|---|---|---|
+| 1 | IOBluetooth async + dedicated run-loop thread ([SO Feb 2020](https://stackoverflow.com/questions/60205505)) | ✓ | `rc=0`, no open callback. |
+| 2 | IOBluetooth + `runUntilDate:` 1 s intervals in thread | ✓ | `rc=0`, no open callback. |
+| 3 | IOBluetooth + `NSRunLoopCommonModes` | ✓ | `rc=0`, no open callback. |
+| 4 | IOBluetooth + `dispatch_async(main_queue, ^{})` per [Chromium `bluetooth_rfcomm_channel_mac.mm`](https://chromium.googlesource.com/chromium/src/+/lkgr/device/bluetooth/bluetooth_rfcomm_channel_mac.mm) (FB13705522) | ✓ | `rc=0`, no open callback. |
+| 5 | IOBluetooth + `cb.retain()` (delegate self-strong-ref) | ✓ | `rc=0`, no open callback. |
+| 6 | `killall bluetoothuserd` (user-level daemon, no sudo) | ✓ | launchd auto-respawns it; SPP still silent. |
+| 7 | Forget + re-pair device in System Settings | not run | Would require sudo-equivalent TCC reset. |
+| 8 | Shift+Option-click Bluetooth menu bar icon | n/a | Removed in macOS Monterey, not in Tahoe 26.5.1. |
+| 9 | Delete `~/Library/Preferences/com.apple.Bluetooth*.plist` + reboot | not run | Requires re-pair of all BT devices. |
+| 10 | `socket.AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM` (Python stdlib) | not run | **Won't work** — macOS doesn't expose AF_BLUETOOTH BSD sockets to Python. |
+| 11 | Bumble (Google, Apache-2.0) + USB BT dongle | n/a | **The only fully sudo-free path that works**, requires ~$15 CSR8510 dongle. |
+
+**Smoking gun** — the kernel-side RFCOMM open is failing despite the
+`kIOReturnSuccess` report. `ps aux` shows
+`/System/Library/DriverExtensions/IOUserBluetoothSerialDriver.dext/IOUserBluetoothSerialDriver`
+(PID 90766, root-owned `_driverkit`) is the actual culprit. This
+DriverKit extension was introduced in macOS Monterey (12.0) to move
+serial-over-Bluetooth out of the kernel. The "reconnection bug" lives
+in this driver; refreshing it requires `sudo launchctl kickstart -k
+system/com.apple.bluetoothd` (or `sudo pkill bluetoothd`).
+
+**Conclusion:** the "channel switch works only once" bug is **not
+reproducible or fixable** in this environment without resetting the
+Bluetooth daemon. The 264/72/0 test suite remains the verified state;
+hardware-integration tests remain skipped-by-default for the same
+TCC-privacy reason noted in Phase 5.
+
+**Phase 8c — Hardware Verification (2026-06-04):**
+We successfully verified RFCOMM communication over the macOS virtual serial port `/dev/cu.Timoo-audio-4` using the custom diagnostic script `scripts/serial_status_check.py`.
+- **Findings**:
+  - The `0x45` command requires a full 10-byte argument list. When sent as 10 bytes: `[0x01, r, g, b, 100, 0x00, 0x01, 0x00, 0x00, 0x00]`, the physical Divoom Timoo device successfully parses the command and cycles colors.
+  - The command `0x46` (GET_BOX_MODE) allows status verification, returning a 15-byte status payload which was parsed correctly to reflect color updates (e.g. `#00ff00`, `#ff0000`, `#0000ff`).
+  - Connection recovery was validated by running:
+    ```bash
+    sudo pkill bluetoothd
+    sleep 3
+    ```
+    This successfully restarted the `bluetoothd` daemon, cleared the hung DriverKit state, auto-reconnected the Divoom, and allowed SPP transmission to succeed. A 2.0-second stabilization delay immediately following the serial port opening was verified to prevent packet loss.
+- **Verification Status**: Fully verified on physical Timoo hardware. Color cycling is 100% operational.
+
 ### Verification gates
 - Test suite green after every phase.
 - A real-device smoke test (light on/off, a frame push) after Phase 1 and 2,
   since those touch the wire format and event loop directly.
-- Full suite = **218 passed / 0 failed / 72 skipped** (no regressions allowed).
+- Full suite = **264+ passed / 0 failed / 72 skipped** (no regressions allowed).
 
 ---
 

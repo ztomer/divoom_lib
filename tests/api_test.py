@@ -34,7 +34,8 @@ async def main():
                 logger.error(
                     f"No Bluetooth device found with name containing '{args.name}'. Exiting.")
                 return
-            divoom = Divoom(mac=device_id, logger=logger)
+            device_name = ble_device.name if hasattr(ble_device, "name") else None
+            divoom = Divoom(mac=device_id, logger=logger, device_name=device_name)
 
         await divoom.protocol.connect()
         logger.info(f"Successfully connected to {divoom.protocol.mac}!")

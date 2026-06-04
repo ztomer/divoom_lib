@@ -32,9 +32,9 @@ def test_generic_ack_commands_list():
 
 def test_ios_le_protocol_constants():
     """Test constants related to the iOS LE protocol."""
-    assert constants.IOS_LE_MIN_DATA_LENGTH == 13
+    assert constants.IOS_LE_MIN_DATA_LENGTH == 11
     assert constants.IOS_LE_HEADER == [0xFE, 0xEF, 0xAA, 0x55]
-    assert constants.IOS_LE_COMMAND_IDENTIFIER == 6
+    assert constants.IOS_LE_COMMAND_IDENTIFIER == 7
 
 def test_basic_protocol_constants():
     """Test constants related to the Basic Protocol."""

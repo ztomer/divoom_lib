@@ -255,32 +255,38 @@ To make working with this codebase significantly easier, faster, and more robust
 The library is organized into the following modules:
 
 * `divoom_lib/`: The main library code.
-  * `divoom.py`: The main `Divoom` class.
-  * `protocol.py`: The `DivoomProtocol` class for low-level communication.
-  * `models.py`: Divoom protocol constants and data models.
+  * `divoom.py`: The main `Divoom` facade class.
+  * `connection.py`: The `DivoomConnection` manager class.
+  * `bt_spp_transport.py`: BT Classic SPP RFCOMM transport wrapper.
+  * `lan_transport.py`: Local Wi-Fi HTTP transport client.
+  * `framing.py`: Pure functional package formatting helper functions.
+  * `sender_protocol.py`: `CommandSender` PEP-544 abstract protocol interface.
+  * `exceptions.py`: Custom domain exception classes.
+  * `protocol.py`: Backward-compatibility wrapper for `DivoomProtocol`.
+  * `models/`: Folder containing configuration models, constants, and command schemas.
   * `wall.py`: Display wall coordinator class (`DivoomWall`).
   * `display/`: Modules for controlling the display.
-    * `light.py`: Light related commands.
-    * `animation.py`: Animation related commands.
-    * `drawing.py`: Drawing related commands.
-    * `text.py`: Text related commands.
+    * `light.py`: Light/ambient channel commands.
+    * `animation.py` / `display_animation.py`: Animation and GIF playback.
+    * `drawing.py`: Matrix pixel drawing controls.
+    * `text.py` / `display_text.py`: Canvas text generation and formatting.
   * `media/`: Modules for controlling media playback.
-    * `music.py`: Music related commands.
-    * `radio.py`: Radio related commands.
+    * `music.py`: Audio control, speaker profiles, and volume commands.
+    * `radio.py`: FM radio controls.
   * `scheduling/`: Modules for scheduling events.
-    * `alarm.py`: Alarm related commands.
-    * `sleep.py`: Sleep related commands.
-    * `timeplan.py`: Time plan related commands.
+    * `alarm.py`: Alarm settings.
+    * `sleep.py`: Sleep profiles.
+    * `timeplan.py`: Automated timeplans.
   * `system/`: Modules for controlling system settings.
-    * `device.py`: General device settings.
-    * `time.py`: Time related functions.
-    * `bluetooth.py`: Bluetooth settings.
+    * `device.py`: General brightness and orientation settings.
+    * `time.py`: Timezone, time updates, and date syncing.
+    * `bluetooth.py`: Device-level BT settings.
   * `tools/`: Modules for controlling tools.
     * `scoreboard.py`: Scoreboard tool.
     * `timer.py`: Timer tool.
     * `countdown.py`: Countdown tool.
-    * `noise.py`: Noise tool.
-  * `utils/`: Utility functions for discovery, image processing, devices database, macOS media sync, etc.
+    * `noise.py`: Noise decibel meter tool.
+  * `utils/`: Utility functions for discovery, image processing, device database lookup, macOS media sync, etc.
 * `gui/`: Interactive Desktop applications.
   * `gui_main.py`: PyWebView control bridge backend.
   * `menubar.py`: Native Cocoa Status Bar App & UNIX Domain Socket IPC.

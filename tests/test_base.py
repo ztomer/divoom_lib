@@ -145,24 +145,28 @@ async def test_handle_ios_le_notification_expected_response(divoom_base_instance
     base.use_ios_le_protocol = True
     base._expected_response_command = 0x01 # Example command ID
 
-    # Mock iOS LE data: Header (4 bytes), Length (2 bytes, little-endian), Cmd ID (1 byte), Packet Num (4 bytes), Data (variable), Checksum (2 bytes)
-    # Example: 0x0104000000 (Header) 0x0B00 (Length 11) 0x01 (Cmd ID) 0x00000000 (Packet Num) 0x1234 (Data) 0xXXYY (Checksum)
-    # For simplicity, let's construct a valid looking one
+    # Mock iOS LE data (new format):
+    # header(4) + length(2) + packet_num(1) + cmd_id(1) + data + checksum(2) + end(1)
     cmd_id = 0x01
-    packet_num = 0x00000000
+    packet_num = 0x00
     data_payload = [0x12, 0x34]
-    
-    # Calculate length and checksum for the mock
-    # Length = Cmd ID (1) + Packet Num (4) + Data (2) + Checksum (2) = 9
-    # Data length in header is for (Cmd ID + Packet Num + Data + Checksum)
-    data_len_val = 1 + 4 + len(data_payload) + 2 # 9
+
+    # total wire = 4+2+1+1+len(data)+2+1; length_field = total - 7
+    data_len_val = 1 + 1 + len(data_payload) + 2  # 6
     data_len_bytes = data_len_val.to_bytes(2, 'little')
 
-    checksum_input = list(data_len_bytes) + [cmd_id] + list(packet_num.to_bytes(4, 'little')) + data_payload
+    checksum_input = list(data_len_bytes) + [packet_num, cmd_id] + data_payload
     checksum_val = sum(checksum_input)
     checksum_bytes = checksum_val.to_bytes(2, 'little')
 
-    mock_data = bytearray(constants.IOS_LE_HEADER) + bytearray(data_len_bytes) + bytearray([cmd_id]) + bytearray(packet_num.to_bytes(4, 'little')) + bytearray(data_payload) + bytearray(checksum_bytes)
+    mock_data = (
+        bytearray(constants.IOS_LE_HEADER)
+        + bytearray(data_len_bytes)
+        + bytearray([packet_num, cmd_id])
+        + bytearray(data_payload)
+        + bytearray(checksum_bytes)
+        + bytearray([constants.MESSAGE_END_BYTE])
+    )
 
     result = base._handle_ios_le_notification(mock_data)
     assert result is True
@@ -181,17 +185,24 @@ async def test_handle_ios_le_notification_generic_ack(divoom_base_instance):
 
     # Mock generic ACK (0x33)
     cmd_id = 0x33
-    packet_num = 0x00000000
+    packet_num = 0x00
     data_payload = [] # Generic ACK might have empty payload
-    
-    data_len_val = 1 + 4 + len(data_payload) + 2 # 7
+
+    data_len_val = 1 + 1 + len(data_payload) + 2  # 4
     data_len_bytes = data_len_val.to_bytes(2, 'little')
 
-    checksum_input = list(data_len_bytes) + [cmd_id] + list(packet_num.to_bytes(4, 'little')) + data_payload
+    checksum_input = list(data_len_bytes) + [packet_num, cmd_id] + data_payload
     checksum_val = sum(checksum_input)
     checksum_bytes = checksum_val.to_bytes(2, 'little')
 
-    mock_data = bytearray(constants.IOS_LE_HEADER) + bytearray(data_len_bytes) + bytearray([cmd_id]) + bytearray(packet_num.to_bytes(4, 'little')) + bytearray(data_payload) + bytearray(checksum_bytes)
+    mock_data = (
+        bytearray(constants.IOS_LE_HEADER)
+        + bytearray(data_len_bytes)
+        + bytearray([packet_num, cmd_id])
+        + bytearray(data_payload)
+        + bytearray(checksum_bytes)
+        + bytearray([constants.MESSAGE_END_BYTE])
+    )
 
     # Temporarily add 0x45 to GENERIC_ACK_COMMANDS for this test
     original_generic_acks = constants.GENERIC_ACK_COMMANDS
@@ -217,17 +228,24 @@ async def test_handle_ios_le_notification_unexpected_response(divoom_base_instan
 
     # Mock iOS LE data for command 0x02 (unexpected)
     cmd_id = 0x02
-    packet_num = 0x00000000
+    packet_num = 0x00
     data_payload = [0x56, 0x78]
-    
-    data_len_val = 1 + 4 + len(data_payload) + 2 # 9
+
+    data_len_val = 1 + 1 + len(data_payload) + 2  # 6
     data_len_bytes = data_len_val.to_bytes(2, 'little')
 
-    checksum_input = list(data_len_bytes) + [cmd_id] + list(packet_num.to_bytes(4, 'little')) + data_payload
+    checksum_input = list(data_len_bytes) + [packet_num, cmd_id] + data_payload
     checksum_val = sum(checksum_input)
     checksum_bytes = checksum_val.to_bytes(2, 'little')
 
-    mock_data = bytearray(constants.IOS_LE_HEADER) + bytearray(data_len_bytes) + bytearray([cmd_id]) + bytearray(packet_num.to_bytes(4, 'little')) + bytearray(data_payload) + bytearray(checksum_bytes)
+    mock_data = (
+        bytearray(constants.IOS_LE_HEADER)
+        + bytearray(data_len_bytes)
+        + bytearray([packet_num, cmd_id])
+        + bytearray(data_payload)
+        + bytearray(checksum_bytes)
+        + bytearray([constants.MESSAGE_END_BYTE])
+    )
 
     result = base._handle_ios_le_notification(mock_data)
     assert result is False # Should return False for unexpected
@@ -571,5 +589,5 @@ def test_make_message_ios_le(divoom_base_instance):
     base = divoom_base_instance
     payload_bytes = [0x01, 0x12, 0x34] # Cmd ID 0x01, Data 0x12, 0x34
     packet_number = 0x00000000
-    expected_hex = "feefaa550a0001000000000112345200"
+    expected_hex = "feefaa550600000112344d0002"
     assert base._make_message_ios_le(payload_bytes, packet_number).hex() == expected_hex

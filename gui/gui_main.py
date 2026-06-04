@@ -345,7 +345,26 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                         from mock_device import MockBleakClient
                         client = MockBleakClient(address)
                         logger.info("DIVOOM_MOCK_BLE: using MockBleakClient")
-                    self.current_divoom = Divoom(mac=address, client=client, logger=logger, use_ios_le_protocol=True)
+                    device_name = None
+                    for d in self.discovered_list:
+                        if d.get("address") == address:
+                            device_name = d.get("name")
+                            break
+                    if not device_name:
+                        try:
+                            import json
+                            from pathlib import Path
+                            cache_file = Path.home() / ".config" / "divoom-control" / "discovered_devices.json"
+                            if cache_file.exists():
+                                devices = json.loads(cache_file.read_text(encoding="utf-8"))
+                                for d in devices:
+                                    if d.get("address") == address:
+                                        device_name = d.get("name")
+                                        break
+                        except Exception:
+                            pass
+
+                    self.current_divoom = Divoom(mac=address, client=client, logger=logger, use_ios_le_protocol=True, device_name=device_name)
                     self._run_async(self.current_divoom.connect())
                     connected = True
 
@@ -428,12 +447,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.set_light(color, brightness))
-            elif self.current_divoom and self.current_divoom.lan:
-                c = color.lstrip('#')
-                r, g, b = tuple(int(c[i:i+2], 16) for i in (0, 2, 4))
-                self._run_async(self.current_divoom.lan.set_ambient_light(brightness, r, g, b))
-                return True
-            elif self.current_divoom and self.current_divoom.is_connected:
+            elif self.current_divoom:
                 return self._run_async(self.current_divoom.display.show_light(color, brightness, True))
             return False
         except Exception as e:
@@ -448,10 +462,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.show_clock(clock=style))
-            elif self.current_divoom and self.current_divoom.lan:
-                self._run_async(self.current_divoom.lan.set_clock(style))
-                return True
-            elif self.current_divoom and self.current_divoom.is_connected:
+            elif self.current_divoom:
                 return self._run_async(self.current_divoom.display.show_clock(clock=style, color=color))
             return False
         except Exception as e:
@@ -467,20 +478,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                     return False
                 tasks = []
                 for divoom, _, _, _, _, _ in self.wall_instance.devices:
-                    is_divoom_lan = bool(divoom and divoom.lan)
-                    if is_divoom_lan:
-                        mapping = {"clock": 0, "vj": 1, "visualizer": 2, "design": 3}
-                        val = mapping.get(channel, 0)
-                        tasks.append(divoom.lan.set_channel(val))
-                    else:
-                        if channel == "clock":
-                            tasks.append(divoom.display.show_clock())
-                        elif channel == "visualizer":
-                            tasks.append(divoom.display.show_visualization(number=0))
-                        elif channel == "vj":
-                            tasks.append(divoom.display.show_effects(number=0))
-                        elif channel == "design":
-                            tasks.append(divoom.display.show_design())
+                    tasks.append(divoom.display.switch_channel(channel))
                 
                 async def run_switch():
                     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -489,25 +487,9 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                 return self._run_async(run_switch())
 
             target = self.current_divoom
-            is_lan = bool(target and target.lan)
-            if not target or (not target.is_connected and not is_lan):
+            if not target:
                 return False
-            
-            if is_lan:
-                mapping = {"clock": 0, "vj": 1, "visualizer": 2, "design": 3}
-                val = mapping.get(channel, 0)
-                self._run_async(target.lan.set_channel(val))
-                return True
-            
-            if channel == "clock":
-                return self._run_async(target.display.show_clock())
-            elif channel == "visualizer":
-                return self._run_async(target.display.show_visualization(number=0))
-            elif channel == "vj":
-                return self._run_async(target.display.show_effects(number=0))
-            elif channel == "design":
-                return self._run_async(target.display.show_design())
-            return False
+            return self._run_async(target.display.switch_channel(channel))
         except Exception as e:
             logger.error(f"Channel switch failed: {e}")
             return False
@@ -524,13 +506,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                     return False
                 return self._run_async(self.wall_instance.show_effects(number=int(number)))
             target = self.current_divoom
-            is_lan = bool(target and target.lan)
-            if not target or (not target.is_connected and not is_lan):
+            if not target:
                 return False
-            if is_lan:
-                # LAN protocol switches to the VJ channel (no per-effect index).
-                self._run_async(target.lan.set_channel(1))
-                return True
             return self._run_async(target.display.show_effects(number=int(number)))
         except Exception as e:
             logger.error(f"VJ effect failed: {e}")
@@ -545,12 +522,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin):
                     return False
                 return self._run_async(self.wall_instance.show_visualization(number=int(number)))
             target = self.current_divoom
-            is_lan = bool(target and target.lan)
-            if not target or (not target.is_connected and not is_lan):
+            if not target:
                 return False
-            if is_lan:
-                self._run_async(target.lan.set_channel(2))
-                return True
             return self._run_async(target.display.show_visualization(number=int(number)))
         except Exception as e:
             logger.error(f"Visualizer failed: {e}")

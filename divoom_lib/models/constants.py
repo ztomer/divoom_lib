@@ -284,16 +284,24 @@ DEFAULT_RECONNECT_DELAY = 0.5
 DEFAULT_SPP_CHARACTERISTIC_UUID = "49535343-6daa-4d02-abf6-19569aca69fe"
 
 # NOTIFICATION HANDLER CONSTANTS (from base.py)
-# iOS LE Protocol
-IOS_LE_MIN_DATA_LENGTH = 13
+# iOS-LE protocol layout, confirmed against the official Divoom APK
+# (com.divoom.Divoom.bluetooth.c#b).
+# Wire format:
+#   [0xFE, 0xEF, 0xAA, 0x55]   header
+#   [len_lo, len_hi]            length = total_bytes - 7
+#   [packet_number]             1 byte
+#   [command_id]                1 byte
+#   [data...]                   n bytes
+#   [checksum_lo, checksum_hi]  sum of bytes 4..end-3
+#   [0x02]                      end marker
+IOS_LE_MIN_DATA_LENGTH = 11
 IOS_LE_HEADER = [0xFE, 0xEF, 0xAA, 0x55]
 IOS_LE_DATA_LENGTH_START = 4
 IOS_LE_DATA_LENGTH_END = 6
-IOS_LE_COMMAND_IDENTIFIER = 6
-IOS_LE_PACKET_NUMBER_START = 7
-IOS_LE_PACKET_NUMBER_END = 11
+IOS_LE_PACKET_NUMBER = 6
+IOS_LE_COMMAND_IDENTIFIER = 7
+IOS_LE_DATA_OFFSET = 8
 IOS_LE_CHECKSUM_LENGTH = 2
-IOS_LE_DATA_OFFSET = 11
 
 # Basic Protocol
 BASIC_PROTOCOL_MIN_DATA_LENGTH = 6
@@ -325,7 +333,7 @@ MESSAGE_END_BYTE = 0x02
 # Make Message iOS LE Constants (from base.py)
 IOS_LE_MESSAGE_HEADER = [0xFE, 0xEF, 0xAA, 0x55]
 IOS_LE_MESSAGE_CMD_ID_LENGTH = 1
-IOS_LE_MESSAGE_PACKET_NUM_LENGTH = 4
+IOS_LE_MESSAGE_PACKET_NUM_LENGTH = 1
 IOS_LE_MESSAGE_CHECKSUM_LENGTH = 2
 
 # TOOL CONSTANTS (from tool.py)

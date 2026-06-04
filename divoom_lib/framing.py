@@ -48,36 +48,86 @@ def encode_basic_payload(payload_bytes: list, escape: bool = False) -> bytes:
 
 
 def encode_ios_le_payload(payload_bytes: list, packet_number: int = 0x00000000) -> bytes:
+    """
+    Encode a command in the official Divoom iOS-LE protocol format.
+
+    Layout (from the official APK ``com.divoom.Divoom.bluetooth.c#b``):
+        [0xFE, 0xEF, 0xAA, 0x55]                 (4-byte header)
+        [len_lo, len_hi]                          (len = total_bytes - 7, little-endian)
+        [packet_number_byte]                      (1 byte — only the low byte is transmitted)
+        [command_id]                              (1 byte, separate from the data payload)
+        [data...]                                 (raw data WITHOUT the command id)
+        [checksum_lo, checksum_hi]                (sum of bytes 4..end-3, little-endian)
+        [0x02]                                    (end marker)
+
+    The caller passes ``payload_bytes`` as ``[cmd, data...]`` (i.e. cmd is
+    included). We strip the cmd off and emit it separately so the wire format
+    matches the APK exactly. (Previous versions incorrectly emitted the cmd
+    twice — once as ``[command_identifier]`` and again inside ``data_bytes``.)
+    """
+    if not payload_bytes:
+        raise ValueError("payload_bytes must contain at least the command id")
     command_identifier = payload_bytes[0]
-    data_bytes = payload_bytes
-    packet_number_bytes = list(
-        packet_number.to_bytes(models.IOS_LE_MESSAGE_PACKET_NUM_LENGTH, byteorder='little'))
-    data_length_value = models.IOS_LE_MESSAGE_CMD_ID_LENGTH + models.IOS_LE_MESSAGE_PACKET_NUM_LENGTH + len(data_bytes) + models.IOS_LE_MESSAGE_CHECKSUM_LENGTH
-    data_length_bytes = list(
-        data_length_value.to_bytes(2, byteorder='little'))
-    checksum_input = data_length_bytes + \
-        [command_identifier] + packet_number_bytes + data_bytes
-    checksum_value = sum(checksum_input)
-    checksum_bytes = list(checksum_value.to_bytes(models.IOS_LE_MESSAGE_CHECKSUM_LENGTH, byteorder='little'))
-    final_message_bytes = models.IOS_LE_MESSAGE_HEADER + data_length_bytes + \
-        [command_identifier] + packet_number_bytes + \
-        data_bytes + checksum_bytes
-    return bytes(final_message_bytes)
+    data_bytes = payload_bytes[1:]
+
+    # Total wire length = header(4) + length(2) + packet_num(1) + cmd(1)
+    #                  + data + checksum(2) + end(1)
+    total_len = 4 + 2 + 1 + 1 + len(data_bytes) + 2 + 1
+    length_field = total_len - 7
+    length_bytes = list(length_field.to_bytes(2, byteorder="little"))
+
+    packet_number_byte = packet_number & 0xFF
+
+    pre_checksum = (
+        length_bytes
+        + [packet_number_byte, command_identifier]
+        + list(data_bytes)
+    )
+    checksum = sum(pre_checksum) & 0xFFFF
+    checksum_bytes = list(checksum.to_bytes(2, byteorder="little"))
+
+    wire = (
+        list(models.IOS_LE_MESSAGE_HEADER)
+        + length_bytes
+        + [packet_number_byte, command_identifier]
+        + list(data_bytes)
+        + checksum_bytes
+        + [models.MESSAGE_END_BYTE]
+    )
+    return bytes(wire)
 
 
 def parse_ios_le_notification(data: bytes) -> dict | None:
-    if len(data) >= models.IOS_LE_MIN_DATA_LENGTH and data[0:4] == bytes(models.IOS_LE_HEADER):
-        command_identifier = data[models.IOS_LE_COMMAND_IDENTIFIER]
-        packet_number = int.from_bytes(data[models.IOS_LE_PACKET_NUMBER_START:models.IOS_LE_PACKET_NUMBER_END], byteorder='little')
-        response_data = data[models.IOS_LE_DATA_OFFSET:-models.IOS_LE_CHECKSUM_LENGTH]
-        checksum = int.from_bytes(data[-models.IOS_LE_CHECKSUM_LENGTH:], byteorder='little')
-        return {
-            'command_id': command_identifier,
-            'payload': response_data,
-            'packet_number': packet_number,
-            'checksum': checksum,
-        }
-    return None
+    """
+    Parse a notification sent in the official Divoom iOS-LE protocol format.
+
+    Layout matches ``encode_ios_le_payload``. The data section begins at
+    ``IOS_LE_DATA_OFFSET`` (8) and runs up to ``-IOS_LE_CHECKSUM_LENGTH``;
+    the command id lives at ``IOS_LE_COMMAND_IDENTIFIER`` (7) — *not* 6 as
+    the previous constants claimed. The packet number is a single byte at
+    offset 6.
+    """
+    if len(data) < models.IOS_LE_MIN_DATA_LENGTH:
+        return None
+    if data[0:4] != bytes(models.IOS_LE_HEADER):
+        return None
+    if data[-1] != models.MESSAGE_END_BYTE:
+        return None
+    command_id = data[models.IOS_LE_COMMAND_IDENTIFIER]
+    packet_number = data[models.IOS_LE_PACKET_NUMBER]
+    # Payload sits between the data offset and the (checksum + end marker).
+    payload = bytes(
+        data[models.IOS_LE_DATA_OFFSET : -models.IOS_LE_CHECKSUM_LENGTH - 1]
+    )
+    checksum = int.from_bytes(
+        data[-models.IOS_LE_CHECKSUM_LENGTH - 1:-1], byteorder="little"
+    )
+    return {
+        "command_id": command_id,
+        "payload": payload,
+        "packet_number": packet_number,
+        "checksum": checksum,
+    }
 
 
 def parse_basic_protocol_frames(buf: bytearray) -> Tuple[list, bytearray]:

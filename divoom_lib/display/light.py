@@ -107,5 +107,7 @@ class Light:
         """
         from ..utils.converters import color_to_rgb_list
         rgb = color_to_rgb_list(color)
-        payload = [0x01] + rgb + [brightness, 0x00, 0x01 if power else 0x00]
+        # Divoom Light mode command (0x45) expects a strict 10-byte payload format:
+        # [0x01 (Light Mode), R, G, B, Brightness, Effect Mode, On/Off Switch, 0x00, 0x00, 0x00]
+        payload = [0x01] + rgb + [brightness, 0x00, 0x01 if power else 0x00, 0x00, 0x00, 0x00]
         await self.communicator.send_command("set light mode", payload)

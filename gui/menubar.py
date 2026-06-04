@@ -106,9 +106,10 @@ class DivoomMenuBarAgent(NSObject):
                 devices = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=3.0))
                 if devices:
                     self.active_device_mac = devices[0]["address"]
-                    self.current_divoom = Divoom(mac=self.active_device_mac, logger=logger, use_ios_le_protocol=False)
+                    device_name = devices[0].get("name")
+                    self.current_divoom = Divoom(mac=self.active_device_mac, logger=logger, use_ios_le_protocol=False, device_name=device_name)
                     loop.run_until_complete(self.current_divoom.connect())
-                    logger.info(f"IPC Auto-connected to device {self.active_device_mac}")
+                    logger.info(f"IPC Auto-connected to device {self.active_device_mac} ({device_name})")
                 else:
                     logger.warning("No Divoom device found to execute IPC command.")
                     return False

@@ -4,23 +4,31 @@ This document provides a high-level overview of the `divoom-control` library, de
 
 ## System Overview
 
-The library is structured to provide a high-level Python API for controlling Divoom devices over Bluetooth Low Energy (BLE).
+The library is structured as a facade architecture supporting multi-transport (BLE, Bluetooth Classic SPP, and local LAN Wi-Fi HTTP) connection routing.
 
 ```mermaid
 graph TD
-    User[User Script] --> Divoom[Divoom Class (divoom.py)]
-    Divoom --> Modules[Sub-modules (light, media, etc.)]
-    Divoom --> Protocol[DivoomProtocol (protocol.py)]
-    Protocol --> Bleak[BleakClient (BLE Library)]
+    User[User Script / GUI Bridge] --> Divoom[Divoom Facade (divoom.py)]
+    Divoom --> Modules[Sub-modules: light, media, system, tools]
+    Divoom --> DivoomConnection[DivoomConnection (connection.py)]
+    DivoomConnection --> Bleak[BleakClient (BLE)]
+    DivoomConnection --> BTSpp[BTSppTransport (BT Classic SPP/RFCOMM)]
+    DivoomConnection --> Lan[LanTransport (LAN HTTP :9000)]
     Bleak --> Device[Physical Divoom Device]
+    BTSpp --> Device
+    Lan --> Device
 ```
 
 ### Key Components
 
-*   **`divoom_lib/divoom.py` (`Divoom`)**: The main entry point. It initializes sub-modules and manages the connection. It currently (and redundantly) implements some protocol logic that should ideally be in `protocol.py`.
-*   **`divoom_lib/protocol.py` (`DivoomProtocol`)**: Handles the low-level details of BLE communication, including packet framing, checksum calculation, and payload escaping.
-*   **`divoom_lib/models.py`**: Contains constants, command codes, and configuration data classes (`DivoomConfig`).
-*   **`divoom_lib/display/`, `divoom_lib/system/`, etc.**: Sub-modules that group related functionality (e.g., `Light`, `Time`, `Radio`).
+*   **`divoom_lib/divoom.py` (`Divoom`)**: The main facade orchestrator. It registers all functional submodules and exposes clean, high-level APIs to user scripts and bridge controllers, delegating connection states and command routing to `DivoomConnection`.
+*   **`divoom_lib/connection.py` (`DivoomConnection`)**: The central transport controller that manages connection state lifecycles and routes encoded frames over BLE, Bluetooth Classic RFCOMM (`BTSppTransport`), or Wi-Fi (`LanTransport`).
+*   **`divoom_lib/bt_spp_transport.py` (`BTSppTransport`)**: Async Bluetooth Classic SPP RFCOMM driver utilizing macOS `IOBluetooth` delegates and dedicated run loops to bypass DriverKit daemon hangs and talk to classic devices (Timoo, Tivoo, Ditoo, etc.).
+*   **`divoom_lib/lan_transport.py` (`LanTransport`)**: Local Wi-Fi HTTP client that sends stateless POST JSON commands to Divoom screens (e.g. Pixoo 64) over port `:9000`.
+*   **`divoom_lib/framing.py`**: A pure functional library containing stateless helpers for encoding/decoding basic and iOS LE protocol packets, checksum calculation, and payload byte escaping.
+*   **`divoom_lib/protocol.py` (`DivoomProtocol`)**: A thin, backward-compatible subclass of `Divoom` kept to prevent breaking old client integrations.
+*   **`divoom_lib/models/`**: Configuration models (`DivoomConfig`), constants, and command code schemas.
+*   **`divoom_lib/display/`, `divoom_lib/system/`, `divoom_lib/media/`, `divoom_lib/scheduling/`, `divoom_lib/tools/`**: Decoupled domain submodules wrapping raw commands.
 
 ## Communication Protocols
 
