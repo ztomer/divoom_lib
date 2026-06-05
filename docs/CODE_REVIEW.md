@@ -449,11 +449,95 @@ We successfully verified RFCOMM communication over the macOS virtual serial port
     This successfully restarted the `bluetoothd` daemon, cleared the hung DriverKit state, auto-reconnected the Divoom, and allowed SPP transmission to succeed. A 2.0-second stabilization delay immediately following the serial port opening was verified to prevent packet loss.
 - **Verification Status**: Fully verified on physical Timoo hardware. Color cycling is 100% operational.
 
+**Phase 8 split — SPP vs iOS-LE BLE (2026-06-05):** the two Phase 8c
+findings are both true, in different contexts. SPP *does* work after
+`sudo pkill bluetoothd` + 2 s stabilization delay on a fresh pairing
+session — that path is fully verified on the physical Timoo. However,
+**iOS-LE BLE is the production transport** for this codebase: the official
+Divoom iOS app uses iOS-LE protocol over BLE, the codebase ships an
+iOS-LE-capable `BleTransport` ([divoom_lib/ble_transport.py](../divoom_lib/ble_transport.py))
+with iOS-LE format in [divoom_lib/framing.py](../divoom_lib/framing.py) and
+auto-detection in [divoom_lib/probing.py](../divoom_lib/probing.py), and
+the user has confirmed iOS-LE BLE works perfectly with all 4 Divoom
+devices. `BTSppTransport` is therefore **held as a future-option** for
+non-macOS hosts (Linux, Windows, USB BT dongle) and is not used in
+production on macOS. SPP work is intentionally kept: it documents an
+alternative transport that future work may reach for, the
+`tests/test_bt_spp_transport.py` suite validates the parser, and the
+`sudo pkill bluetoothd` recipe is preserved for emergency SPP recovery.
+
+### Phase 9 — Visual regression cleanup (2026-06-05)
+
+Cleanup pass over commit `f2d2507d` "in progress" which introduced
+visual regressions across the GUI. 8 regression hotspots identified
+and 6 fixed; 2 deferred to follow-up.
+
+- **A-1** Custom Art: scroll container now `flex:1; min-height:0`; "Push to Device"
+  button now `flex-shrink:0; width:100%`. Fixes empty custom-art gallery.
+- **A-2** Color picker: `<div>` → `<label>` (HTML-native click-to-open); JS click
+  delegation block removed from `channels.js`. Fixes unclickable picker ring.
+- **A-3** Ambient previews: Love = CSS gradient with hue-shift animation,
+  Plants = 16×16 SVG with 4 blue stripes on red bg, Sleeping = static green,
+  Mosquito = static low-brightness orange; `updateAmbientPreviewsColor` now
+  scoped to `.ambient-preview.plain` only. Fixes all 4 previews showing
+  wrong content.
+- **A-4** Dead CSS removed: `.appbar-device` + `select.appbar-device-select`
+  rules; renamed `appbarSelect` → `sidebarDeviceSelect` in `app.js:423`.
+- **A-5** Unstaged `channels.js` −11 lines (orphan `channel-options-title` JS).
+  Pre-existing in working tree, ready to commit.
+- **A-bonus** 10 last-selected favorites added (`#ambient-favorites-grid`,
+  `localStorage["divoom-ambient-favorites"]`). Deliberate override of
+  Dieter Rams #10 (as little design as possible) per user preference —
+  Kare+Rams is the design *lens*, not the design *owner*.
+- **B-1** Window drag: moved handler from `widgets.js` to `app.js`,
+  uses `clientX/Y` (not `screenX/Y`); `e.preventDefault()` on mousedown;
+  document-level delegation (`addEventListener(..., true)`) so it survives
+  template re-injection. Stops on mouseup/mouseleave/blur/appbar-missing.
+- **B-2** First instrumented Playwright test: `tests/test_gui_drag_instrumented.py`
+  (2 tests) — local HTTP server + Playwright Chromium + stubbed `pywebview.api`
+  via `addInitScript`. Asserts `drag_window` is called with positive dx/dy
+  and that button clicks don't trigger drag.
+- **Real bug fix** during B: removed duplicate `const sysmonDisplayBtn` in
+  `widgets.js` (was redeclaring the same const at line 410, broke whole script
+  with `SyntaxError` and silently disabled all four Live Widgets cards).
+- **C-1/2/3/4** Settings restructure: 4th sub-tab "Connectivity" added
+  (`templates.js`); 4-row connectivity legend moved from `#settings-devices`
+  to `#settings-connectivity`; BLE table now 4 columns (Name, Address,
+  Resolution, Speaker) and Wi-Fi table 5 columns (IP, Token, Resolution,
+  Speaker, Action); speaker/res populated via `window.getDeviceDimensions(name)`
+  + `/timoo|ditoo/i.test(name)` regex; removed speaker+res from `index.html`
+  sidebar banner; `.sidebar-device-preview` enlarged 80×80 → 120×120;
+  `updateSidebarSpeakerIcon` made a no-op (kept for back-compat); `app.js:80-87`
+  no longer writes to removed `banner-device-res`/`-speaker` elements.
+- **D-1** Monthly Best flex chain: `.monthly-best-layout` now
+  `display: grid; flex: 1; min-height: 0;` (was `height: calc(100vh - 160px)`
+  which didn't match the parent chain); `#monthly-best.active` now
+  `flex: 1; min-height: 0` (was a calc that used undefined `var(--header-height)`).
+- **D-2** Live widgets regression confirmed fixed: `tests/test_live_widgets_diagnostic.py`
+  captures 0 page errors, 0 console errors, all cards present and active on
+  click. Was caused by the duplicate `const sysmonDisplayBtn` breaking the
+  whole `widgets.js` script (see B bug fix above).
+- **E** This section.
+
+**Design lens (Kare + Rams):** Susan Kare (bitmap/clarity, platform-native)
+and Dieter Rams (restraint, honest, unobtrusive) are the design *lens* —
+their combined principles informed every A/B/C/D fix. Kare/Rams did not
+approve any specific design; user is the design *owner*.
+
+**Verification:** test count went 290 → 306 → **308** passed / 72 skipped /
+0 failed (2 new instrumented tests added in B-2).
+
+**Deferred to follow-up:**
+- Drag-direction visual feedback (cursor change) — not user-reported as
+  missing; skip until asked.
+- SPP transport may eventually be reachable via Bumble + USB BT dongle
+  (~$15 CSR8510); not deployable without hardware, held as Phase 8 future-option.
+
 ### Verification gates
 - Test suite green after every phase.
 - A real-device smoke test (light on/off, a frame push) after Phase 1 and 2,
   since those touch the wire format and event loop directly.
-- Full suite = **264+ passed / 0 failed / 72 skipped** (no regressions allowed).
+- Full suite = **308 passed / 0 failed / 72 skipped** (no regressions allowed).
 
 ---
 

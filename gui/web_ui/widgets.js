@@ -1,7 +1,7 @@
-/* widgets.js — Frameless window controls, live music synchronizer, stocks ticker, and system monitor */
+/* widgets.js — Live music synchronizer, stocks ticker, and system monitor */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // ── 1. FRAMELESS WINDOW TITLEBAR BUTTON BINDINGS ──
+    // Frameless window titlebar button bindings
     const winMin = document.getElementById("win-min");
     const winMax = document.getElementById("win-max");
     const winClose = document.getElementById("win-close");
@@ -10,23 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (winMax) winMax.addEventListener("click", () => window.pywebview?.api?.maximize_window());
     if (winClose) winClose.addEventListener("click", () => window.pywebview?.api?.close_window());
 
-    // Frameless window dragging relative movement via python API
-    let isDragging = false, lastScreenX = 0, lastScreenY = 0;
-    const appbar = document.querySelector(".integrated-appbar");
-    if (appbar) {
-        appbar.addEventListener("mousedown", (e) => {
-            if (e.button === 0 && !e.target.closest("button, select, input")) {
-                isDragging = true; lastScreenX = e.screenX; lastScreenY = e.screenY;
-            }
-        });
-        window.addEventListener("mousemove", (e) => {
-            if (!isDragging) return;
-            const dx = e.screenX - lastScreenX, dy = e.screenY - lastScreenY;
-            lastScreenX = e.screenX; lastScreenY = e.screenY;
-            if ((dx || dy) && window.pywebview?.api?.drag_window) window.pywebview.api.drag_window(dx, dy);
-        });
-        window.addEventListener("mouseup", () => isDragging = false);
-    }
+    // (Frameless window drag handler lives in app.js, see "0. FRAMELESS WINDOW DRAG".)
 
     // ── 2. LIVE MUSIC SYNCHRONIZER & AUDIO VISUALIZER POLLING ──
     let visualizerTimer = null;
@@ -312,6 +296,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // (The duplicate sysmonDisplayBtn block at the old line ~407 was
+    //  removed — it redeclared the same `const` and broke the whole script.)
+
+    // (Duplicate sysmonDisplayBtn block was removed; the wiring below at
+    //  line ~403 was the second declaration of the same const. The first
+    //  declaration at line ~284 already attaches the handler.)
+
     let selectedWidget = "music"; // Default selected widget is cover art
 
     function selectWidget(widgetId) {
@@ -413,21 +404,6 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 syncActiveWidget();
             }
-        });
-    }
-
-    const sysmonDisplayBtn = document.getElementById("sysmon-display-btn");
-    if (sysmonDisplayBtn) {
-        sysmonDisplayBtn.addEventListener("click", () => {
-            if (!(window.pywebview && window.pywebview.api && window.pywebview.api.apply_system_stats)) return;
-            window.pywebview.api.apply_system_stats().then(json => {
-                try {
-                    const r = JSON.parse(json);
-                    const img = document.getElementById("sysmon-device-preview");
-                    if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
-                    window.showToast(r.success ? "System monitor on device" : (r.error || "Failed"), r.success ? "success" : "🔵 BLE");
-                } catch (e) { window.showToast("Failed", "error"); }
-            });
         });
     }
 

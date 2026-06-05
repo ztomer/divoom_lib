@@ -81,7 +81,7 @@
 #monthly-best.active {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 40px - var(--header-height) - 40px); /* Fit cleanly inside main viewport */
+    flex: 1;
     min-height: 0;
 }
 
@@ -242,7 +242,9 @@
     display: grid;
     grid-template-columns: 1.4fr 1fr;
     gap: 20px;
-    height: calc(100vh - 160px);
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
 }
 
 .device-accent-dot {

@@ -103,16 +103,7 @@
                     <option value="">Select Screen…</option>
                 </select>
                 <span id="banner-device-name" style="display: none;">No Connected Screen</span>
-                <div class="sidebar-device-status">
-                    <span id="sidebar-device-speaker-container" title="Speaker Status">
-                        <svg class="kare-icon" id="sidebar-speaker-icon" viewBox="0 0 16 16">
-                            <path d="M3 5v6h3l4 4V1L7 5H3zm8.5 1.5l1.5-1.5 1.5 1.5-1.5 1.5 1.5 1.5-1.5 1.5-1.5-1.5 1.5-1.5-1.5-1.5z" fill="currentColor"/>
-                        </svg>
-                    </span>
-                    <span id="banner-device-res" class="sidebar-device-res">16x16</span>
-                </div>
                 <span id="banner-device-mac" style="display: none;">-</span>
-                <span id="banner-device-speaker" style="display: none;">No</span>
             </div>
 
             <!-- Settings placed below the device preview -->
@@ -207,7 +198,7 @@
                                 </div>
                                 <!-- Custom art -->
                                 <div class="channel-panel" id="panel-design">
-                                    <div class="custom-art-scroll-container" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; margin-bottom:12px; padding-right:6px; box-sizing:border-box; width:100%;">
+                                    <div class="custom-art-scroll-container" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:12px; margin-bottom:12px; padding-right:6px; box-sizing:border-box; width:100%;">
                                         <p class="panel-hint" style="margin-top: 0; margin-bottom: 0;">Display your own custom art/GIFs on the device's "Custom" channel.</p>
                                         <div class="custom-art-upload-section" style="display:flex; flex-direction:column; gap:12px; max-width:100%;">
                                             <div style="display:flex; gap:10px; align-items:center;">
@@ -237,7 +228,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <button id="apply-custom-art-btn" class="glow-btn" style="margin:0; width:100%;">Push to Device</button>
+                                    <button id="apply-custom-art-btn" class="glow-btn" style="margin:0; width:100%; flex-shrink:0;">Push to Device</button>
                                 </div>
                                 <!-- Ambient light (now a channel selection) -->
                                 <div class="channel-panel" id="panel-ambient">
@@ -247,12 +238,12 @@
                                                 <label class="form-label" style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom: 6px;">Ambient Effect Mode:</label>
                                                 <div class="selector-grid" id="ambient-mode-grid" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; width: 100%;"></div>
                                             </div>
-                                            
+
                                             <!-- Color Picker and Swatches Grid -->
                                             <div class="ambient-swatches-grid" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px;">
-                                                <div class="color-picker-wrapper" style="position:relative; width:36px; height:36px; border-radius:50%; overflow:hidden; border:2px solid rgba(255,255,255,0.1); cursor:pointer; flex-shrink:0;">
+                                                <label class="color-picker-wrapper" style="position:relative; width:36px; height:36px; border-radius:50%; overflow:hidden; border:2px solid rgba(255,255,255,0.1); cursor:pointer; flex-shrink:0; display:inline-block;">
                                                     <input type="color" id="ambient-color-input" value="#00ffcc" style="position:absolute; top:-4px; left:-4px; width:44px; height:44px; border:none; background:none; cursor:pointer; padding:0;">
-                                                </div>
+                                                </label>
                                                 <button class="ambient-swatch" style="background:#ff0000;" data-color="#ff0000" title="Red"></button>
                                                 <button class="ambient-swatch" style="background:#00ff00;" data-color="#00ff00" title="Green"></button>
                                                 <button class="ambient-swatch" style="background:#0000ff;" data-color="#0000ff" title="Blue"></button>
@@ -262,6 +253,11 @@
                                                 <button class="ambient-swatch" style="background:#ff00ff;" data-color="#ff00ff" title="Magenta"></button>
                                                 <button class="ambient-swatch" style="background:#ffffff;" data-color="#ffffff" title="White"></button>
                                                 <span style="font-size:11px; color:var(--text-muted); margin-left:4px;">Pick Custom Color</span>
+                                            </div>
+
+                                            <!-- 10 last-selected favorites (user override of Rams #10) -->
+                                            <div class="ambient-favorites-grid" id="ambient-favorites-grid" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px; min-height:36px;">
+                                                <span style="font-size:10px; color:var(--text-muted); margin-right:2px;">Favorites:</span>
                                             </div>
                                         </div>
                                     </div>

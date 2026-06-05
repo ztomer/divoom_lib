@@ -20,27 +20,7 @@
     -webkit-app-region: no-drag;
 }
 
-/* Active device selector + connection indicator in the app bar */
-.appbar-device {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: 24px;
-    -webkit-app-region: no-drag;
-    flex-shrink: 0 !important;
-}
-
-select.appbar-device-select {
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    width: 300px !important;
-    min-width: 300px !important;
-    max-width: 380px !important;
-    height: 32px !important;
-    padding: 0 28px 0 12px !important;
-    line-height: 30px !important;
-    box-sizing: border-box !important;
-}
+/* Active device selector moved to sidebar (see sidebar.css .sidebar-device-select) */
 
 #global-status-dot {
     width: 10px;

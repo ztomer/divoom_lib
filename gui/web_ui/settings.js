@@ -120,12 +120,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (deviceListUl) {
             deviceListUl.innerHTML = "";
             if (devices.length === 0) {
-                deviceListUl.innerHTML = `<tr><td colspan="2" class="empty-list">No BLE screens found.</td></tr>`;
+                deviceListUl.innerHTML = `<tr><td colspan="4" class="empty-list">No BLE screens found.</td></tr>`;
             } else {
                 devices.forEach(d => {
                     const tr = document.createElement("tr");
                     tr.style.cursor = "pointer";
                     const color = window.deviceColor(d.address);
+                    const dims = window.getDeviceDimensions ? window.getDeviceDimensions(d.name) : { size: 16 };
+                    const isSpk = /timoo|ditoo/i.test(d.name || "");
                     tr.innerHTML = `
                         <td>
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -134,6 +136,8 @@ document.addEventListener("DOMContentLoaded", () => {
                             </div>
                         </td>
                         <td><span class="device-mac">${d.address}</span></td>
+                        <td>${dims.size}x${dims.size}</td>
+                        <td>${isSpk ? "Yes" : "No"}</td>
                     `;
                     tr.addEventListener("click", () => {
                         window.connectDevice(d.name, d.address);
@@ -166,14 +170,17 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!tbody) return;
         tbody.innerHTML = "";
         if (window.DivoomState.registeredLanDevices.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="empty-list">No Wi-Fi screens registered.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-list">No Wi-Fi screens registered.</td></tr>';
             return;
         }
         window.DivoomState.registeredLanDevices.forEach(d => {
             const tr = document.createElement("tr");
+            const dims = window.getDeviceDimensions ? window.getDeviceDimensions(`Wi-Fi Screen: ${d.ip}`) : { size: 16 };
             tr.innerHTML = `
                 <td style="font-weight:600; cursor:pointer;" class="lan-connect-cell">🟢 ${d.ip}</td>
                 <td>${d.token || 0}</td>
+                <td>${dims.size}x${dims.size}</td>
+                <td>—</td>
                 <td>
                     <button class="glow-btn compact delete-lan-btn" style="margin:0; background:rgba(255, 68, 68, 0.15); border-color:#ef4444; color:#ef4444; padding: 4px 8px; font-size: 11px;" data-ip="${d.ip}">Delete</button>
                 </td>

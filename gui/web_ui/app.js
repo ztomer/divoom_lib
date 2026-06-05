@@ -48,16 +48,10 @@ window.getDeviceDimensions = function(name) {
 };
 
 // ── 3. CONNECTION ACTIONS ──
-window.updateSidebarSpeakerIcon = function(hasSpeaker) {
-    const iconSvg = document.getElementById("sidebar-speaker-icon");
-    if (!iconSvg) return;
-    if (hasSpeaker) {
-        iconSvg.innerHTML = `<path d="M3 5v6h3l4 4V1L7 5H3zm9 3c0-1.8-1-3.3-2.5-4v8c1.5-.7 2.5-2.2 2.5-4z" fill="currentColor"/>`;
-        iconSvg.setAttribute("title", "Speaker Active");
-    } else {
-        iconSvg.innerHTML = `<path d="M3 5v6h3l4 4V1L7 5H3zm8.5 1.5l1.5-1.5 1.5 1.5-1.5 1.5 1.5 1.5-1.5 1.5-1.5-1.5 1.5-1.5-1.5-1.5z" fill="currentColor"/>`;
-        iconSvg.setAttribute("title", "No Speaker");
-    }
+// updateSidebarSpeakerIcon was removed — speaker status now lives in
+// Settings → Devices tables. Kept as a no-op for backward compatibility.
+window.updateSidebarSpeakerIcon = function(_hasSpeaker) {
+    return;
 };
 
 window.connectDevice = function(name, address) {
@@ -78,9 +72,9 @@ window.connectDevice = function(name, address) {
                 document.getElementById("banner-device-mac").textContent = address;
                 const dims = window.getDeviceDimensions(name);
                 document.getElementById("banner-device-image").src = dims.image;
-                document.getElementById("banner-device-res").textContent = `${dims.size}x${dims.size}`;
+                // banner-device-res and banner-device-speaker moved to Settings → Devices.
+                // Their textContent assignments are intentionally skipped here.
                 const isSpk = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo");
-                document.getElementById("banner-device-speaker").textContent = isSpk ? "Yes" : "No";
                 window.updateSidebarSpeakerIcon(isSpk);
                 const sidebarSelect = document.getElementById("sidebar-device-select");
                 if (sidebarSelect) sidebarSelect.value = address;
@@ -201,6 +195,48 @@ window.renderArrangerCanvas = function() {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+
+    // ── 0. FRAMELESS WINDOW DRAG (appbar) ──
+    // Susan Kare: minimal, predictable interaction. Dieter Rams #4: understandable.
+    // Uses document-level delegation so the handler survives any future
+    // appbar/template re-injection. clientX/Y is the pywebview-reliable axis
+    // (screenX is sometimes 0 in pywebview on macOS).
+    {
+        let isDragging = false;
+        let lastClientX = 0, lastClientY = 0;
+        let dragStartEl = null;
+
+        document.addEventListener("mousedown", (e) => {
+            if (e.button !== 0) return;
+            const appbar = e.target.closest(".integrated-appbar");
+            if (!appbar) return;
+            if (e.target.closest("button, select, input, .no-drag")) return;
+            isDragging = true;
+            dragStartEl = appbar;
+            lastClientX = e.clientX;
+            lastClientY = e.clientY;
+            e.preventDefault();
+        }, true);
+
+        document.addEventListener("mousemove", (e) => {
+            if (!isDragging || !dragStartEl) return;
+            const dx = e.clientX - lastClientX;
+            const dy = e.clientY - lastClientY;
+            lastClientX = e.clientX;
+            lastClientY = e.clientY;
+            if ((dx || dy) && window.pywebview?.api?.drag_window) {
+                window.pywebview.api.drag_window(dx, dy);
+            }
+        });
+
+        const stopDrag = () => {
+            isDragging = false;
+            dragStartEl = null;
+        };
+        document.addEventListener("mouseup", stopDrag);
+        document.addEventListener("mouseleave", stopDrag);
+        window.addEventListener("blur", stopDrag);
+    }
 
     // Inject HTML Templates
     if (document.getElementById('monthly-best') && window.DivoomTemplates?.monthlyBest) {
@@ -420,9 +456,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    const appbarSelect = document.getElementById("sidebar-device-select");
-    if (appbarSelect) {
-        appbarSelect.addEventListener("change", (e) => {
+    const sidebarDeviceSelect = document.getElementById("sidebar-device-select");
+    if (sidebarDeviceSelect) {
+        sidebarDeviceSelect.addEventListener("change", (e) => {
             const addr = e.target.value;
             if (!addr) return;
             if (addr === "MatrixWall") {

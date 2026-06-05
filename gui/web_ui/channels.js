@@ -35,17 +35,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function showChannelPanel(channel) {
         channelPanels.forEach(p => p.classList.toggle("active", p.id === `panel-${channel}`));
-        const titleEl = document.getElementById("channel-options-title");
-        if (titleEl) {
-            const channelNames = {
-                "clock": "Clock Mode Options",
-                "visualizer": "Music EQ Options",
-                "vj": "VJ Effects Options",
-                "design": "Custom Art Options",
-                "ambient": "Ambient Color Options"
-            };
-            titleEl.textContent = channelNames[channel] || "Channel Options";
-        }
         if (channel === "design") {
             loadCustomArtCacheGrid();
             renderCustomArtHistory();
@@ -273,21 +262,25 @@ document.addEventListener("DOMContentLoaded", () => {
     ];
     const AMBIENT_PREVIEWS = {
         0: `<div class="ambient-preview plain" style="background:#00ffcc; height:60px; border-radius:4px; box-shadow: 0 0 10px rgba(0,255,204,0.3);"></div>`,
-        1: `<div class="ambient-preview love" style="background:#ff3366; height:60px; border-radius:4px; animation: heartbeat 1.2s infinite ease-in-out;"></div>`,
-        2: `<div class="ambient-preview plants" style="background:#33cc66; height:60px; border-radius:4px; animation: breathe 3s infinite ease-in-out;"></div>`,
-        3: `<div class="ambient-preview sleeping" style="background:#9933ff; height:60px; border-radius:4px; animation: sleeping-fade 4s infinite ease-in-out;"></div>`,
-        4: `<div class="ambient-preview mosquito" style="background:#ffcc00; height:60px; border-radius:4px; animation: repeller-strobe 0.2s infinite steps(2);"></div>`
+        1: `<div class="ambient-preview love" style="background:linear-gradient(90deg, #ff0000, #ffaa00, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000); background-size:200% 100%; height:60px; border-radius:4px; animation:hue-shift 6s linear infinite;"></div>`,
+        2: `<svg class="ambient-preview plants" viewBox="0 0 16 16" preserveAspectRatio="none" style="height:60px; width:100%; border-radius:4px; image-rendering:pixelated; display:block;">
+                <rect width="16" height="16" fill="#ff0000"/>
+                <rect x="0" y="0" width="1" height="16" fill="#0000ff"/>
+                <rect x="4" y="0" width="1" height="16" fill="#0000ff"/>
+                <rect x="8" y="0" width="1" height="16" fill="#0000ff"/>
+                <rect x="12" y="0" width="1" height="16" fill="#0000ff"/>
+            </svg>`,
+        3: `<div class="ambient-preview sleeping" style="background:#33cc33; height:60px; border-radius:4px;"></div>`,
+        4: `<div class="ambient-preview mosquito" style="background:rgba(255, 165, 0, 0.4); height:60px; border-radius:4px;"></div>`
     };
 
     let selectedAmbientMode = 0;
 
     function updateAmbientPreviewsColor(color) {
-        const previews = document.querySelectorAll(".ambient-preview");
-        previews.forEach(p => {
+        const plainPreviews = document.querySelectorAll(".ambient-preview.plain");
+        plainPreviews.forEach(p => {
             p.style.backgroundColor = color;
-            if (p.classList.contains("plain")) {
-                p.style.boxShadow = `0 0 10px ${color}4d`;
-            }
+            p.style.boxShadow = `0 0 10px ${color}4d`;
         });
     }
 
@@ -313,7 +306,50 @@ document.addEventListener("DOMContentLoaded", () => {
         const initialColor = ambientColorInput?.value || "#00ffcc";
         updateAmbientPreviewsColor(initialColor);
     }, 500);
-    
+
+    // ── 10-favorites (last-selected colors) — Kare-style bitmap clarity, Rams #10 overridden per user ──
+    const FAVORITES_KEY = "divoom-ambient-favorites";
+    const FAVORITES_MAX = 10;
+    function loadFavorites() {
+        try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]"); }
+        catch (e) { return []; }
+    }
+    function saveFavorites(favs) {
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+    }
+    function pushFavorite(color) {
+        if (!color) return;
+        const norm = color.toLowerCase();
+        const favs = loadFavorites().filter(c => c.toLowerCase() !== norm);
+        favs.unshift(norm);
+        if (favs.length > FAVORITES_MAX) favs.length = FAVORITES_MAX;
+        saveFavorites(favs);
+        renderFavorites();
+    }
+    function renderFavorites() {
+        const grid = document.getElementById("ambient-favorites-grid");
+        if (!grid) return;
+        const label = grid.querySelector("span");
+        grid.innerHTML = "";
+        if (label) grid.appendChild(label);
+        const favs = loadFavorites();
+        favs.forEach(color => {
+            const btn = document.createElement("button");
+            btn.className = "ambient-swatch ambient-favorite";
+            btn.style.background = color;
+            btn.setAttribute("data-color", color);
+            btn.setAttribute("title", color);
+            btn.addEventListener("click", () => {
+                if (ambientColorInput) ambientColorInput.value = color;
+                ambientSwatches.forEach(s => s.classList.remove("active"));
+                updateAmbientPreviewsColor(color);
+                window.applyAmbientColor(color);
+            });
+            grid.appendChild(btn);
+        });
+    }
+    renderFavorites();
+
     ambientSwatches.forEach(swatch => {
         swatch.addEventListener("click", () => {
             ambientSwatches.forEach(s => s.classList.remove("active"));
@@ -321,6 +357,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const color = swatch.getAttribute("data-color");
             if (ambientColorInput) ambientColorInput.value = color;
             updateAmbientPreviewsColor(color);
+            pushFavorite(color);
             window.applyAmbientColor(color);
         });
     });
@@ -337,17 +374,9 @@ document.addEventListener("DOMContentLoaded", () => {
             updateAmbientPreviewsColor(color);
         });
         ambientColorInput.addEventListener("change", (e) => {
-            window.applyAmbientColor(e.target.value);
-        });
-    }
-
-    // Custom color picker click delegation
-    const colorPickerWrapper = document.querySelector(".color-picker-wrapper");
-    if (colorPickerWrapper && ambientColorInput) {
-        colorPickerWrapper.addEventListener("click", (e) => {
-            if (e.target !== ambientColorInput) {
-                ambientColorInput.click();
-            }
+            const color = e.target.value;
+            pushFavorite(color);
+            window.applyAmbientColor(color);
         });
     }
 
