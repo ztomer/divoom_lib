@@ -1,8 +1,11 @@
-# divoom_lib/probing.py
-
 import asyncio
 from typing import Any
-from .connection import _get_cache_module
+
+def _get_cache_module(cache_mod=None):
+    if cache_mod is not None:
+        return cache_mod
+    from .utils import cache as cache_mod
+    return cache_mod
 
 async def _try_send_command_with_framing(conn: Any, command_id: int, payload: list, timeout: float = 3.0, use_ios: bool = False, escape: bool = False):
     conn.use_ios_le_protocol = use_ios

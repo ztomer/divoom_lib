@@ -323,6 +323,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    // Auto-fetch Monthly Best on tab select
+    window.addEventListener("tab-changed", (e) => {
+        if (e.detail.tab === "monthly-best") {
+            const loadBtn = document.getElementById("load-gallery-btn");
+            if (loadBtn && loadBtn.textContent === "Fetch Gallery") {
+                loadBtn.click();
+            }
+        }
+    });
+
     // Mount initializers
     setTimeout(() => {
         window.updateSyncTargetList();

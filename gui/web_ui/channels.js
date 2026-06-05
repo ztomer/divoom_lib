@@ -144,11 +144,61 @@ document.addEventListener("DOMContentLoaded", () => {
         applyClockStyle(v);
     }, 0, CLOCK_PREVIEWS);
 
+    function updateClockPreviewsColor(color) {
+        // Style 0 (Full Screen Digital) - update text color and text shadow
+        const style0 = document.querySelector(".clock-preview-box.digital-full");
+        if (style0) {
+            style0.style.color = color;
+            style0.style.textShadow = `0 0 6px ${color}`;
+        }
+        
+        // Style 2 (With Box) - update box style: border color and time color
+        const style2Span = document.querySelector(".clock-preview-box.digital-box span");
+        if (style2Span) {
+            style2Span.style.color = color;
+            style2Span.style.borderColor = color;
+            style2Span.style.textShadow = `0 0 4px ${color}`;
+        }
+        
+        // Style 3 (Analog Square) - update SVG stroke colors
+        const style3Svg = document.querySelector(".clock-preview-box.analog-square svg");
+        if (style3Svg) {
+            style3Svg.querySelectorAll("rect, line").forEach(el => {
+                el.style.stroke = color;
+            });
+            style3Svg.style.color = color;
+        }
+        
+        // Style 4 (Full Screen Neg) - inverted: background is color, text is dark
+        const style4 = document.querySelector(".clock-preview-box.digital-neg");
+        if (style4) {
+            style4.style.backgroundColor = color;
+            style4.style.color = "#1a2318";
+            style4.style.textShadow = "none";
+        }
+        
+        // Style 5 (Analog Round) - update SVG stroke colors
+        const style5Svg = document.querySelector(".clock-preview-box.analog-round svg");
+        if (style5Svg) {
+            style5Svg.querySelectorAll("circle, line").forEach(el => {
+                el.style.stroke = color;
+            });
+            style5Svg.style.color = color;
+        }
+    }
+
     const clockColorInput = document.getElementById("clock-color-input");
     if (clockColorInput) {
-        clockColorInput.addEventListener("input", () => {
+        clockColorInput.addEventListener("input", (e) => {
+            const color = e.target.value;
+            updateClockPreviewsColor(color);
             applyClockStyle(selectedClockStyle);
         });
+        
+        // Call it initially after a small timeout to let the grid render
+        setTimeout(() => {
+            updateClockPreviewsColor(clockColorInput.value || "#ffffff");
+        }, 500);
     }
 
     // ── 4. VJ EFFECTS GRID ──

@@ -48,6 +48,18 @@ window.getDeviceDimensions = function(name) {
 };
 
 // ── 3. CONNECTION ACTIONS ──
+window.updateSidebarSpeakerIcon = function(hasSpeaker) {
+    const iconSvg = document.getElementById("sidebar-speaker-icon");
+    if (!iconSvg) return;
+    if (hasSpeaker) {
+        iconSvg.innerHTML = `<path d="M3 5v6h3l4 4V1L7 5H3zm9 3c0-1.8-1-3.3-2.5-4v8c1.5-.7 2.5-2.2 2.5-4z" fill="currentColor"/>`;
+        iconSvg.setAttribute("title", "Speaker Active");
+    } else {
+        iconSvg.innerHTML = `<path d="M3 5v6h3l4 4V1L7 5H3zm8.5 1.5l1.5-1.5 1.5 1.5-1.5 1.5 1.5 1.5-1.5 1.5-1.5-1.5 1.5-1.5-1.5-1.5z" fill="currentColor"/>`;
+        iconSvg.setAttribute("title", "No Speaker");
+    }
+};
+
 window.connectDevice = function(name, address) {
     window.showToast(`Connecting to ${name}...`, "success");
     const statusDot = document.getElementById("global-status-dot");
@@ -69,6 +81,7 @@ window.connectDevice = function(name, address) {
                 document.getElementById("banner-device-res").textContent = `${dims.size}x${dims.size}`;
                 const isSpk = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo");
                 document.getElementById("banner-device-speaker").textContent = isSpk ? "Yes" : "No";
+                window.updateSidebarSpeakerIcon(isSpk);
                 const sidebarSelect = document.getElementById("sidebar-device-select");
                 if (sidebarSelect) sidebarSelect.value = address;
                 if (window.updateSyncTargetList) window.updateSyncTargetList();
@@ -79,6 +92,7 @@ window.connectDevice = function(name, address) {
                 if (statusDot) { statusDot.className = "transport-dot inactive"; statusDot.removeAttribute("style"); }
                 document.getElementById("banner-device-name").textContent = "None";
                 document.getElementById("banner-device-mac").textContent = "None";
+                window.updateSidebarSpeakerIcon(false);
                 if (window.updateSyncTargetList) window.updateSyncTargetList();
                 if (window.updateChannelButtonsVisibility) window.updateChannelButtonsVisibility("None");
             }

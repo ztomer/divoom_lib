@@ -156,6 +156,8 @@
     padding: 30px;
     overflow-y: auto;
     width: calc(100% - var(--sidebar-width));
+    display: flex;
+    flex-direction: column;
 }
 
 .tab-content {
@@ -168,6 +170,8 @@
     flex-direction: column;
     gap: 20px;
     width: 100%;
+    flex: 1;
+    min-height: 0;
 }
 
 @keyframes fadeIn {
@@ -188,61 +192,74 @@
     font-size: 14px;
 }
 
-.device-banner {
+/* ── Sidebar Connected Device Panel ─────────────────────────────────── */
+.sidebar-device-panel {
+    margin-top: 15px;
+    padding: 12px 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 25px;
-    padding: 20px;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.banner-preview {
-    width: 120px;
-    height: 120px;
+.sidebar-device-preview {
+    width: 80px;
+    height: 80px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 12px;
-    border: 2px solid var(--border-color);
-    padding: 8px;
-    flex-shrink: 0;
+    overflow: hidden;
+    margin-bottom: 8px;
 }
 
-.banner-preview img {
-    max-width: 100%;
-    max-height: 100%;
+.sidebar-device-preview img {
+    width: 80%;
+    height: 80%;
     object-fit: contain;
     image-rendering: pixelated;
     filter: grayscale(100%) contrast(300%) brightness(110%);
 }
 
-.banner-info {
-    flex: 1;
+body.theme-light .sidebar-device-preview img {
+    filter: grayscale(100%) contrast(300%) brightness(95%) !important;
 }
 
-.banner-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--primary);
-    font-weight: 600;
-    margin-bottom: 2px;
+@media (prefers-color-scheme: light) {
+    body.theme-system .sidebar-device-preview img {
+        filter: grayscale(100%) contrast(300%) brightness(95%) !important;
+    }
 }
 
-.banner-info h2 {
+.sidebar-device-name {
     font-family: var(--font-display);
-    font-size: 18px;
+    font-size: 13px;
     font-weight: 700;
-    margin-bottom: 4px;
-}
-
-.banner-specs {
-    display: flex;
-    gap: 20px;
-    font-size: 12px;
-    color: var(--text-muted);
-}
-
-.banner-specs b {
     color: var(--text-main);
+    margin-bottom: 6px;
+    word-break: break-word;
+    max-width: 100%;
+}
+
+.sidebar-device-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.sidebar-device-status .kare-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
 }

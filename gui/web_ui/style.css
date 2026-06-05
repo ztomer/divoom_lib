@@ -338,7 +338,7 @@ body {
 }
 /* Channels grid column sizes: narrower left side, wider right side */
 #control-panel .grid-layout {
-    grid-template-columns: 190px 1fr;
+    grid-template-columns: 1fr;
 }
 
 /* --- Responsive Widget Grid Layout --- */
@@ -399,4 +399,64 @@ body.theme-light .arranger-node-image {
 @keyframes repeller-strobe {
     0% { opacity: 0.4; filter: brightness(0.7); }
     100% { opacity: 1; filter: brightness(1.3); }
+}
+
+/* ── Channels Tab: Full Height Custom Art Grid ─────────────────────── */
+#control-panel.tab-content.active {
+    height: 100%;
+    min-height: 0;
+}
+
+#control-panel .grid-layout {
+    height: 100%;
+    min-height: 0;
+    align-items: stretch;
+}
+
+#control-panel .card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#control-panel .card-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+#panel-design {
+    display: none;
+    height: 100%;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#panel-design.active {
+    display: flex;
+}
+
+#panel-design .custom-art-upload-section {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 12px;
+}
+
+#panel-design .gallery-cache-selector {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-top: 4px;
+}
+
+#panel-design #custom-art-cache-grid {
+    flex: 1;
+    max-height: none !important;
+    overflow-y: auto;
 }

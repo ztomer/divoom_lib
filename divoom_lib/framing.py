@@ -70,23 +70,47 @@ def encode_basic_payload(payload_bytes: list, escape: bool = False) -> bytes:
         except Exception:
             pass
 
-    working_payload = payload_bytes
+    n = len(payload_bytes)
+    max_size = 6 + (2 * n if escape else n)
+    buf = bytearray(max_size)
+    mv = memoryview(buf)
+    
+    mv[0] = models.MESSAGE_START_BYTE
+    
+    idx = 3
     if escape:
-        working_payload = escape_payload(payload_bytes)
-
-    length_value = len(working_payload) + models.MESSAGE_CHECKSUM_LENGTH
-    length_bytes = length_value.to_bytes(2, byteorder='little')
-
-    checksum = (sum(length_bytes) + sum(working_payload)) & 0xFFFF
-
-    message = bytearray()
-    message.append(models.MESSAGE_START_BYTE)
-    message += length_bytes
-    message += bytes(working_payload)
-    message += checksum.to_bytes(2, byteorder='little')
-    message.append(models.MESSAGE_END_BYTE)
-    return bytes(message)
-
+        esc1, esc2, esc3 = models.ESCAPE_BYTE_1, models.ESCAPE_BYTE_2, models.ESCAPE_BYTE_3
+        seq1, seq2, seq3 = models.ESCAPE_SEQUENCE_1, models.ESCAPE_SEQUENCE_2, models.ESCAPE_SEQUENCE_3
+        for b in payload_bytes:
+            if b == esc1:
+                mv[idx:idx+2] = seq1
+                idx += 2
+            elif b == esc2:
+                mv[idx:idx+2] = seq2
+                idx += 2
+            elif b == esc3:
+                mv[idx:idx+2] = seq3
+                idx += 2
+            else:
+                mv[idx] = b
+                idx += 1
+    else:
+        mv[idx:idx+n] = bytes(payload_bytes)
+        idx += n
+        
+    working_payload_len = idx - 3
+    length_value = working_payload_len + models.MESSAGE_CHECKSUM_LENGTH
+    
+    mv[1] = length_value & 0xFF
+    mv[2] = (length_value >> 8) & 0xFF
+    
+    checksum = sum(mv[1:idx]) & 0xFFFF
+    
+    mv[idx] = checksum & 0xFF
+    mv[idx+1] = (checksum >> 8) & 0xFF
+    mv[idx+2] = models.MESSAGE_END_BYTE
+    
+    return bytes(mv[:idx+3])
 
 
 def encode_ios_le_payload(payload_bytes: list, packet_number: int = 0x00000000) -> bytes:
@@ -101,11 +125,6 @@ def encode_ios_le_payload(payload_bytes: list, packet_number: int = 0x00000000) 
         [data...]                                 (raw data WITHOUT the command id)
         [checksum_lo, checksum_hi]                (sum of bytes 4..end-3, little-endian)
         [0x02]                                    (end marker)
-
-    The caller passes ``payload_bytes`` as ``[cmd, data...]`` (i.e. cmd is
-    included). We strip the cmd off and emit it separately so the wire format
-    matches the APK exactly. (Previous versions incorrectly emitted the cmd
-    twice — once as ``[command_identifier]`` and again inside ``data_bytes``.)
     """
     if not payload_bytes:
         raise ValueError("payload_bytes must contain at least the command id")
@@ -124,34 +143,34 @@ def encode_ios_le_payload(payload_bytes: list, packet_number: int = 0x00000000) 
         except Exception:
             pass
 
-    command_identifier = payload_bytes[0]
-    data_bytes = payload_bytes[1:]
-
-    # Total wire length = header(4) + length(2) + packet_num(1) + cmd(1)
-    #                  + data + checksum(2) + end(1)
-    total_len = 4 + 2 + 1 + 1 + len(data_bytes) + 2 + 1
+    n = len(payload_bytes)
+    total_len = n + 10
+    buf = bytearray(total_len)
+    mv = memoryview(buf)
+    
+    mv[0:4] = models.IOS_LE_MESSAGE_HEADER
+    
     length_field = total_len - 7
-    length_bytes = list(length_field.to_bytes(2, byteorder="little"))
-
+    mv[4] = length_field & 0xFF
+    mv[5] = (length_field >> 8) & 0xFF
+    
     packet_number_byte = packet_number & 0xFF
-
-    pre_checksum = (
-        length_bytes
-        + [packet_number_byte, command_identifier]
-        + list(data_bytes)
-    )
-    checksum = sum(pre_checksum) & 0xFFFF
-    checksum_bytes = list(checksum.to_bytes(2, byteorder="little"))
-
-    wire = (
-        list(models.IOS_LE_MESSAGE_HEADER)
-        + length_bytes
-        + [packet_number_byte, command_identifier]
-        + list(data_bytes)
-        + checksum_bytes
-        + [models.MESSAGE_END_BYTE]
-    )
-    return bytes(wire)
+    mv[6] = packet_number_byte
+    
+    command_identifier = payload_bytes[0]
+    mv[7] = command_identifier
+    
+    if n > 1:
+        mv[8:8+n-1] = bytes(payload_bytes[1:])
+        
+    checksum = sum(mv[4:n+7]) & 0xFFFF
+    
+    idx = n + 7
+    mv[idx] = checksum & 0xFF
+    mv[idx+1] = (checksum >> 8) & 0xFF
+    mv[idx+2] = models.MESSAGE_END_BYTE
+    
+    return bytes(mv)
 
 
 

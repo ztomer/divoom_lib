@@ -427,7 +427,7 @@ class AudioVisualizerWorker:
         
         self.p = pyaudio.PyAudio()
         
-        # Scan devices to locate loopback driver (e.g. BlackHole, Loopback, Soundflower)
+        # Scan devices to locate loopback driver (e.g. BlackHole, Loopback, Soundflower, SoundSource, ACE)
         device_index = None
         self.loopback_active = False
         self.device_name = "None"
@@ -438,27 +438,20 @@ class AudioVisualizerWorker:
                 try:
                     dev_info = self.p.get_device_info_by_index(i)
                     name = dev_info.get("name", "")
-                    if any(k in name.lower() for k in ["blackhole", "loopback", "soundflower"]):
+                    if any(k in name.lower() for k in ["blackhole", "loopback", "soundflower", "soundsource", "ace"]):
                         device_index = i
                         self.loopback_active = True
                         self.device_name = name
                         break
                 except Exception:
                     pass
-            
-            if device_index is None:
-                # Default to fallback system input device (microphone)
-                try:
-                    default_input = self.p.get_default_input_device_info()
-                    device_index = default_input.get("index")
-                    self.device_name = default_input.get("name", "Microphone")
-                except Exception:
-                    pass
         except Exception as e:
             logger.error(f"Audio scan error: {e}")
             
         if device_index is None:
-            logger.error("No audio input device found.")
+            logger.warning("No virtual loopback audio device detected (BlackHole, SoundSource, ACE, Loopback, etc.). Visualizer disabled to avoid microphone fallback.")
+            self.loopback_active = False
+            self.device_name = "None"
             return
 
         CHUNK = 512

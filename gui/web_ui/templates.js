@@ -27,8 +27,11 @@ window.DivoomTemplates = {
                         </div>
                         <div class="card-body" style="flex:1; overflow:hidden; min-height:0; display:flex; flex-direction:column;">
                             <!-- Dynamic Grid with preview covers -->
-                            <div class="gallery-grid" id="gallery-container" style="flex:1; overflow-y:auto; min-height:0;">
+                            <div class="gallery-grid" id="gallery-container" style="flex:1; overflow-y:auto; min-height:0; margin-bottom:12px;">
                                 <div class="empty-list">Click "Fetch Gallery" to load public artworks.</div>
+                            </div>
+                            <div class="gallery-actions" style="margin-top:auto; display:flex; gap:10px;">
+                                <button id="batch-sync-btn" class="glow-btn" style="flex:1; margin:0;">Push Selected to Device</button>
                             </div>
                         </div>
                     </div>
@@ -47,8 +50,7 @@ window.DivoomTemplates = {
                                 </div>
 
                                 <div class="hc-actions">
-                                    <button id="batch-sync-btn" class="glow-btn">Sync Selected Art</button>
-                                    <button id="sync-all-btn" class="glow-btn secondary">Sync All → Targets</button>
+                                    <button id="sync-all-btn" class="glow-btn secondary" style="flex:1;">Sync All → Targets</button>
                                 </div>
 
                                 <!-- Automatic hot-channel schedule (4.d) -->
@@ -79,12 +81,12 @@ window.DivoomTemplates = {
                     <div class="card glass-card" id="widget-card-music">
                         <div class="card-header flex-header">
                             <h3>Live cover art</h3>
-                            <span class="active-indicator">● Active</span>
+                            <span class="active-indicator"></span>
                         </div>
                         <div class="card-body">
                             <!-- Loopback Warning/Tip Banner -->
                             <div id="audio-loopback-tip" style="display:none; color:var(--transport-ext); background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); padding:8px; border-radius:6px; margin-bottom:12px; font-size:10px; line-height:1.4;">
-                                ⚠️ Capturing audio via microphone. For clean system audio loopback sync, install the free <b>BlackHole</b> audio driver.
+                                ⚠️ No loopback audio device detected (BlackHole, SoundSource, ACE, Loopback, etc.). Audio visualizer is disabled to avoid microphone fallback.
                             </div>
                             <!-- Preview on top -->
                             <div class="music-previews-container" style="margin-bottom: 12px;">
@@ -94,7 +96,6 @@ window.DivoomTemplates = {
                                 </div>
                                 <div class="music-device-preview-wrap">
                                     <img id="music-device-preview" class="device-preview-img" alt="Device Preview" style="display:none;">
-                                    <span class="hc-label">On Device</span>
                                 </div>
                             </div>
                             
@@ -125,16 +126,15 @@ window.DivoomTemplates = {
                     <div class="card glass-card" id="widget-card-stock">
                         <div class="card-header flex-header">
                             <h3>Live Stocks &amp; Crypto Tickers</h3>
-                            <span class="active-indicator">● Active</span>
+                            <span class="active-indicator"></span>
                         </div>
                         <div class="card-body">
                             <!-- Preview on top -->
                             <div style="display:flex; gap:12px; margin-bottom:12px; align-items:center;">
-                                <div class="device-preview-wrap" style="flex:1; margin:0;">
-                                    <span class="hc-label">On-device preview</span>
+                                <div class="device-preview-wrap large" style="margin:0;">
                                     <img id="ticker-device-preview" class="device-preview-img" alt="" style="display:none;">
                                 </div>
-                                <div class="widget-preview-ticker" id="ticker-preview-box" style="flex:1; margin:0;">
+                                <div class="widget-preview-ticker" id="ticker-preview-box" style="flex:1; margin:0; height: 128px;">
                                     <div class="mini-canvas-view">
                                         <div class="ticker-arrow-mock">▲</div>
                                         <div class="ticker-price-mock">$64,285</div>
@@ -151,22 +151,23 @@ window.DivoomTemplates = {
                                     <button id="add-ticker-btn" class="glow-btn compact ghost">+ Save</button>
                                 </div>
                             </div>
-
+ 
                             <div id="tickers-list" class="tickers-list"></div>
                         </div>
                     </div>
-
+ 
                     <!-- System Monitor -->
                     <div class="card glass-card" id="widget-card-sysmon">
                         <div class="card-header flex-header">
                             <h3>System Monitor</h3>
-                            <span class="active-indicator">● Active</span>
+                            <span class="active-indicator"></span>
                         </div>
                         <div class="card-body">
                             <!-- Preview on top -->
-                            <div class="device-preview-wrap" style="margin-bottom:12px;">
-                                <span class="hc-label">On-device preview</span>
-                                <img id="sysmon-device-preview" class="device-preview-img" alt="" style="display:none;">
+                            <div style="display:flex; justify-content:center; margin-bottom:12px;">
+                                <div class="device-preview-wrap large" style="margin:0;">
+                                    <img id="sysmon-device-preview" class="device-preview-img" alt="" style="display:none;">
+                                </div>
                             </div>
                             
                             <!-- Stats below -->
@@ -179,7 +180,6 @@ window.DivoomTemplates = {
                                 <button id="sysmon-display-btn" class="glow-btn compact" style="margin:0;">Display on Device</button>
                                 <label class="hc-toggle" style="margin:0;"><input type="checkbox" id="sysmon-live" checked> Live (5s)</label>
                             </div>
-                        </div>
                     </div>
                 </div>
     `,

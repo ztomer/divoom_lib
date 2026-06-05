@@ -98,52 +98,46 @@
                         </svg>
                     </span> Live Widgets
                 </button>
-                <button class="nav-btn" data-tab="settings">
-                    <span class="btn-icon">
-                        <svg class="kare-icon" viewBox="0 0 16 16">
-                            <path d="M8,6 C6.9,6 6,6.9 6,8 C6,9.1 6.9,10 8,10 C9.1,10 10,9.1 10,8 C10,6.9 9.1,6 8,6 Z M8,0 L6,3 L10,3 Z M8,16 L10,13 L6,13 Z M0,8 L3,6 L3,10 Z M16,8 L13,10 L13,6 Z"/>
-                        </svg>
-                    </span> Settings
-                </button>
             </nav>
+            
+            <!-- Connected Device Panel (Moved from channels) -->
+            <div class="sidebar-device-panel" id="connected-device-banner">
+                <div class="sidebar-device-preview">
+                    <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
+                </div>
+                <div class="sidebar-device-name" id="banner-device-name">No Connected Screen</div>
+                <div class="sidebar-device-status">
+                    <span id="sidebar-device-speaker-container" title="Speaker Status">
+                        <svg class="kare-icon" id="sidebar-speaker-icon" viewBox="0 0 16 16">
+                            <path d="M3 5v6h3l4 4V1L7 5H3zm8.5 1.5l1.5-1.5 1.5 1.5-1.5 1.5 1.5 1.5-1.5 1.5-1.5-1.5 1.5-1.5-1.5-1.5z" fill="currentColor"/>
+                        </svg>
+                    </span>
+                    <span id="banner-device-res" class="sidebar-device-res">16x16</span>
+                </div>
+                <span id="banner-device-mac" style="display: none;">-</span>
+                <span id="banner-device-speaker" style="display: none;">No</span>
+            </div>
+
+            <!-- Settings placed below the device preview -->
+            <button class="nav-btn" data-tab="settings">
+                <span class="btn-icon">
+                    <svg class="kare-icon" viewBox="0 0 16 16">
+                        <path d="M8,6 C6.9,6 6,6.9 6,8 C6,9.1 6.9,10 8,10 C9.1,10 10,9.1 10,8 C10,6.9 9.1,6 8,6 Z M8,0 L6,3 L10,3 Z M8,16 L10,13 L6,13 Z M0,8 L3,6 L3,10 Z M16,8 L13,10 L13,6 Z"/>
+                    </svg>
+                </span> Settings
+            </button>
         </aside>
         
         <main class="main-content">
             
             <!-- TAB 1: CONTROL CENTER -->
             <section id="control-panel" class="tab-content active">
-                <!-- Connected Device Info Banner -->
-                <div class="device-banner glass-card" id="connected-device-banner">
-                    <span class="transport-badge ble card-transport-badge">
-                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
-                            <path d="M5,4 L11,9.5 L8,12 L8,1 L11,3.5 L5,9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter"/>
-                        </svg>
-                        Bluetooth
-                    </span>
-                    <div class="banner-preview">
-                        <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
-                    </div>
-                    <div class="banner-info">
-                        <div class="banner-label">Active Device</div>
-                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
-                            <h2 id="banner-device-name" style="margin-bottom:0; font-size:18px;">No Connected Screen</h2>
-                        </div>
-                        <div class="banner-specs">
-                            <span style="display: none;">Target: <b id="banner-device-mac">-</b></span>
-                            <span>Resolution: <b id="banner-device-res">16x16</b></span>
-                            <span>Speaker: <b id="banner-device-speaker">No</b></span>
-                        </div>
-                    </div>
-                </div>
-                
                 <div class="grid-layout">
-                    <!-- Channels (Left: Channel selection) -->
+                    <!-- Channel sub-selection panels (Dynamic options - converted to full width tabs) -->
                     <div class="card glass-card">
-                        <div class="card-header">
-                            <h3>Channels</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="channel-grid">
+                        <div class="card-header" style="display:flex; flex-direction:row; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+                            <h3 id="channel-options-title" style="margin:0;">Clock Mode Options</h3>
+                            <div class="channel-tabs">
                                 <button class="channel-card active" data-channel="clock">
                                     <span class="channel-icon">
                                         <svg class="kare-icon" viewBox="0 0 16 16">
@@ -151,7 +145,7 @@
                                             <path d="M8,4 L8,8 L11,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                         </svg>
                                     </span>
-                                    <h4>Clock Mode</h4>
+                                    <h4>Clock</h4>
                                 </button>
                                 <button class="channel-card" data-channel="visualizer">
                                     <span class="channel-icon">
@@ -162,7 +156,7 @@
                                             <rect x="14" y="2" width="2" height="14"/>
                                         </svg>
                                     </span>
-                                    <h4>Music EQ</h4>
+                                    <h4>EQ Visualizer</h4>
                                 </button>
                                 <button class="channel-card" data-channel="vj">
                                     <span class="channel-icon">
@@ -196,13 +190,6 @@
                                     <h4>Ambient</h4>
                                 </button>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Channel sub-selection panels (Right: Dynamic options) -->
-                    <div class="card glass-card">
-                        <div class="card-header">
-                            <h3 id="channel-options-title">Clock Mode Options</h3>
                         </div>
                         <div class="card-body">
                             <div class="channel-panels">

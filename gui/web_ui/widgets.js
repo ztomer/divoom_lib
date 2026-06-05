@@ -6,57 +6,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const winMax = document.getElementById("win-max");
     const winClose = document.getElementById("win-close");
 
-    if (winMin) {
-        winMin.addEventListener("click", () => {
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.minimize_window();
-            }
-        });
-    }
-    if (winMax) {
-        winMax.addEventListener("click", () => {
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.maximize_window();
-            }
-        });
-    }
-    if (winClose) {
-        winClose.addEventListener("click", () => {
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.close_window();
-            }
-        });
-    }
+    if (winMin) winMin.addEventListener("click", () => window.pywebview?.api?.minimize_window());
+    if (winMax) winMax.addEventListener("click", () => window.pywebview?.api?.maximize_window());
+    if (winClose) winClose.addEventListener("click", () => window.pywebview?.api?.close_window());
 
     // Frameless window dragging relative movement via python API
-    let isDragging = false;
-    let lastScreenX = 0;
-    let lastScreenY = 0;
+    let isDragging = false, lastScreenX = 0, lastScreenY = 0;
     const appbar = document.querySelector(".integrated-appbar");
     if (appbar) {
         appbar.addEventListener("mousedown", (e) => {
-            if (e.button !== 0 || e.target.closest("button") || e.target.closest("select") || e.target.closest("input")) return;
-            isDragging = true;
-            lastScreenX = e.screenX;
-            lastScreenY = e.screenY;
-        });
-
-        window.addEventListener("mousemove", (e) => {
-            if (!isDragging) return;
-            const deltaX = e.screenX - lastScreenX;
-            const deltaY = e.screenY - lastScreenY;
-            lastScreenX = e.screenX;
-            lastScreenY = e.screenY;
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.drag_window) {
-                if (deltaX !== 0 || deltaY !== 0) {
-                    window.pywebview.api.drag_window(deltaX, deltaY);
-                }
+            if (e.button === 0 && !e.target.closest("button, select, input")) {
+                isDragging = true; lastScreenX = e.screenX; lastScreenY = e.screenY;
             }
         });
-
-        window.addEventListener("mouseup", () => {
-            isDragging = false;
+        window.addEventListener("mousemove", (e) => {
+            if (!isDragging) return;
+            const dx = e.screenX - lastScreenX, dy = e.screenY - lastScreenY;
+            lastScreenX = e.screenX; lastScreenY = e.screenY;
+            if ((dx || dy) && window.pywebview?.api?.drag_window) window.pywebview.api.drag_window(dx, dy);
         });
+        window.addEventListener("mouseup", () => isDragging = false);
     }
 
     // ── 2. LIVE MUSIC SYNCHRONIZER & AUDIO VISUALIZER POLLING ──
@@ -343,27 +312,122 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    let selectedWidget = "music"; // Default selected widget is cover art
+
+    function selectWidget(widgetId) {
+        selectedWidget = widgetId;
+        
+        // Update visual card states
+        const cards = ["music", "stock", "sysmon"];
+        cards.forEach(id => {
+            const cardEl = document.getElementById(`widget-card-${id}`);
+            if (cardEl) {
+                cardEl.classList.toggle("widget-active", id === widgetId);
+            }
+        });
+        
+        // Trigger background sync toggles
+        syncActiveWidget();
+    }
+
+    function syncActiveWidget() {
+        if (!window.pywebview || !window.pywebview.api) return;
+        const isTabActive = document.getElementById("data-sources")?.classList.contains("active");
+
+        // 1. Music (Cover Art)
+        const startMusic = isTabActive && (selectedWidget === "music");
+        window.pywebview.api.toggle_music_sync(startMusic);
+        if (window.pywebview.api.toggle_audio_visualizer) {
+            window.pywebview.api.toggle_audio_visualizer(startMusic);
+        }
+        if (startMusic) {
+            startTrackPolling();
+            startVisualizerPolling();
+        } else {
+            stopTrackPolling();
+            stopVisualizerPolling();
+        }
+
+        // 2. Stocks
+        const symbol = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
+        const startStocks = isTabActive && (selectedWidget === "stock") && !!symbol;
+        if (window.pywebview.api.toggle_stocks_sync) {
+            window.pywebview.api.toggle_stocks_sync(startStocks, symbol || "");
+        }
+        if (startStocks) {
+            refreshStockPreview();
+            if (!stockTimer) {
+                stockTimer = setInterval(refreshStockPreview, 15000);
+            }
+        } else {
+            if (stockTimer) {
+                clearInterval(stockTimer);
+                stockTimer = null;
+            }
+        }
+
+        // 3. System Monitor
+        const sysmonLiveChecked = sysmonLive ? sysmonLive.checked : true;
+        const startSysmon = isTabActive && (selectedWidget === "sysmon") && sysmonLiveChecked;
+        if (window.pywebview.api.toggle_sysmon_sync) {
+            window.pywebview.api.toggle_sysmon_sync(startSysmon);
+        }
+        if (startSysmon) {
+            refreshSysmonPreview();
+            if (!sysmonTimer) {
+                sysmonTimer = setInterval(refreshSysmonPreview, 5000);
+            }
+        } else {
+            if (sysmonTimer) {
+                clearInterval(sysmonTimer);
+                sysmonTimer = null;
+            }
+        }
+    }
+
+    function bindCardSelection(cardId, widgetName) {
+        const card = document.getElementById(cardId);
+        if (card) {
+            card.style.cursor = "pointer";
+            card.addEventListener("click", (e) => {
+                if (e.target.closest("input") || e.target.closest("button") || e.target.closest("select")) {
+                    if (e.target.closest("#apply-stock-btn") || e.target.closest("#sysmon-display-btn") || e.target.closest("#sysmon-live")) {
+                        selectWidget(widgetName);
+                    }
+                    return;
+                }
+                selectWidget(widgetName);
+            });
+        }
+    }
+
+    bindCardSelection("widget-card-music", "music");
+    bindCardSelection("widget-card-stock", "stock");
+    bindCardSelection("widget-card-sysmon", "sysmon");
+
     const sysmonLive = document.getElementById("sysmon-live");
     if (sysmonLive) {
-        sysmonLive.addEventListener("change", (e) => {
-            const active = e.target.checked && document.getElementById("data-sources").classList.contains("active");
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_sysmon_sync) {
-                window.pywebview.api.toggle_sysmon_sync(active);
-            }
-            const sysmonCard = document.getElementById("widget-card-sysmon");
-            if (active) {
-                if (sysmonCard) sysmonCard.classList.add("widget-active");
-                refreshSysmonPreview();
-                if (!sysmonTimer) {
-                    sysmonTimer = setInterval(refreshSysmonPreview, 5000);
-                }
+        sysmonLive.addEventListener("change", () => {
+            if (sysmonLive.checked) {
+                selectWidget("sysmon");
             } else {
-                if (sysmonCard) sysmonCard.classList.remove("widget-active");
-                if (sysmonTimer) {
-                    clearInterval(sysmonTimer);
-                    sysmonTimer = null;
-                }
+                syncActiveWidget();
             }
+        });
+    }
+
+    const sysmonDisplayBtn = document.getElementById("sysmon-display-btn");
+    if (sysmonDisplayBtn) {
+        sysmonDisplayBtn.addEventListener("click", () => {
+            if (!(window.pywebview && window.pywebview.api && window.pywebview.api.apply_system_stats)) return;
+            window.pywebview.api.apply_system_stats().then(json => {
+                try {
+                    const r = JSON.parse(json);
+                    const img = document.getElementById("sysmon-device-preview");
+                    if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
+                    window.showToast(r.success ? "System monitor on device" : (r.error || "Failed"), r.success ? "success" : "🔵 BLE");
+                } catch (e) { window.showToast("Failed", "error"); }
+            });
         });
     }
 
@@ -371,45 +435,9 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("tab-changed", (e) => {
         const tab = e.detail.tab;
         if (tab === "data-sources") {
-            // Start Cover Art/Music sync
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.toggle_music_sync(true);
-                if (window.pywebview.api.toggle_audio_visualizer) {
-                    window.pywebview.api.toggle_audio_visualizer(true);
-                }
-            }
-            startTrackPolling();
-            startVisualizerPolling();
-
-            // Start Sysmon sync if checkbox is checked
-            const sysmonLiveChecked = sysmonLive ? sysmonLive.checked : true;
-            if (sysmonLiveChecked) {
-                const sysmonCard = document.getElementById("widget-card-sysmon");
-                if (sysmonCard) sysmonCard.classList.add("widget-active");
-                if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_sysmon_sync) {
-                    window.pywebview.api.toggle_sysmon_sync(true);
-                }
-                refreshSysmonPreview();
-                if (!sysmonTimer) {
-                    sysmonTimer = setInterval(refreshSysmonPreview, 5000);
-                }
-            }
-
-            // Start Stocks sync if symbol is configured
-            const symbol = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
-            if (symbol) {
-                const stockCard = document.getElementById("widget-card-stock");
-                if (stockCard) stockCard.classList.add("widget-active");
-                if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_stocks_sync) {
-                    window.pywebview.api.toggle_stocks_sync(true, symbol);
-                }
-                refreshStockPreview();
-                if (!stockTimer) {
-                    stockTimer = setInterval(refreshStockPreview, 15000);
-                }
-            }
+            selectWidget(selectedWidget);
         } else {
-            // Stop everything to conserve resources and device bandwidth
+            // Stop everything when leaving the tab
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.toggle_music_sync(false);
                 if (window.pywebview.api.toggle_sysmon_sync) {
@@ -432,11 +460,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 clearInterval(stockTimer);
                 stockTimer = null;
             }
-
-            const sysmonCard = document.getElementById("widget-card-sysmon");
-            if (sysmonCard) sysmonCard.classList.remove("widget-active");
-            const stockCard = document.getElementById("widget-card-stock");
-            if (stockCard) stockCard.classList.remove("widget-active");
+            ["music", "stock", "sysmon"].forEach(id => {
+                const cardEl = document.getElementById(`widget-card-${id}`);
+                if (cardEl) cardEl.classList.remove("widget-active");
+            });
         }
     });
 

@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 import sys
 from typing import Callable, Any
@@ -177,7 +178,7 @@ class MockBleakClient:
             logger.info(f"Sending notification: {data.hex()}")
             # Call the callback (sender_handle, data)
             # In bleak, callback is often a partial or bound method, but signature is (sender, data)
-            if asyncio.iscoroutinefunction(callback):
+            if inspect.iscoroutinefunction(callback):
                  await callback(1, data)
             else:
                  callback(1, data)

@@ -40,28 +40,41 @@ class GallerySyncMixin:
             except Exception as e:
                 logger.warning(f"Failed to parse gallery cache map: {e}")
 
-        results = []
+        results = {}
         for path in cache_dir.iterdir():
             if path.is_file() and path.suffix.lower() in [".gif", ".png", ".jpg", ".jpeg"]:
                 if path.stat().st_size == 0:
                     continue
                 safe_name = path.stem
+                ext = path.suffix.lower()
+                
+                # Deduplicate by stem, prioritizing .gif animations
+                if safe_name in results and results[safe_name]["ext"] == ".gif" and ext != ".gif":
+                    continue
+                    
                 display_name = name_map.get(safe_name, path.name)
-                ext = path.suffix.lower().replace(".", "")
-                mime_type = "image/gif" if ext == "gif" else ("image/jpeg" if ext in ["jpg", "jpeg"] else "image/png")
+                mime_type = "image/gif" if ext == ".gif" else ("image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png")
                 try:
                     img_data = path.read_bytes()
                     b64_str = base64.b64encode(img_data).decode("utf-8")
                     preview_url = f"data:{mime_type};base64,{b64_str}"
-                    results.append({
+                    results[safe_name] = {
                         "name": display_name,
                         "path": str(path.absolute()),
-                        "preview_url": preview_url
-                    })
+                        "preview_url": preview_url,
+                        "ext": ext
+                    }
                 except Exception as e:
                     logger.warning(f"Failed to encode cache file {path}: {e}")
         
-        return json.dumps(results)
+        final_list = []
+        for item in results.values():
+            final_list.append({
+                "name": item["name"],
+                "path": item["path"],
+                "preview_url": item["preview_url"]
+            })
+        return json.dumps(final_list)
 
     def fetch_gallery(self, classify: int, target_size: int = 16) -> str:
         logger.info(f"GUI Action: Fetching gallery classify={classify} target_size={target_size}...")
@@ -183,7 +196,7 @@ class GallerySyncMixin:
                             safe_filename = file_id.replace("/", "_")
                             cache_file_item = cache_dir / safe_filename
                             
-                            for ext in [".png", ".jpg", ".jpeg", ".gif"]:
+                            for ext in [".gif", ".png", ".jpg", ".jpeg"]:
                                 possible_file = cache_file_item.with_suffix(ext)
                                 if possible_file.exists():
                                     try:
