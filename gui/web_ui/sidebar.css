@@ -210,8 +210,8 @@
 .sidebar-device-preview {
     width: 80px;
     height: 80px;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--border-color);
+    background: transparent;
+    border: none;
     border-radius: 6px;
     display: flex;
     align-items: center;
@@ -221,31 +221,47 @@
 }
 
 .sidebar-device-preview img {
-    width: 80%;
-    height: 80%;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
     image-rendering: pixelated;
-    filter: grayscale(100%) contrast(300%) brightness(110%);
 }
 
-body.theme-light .sidebar-device-preview img {
-    filter: grayscale(100%) contrast(300%) brightness(95%) !important;
+.sidebar-device-select {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+    text-align: center;
+    transition: border-color 0.2s, background-color 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.6)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    padding-right: 24px;
 }
-
-@media (prefers-color-scheme: light) {
-    body.theme-system .sidebar-device-preview img {
-        filter: grayscale(100%) contrast(300%) brightness(95%) !important;
-    }
+.sidebar-device-select:hover {
+    border-color: var(--primary);
+    background-color: rgba(255, 90, 31, 0.05);
+}
+.sidebar-device-select option {
+    background-color: #1a1b20;
+    color: var(--text-main);
+    text-align: left;
 }
 
 .sidebar-device-name {
-    font-family: var(--font-display);
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-main);
-    margin-bottom: 6px;
-    word-break: break-word;
-    max-width: 100%;
+    display: none;
 }
 
 .sidebar-device-status {

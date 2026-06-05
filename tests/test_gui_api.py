@@ -36,6 +36,13 @@ class TestDivoomGuiAPI(unittest.TestCase):
             self.api.close_window()
             mock_thread.assert_called_once()
 
+    def test_drag_window(self):
+        """Test window dragging movement calculations."""
+        self.api.window.x = 100
+        self.api.window.y = 200
+        self.api.drag_window(15, -25)
+        self.api.window.move.assert_called_once_with(115, 175)
+
     @patch("gui_main.BleakScanner")
     def test_scan_devices_with_config(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""

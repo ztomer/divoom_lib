@@ -10,7 +10,7 @@
     z-index: 1000;
     position: relative;
     user-select: none;
-    -webkit-app-region: drag; /* Allows moving window by dragging titlebar */
+    -webkit-app-region: no-drag; /* Custom JS event dragging handles window moving */
 }
 
 .appbar-brand {

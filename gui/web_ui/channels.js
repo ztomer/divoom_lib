@@ -272,14 +272,24 @@ document.addEventListener("DOMContentLoaded", () => {
         { value: 4, name: "No Mosquitto" }
     ];
     const AMBIENT_PREVIEWS = {
-        0: `<div class="ambient-preview plain" style="background:#00ffcc; height:40px; border-radius:4px; box-shadow: 0 0 10px rgba(0,255,204,0.3);"></div>`,
-        1: `<div class="ambient-preview love" style="background:#ff3366; height:40px; border-radius:4px; animation: heartbeat 1.2s infinite ease-in-out;"></div>`,
-        2: `<div class="ambient-preview plants" style="background:#33cc66; height:40px; border-radius:4px; animation: breathe 3s infinite ease-in-out;"></div>`,
-        3: `<div class="ambient-preview sleeping" style="background:#9933ff; height:40px; border-radius:4px; animation: sleeping-fade 4s infinite ease-in-out;"></div>`,
-        4: `<div class="ambient-preview mosquito" style="background:#ffcc00; height:40px; border-radius:4px; animation: repeller-strobe 0.2s infinite steps(2);"></div>`
+        0: `<div class="ambient-preview plain" style="background:#00ffcc; height:60px; border-radius:4px; box-shadow: 0 0 10px rgba(0,255,204,0.3);"></div>`,
+        1: `<div class="ambient-preview love" style="background:#ff3366; height:60px; border-radius:4px; animation: heartbeat 1.2s infinite ease-in-out;"></div>`,
+        2: `<div class="ambient-preview plants" style="background:#33cc66; height:60px; border-radius:4px; animation: breathe 3s infinite ease-in-out;"></div>`,
+        3: `<div class="ambient-preview sleeping" style="background:#9933ff; height:60px; border-radius:4px; animation: sleeping-fade 4s infinite ease-in-out;"></div>`,
+        4: `<div class="ambient-preview mosquito" style="background:#ffcc00; height:60px; border-radius:4px; animation: repeller-strobe 0.2s infinite steps(2);"></div>`
     };
 
     let selectedAmbientMode = 0;
+
+    function updateAmbientPreviewsColor(color) {
+        const previews = document.querySelectorAll(".ambient-preview");
+        previews.forEach(p => {
+            p.style.backgroundColor = color;
+            if (p.classList.contains("plain")) {
+                p.style.boxShadow = `0 0 10px ${color}4d`;
+            }
+        });
+    }
 
     window.applyAmbientColor = function(color) {
         if (!window.requireDevice()) return;
@@ -297,6 +307,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const color = ambientColorInput?.value || "#00ffcc";
         window.applyAmbientColor(color);
     }, 0, AMBIENT_PREVIEWS);
+
+    // Call it initially after grid builds
+    setTimeout(() => {
+        const initialColor = ambientColorInput?.value || "#00ffcc";
+        updateAmbientPreviewsColor(initialColor);
+    }, 500);
     
     ambientSwatches.forEach(swatch => {
         swatch.addEventListener("click", () => {
@@ -304,6 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
             swatch.classList.add("active");
             const color = swatch.getAttribute("data-color");
             if (ambientColorInput) ambientColorInput.value = color;
+            updateAmbientPreviewsColor(color);
             window.applyAmbientColor(color);
         });
     });
@@ -317,15 +334,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     s.classList.add("active");
                 }
             });
-            // Update preview color for the Plain mode in the selector grid
-            const plainPrev = document.querySelector(".ambient-preview.plain");
-            if (plainPrev) {
-                plainPrev.style.backgroundColor = color;
-                plainPrev.style.boxShadow = `0 0 10px ${color}4d`;
-            }
+            updateAmbientPreviewsColor(color);
         });
         ambientColorInput.addEventListener("change", (e) => {
             window.applyAmbientColor(e.target.value);
+        });
+    }
+
+    // Custom color picker click delegation
+    const colorPickerWrapper = document.querySelector(".color-picker-wrapper");
+    if (colorPickerWrapper && ambientColorInput) {
+        colorPickerWrapper.addEventListener("click", (e) => {
+            if (e.target !== ambientColorInput) {
+                ambientColorInput.click();
+            }
         });
     }
 
@@ -386,6 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         const pathInput = document.getElementById("custom-art-path-input");
                         if (pathInput) pathInput.value = f.path;
+                        if (window.showCustomArtPreview) window.showCustomArtPreview(f.path);
                     });
                     grid.appendChild(item);
                 });
@@ -433,6 +456,7 @@ document.addEventListener("DOMContentLoaded", () => {
             item.addEventListener("click", () => {
                 const pathInput = document.getElementById("custom-art-path-input");
                 if (pathInput) pathInput.value = itemData.path;
+                if (window.showCustomArtPreview) window.showCustomArtPreview(itemData.path);
             });
             
             filmstrip.appendChild(item);

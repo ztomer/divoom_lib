@@ -27,13 +27,7 @@
             <button id="win-min" class="win-btn min" title="MinimizeWindow">—</button>
             <button id="win-max" class="win-btn max" title="ToggleFullscreen">▢</button>
         </div>
-        <!-- Active device selector + connection indicator -->
-        <div class="appbar-device">
-            <select id="sidebar-device-select" class="custom-select appbar-device-select" style="width: 300px !important; min-width: 300px !important; height: 32px !important; padding: 0 28px 0 12px !important; line-height: 30px !important; box-sizing: border-box !important; flex-shrink: 0 !important;">
-                <option value="">Select Screen…</option>
-            </select>
-        </div>
-        
+
         <!-- Global Brightness Slider in Appbar -->
         <div class="appbar-brightness">
             <svg class="kare-icon" viewBox="0 0 16 16">
@@ -105,7 +99,10 @@
                 <div class="sidebar-device-preview">
                     <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
                 </div>
-                <div class="sidebar-device-name" id="banner-device-name">No Connected Screen</div>
+                <select id="sidebar-device-select" class="sidebar-device-select">
+                    <option value="">Select Screen…</option>
+                </select>
+                <span id="banner-device-name" style="display: none;">No Connected Screen</span>
                 <div class="sidebar-device-status">
                     <span id="sidebar-device-speaker-container" title="Speaker Status">
                         <svg class="kare-icon" id="sidebar-speaker-icon" viewBox="0 0 16 16">
@@ -133,10 +130,8 @@
             <!-- TAB 1: CONTROL CENTER -->
             <section id="control-panel" class="tab-content active">
                 <div class="grid-layout">
-                    <!-- Channel sub-selection panels (Dynamic options - converted to full width tabs) -->
                     <div class="card glass-card">
-                        <div class="card-header" style="display:flex; flex-direction:row; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
-                            <h3 id="channel-options-title" style="margin:0;">Clock Mode Options</h3>
+                        <div class="card-header" style="display:flex; flex-direction:row; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:16px;">
                             <div class="channel-tabs">
                                 <button class="channel-card active" data-channel="clock">
                                     <span class="channel-icon">
@@ -212,31 +207,37 @@
                                 </div>
                                 <!-- Custom art -->
                                 <div class="channel-panel" id="panel-design">
-                                    <p class="panel-hint" style="margin-top: 0; margin-bottom: 12px;">Display your own custom art/GIFs on the device's "Custom" channel.</p>
-                                    <div class="custom-art-upload-section" style="display:flex; flex-direction:column; gap:12px; max-width:100%;">
-                                        <div style="display:flex; gap:10px; align-items:center;">
-                                            <button id="browse-custom-art-btn" class="glow-btn compact" style="margin:0; white-space:nowrap;">Browse File...</button>
-                                            <input type="text" id="custom-art-path-input" placeholder="No file selected" class="text-input" style="flex:1;" readonly>
-                                        </div>
-                                        
-                                        <!-- Last 5 Selected Items filmstrip preview -->
-                                        <div id="custom-art-history-container" style="display:flex; flex-direction:column; gap:6px; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
-                                            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:2px;">Last 5 Selected Items:</label>
-                                            <div id="custom-art-history-filmstrip" style="display:flex; gap:8px; overflow-x:auto; padding:2px; min-height:60px;">
-                                                <div class="empty-list" style="font-size:11px;">No design pushed yet.</div>
+                                    <div class="custom-art-scroll-container" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; margin-bottom:12px; padding-right:6px; box-sizing:border-box; width:100%;">
+                                        <p class="panel-hint" style="margin-top: 0; margin-bottom: 0;">Display your own custom art/GIFs on the device's "Custom" channel.</p>
+                                        <div class="custom-art-upload-section" style="display:flex; flex-direction:column; gap:12px; max-width:100%;">
+                                            <div style="display:flex; gap:10px; align-items:center;">
+                                                <button id="browse-custom-art-btn" class="glow-btn compact" style="margin:0; white-space:nowrap;">Browse File...</button>
+                                                <input type="text" id="custom-art-path-input" placeholder="No file selected" class="text-input" style="flex:1;" readonly>
+                                            </div>
+                                            
+                                            <!-- Realtime Custom Art Preview -->
+                                            <div id="custom-art-preview-container" style="display:none; justify-content:center; padding:12px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid var(--border-color);">
+                                                <img id="custom-art-preview-img" src="" style="max-width:128px; max-height:128px; object-fit:contain; image-rendering:pixelated; border-radius:4px;">
+                                            </div>
+                                            
+                                            <!-- Last 5 Selected Items filmstrip preview -->
+                                            <div id="custom-art-history-container" style="display:flex; flex-direction:column; gap:6px; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
+                                                <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:2px;">Last 5 Selected Items:</label>
+                                                <div id="custom-art-history-filmstrip" style="display:flex; gap:8px; overflow-x:auto; padding:2px; min-height:60px;">
+                                                    <div class="empty-list" style="font-size:11px;">No design pushed yet.</div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Gallery Cache Selection Grid -->
+                                            <div class="gallery-cache-selector" style="margin-top: 4px;">
+                                                <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Select from Gallery Cache:</label>
+                                                <div class="selector-grid" id="custom-art-cache-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap:8px; max-height: 120px; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
+                                                    <div class="empty-list" style="grid-column: 1/-1;">No cached gallery files.</div>
+                                                </div>
                                             </div>
                                         </div>
-                                        
-                                        <!-- Gallery Cache Selection Grid -->
-                                        <div class="gallery-cache-selector" style="margin-top: 4px;">
-                                            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Select from Gallery Cache:</label>
-                                            <div class="selector-grid" id="custom-art-cache-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap:8px; max-height: 120px; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
-                                                <div class="empty-list" style="grid-column: 1/-1;">No cached gallery files.</div>
-                                            </div>
-                                        </div>
-
-                                        <button id="apply-custom-art-btn" class="glow-btn" style="margin:0;">Push to Device</button>
                                     </div>
+                                    <button id="apply-custom-art-btn" class="glow-btn" style="margin:0; width:100%;">Push to Device</button>
                                 </div>
                                 <!-- Ambient light (now a channel selection) -->
                                 <div class="channel-panel" id="panel-ambient">
@@ -249,8 +250,8 @@
                                             
                                             <!-- Color Picker and Swatches Grid -->
                                             <div class="ambient-swatches-grid" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px;">
-                                                <div class="color-picker-wrapper" style="position:relative; width:28px; height:28px; border-radius:50%; overflow:hidden; border:2px solid rgba(255,255,255,0.1); cursor:pointer; flex-shrink:0;">
-                                                    <input type="color" id="ambient-color-input" value="#00ffcc" style="position:absolute; top:-4px; left:-4px; width:36px; height:36px; border:none; background:none; cursor:pointer; padding:0;">
+                                                <div class="color-picker-wrapper" style="position:relative; width:36px; height:36px; border-radius:50%; overflow:hidden; border:2px solid rgba(255,255,255,0.1); cursor:pointer; flex-shrink:0;">
+                                                    <input type="color" id="ambient-color-input" value="#00ffcc" style="position:absolute; top:-4px; left:-4px; width:44px; height:44px; border:none; background:none; cursor:pointer; padding:0;">
                                                 </div>
                                                 <button class="ambient-swatch" style="background:#ff0000;" data-color="#ff0000" title="Red"></button>
                                                 <button class="ambient-swatch" style="background:#00ff00;" data-color="#00ff00" title="Green"></button>

@@ -131,6 +131,10 @@
     gap: 8px;
 }
 
+#clock-faces-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
 .selector-cell {
     padding: 10px 8px;
     border: 1px solid var(--border-color);
@@ -182,8 +186,8 @@
 
 /* Clock mode presets and preview screens */
 .clock-preview-box {
-    width: 64px;
-    height: 48px;
+    width: 120px;
+    height: 90px;
     background: #050608;
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 6px;
@@ -192,7 +196,7 @@
     justify-content: center;
     font-family: monospace;
     font-weight: 700;
-    font-size: 13px;
+    font-size: 22px;
     color: #e8e9eb;
     margin: 0 auto 8px auto;
     position: relative;
@@ -207,10 +211,10 @@
 }
 
 .clock-preview-box.digital-box span {
-    border: 1px solid var(--primary);
-    padding: 1px 3px;
-    border-radius: 2px;
-    font-size: 10px;
+    border: 2px solid var(--primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 18px;
 }
 
 .clock-preview-box.digital-neg {
@@ -224,8 +228,8 @@
 }
 
 .mini-clock-svg {
-    width: 32px;
-    height: 32px;
+    width: 64px;
+    height: 64px;
     color: var(--text-main);
 }
 
@@ -303,8 +307,8 @@
 }
 
 .ambient-swatch {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;

@@ -201,17 +201,6 @@ window.renderArrangerCanvas = function() {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Force styling on sidebar-device-select to prevent WebKit rendering constraints
-    const sidebarSelect = document.getElementById("sidebar-device-select");
-    if (sidebarSelect) {
-        sidebarSelect.style.setProperty("width", "300px", "important");
-        sidebarSelect.style.setProperty("min-width", "300px", "important");
-        sidebarSelect.style.setProperty("height", "32px", "important");
-        sidebarSelect.style.setProperty("padding", "0 28px 0 12px", "important");
-        sidebarSelect.style.setProperty("line-height", "30px", "important");
-        sidebarSelect.style.setProperty("box-sizing", "border-box", "important");
-        sidebarSelect.style.setProperty("flex-shrink", "0", "important");
-    }
 
     // Inject HTML Templates
     if (document.getElementById('monthly-best') && window.DivoomTemplates?.monthlyBest) {
@@ -228,16 +217,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const addArrangerBtn = document.getElementById("add-arranger-screen-btn");
     if (addArrangerBtn) {
         addArrangerBtn.addEventListener("click", () => {
-            if (window.DivoomState.discoveredDevices.length === 0) {
-                window.showToast("Please scan BLE screens first under Settings tab!", "error");
+            document.querySelectorAll(".arranger-popup").forEach(p => p.remove());
+            
+            const bleOptions = (window.DivoomState.discoveredDevices || []).map(d => `<option value="${d.address}">🔵 BLE: ${d.name}</option>`);
+            const lanOptions = (window.DivoomState.registeredLanDevices || []).map(d => `<option value="LAN:${d.ip}">🟢 LAN: ${d.ip}</option>`);
+            const combinedOptions = bleOptions.concat(lanOptions).join("");
+
+            if (!combinedOptions) {
+                window.showToast("No devices found. Scan BLE screens or configure a LAN screen first!", "error");
                 return;
             }
-            const options = window.DivoomState.discoveredDevices.map(d => `<option value="${d.address}">${d.name}</option>`).join("");
+            
             const popup = document.createElement("div");
             popup.className = "arranger-popup";
             popup.innerHTML = `
                 <h3 style="font-family: var(--font-display); font-size:16px; margin-bottom:15px; color: var(--text-main);">Add Screen to Arranger</h3>
-                <select id="canvas-add-select" class="custom-select" style="width:100%; margin-bottom:15px;">${options}</select>
+                <select id="canvas-add-select" class="custom-select" style="width:100%; margin-bottom:15px;">${combinedOptions}</select>
                 <div style="display:flex; gap:10px; justify-content:flex-end;">
                     <button id="canvas-add-cancel" class="glow-btn compact" style="background:rgba(130,131,138,0.1); border: 1px solid var(--border-color); color: var(--text-main); box-shadow:none;">Cancel</button>
                     <button id="canvas-add-confirm" class="glow-btn compact" style="background: var(--primary); border: 1px solid var(--primary); color:#fff; box-shadow:none;">Add Node</button>
@@ -255,8 +250,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.showToast("Device already placed on canvas!", "error");
                     return;
                 }
-                const dev = window.DivoomState.discoveredDevices.find(d => d.address === addr);
-                const devName = dev ? dev.name : "Divoom Screen";
+                const isLan = addr.startsWith("LAN:");
+                let devName = "Divoom Screen";
+                if (isLan) {
+                    devName = `Wi-Fi Screen: ${addr.split("LAN:")[1]}`;
+                } else {
+                    const dev = window.DivoomState.discoveredDevices.find(d => d.address === addr);
+                    devName = dev ? dev.name : "Divoom Screen";
+                }
                 const dims = window.getDeviceDimensions(devName);
                 const placementX = Math.round((arrangerCanvas.clientWidth - dims.width) / 2);
                 const placementY = Math.round((arrangerCanvas.clientHeight - dims.height) / 2);
@@ -337,6 +338,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.pywebview.api.open_file_dialog().then(path => {
                     if (path) {
                         if (customArtPathInput) customArtPathInput.value = path;
+                        if (window.showCustomArtPreview) window.showCustomArtPreview(path);
                     }
                 });
             }
@@ -490,5 +492,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         }
+        
+        // Realtime Custom Art Preview Helper
+        window.showCustomArtPreview = function(path) {
+            if (!path) {
+                if (customArtPreviewContainer) customArtPreviewContainer.style.display = "none";
+                return;
+            }
+            if (customArtPreviewImg) {
+                const src = (path.startsWith("data:") || path.startsWith("file://") || path.startsWith("http"))
+                    ? path
+                    : "file://" + path;
+                customArtPreviewImg.src = src;
+            }
+            if (customArtPreviewContainer) {
+                customArtPreviewContainer.style.display = "flex";
+            }
+        };
+        
+        // Close modals on tab change
+        window.addEventListener("tab-changed", () => {
+            document.querySelectorAll(".arranger-popup").forEach(p => p.remove());
+        });
     }, 1000);
 });
