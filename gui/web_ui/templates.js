@@ -84,65 +84,51 @@ window.DivoomTemplates = {
                             <span class="active-indicator"></span>
                         </div>
                         <div class="card-body">
-                            <!-- Loopback Warning/Tip Banner -->
-                            <div id="audio-loopback-tip" style="display:none; color:var(--transport-ext); background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); padding:8px; border-radius:6px; margin-bottom:12px; font-size:10px; line-height:1.4;">
-                                ⚠️ No loopback audio device detected (BlackHole, SoundSource, ACE, Loopback, etc.). Audio visualizer is disabled to avoid microphone fallback.
-                            </div>
-                            <!-- Preview on top -->
-                            <div class="music-previews-container" style="margin-bottom: 12px;">
-                                <div class="music-cover-preview">
+                            <!-- Cover art + device preview side-by-side, larger than before (Rams #10: as little as possible — no visualizer) -->
+                            <div class="music-previews-container" style="margin-bottom: 12px; gap:16px;">
+                                <div class="music-cover-preview" style="width:144px; height:144px;">
                                     <div class="cover-vinyl"></div>
                                     <img id="music-cover-img" src="assets/pixoo.png" alt="Vinyl Cover">
                                 </div>
-                                <div class="music-device-preview-wrap">
-                                    <img id="music-device-preview" class="device-preview-img" alt="Device Preview" style="display:none;">
+                                <div class="music-device-preview-wrap" style="flex:1; min-width:0; display:flex; align-items:center; justify-content:center;">
+                                    <img id="music-device-preview" class="device-preview-img" alt="Device Preview" style="display:none; max-width:100%; max-height:144px;">
                                 </div>
                             </div>
-                            
-                            <!-- Track Info & Visualizer below -->
+
+                            <!-- Track Info (Kare: just the essentials — name + artist) -->
                             <div class="music-tracker-card active" id="music-track-status" style="display:flex; flex-direction:column; gap:8px;">
                                 <div class="music-track-info" style="margin-top: 0;">
                                     <h4 id="music-track-name">No Music Playing</h4>
                                     <p id="music-artist-name">Spotify / Apple Music</p>
-                                    <!-- Winamp Retro pixelated spectrum visualizer -->
-                                    <div class="winamp-visualizer">
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                        <div class="winamp-bar"><div class="winamp-fill"></div></div>
-                                    </div>
                                 </div>
+                                <button id="music-push-cover-btn" class="glow-btn compact" style="margin:0;">Push Cover Art to Device</button>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Stock Prices Widget -->
-                    <div class="card glass-card" id="widget-card-stock">
+                    <div class="card glass-card" id="widget-card-stock" style="min-width:0; overflow:hidden;">
                         <div class="card-header flex-header">
                             <h3>Live Stocks &amp; Crypto Tickers</h3>
                             <span class="active-indicator"></span>
                         </div>
-                        <div class="card-body">
-                            <!-- Preview on top -->
-                            <div style="display:flex; gap:12px; margin-bottom:12px; align-items:center;">
-                                <div class="device-preview-wrap large" style="margin:0;">
+                        <div class="card-body" style="min-width:0; overflow:hidden;">
+                            <!-- Preview on top. min-width:0 on flex children so the
+                                 ticker box can shrink to fit narrow columns (Kare:
+                                 fits the container, Rams #5 unobtrusive). -->
+                            <div style="display:flex; gap:12px; margin-bottom:12px; align-items:stretch; min-width:0;">
+                                <div class="device-preview-wrap large" style="margin:0; flex-shrink:0;">
                                     <img id="ticker-device-preview" class="device-preview-img" alt="" style="display:none;">
                                 </div>
-                                <div class="widget-preview-ticker" id="ticker-preview-box" style="flex:1; margin:0; height: 128px;">
-                                    <div class="mini-canvas-view">
+                                <div class="widget-preview-ticker" id="ticker-preview-box" style="flex:1; min-width:0; margin:0; padding:12px;">
+                                    <div class="mini-canvas-view" style="min-width:0;">
                                         <div class="ticker-arrow-mock">▲</div>
                                         <div class="ticker-price-mock">$64,285</div>
                                         <div class="ticker-name-mock">BTC</div>
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Input below -->
                             <div class="form-group">
                                 <div class="flex-row">
@@ -151,37 +137,58 @@ window.DivoomTemplates = {
                                     <button id="add-ticker-btn" class="glow-btn compact ghost">+ Save</button>
                                 </div>
                             </div>
- 
+
                             <div id="tickers-list" class="tickers-list"></div>
                         </div>
                     </div>
  
                     <!-- System Monitor -->
-                    <div class="card glass-card" id="widget-card-sysmon">
+                    <div class="card glass-card" id="widget-card-sysmon" style="min-width:0; overflow:hidden;">
                         <div class="card-header flex-header">
                             <h3>System Monitor</h3>
                             <span class="active-indicator"></span>
                         </div>
-                        <div class="card-body">
-                            <!-- Preview on top -->
+                        <div class="card-body" style="min-width:0;">
+                            <!-- Device preview (the actual frame the device shows).
+                                 Above-the-fold: just the dark frame, no white panel. -->
                             <div style="display:flex; justify-content:center; margin-bottom:12px;">
-                                <div class="device-preview-wrap large" style="margin:0;">
+                                <div class="device-preview-wrap large" style="margin:0; flex-shrink:0;">
                                     <img id="sysmon-device-preview" class="device-preview-img" alt="" style="display:none;">
                                 </div>
                             </div>
-                            
-                            <!-- Stats below -->
-                            <div class="sysmon-readout" style="margin-bottom:10px;">
-                                <div class="sysmon-stat"><span class="sysmon-label">CPU</span><b id="sysmon-cpu">–</b></div>
-                                <div class="sysmon-stat"><span class="sysmon-label">MEM</span><b id="sysmon-mem">–</b></div>
-                                <div class="sysmon-stat"><span class="sysmon-label">BAT</span><b id="sysmon-bat">–</b></div>
+
+                            <!-- Three labeled bars: CPU (green) / MEM (blue) / BAT (yellow).
+                                 Colors match the on-device bar colors so it's recognizable
+                                 in 1 second (Rams #4). No white/gray background panels. -->
+                            <div class="sysmon-bars" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+                                <div class="sysmon-bar-row" data-stat="cpu">
+                                    <span class="sysmon-bar-label" style="color:#00ffb4;">CPU</span>
+                                    <div class="sysmon-bar-track">
+                                        <div class="sysmon-bar-fill" data-fill-color="#00ffb4" style="width:0%; background:#00ffb4;"></div>
+                                    </div>
+                                    <b class="sysmon-bar-value" id="sysmon-cpu" style="color:#00ffb4;">–</b>
+                                </div>
+                                <div class="sysmon-bar-row" data-stat="mem">
+                                    <span class="sysmon-bar-label" style="color:#5aaaff;">MEM</span>
+                                    <div class="sysmon-bar-track">
+                                        <div class="sysmon-bar-fill" data-fill-color="#5aaaff" style="width:0%; background:#5aaaff;"></div>
+                                    </div>
+                                    <b class="sysmon-bar-value" id="sysmon-mem" style="color:#5aaaff;">–</b>
+                                </div>
+                                <div class="sysmon-bar-row" data-stat="bat">
+                                    <span class="sysmon-bar-label" style="color:#00ff64;">BAT</span>
+                                    <div class="sysmon-bar-track">
+                                        <div class="sysmon-bar-fill" data-fill-color="#00ff64" style="width:0%; background:#00ff64;"></div>
+                                    </div>
+                                    <b class="sysmon-bar-value" id="sysmon-bat" style="color:#00ff64;">–</b>
+                                </div>
                             </div>
                             <div class="hc-actions" style="display:flex; gap:10px; align-items:center;">
-                                <button id="sysmon-display-btn" class="glow-btn compact" style="margin:0;">Display on Device</button>
+                                <button id="sysmon-display-btn" class="glow-btn compact" style="margin:0;">Push to Device</button>
                                 <label class="hc-toggle" style="margin:0;"><input type="checkbox" id="sysmon-live" checked> Live (5s)</label>
                             </div>
+                        </div>
                     </div>
-                </div>
     `,
     settings: `
                 <!-- Settings Sub-Tabs Navigation -->

@@ -406,6 +406,20 @@ body.theme-light .arranger-node-image {
     100% { background-position: 200% 50%; }
 }
 
+@keyframes love-color-cycle {
+    /* The Divoom "Love" ambient channel: the entire screen is a single solid
+       color, transitioning smoothly through a sequence (blue → purple → red
+       → orange → pink → back). User-described as "the whole screen is one
+       color that transitions to the next color" — i.e. NOT a rainbow
+       gradient, NOT a pulse, just one solid block fading between colors. */
+    0%   { background-color: #4d79ff; }  /* blue */
+    20%  { background-color: #9d4edd; }  /* purple */
+    40%  { background-color: #ff4d6d; }  /* red */
+    60%  { background-color: #ff7a3d; }  /* orange */
+    80%  { background-color: #ff85b3; }  /* pink */
+    100% { background-color: #4d79ff; }  /* back to blue */
+}
+
 /* ── Channels Tab: Full Height Custom Art Grid ─────────────────────── */
 #control-panel.tab-content.active {
     height: 100%;

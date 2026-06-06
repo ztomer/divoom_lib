@@ -23,6 +23,49 @@ from divoom_lib import divoom_auth
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("divoom_gui")
 
+
+def _pywebview_1820_bug_present() -> bool:
+    """Detect whether pywebview's cocoa `BrowserView.move` still has
+    the multi-monitor drag bug from upstream issue #1820.
+
+    The bug (May 2026, present in 6.2.1): the cocoa backend's
+    `BrowserView.move` does
+        AppKit.NSPoint(self.screen.origin.x + x, self.screen.origin.y + flipped_y)
+    but the JS in `webview/js/customize.js:44-48` sends absolute
+    screen coordinates (`x = ev.screenX - initialX`), so the X is
+    double-counted on multi-monitor setups and the window jumps
+    off-screen mid-drag.
+
+    The fix (upstream-recommended): drop the `self.screen.origin.x`
+    term, or replace with the primary screen's origin. Any fix
+    necessarily changes the literal token `self.screen.origin.x + x`
+    inside the NSPoint call, so we can use that token's presence
+    as a robust detection signal.
+
+    Returns:
+        True if the installed pywebview's `BrowserView.move` still
+        contains the bug token and the downstream monkey-patch
+        should be applied. False if the bug is not detectable
+        (non-cocoa backend, source not introspectable) or if the
+        upstream fix has shipped.
+
+    The detection is intentionally narrow: matching on the exact
+    bug token (`self.screen.origin.x + x`) means any plausible
+    upstream fix (drop the term, replace with primary screen
+    reference, rewrite the call) will not match, and the
+    monkey-patch will be skipped cleanly. See
+    `docs/DRAG_FIX_HISTORY.md` for the full journey.
+    """
+    try:
+        import inspect
+        from webview.platforms.cocoa import BrowserView
+        src = inspect.getsource(BrowserView.move)
+    except (ImportError, OSError, TypeError):
+        return False
+
+    return "self.screen.origin.x + x" in src
+
+
 def main():
     api = DivoomGuiAPI()
     web_ui_dir = Path(__file__).parent / "web_ui"
@@ -49,7 +92,41 @@ def main():
             logger.warning(f"Failed to start unix control server: {e}")
 
     logger.info("Starting Divoom Desktop GUI window in frameless mode...")
-    
+
+    # Workaround for pywebview upstream issue #1820
+    # (https://github.com/r0x0r/pywebview/issues/1820, May 2026):
+    # BrowserView.move in the cocoa backend double-counts the window's
+    # screen origin on multi-monitor setups, causing the window to
+    # jump off the visible workspace mid-drag. The recommended
+    # downstream patch drops the `self.screen.origin.x` term from the
+    # NSPoint calculation. This is a no-op on single-monitor setups
+    # (where screen.origin = (0, 0)) and matches the JS-side contract
+    # that drag deltas are applied relative to the live window
+    # position tracked by the host.
+    #
+    # The detection is source-based: if the literal token
+    # `self.screen.origin.x + x` is no longer in BrowserView.move's
+    # source, the upstream fix has shipped and the patch is skipped
+    # (idempotent). See docs/DRAG_FIX_HISTORY.md for the journey.
+    if sys.platform == "darwin":
+        try:
+            from webview.platforms.cocoa import BrowserView
+            import AppKit
+
+            if _pywebview_1820_bug_present():
+                def _patched_move(self, x, y):
+                    flipped_y = self.screen.size.height - y
+                    self.window.setFrameTopLeftPoint_(
+                        AppKit.NSPoint(x, self.screen.origin.y + flipped_y)
+                    )
+
+                BrowserView.move = _patched_move
+                logger.info("Applied pywebview #1820 multi-monitor drag patch")
+            else:
+                logger.info("pywebview #1820 already fixed upstream; skipping patch")
+        except ImportError:
+            logger.warning("Could not check pywebview #1820 patch (AppKit not available)")
+
     import time
     url_str = f"{index_html.as_uri()}?t={int(time.time())}"
     window = webview.create_window(

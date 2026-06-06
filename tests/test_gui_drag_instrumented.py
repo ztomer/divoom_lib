@@ -1,221 +1,236 @@
 """
-Instrumented test for the frameless window drag handler.
+Regression guard for the frameless window drag mechanism.
 
-Regression test for: "can't move the window" — this broke at least once
-in commit f2d2507d (and possibly earlier). The test loads the real
-`gui/web_ui/index.html` in headless Chromium via Playwright, injects a
-stub `pywebview` global, and verifies that a mouse drag on the appbar
-results in `drag_window` being called with non-zero deltas.
+The window drag is handled by pywebview's built-in drag-region
+mechanism (`gui/web_ui/index.html` <header class="integrated-appbar
+pywebview-drag-region">) + the cocoa `BrowserView.move` patched
+in `gui/gui_main.py` per upstream issue #1820 (May 2026).
 
-Requires:
-    pip install playwright
-    playwright install chromium
+This file contains static-analysis guards. The actual drag behavior
+can only be verified by manual test on a real macOS window, because:
 
-Runs in the normal pytest suite (no flag needed). Falls back to a
-skip-with-reason if Playwright or chromium is unavailable.
+1. pywebview's bundled `customize.js` is only injected by pywebview's
+   `start()` (not by loading the HTML in a plain browser), so a
+   Playwright test that serves the HTML over HTTP will not exercise
+   the drag handler.
+2. The Cocoa `setFrameTopLeftPoint_` call is in Python and only
+   takes effect on a real NSWindow, so it cannot be observed from
+   a headless browser.
+3. The upstream #1820 patch is a no-op on single-monitor setups
+   (the most common test environment), so a CI test on single-
+   monitor would not detect a regression in the multi-monitor
+   coordinate handling.
+
+The structural guards below catch the regressions that have actually
+broken the drag in prior rounds (custom JS handler re-added, custom
+Python `drag_window` re-added, `pywebview-drag-region` class dropped,
+#1820 patch removed or wrong).
 """
-import contextlib
-import http.server
-import os
-import socket
-import socketserver
-import threading
-import time
+import re
+import sys
 from pathlib import Path
 
-import pytest
-
-try:
-    from playwright.sync_api import sync_playwright
-except ImportError:
-    sync_playwright = None
+REPO_ROOT = Path(__file__).resolve().parents[1]
+INDEX_HTML = REPO_ROOT / "gui" / "web_ui" / "index.html"
+APP_JS = REPO_ROOT / "gui" / "web_ui" / "app.js"
+GUI_MAIN = REPO_ROOT / "gui" / "gui_main.py"
 
 
-WEB_UI_DIR = Path(__file__).resolve().parents[1] / "gui" / "web_ui"
-
-
-def _free_port() -> int:
-    """Bind to port 0, read assigned port, release."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
-
-
-class _QuietHandler(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, format, *args):  # noqa: A002
-        pass
-
-
-@contextlib.contextmanager
-def _serve_directory(directory: Path):
-    """Serve `directory` over HTTP on a free port. Yields the base URL."""
-    port = _free_port()
-    handler = lambda *a, **kw: _QuietHandler(*a, directory=str(directory), **kw)
-    httpd = socketserver.TCPServer(("127.0.0.1", port), handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
+def _read_cocoa_browser_view_move_source():
+    """Return the source text of pywebview's cocoa BrowserView.move,
+    or None if the cocoa backend is not importable in this test
+    environment (e.g. CI on Linux)."""
     try:
-        yield f"http://127.0.0.1:{port}/index.html"
+        import inspect
+        from webview.platforms.cocoa import BrowserView
+        return inspect.getsource(BrowserView.move)
+    except (ImportError, OSError, TypeError):
+        return None
+
+
+def test_appbar_has_pywebview_drag_region_class():
+    """The appbar <header> must carry `pywebview-drag-region` so
+    pywebview's customize.js (webview/js/customize.js:69-89) treats
+    it as a native drag region and dispatches `pywebviewMoveWindow`
+    on mousedown. Combined with the #1820 patch in gui_main.py,
+    this is the only working drag path on macOS."""
+    html = INDEX_HTML.read_text()
+    m = re.search(r'<header[^>]*class="([^"]*)"[^>]*>', html)
+    assert m is not None, "could not find <header> in gui/web_ui/index.html"
+    classes = m.group(1).split()
+    assert "integrated-appbar" in classes, (
+        "header is missing 'integrated-appbar' class"
+    )
+    assert "pywebview-drag-region" in classes, (
+        "header is missing 'pywebview-drag-region' class — pywebview will "
+        "not start a native window drag from the appbar. Add it to use "
+        "the bundled drag-region mechanism (with the #1820 patch)."
+    )
+
+
+def test_gui_main_patches_cocoa_drag():
+    """gui_main.py must apply the upstream #1820 monkey-patch to
+    BrowserView.move on macOS, but only when the bug is still present
+    in the installed pywebview. The patch is gated by
+    _pywebview_1820_bug_present() so it self-deactivates when
+    pywebview ships the upstream fix.
+
+    The patched move implementation must drop the
+    `self.screen.origin.x` term that causes the coordinate double-
+    count on multi-monitor setups."""
+    src = GUI_MAIN.read_text()
+    assert "_pywebview_1820_bug_present" in src, (
+        "gui_main.py must define the _pywebview_1820_bug_present() "
+        "detection helper that gates the monkey-patch on whether the "
+        "upstream bug is still in the installed pywebview."
+    )
+    assert "BrowserView.move = _patched_move" in src, (
+        "gui_main.py must apply the pywebview #1820 multi-monitor drag patch "
+        "(`BrowserView.move = _patched_move`). Without it, the window jumps "
+        "off-screen on multi-monitor macOS setups."
+    )
+    # The patched move body must NOT contain the bug term
+    # `self.screen.origin.x + x` — that's the very thing the patch
+    # is supposed to drop. The bug token IS allowed elsewhere in
+    # the file (in the detection helper's comment + token, since
+    # the token is the detection signal).
+    patched_block = src.split("def _patched_move")[1].split("BrowserView.move = _patched_move")[0]
+    assert "self.screen.origin.x + x" not in patched_block, (
+        "the #1820 patch body must drop the `self.screen.origin.x + x` term — "
+        "keeping it causes the coordinate double-count."
+    )
+
+
+def test_app_js_has_no_custom_drag_handler():
+    """app.js must NOT have a custom drag handler. The drag is
+    delegated to pywebview's bundled drag-region mechanism; the
+    only Python path that should exist is the #1820 patch in
+    gui_main.py.
+
+    A custom JS drag handler (mousedown/mousemove/mouseup on
+    .integrated-appbar with pywebview.api.drag_window calls) was
+    the source of multiple regressions. Replaced by the native
+    pywebview drag-region (with the cocoa #1820 patch).
+    """
+    src = APP_JS.read_text()
+    assert "pywebview.api.drag_window" not in src, (
+        "gui/web_ui/app.js still calls pywebview.api.drag_window — this is "
+        "an OLD custom drag path. Delete the drag handler block; the "
+        "window drag is handled natively by pywebview's drag region."
+    )
+    assert 'e.target.closest(".integrated-appbar")' not in src, (
+        "gui/web_ui/app.js still walks the DOM for .integrated-appbar to "
+        "attach a drag handler — this is the OLD custom drag path. "
+        "pywebview handles drag detection natively for elements with "
+        "the .pywebview-drag-region class."
+    )
+
+
+def test_gui_api_has_no_drag_window():
+    """gui_api.py must NOT define a custom drag_window method. The
+    drag is handled by pywebview's bundled mechanism + the #1820
+    patch in gui_main.py. A custom Python drag_window would be
+    dead code (and is the source of multiple regressions)."""
+    sys.path.insert(0, str(REPO_ROOT / "gui"))
+    import gui_api as _api_mod
+    assert not hasattr(_api_mod.DivoomGuiAPI, "drag_window"), (
+        "DivoomGuiAPI.drag_window still exists — this is the OLD custom "
+        "Python drag path. Delete it; pywebview handles drag natively."
+    )
+
+
+def test_pywebview_1820_detection_matches_source():
+    """The _pywebview_1820_bug_present() helper in gui_main.py must
+    agree with the actual source of pywebview's cocoa BrowserView.move.
+
+    This is the canary for upstream self-deactivation: when pywebview
+    ships the fix for #1820, the literal token
+    `self.screen.origin.x + x` will no longer be in BrowserView.move's
+    source, our detection will return False, and the monkey-patch
+    will be skipped.
+
+    If this test fails after a pywebview upgrade, it means the
+    detection token in gui_main.py no longer matches the bug
+    signature in the new pywebview source. Update the detection
+    token to match the new bug pattern (or, ideally, confirm the
+    bug is fixed and remove the monkey-patch entirely)."""
+    cocoa_src = _read_cocoa_browser_view_move_source()
+    if cocoa_src is None:
+        import pytest
+        pytest.skip("pywebview cocoa backend not importable in this env")
+
+    # The exact bug token from issue #1820 (May 2026).
+    BUG_TOKEN = "self.screen.origin.x + x"
+
+    # What the source actually says.
+    actual_bug_present = BUG_TOKEN in cocoa_src
+
+    # What our detection helper says.
+    sys.path.insert(0, str(REPO_ROOT))
+    sys.path.insert(0, str(REPO_ROOT / "gui"))
+    # Import the helper without triggering main()/webview.start().
+    import importlib
+    if "gui_main" in sys.modules:
+        importlib.reload(sys.modules["gui_main"])
+    from gui_main import _pywebview_1820_bug_present
+    detected_bug_present = _pywebview_1820_bug_present()
+
+    assert detected_bug_present == actual_bug_present, (
+        f"Detection mismatch: helper says bug_present={detected_bug_present} "
+        f"but the actual pywebview cocoa source has the bug token "
+        f"{BUG_TOKEN!r} present={actual_bug_present}. "
+        f"--- BrowserView.move source ---\n{cocoa_src}\n--- end source ---\n"
+        f"This usually means pywebview upstream changed the bug "
+        f"signature. If the fix has shipped, the monkey-patch will "
+        f"auto-deactivate and you can delete the workaround from "
+        f"gui_main.py entirely. If pywebview restructured the code "
+        f"but kept the same bug, update the BUG_TOKEN in the "
+        f"detection helper to match the new signature."
+    )
+
+
+def test_pywebview_1820_detection_simulates_upstream_fix():
+    """Simulate pywebview shipping the #1820 fix and confirm the
+    detection returns False (i.e. the monkey-patch would be
+    skipped on a fixed pywebview). This is the self-deactivation
+    contract.
+
+    We monkey-patch webview.platforms.cocoa.BrowserView.move with
+    the upstream-recommended fix shape, then call the detection
+    helper. If the helper still returns True after the simulation,
+    the detection token is too lenient and a real upstream fix
+    would not auto-deactivate the patch."""
+    try:
+        from webview.platforms import cocoa as _cocoa
+    except ImportError:
+        import pytest
+        pytest.skip("pywebview cocoa backend not importable in this env")
+
+    # Upstream-recommended fix shape (per the bug description's
+    # "Suggested fix" section): drop the `self.screen.origin.x` term.
+    def _fixed_move(self, x, y):
+        flipped_y = self.screen.size.height - y
+        self.window.setFrameTopLeftPoint_(
+            _cocoa.AppKit.NSPoint(x, self.screen.origin.y + flipped_y)
+        )
+
+    original = _cocoa.BrowserView.move
+    _cocoa.BrowserView.move = _fixed_move
+    try:
+        # Re-import the helper so it picks up the new source.
+        sys.path.insert(0, str(REPO_ROOT))
+        sys.path.insert(0, str(REPO_ROOT / "gui"))
+        import importlib
+        if "gui_main" in sys.modules:
+            importlib.reload(sys.modules["gui_main"])
+        from gui_main import _pywebview_1820_bug_present
+
+        detected = _pywebview_1820_bug_present()
+        assert detected is False, (
+            "Detection still says the bug is present after simulating "
+            "the upstream fix. The detection token is too lenient and "
+            "the monkey-patch will not auto-deactivate when pywebview "
+            "ships the real fix. Tighten the token in gui_main.py."
+        )
     finally:
-        httpd.shutdown()
-        httpd.server_close()
-
-
-pytestmark = pytest.mark.skipif(
-    sync_playwright is None,
-    reason="playwright not installed (pip install playwright && playwright install chromium)",
-)
-
-
-@pytest.fixture(scope="module")
-def browser():
-    """Single Chromium instance for the whole test module."""
-    if sync_playwright is None:
-        yield None
-        return
-    with sync_playwright() as p:
-        with p.chromium.launch(headless=True) as b:
-            yield b
-
-
-def test_appbar_drag_calls_drag_window(browser):
-    """
-    Real event flow: mousedown on .integrated-appbar → mousemove → mouseup.
-    Expects window.pywebview.api.drag_window to be called multiple times with
-    deltas that are non-trivially non-zero. We don't assert exact delta values
-    because Playwright's smooth-move interpolation and the appbar's position
-    can produce sub-pixel rounding; the regression we care about is "handler
-    is wired" + "deltas are reasonable (no all-zero, no NaN)".
-    """
-    if browser is None:
-        pytest.skip("playwright not available")
-    if not WEB_UI_DIR.exists():
-        pytest.skip(f"web_ui dir not found at {WEB_UI_DIR}")
-
-    with _serve_directory(WEB_UI_DIR) as url:
-        context = browser.new_context(viewport={"width": 1024, "height": 768})
-        # Inject stub pywebview before any page script runs.
-        context.add_init_script("""
-            window._dragCalls = [];
-            window._dragAttached = false;
-            window.pywebview = {
-                api: {
-                    minimize_window: () => {},
-                    maximize_window: () => {},
-                    close_window: () => {},
-                    drag_window: (dx, dy) => window._dragCalls.push([dx, dy]),
-                }
-            };
-        """)
-        page = context.new_page()
-
-        # Forward console messages so we see JS errors from app.js/widgets.js.
-        console_errors = []
-        page.on("pageerror", lambda exc: console_errors.append(str(exc)))
-        page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
-
-        page.goto(url, wait_until="domcontentloaded")
-
-        # Wait for the appbar handler to be attached.
-        page.wait_for_selector(".integrated-appbar", state="visible", timeout=5000)
-
-        # .appbar-drag-spacer is the natural drag target.
-        spacer = page.query_selector(".appbar-drag-spacer")
-        target = spacer if spacer else page.query_selector(".integrated-appbar")
-        assert target is not None, "could not find drag target inside .integrated-appbar"
-
-        box = target.bounding_box()
-        assert box is not None
-        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
-
-        # Simulate a real drag: mousedown → mousemove → mouseup.
-        # Single move (no steps) so we get one mousemove per Python call.
-        page.mouse.move(cx, cy)
-        page.mouse.down()
-        page.mouse.move(cx + 80, cy + 40)
-        time.sleep(0.05)
-        page.mouse.up()
-
-        # Give the event loop a tick to process the final move.
-        page.wait_for_timeout(50)
-
-        calls = page.evaluate("window._dragCalls")
-        assert calls, (
-            f"drag_window was never called. "
-            f"console errors: {console_errors}"
-        )
-        # 1) At least one call (one per mousemove).
-        assert len(calls) >= 1, f"expected at least one drag call, got {len(calls)}: {calls}"
-        # 2) No NaN, no Infinity, no absurd values.
-        for dx, dy in calls:
-            assert dx == dx and dy == dy, f"NaN in drag calls: {calls}"  # NaN check
-            assert abs(dx) < 1e6 and abs(dy) < 1e6, f"absurd delta: {calls}"
-        # 3) The call(s) should reflect a rightward + downward drag.
-        #    Headless Chromium sometimes coalesces mousemoves; we just need at
-        #    least one positive dx and one positive dy across all calls.
-        all_dx = [c[0] for c in calls]
-        all_dy = [c[1] for c in calls]
-        assert any(dx > 0 for dx in all_dx), f"expected rightward drag, got {calls}"
-        assert any(dy > 0 for dy in all_dy), f"expected downward drag, got {calls}"
-
-        # Filter out errors that aren't related to the drag handler. The
-        # test environment doesn't load the full app API surface (load_config,
-        # apply_system_stats, etc.) — those errors are expected and not
-        # related to the regression we're guarding against.
-        DRAG_UNRELATED = ("load_config", "apply_system_stats", "get_audio_levels",
-                          "get_current_track_info", "get_transport_status",
-                          "scan_devices_with_config", "load_lan_devices",
-                          "get_tickers", "get_ticker_preview",
-                          "apply_stock_ticker", "toggle_music_sync",
-                          "toggle_sysmon_sync", "toggle_stocks_sync",
-                          "toggle_audio_visualizer", "set_brightness",
-                          "is not a function")
-        drag_errors = [e for e in console_errors
-                       if not any(needle in e for needle in DRAG_UNRELATED)]
-        assert not drag_errors, f"drag-related JS errors: {drag_errors}"
-
-        context.close()
-
-
-def test_appbar_drag_ignores_button_clicks(browser):
-    """
-    Clicking a button inside the appbar (e.g. minimize) must NOT start a drag.
-    This guards against regressions where a `closest("button, select, input")`
-    check is removed.
-    """
-    if browser is None:
-        pytest.skip("playwright not available")
-
-    with _serve_directory(WEB_UI_DIR) as url:
-        context = browser.new_context(viewport={"width": 1024, "height": 768})
-        context.add_init_script("""
-            window._dragCalls = [];
-            window.pywebview = {
-                api: {
-                    minimize_window: () => {},
-                    maximize_window: () => {},
-                    close_window: () => {},
-                    drag_window: (dx, dy) => window._dragCalls.push([dx, dy]),
-                }
-            };
-        """)
-        page = context.new_page()
-        page.goto(url, wait_until="domcontentloaded")
-        page.wait_for_selector("#win-min", state="visible", timeout=5000)
-
-        btn = page.query_selector("#win-min")
-        assert btn is not None
-        box = btn.bounding_box()
-        page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-        page.mouse.down()
-        page.mouse.move(box["x"] + 50, box["y"] + 20)
-        page.mouse.up()
-        page.wait_for_timeout(50)
-
-        calls = page.evaluate("window._dragCalls")
-        assert calls == [], (
-            f"clicking #win-min must not trigger drag, but got {calls}"
-        )
-        context.close()
+        _cocoa.BrowserView.move = original

@@ -12,7 +12,8 @@ class DivoomConfig:
         escapePayload: bool = False,
         use_ios_le_protocol: bool | None = None,
         device_name: str | None = None,
-        client: object | None = None
+        client: object | None = None,
+        screensize: int | None = None,
     ):
         self.mac = mac
         self.logger = logger
@@ -24,3 +25,4 @@ class DivoomConfig:
         self.use_ios_le_protocol = use_ios_le_protocol
         self.device_name = device_name
         self.client = client
+        self.screensize = screensize

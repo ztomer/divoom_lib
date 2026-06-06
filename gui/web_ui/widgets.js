@@ -12,81 +12,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // (Frameless window drag handler lives in app.js, see "0. FRAMELESS WINDOW DRAG".)
 
-    // ── 2. LIVE MUSIC SYNCHRONIZER & AUDIO VISUALIZER POLLING ──
-    let visualizerTimer = null;
-    let simulatedVisualizerFrameId = null;
+    // ── 2. LIVE COVER ART POLLING (visualizer removed: Rams #10) ──
     let trackTimer = null;
     let sysmonTimer = null;
     let stockTimer = null;
-
-    function pollVisualizerLevels() {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_audio_levels) {
-            window.pywebview.api.get_audio_levels().then(resJson => {
-                try {
-                    const res = JSON.parse(resJson);
-                    if (res && res.levels) {
-                        if (simulatedVisualizerFrameId) {
-                            cancelAnimationFrame(simulatedVisualizerFrameId);
-                            simulatedVisualizerFrameId = null;
-                        }
-                        
-                        const fills = document.querySelectorAll(".winamp-fill");
-                        fills.forEach((fill, i) => {
-                            const val = res.levels[i] || 0;
-                            fill.style.height = `${val}%`;
-                        });
-                        
-                        const tip = document.getElementById("audio-loopback-tip");
-                        if (tip) {
-                            tip.style.display = res.loopback_active ? "none" : "block";
-                        }
-                    }
-                } catch (e) {
-                    startSimulatedVisualizer();
-                }
-            }).catch(() => {
-                startSimulatedVisualizer();
-            });
-        } else {
-            startSimulatedVisualizer();
-        }
-    }
-
-    function startVisualizerPolling() {
-        if (visualizerTimer) return;
-        pollVisualizerLevels();
-        visualizerTimer = setInterval(pollVisualizerLevels, 50); // 20 FPS
-    }
-
-    function stopVisualizerPolling() {
-        if (visualizerTimer) {
-            clearInterval(visualizerTimer);
-            visualizerTimer = null;
-        }
-        if (simulatedVisualizerFrameId) {
-            cancelAnimationFrame(simulatedVisualizerFrameId);
-            simulatedVisualizerFrameId = null;
-        }
-        document.querySelectorAll(".winamp-fill").forEach(fill => {
-            fill.style.height = "0%";
-        });
-    }
-
-    function startSimulatedVisualizer() {
-        if (simulatedVisualizerFrameId) return;
-        function animate() {
-            simulatedVisualizerFrameId = requestAnimationFrame(animate);
-            const fills = document.querySelectorAll(".winamp-fill");
-            fills.forEach((fill, i) => {
-                const time = Date.now() * 0.003;
-                const base = Math.sin(time + i * 0.8) * 40 + 50;
-                const noise = Math.sin(time * 2.3 - i * 1.5) * 20;
-                const val = Math.min(100, Math.max(0, base + noise));
-                fill.style.height = `${val}%`;
-            });
-        }
-        animate();
-    }
 
     function pollTrackInfo() {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.get_current_track_info) {
@@ -121,6 +50,35 @@ document.addEventListener("DOMContentLoaded", () => {
             clearInterval(trackTimer);
             trackTimer = null;
         }
+    }
+
+    // Manual push button — gives the user a recovery path when the auto-push
+    // doesn't reach the device (channel-switch, BLE sleep, etc.).
+    const pushCoverBtn = document.getElementById("music-push-cover-btn");
+    if (pushCoverBtn) {
+        pushCoverBtn.addEventListener("click", () => {
+            if (window.pywebview?.api?.push_music_cover_now) {
+                pushCoverBtn.disabled = true;
+                pushCoverBtn.textContent = "Pushing...";
+                window.pywebview.api.push_music_cover_now().then(resJson => {
+                    try {
+                        const res = typeof resJson === "string" ? JSON.parse(resJson) : resJson;
+                        if (res && res.success) {
+                            window.showToast("Cover art pushed to device", "success");
+                        } else {
+                            window.showToast(res?.error || "Push failed — no track or no device", "error");
+                        }
+                    } catch {
+                        window.showToast("Push failed (parse error)", "error");
+                    } finally {
+                        pushCoverBtn.disabled = false;
+                        pushCoverBtn.textContent = "Push Cover Art to Device";
+                    }
+                });
+            } else {
+                window.showToast("Push API not available", "error");
+            }
+        });
     }
 
     // ── 3. YAHOO STOCKS TICKER WIDGET ──
@@ -269,12 +227,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 const r = JSON.parse(json);
                 if (!r.ok) return;
                 const s = r.stats || {};
-                const cpu = document.getElementById("sysmon-cpu");
-                const mem = document.getElementById("sysmon-mem");
-                const bat = document.getElementById("sysmon-bat");
-                if (cpu) cpu.textContent = `${s.cpu}%`;
-                if (mem) mem.textContent = `${s.mem}%`;
-                if (bat) bat.textContent = s.battery != null ? `${s.battery}%` : "n/a";
+                // Update the three labeled bars (Kare: bitmap clarity, color-coded)
+                function setBar(stat, value) {
+                    const row = document.querySelector(`.sysmon-bar-row[data-stat="${stat}"]`);
+                    if (!row) return;
+                    const fill = row.querySelector(".sysmon-bar-fill");
+                    const text = row.querySelector(".sysmon-bar-value");
+                    const pct = value != null ? Math.max(0, Math.min(100, value)) : 0;
+                    if (fill) fill.style.width = `${pct}%`;
+                    if (text) text.textContent = value != null ? `${pct}%` : "n/a";
+                }
+                setBar("cpu", s.cpu);
+                setBar("mem", s.mem);
+                setBar("bat", s.battery);
                 const img = document.getElementById("sysmon-device-preview");
                 if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
             } catch (e) { /* ignore */ }
@@ -328,15 +293,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // 1. Music (Cover Art)
         const startMusic = isTabActive && (selectedWidget === "music");
         window.pywebview.api.toggle_music_sync(startMusic);
-        if (window.pywebview.api.toggle_audio_visualizer) {
-            window.pywebview.api.toggle_audio_visualizer(startMusic);
-        }
         if (startMusic) {
             startTrackPolling();
-            startVisualizerPolling();
         } else {
             stopTrackPolling();
-            stopVisualizerPolling();
         }
 
         // 2. Stocks
@@ -422,12 +382,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (window.pywebview.api.toggle_stocks_sync) {
                     window.pywebview.api.toggle_stocks_sync(false);
                 }
-                if (window.pywebview.api.toggle_audio_visualizer) {
-                    window.pywebview.api.toggle_audio_visualizer(false);
-                }
             }
             stopTrackPolling();
-            stopVisualizerPolling();
             if (sysmonTimer) {
                 clearInterval(sysmonTimer);
                 sysmonTimer = null;

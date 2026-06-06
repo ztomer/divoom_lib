@@ -537,7 +537,9 @@ approve any specific design; user is the design *owner*.
 - Test suite green after every phase.
 - A real-device smoke test (light on/off, a frame push) after Phase 1 and 2,
   since those touch the wire format and event loop directly.
-- Full suite = **308 passed / 0 failed / 72 skipped** (no regressions allowed).
+- Full suite = **354 passed / 0 failed / 72 skipped** (no regressions allowed).
+  (313 at start of Phase 10; +38 from `test_native_downscaler.py`,
+  +3 from previous phases.)
 
 ---
 
@@ -669,3 +671,191 @@ skipped**; settled at **36 failed / 182 passed / 72 skipped** after Phase 5
 - **Verify:** full suite **218 passed / 0 failed / 72 skipped** (290 collected).
   All review items (L1–L6, B1–B4, dedup, housecleaning) are complete and the
   entire non-hardware suite is green. ✅
+
+---
+
+## Phase 10 — Native LANCZOS3 downsampler in C (2026-06-05)
+
+User requirement: cover-art downscale must be **byte-exact to
+`PIL.Image.resize(..., LANCZOS)`**, deterministic, and live in C
+(so it's reusable for Google Photos albums, wallpapers, etc., not
+just cover art). Performance is secondary to correctness.
+
+### Architecture
+
+PIL's resize is a 3-step pipeline for RGBA:
+
+```
+PIL: im.convert('RGBa')  →  im.resize(..., LANCZOS)  →  im.convert('RGBA')
+C:   premultiply_rgba    →  resample (per-channel)     →  unpremultiply_rgba
+```
+
+We moved the entire pipeline into the C function `downsample_lanczos3`
+in `divoom_lib/native_src/downsample.c`, exposed via the dylib
+`libdivoom_compact.dylib`. The Python wrapper
+(`divoom_lib/native/downscaler.py`) is now a thin ctypes shim with a
+completely separate `_pil_downsample` fallback. RGBA pre/un-premult
+math is gone from Python — the C function owns it.
+
+### Key implementation learnings
+
+These are the things that cost time during the integration. Listed so
+the next person doesn't relearn them.
+
+1. **PIL's filterscale stretches the LANCZOS support for downscaling.**
+   For downscale, `filterscale = max(scale, 1.0)`, then `support = 3 * filterscale`,
+   and the kernel argument is multiplied by `ss = 1/filterscale` to compress
+   the filter back to its natural width. Skip this and your downscaled images
+   are blurry.
+
+2. **Input pixel center is `+0.5`.** PIL samples pixel `i` at coordinate
+   `i + 0.5` (pixel is a unit square, sample at center). The filter argument
+   becomes `(input_idx + 0.5 - center) * ss`.
+
+3. **`xmax` is a *count*, not an absolute index.** PIL does
+   `xmax_raw = (int)(center + support + 0.5); xmax -= xmin;` — the result
+   is the number of input samples in the kernel, not the highest index.
+   Loop with `for (x = 0; x < xmax; x++) im[... + x + xmin]`.
+
+4. **Kernel weight quantization uses `PRECISION_BITS = 22` in PIL.**
+   Weights are stored as `int32_t`: `w_q = (int)(w * (1 << 22) + 0.5)`.
+   The un-normalized kernel sums to >1.0 for downscaling (because of the
+   `filterscale` stretch), so divide by the sum BEFORE quantizing.
+   After normalization the quantized weights sum to ≈ `1 << 22`.
+
+5. **Negative weights round differently from positive weights.**
+   PIL's `normalize_coeffs_8bpc` uses
+   `(int)(-0.5 + w * (1 << 22))` for negative `w` (round-half-down,
+   i.e. away from zero) and `(int)(0.5 + w * (1 << 22))` for positive
+   `w` (round-half-up). This is one place the byte-exact match broke
+   on first attempt — LANCZOS3 has negative side-lobe weights, so the
+   rounding direction matters for kernels near the boundary.
+
+6. **Accumulator uses `int32_t`, bias is `(1 << 21)`.**
+   `acc = (1 << 21) + sum(pixel * w_q)`, then output is
+   `clip8(acc >> 22)`. The bias is half the scale → round-to-nearest.
+
+7. **`clip8` is a saturating clamp to [0, 255].** PIL's 1280-entry
+   LUT (in `Resample.c`) is functionally just a clamp. A simple
+   `if (v <= 0) return 0; if (v >= 255) return 255; return v;` is
+   byte-equivalent and far simpler. (The LUT is a micro-optimization,
+   not a correctness requirement.)
+
+8. **RGBA pre-multiply is `MULDIV255(a, b) = (a*b + 127) / 255`.**
+   The `+127` bias is half the divisor — round-to-nearest via
+   integer division. `muldiv255` in `Convert.c`.
+
+9. **RGBA un-premultiply uses integer division, not rounding.**
+   PIL's `rgba2rgbA`: `out = CLIP8((255 * R_pre) / alpha)`. The
+   `/` is C integer division (truncates toward zero). For alpha=0
+   PIL keeps the pre-multiplied RGB unchanged (can't divide by zero).
+   For alpha=255 the result is the identity.
+
+10. **PIL's full RGBA path is `convert('RGBa')` then `resize()` then
+    `convert('RGBA')`.** The `convert('RGBa')` step pre-multiplies
+    (so transparent pixels get small RGB values), the resize averages
+    in pre-multiplied space (which is correct for "blend two transparent
+    images"), then `convert('RGBA')` un-premultiplies. The whole
+    pre-mult → resample → un-premult pipeline must be in C for
+    byte-exact parity.
+
+11. **8-bit intermediate buffer (two-pass).** PIL's horizontal pass
+    writes 8-bit output; the vertical pass reads 8-bit input. This
+    quantizes intermediate results and matches PIL's behavior.
+
+12. **`vld1q_u32` loads 4 *uint32s* (16 bytes), not 4 bytes.** This
+    is the bug that broke byte-exact for one revision of the
+    NEON-intrinsic inner loop. To load 4 *bytes* into 4 separate
+    int32 lanes, use `vsetq_lane_s32` (or `mov.s v1[c], w` in
+    assembly). The cleaner pattern is `accum_4ch`/`accum_3ch`
+    helpers that build the vector via lane inserts.
+
+13. **No magic numbers.** `LANCZOS_A=3.0`, `PRECISION_BITS=22`,
+    `PRECISION_HALF=(1<<21)`, `MULDIV255_HALF=127`, `MULDIV255_DENOM=255`,
+    `CLIP_MIN=0`, `CLIP_MAX=UINT8_MAX`, `ALPHA_TRANSPARENT=0`,
+    `ALPHA_OPAQUE=255`, `CH_R/G/B/A=0/1/2/3`, `ROUND_HALF_POS=0.5`.
+    The user has a strict "no magic numbers" policy.
+
+14. **Nested `/* */` block comments break the C parser.** C doesn't
+    support nested block comments, so `/* outer /* inner */ rest */`
+    closes the outer comment at the inner `*/`. Use `// line` for
+    any inline annotations inside a `/* ... */` block doc.
+
+### Verification
+
+- **500/500 byte-exact** across random shape/config combinations.
+- **24/24 hand-picked cases** byte-exact (RGB + RGBA, downscale + upscale +
+  identity + edge cases alpha=0, alpha=255, mixed).
+- **38/38 unit tests** in `tests/test_native_downscaler.py` pass.
+- **354/354** in the full project test suite, 0 failed, 72 skipped.
+
+### Performance findings (deferred investigation)
+
+Perf check via `tests/perf_downsample.py` shows the C implementation
+runs at **0.3-0.8× of PIL throughput** depending on workload:
+
+| Workload | PIL | Native | Speedup |
+|----------|----:|-------:|--------:|
+| 144×144 RGB | 0.084ms | 0.100ms | 0.8× |
+| 300×300 RGB | 0.314ms | 0.457ms | 0.7× |
+| 640×480 RGB | 0.984ms | 1.415ms | 0.7× |
+| 1920×1080 RGB | 6.21ms | 8.89ms | 0.7× |
+| 3000×3000 RGB | 26.9ms | 39.6ms | 0.7× |
+| 640×480 RGBA | 0.495ms | 1.331ms | 0.4× |
+| 3000×3000 RGBA | 12.9ms | 43.5ms | 0.3× |
+
+**Surprising and worth investigating later.** The code is correct and
+uses NEON `mla.4s` for the inner loop. Two leading hypotheses:
+
+- **PIL's SIMD pattern processes 4 input pixels per NEON op** (one
+  `mla.4s` = 4 mul-adds of 4 channels each = 16 channel-mul-adds).
+  My code processes 1 input pixel per op (4 channel-mul-adds per
+  `mla.4s`). PIL gets 4× more arithmetic per NEON instruction.
+
+- **The auto-vectorizer prefers the 4-channel pattern** (it emits
+  `umll.8h` for 4-channel) but cannot vectorize 3-channel the same
+  way, so the 3-channel path runs ~3× slower than 4-channel even
+  though it does ~25% less work per pixel.
+
+For the cover-art use case (called once per album art, then cached),
+the 0.7× throughput is acceptable. The investigation to close the
+gap — a 4-pixels-at-a-time SIMD pattern with `vld3q_u8` deinterleave
+— is deferred.
+
+### What we tried and rejected
+
+- **Auto-vectorized scalar only (no intrinsics):** correct, 90% byte-exact
+  on the 500-case stress test, but 4 RGB cases had 1-4 LSB diffs. The
+  int32 fixed-point rewrite closed all 4.
+
+- **Double-precision accumulator (no fixed-point):** 90% byte-exact on
+  stress test. Same 1-4 LSB diffs from the int32/double precision
+  difference. The fixed-point rewrite closed them.
+
+- **Manual `vst1q_s32`/`vld1q_s32` round trip + register reuse:** byte-exact
+  but no measurable perf change. The compiler was already keeping
+  `acc[]` in registers via auto-vectorization.
+
+- **Round-half-up for negative kernel weights (PIL uses round-half-away-from-zero):**
+  broke byte-exact for kernels with side-lobe weights near zero.
+  See learning #5.
+
+### Files added/modified
+
+- `divoom_lib/native_src/downsample.c` (new): LANCZOS3 + RGBA pipeline
+- `divoom_lib/native/downscaler.py` (new): ctypes wrapper + PIL fallback
+- `divoom_lib/native/__init__.py` (new): re-exports `downsample_lanczos`, etc.
+- `scripts/build_libdivoom.sh` (moved from `gui/`): build script with arch detection
+- `gui/libdivoom_compact.dylib` (new, ~50KB): dylib output
+- `tests/test_native_downscaler.py` (new, 38 tests): parity + fallback
+- `tests/perf_downsample.py` (new): perf comparison vs PIL
+
+### Next steps (deferred)
+
+- Investigate the C-vs-PIL perf gap (4-pixel SIMD pattern).
+- Move `downsample.c` and `native_downscaler.py` out of `gui/` into
+  `divoom_lib/native/` so the dylib source is co-located with the
+  library that uses it.
+- Apply the downsampler to Google Photos album thumbnails and
+  live wallpaper rendering.
+

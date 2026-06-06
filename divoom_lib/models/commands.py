@@ -23,11 +23,17 @@ COMMANDS = {
     "get alarm time": 0x42,
     "set alarm": 0x43,
     "set light pic": 0x44,
-    # Image/animation upload uses command 0x44 (Timebox Evo); static frames use
-    # frame_id -1, animation frames 0,1,2…  These aliases are what display.show_image
-    # sends — they were previously missing, so every image push raised KeyError.
+    # 0x44 = single static frame (Timebox Evo). Body is one palette+indices
+    # block prefixed by `00 0A 0A 04`. `set image` and `set light pic` use it.
     "set image": 0x44,
-    "set animation frame": 0x44,
+    "set light pic": 0x44,
+    # 0x49 = multi-frame animation. Body is a sequence of `[LE u16 total_len]
+    # [u8 packet_num] [≤200 bytes chunk]` packets containing the concatenated
+    # per-frame `AA LLLL TTTT RR NN COLORS PIXELS` blocks. (The previous
+    # comment claimed 0x44 here, but that was wrong — see ROMRider
+    # `_animAsDivoomMessages` and the live-device finding on 2026-06-05 that
+    # 0x44 with the 0x49 body renders only frame 0 and discards the rest.)
+    "set animation frame": 0x49,
     "set light mode": 0x45,
     "set channel light": 0x45,
     "get light mode": 0x46,

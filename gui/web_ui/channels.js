@@ -262,7 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ];
     const AMBIENT_PREVIEWS = {
         0: `<div class="ambient-preview plain" style="background:#00ffcc; height:60px; border-radius:4px; box-shadow: 0 0 10px rgba(0,255,204,0.3);"></div>`,
-        1: `<div class="ambient-preview love" style="background:linear-gradient(90deg, #ff0000, #ffaa00, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000); background-size:200% 100%; height:60px; border-radius:4px; animation:hue-shift 6s linear infinite;"></div>`,
+        1: `<div class="ambient-preview love" style="height:60px; border-radius:4px; animation:love-color-cycle 12s linear infinite;"></div>`,
         2: `<svg class="ambient-preview plants" viewBox="0 0 16 16" preserveAspectRatio="none" style="height:60px; width:100%; border-radius:4px; image-rendering:pixelated; display:block;">
                 <rect width="16" height="16" fill="#ff0000"/>
                 <rect x="0" y="0" width="1" height="16" fill="#0000ff"/>

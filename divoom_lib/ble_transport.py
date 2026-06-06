@@ -47,6 +47,22 @@ class BLETransport(DeviceTransport):
         self.message_buf = bytearray()
         self._write_lock = asyncio.Lock()
         self._last_write_time = 0.0
+        # Track whether we've already subscribed to notifications on the
+        # current OS-level GATT session. macOS CoreBluetooth raises
+        # "Characteristic notifications already started" if start_notify
+        # is called twice without a stop_notify in between. After a
+        # transient disconnect/reconnect, is_connected may be True but
+        # the OS-side subscription state can be inconsistent, so we
+        # need an explicit flag to avoid re-subscribing.
+        self._notifications_started = False
+        # Set to True when a write fails with "disconnected" /
+        # "not connected" — even if is_connected() lies and reports
+        # True. The retry loop treats this as "force reconnect on
+        # the next attempt". macOS CoreBluetooth has a known race
+        # where is_connected flips to True before GATT services are
+        # fully discovered; the first write in that window returns
+        # "disconnected" while the cached state is stale.
+        self._connection_likely_broken = False
 
     @property
     def is_connected(self) -> bool:
@@ -105,9 +121,16 @@ class BLETransport(DeviceTransport):
                 raise DeviceConnectionError(f"Failed to connect to {self.mac}: {e}")
 
         if self.NOTIFY_CHARACTERISTIC_UUID:
-            cb = self._divoom.notification_handler if (self._divoom and hasattr(self._divoom, "notification_handler")) else self.notification_handler
-            await self.client.start_notify(self.NOTIFY_CHARACTERISTIC_UUID, cb)
-            self.logger.info(f"Enabled notifications for {self.NOTIFY_CHARACTERISTIC_UUID}")
+            if self._notifications_started:
+                self.logger.info(
+                    f"Notifications already enabled for {self.NOTIFY_CHARACTERISTIC_UUID}; "
+                    "skipping start_notify (macOS CoreBluetooth 'already started' guard)."
+                )
+            else:
+                cb = self._divoom.notification_handler if (self._divoom and hasattr(self._divoom, "notification_handler")) else self.notification_handler
+                await self.client.start_notify(self.NOTIFY_CHARACTERISTIC_UUID, cb)
+                self._notifications_started = True
+                self.logger.info(f"Enabled notifications for {self.NOTIFY_CHARACTERISTIC_UUID}")
         else:
             self.logger.warning("No notify characteristic UUID set. Cannot enable notifications.")
 
@@ -157,6 +180,15 @@ class BLETransport(DeviceTransport):
                 self.logger.info("Disconnected from Divoom device at %s", self.mac)
             except Exception as e:
                 self.logger.error("Error disconnecting from %s: %s", self.mac, e)
+        # Reset the notification-subscription flag so a future connect()
+        # can re-subscribe cleanly. On macOS CoreBluetooth, stop_notify
+        # in disconnect() releases the OS-side subscription, so a
+        # subsequent start_notify on a new connection is valid.
+        self._notifications_started = False
+        # The "connection likely broken" flag was an inference from
+        # write failures; a clean disconnect is the source of truth
+        # and supersedes it.
+        self._connection_likely_broken = False
 
     def notification_handler(self, sender: int, data: bytearray) -> None:
         if self.logger.isEnabledFor(logging.DEBUG):
@@ -289,10 +321,28 @@ class BLETransport(DeviceTransport):
     async def _send_payload_locked(self, payload_bytes: list, max_retries: int = 3, retry_delay: float = 0.1, write_with_response: bool = False) -> bool:
         for attempt in range(max_retries):
             backoff = retry_delay * (2 ** attempt)
-            if not self.is_connected:
-                self.logger.warning(f"Attempt {attempt + 1}: Not connected to a Divoom device. Retrying in {backoff}s...")
+            # Treat the connection as broken if EITHER:
+            #   - self.is_connected is False (the OS-level flag is honest)
+            #   - self._connection_likely_broken is True (a recent write
+            #     failed with "disconnected" even though is_connected
+            #     was still True at the time — the cached flag lags)
+            likely_broken_triggered = self._connection_likely_broken
+            if not self.is_connected or likely_broken_triggered:
+                # Capture and clear the inference flag up front so the
+                # reconnect itself isn't poisoned by stale state.
+                self._connection_likely_broken = False
+                self.logger.warning(
+                    f"Attempt {attempt + 1}: Not connected to a Divoom device "
+                    f"(is_connected={self.is_connected}, likely_broken={likely_broken_triggered}). "
+                    f"Retrying in {backoff}s..."
+                )
                 await asyncio.sleep(backoff)
-                if not self.is_connected:
+                # Reconnect if EITHER:
+                #   - is_connected is False (we're definitely not connected)
+                #   - likely_broken_triggered is True (the OS lied; force
+                #     a fresh connect to clear the stale GATT state)
+                need_reconnect = (not self.is_connected) or likely_broken_triggered
+                if need_reconnect:
                     try:
                         if self._divoom:
                             await self._divoom.connect()
@@ -309,6 +359,7 @@ class BLETransport(DeviceTransport):
             if self.use_ios_le_protocol:
                 send_func = self._divoom._send_ios_le_payload if (self._divoom and hasattr(self._divoom, "_send_ios_le_payload")) else self._send_ios_le_payload
                 if await send_func(payload_bytes, write_with_response):
+                    self._connection_likely_broken = False  # success — clear
                     return True
                 elif attempt == max_retries - 1:
                     return False
@@ -316,11 +367,27 @@ class BLETransport(DeviceTransport):
             else:
                 send_func = self._divoom._send_basic_protocol_payload if (self._divoom and hasattr(self._divoom, "_send_basic_protocol_payload")) else self._send_basic_protocol_payload
                 if await send_func(payload_bytes, write_with_response):
+                    self._connection_likely_broken = False  # success — clear
                     return True
                 elif attempt == max_retries - 1:
                     return False
                 await asyncio.sleep(backoff)
         return False
+
+    def _flag_connection_broken(self, exception: Exception) -> None:
+        """If a write exception indicates a connection drop, flag it.
+
+        macOS CoreBluetooth's BleakClient has a known race: the
+        `is_connected` property can return True (cached) while
+        `write_gatt_char` raises "disconnected" or "not connected"
+        because the GATT services haven't finished discovering yet.
+        This method inspects the exception and sets
+        `_connection_likely_broken` so the next attempt in
+        `_send_payload_locked` will force a full reconnect.
+        """
+        err_str = str(exception).lower()
+        if "disconnected" in err_str or "not connected" in err_str or "not connected to" in err_str:
+            self._connection_likely_broken = True
 
     async def _send_ios_le_payload(self, payload_bytes: list, write_with_response: bool) -> bool:
         message_bytes = framing.encode_ios_le_payload(payload_bytes)
@@ -331,6 +398,7 @@ class BLETransport(DeviceTransport):
             return True
         except Exception as e:
             self.logger.error(f"Error sending iOS LE payload: {e}")
+            self._flag_connection_broken(e)
             return False
 
     async def _send_basic_protocol_payload(self, payload_bytes: list, write_with_response: bool) -> bool:
@@ -351,6 +419,7 @@ class BLETransport(DeviceTransport):
                     await asyncio.sleep(0.05)
                 except Exception as e:
                     self.logger.error(f"Error sending chunk {i+1}: {e}")
+                    self._flag_connection_broken(e)
                     success = False
                     break
             return success
@@ -362,4 +431,5 @@ class BLETransport(DeviceTransport):
                 return True
             except Exception as e:
                 self.logger.error(f"Error sending payload: {e}")
+                self._flag_connection_broken(e)
                 return False

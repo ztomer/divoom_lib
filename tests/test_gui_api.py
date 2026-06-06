@@ -36,13 +36,6 @@ class TestDivoomGuiAPI(unittest.TestCase):
             self.api.close_window()
             mock_thread.assert_called_once()
 
-    def test_drag_window(self):
-        """Test window dragging movement calculations."""
-        self.api.window.x = 100
-        self.api.window.y = 200
-        self.api.drag_window(15, -25)
-        self.api.window.move.assert_called_once_with(115, 175)
-
     @patch("gui_main.BleakScanner")
     def test_scan_devices_with_config(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""
@@ -260,9 +253,11 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.api.cached_creds.user_id = 99
         self.api.cached_creds.is_valid.return_value = True
 
-        # Pre-seed cached data for the offline cache loader check
+        # Pre-seed cached data for the offline cache loader check.
+        # Use a real-looking file_id (not "9999") so the rebuild-on-stale path
+        # doesn't trigger (see gui/gallery_sync.py load_cached_gallery).
         cached_items = [
-            {"name": "NeonSkull", "file_id": "9999", "likes": 1500, "magic": 5, "preview_url": "data:image/png;base64,..."}
+            {"name": "NeonSkull", "file_id": "group1/M00/01/AAA_neon", "likes": 1500, "magic": 5, "preview_url": "data:image/png;base64,..."}
         ]
 
         import threading
@@ -274,7 +269,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
             gallery = json.loads(gallery_json)
             self.assertEqual(len(gallery), 1)
             self.assertEqual(gallery[0]["name"], "NeonSkull")
-            self.assertEqual(gallery[0]["file_id"], "9999")
+            self.assertEqual(gallery[0]["file_id"], "group1/M00/01/AAA_neon")
 
             # Wait for background fetch worker to finish executing under mocked Path
             for t in threading.enumerate():

@@ -99,9 +99,15 @@ async def test_show_clock_emits_clock_frame():
 
 
 @pytest.mark.asyncio
-async def test_show_image_emits_0x44_frames():
-    """Regression: image push must use command 0x44 (was KeyError 'set image',
-    which silently broke album art / gallery / ticker / sysmon on-device)."""
+async def test_show_image_emits_0x49_frames():
+    """Regression: image push must use command 0x49 (was KeyError 'set image',
+    which silently broke album art / gallery / ticker / sysmon on-device).
+
+    Command choice rationale: 0x44 is a single-frame static image; 0x49 is
+    the multi-frame animation (and also works for single-frame, as the device
+    auto-loops a 1-frame animation as a static image). Live device finding
+    on 2026-06-05: 0x44 + 0x49-format body renders only frame 0 and discards
+    the rest. 0x49 + 0x49-format body renders all frames correctly."""
     from PIL import Image
     p = Path("/tmp/e2e_img_test.png")
     Image.new("RGB", (16, 16), (255, 0, 0)).save(p)
@@ -109,12 +115,10 @@ async def test_show_image_emits_0x44_frames():
     ok = await dev.display.show_image(str(p))
     assert ok is True
     assert mock.written, "no frames written"
-    # A large image is split across multiple GATT writes; reassemble the stream
-    # before parsing the (single) framed message.
     full = b"".join(data for _char, data in mock.written)
     msgs, _ = framing.parse_basic_protocol_frames(bytearray(full))
     cmds = [m["command_id"] for m in msgs]
-    assert 0x44 in cmds
+    assert 0x49 in cmds
 
 
 @pytest.mark.asyncio

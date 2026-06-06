@@ -1,55 +1,53 @@
 # divoom_api/utils/image_processing.py
-import math
 from PIL import Image
 
-def process_image(file, time=None):
+from .divoom_image_encode import Frame
+
+
+def process_image(file, time: int | None = None):
+    """Processes an image file (GIF or static image) into a format suitable for Divoom devices.
+
+    Args:
+        file: Path to the image file. Any format PIL supports.
+        time: Optional default frame duration in milliseconds. Used for
+            static images (where PIL doesn't provide a duration) and as
+            a fallback for GIF frames with no per-frame duration set.
+
+    Returns:
+        (frames, frames_count, width, height):
+          frames: list of (rgb_bytes, width, height, duration_ms) tuples,
+              one per image frame. The rgb_bytes is in PIL's `tobytes()`
+              order (left-to-right, top-to-bottom). width and height
+              are the same for all frames in a single image.
+          frames_count: number of frames (1 for static, n for GIF).
+          width: image width in pixels.
+          height: image height in pixels.
+
+        On file error, returns ([], 0, 0, 0).
     """
-    Processes an image file (GIF or static image) into a format suitable for Divoom devices.
-    Returns a tuple: (list of frames, number of frames).
-    Each frame in the list is a tuple: (list of bytes for the frame, size of the frame).
-    """
-    frames = []
-    framesCount = 0
+    default_duration_ms = 1000 if time is None else int(time)
 
     try:
         img = Image.open(file)
     except FileNotFoundError:
         print(f"Error: Image file not found at {file}")
-        return [], 0
+        return [], 0, 0, 0
     except Exception as e:
         print(f"Error opening image file {file}: {e}")
-        return [], 0
+        return [], 0, 0, 0
 
-    if hasattr(img, 'is_animated') and img.is_animated:
-        # Process GIF
-        framesCount = img.n_frames
-        for frame_idx in range(framesCount):
+    width, height = img.size
+    frames: list[Frame] = []
+
+    if hasattr(img, "is_animated") and img.is_animated:
+        for frame_idx in range(img.n_frames):
             img.seek(frame_idx)
-            frame_data = img.convert("RGB").tobytes()
-            frames.append((list(frame_data), len(frame_data)))
+            rgb = img.convert("RGB").tobytes()
+            # PIL exposes per-frame duration in ms via .info.get("duration")
+            duration = img.info.get("duration", default_duration_ms)
+            frames.append((rgb, width, height, int(duration)))
     else:
-        # Process static image
-        framesCount = 1
-        frame_data = img.convert("RGB").tobytes()
-        frames.append((list(frame_data), len(frame_data)))
+        rgb = img.convert("RGB").tobytes()
+        frames.append((rgb, width, height, default_duration_ms))
 
-    return frames, framesCount
-
-def chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
-
-def make_framepart(total_size, frame_id, data):
-    """
-    Constructs a frame part for image/animation transmission.
-    total_size: Total size of the image/animation data.
-    frame_id: Identifier for the current frame (-1 for static image, 0 for first animation frame, etc.).
-    data: List of bytes for the current frame part.
-    """
-    frame = []
-    frame += total_size.to_bytes(2, byteorder='little')
-    frame += frame_id.to_bytes(1, byteorder='big', signed=True)
-    frame += len(data).to_bytes(2, byteorder='little')
-    frame.extend(data)
-    return frame
+    return frames, len(frames), width, height

@@ -39,7 +39,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         self.loop_thread = AsyncLoopThread()
         self.loop_thread.start()
         self.loop_thread.ready.wait()
-        
+
         self.current_divoom = None
         self.discovered_list = []
         self.wall_slots = {}  # "mac" -> {"x": x, "y": y, "width": w, "height": h, "size": size}
@@ -48,7 +48,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         self.device_pw = 0
         self.device_id = 0
         self.window = None  # Reference to pywebview Window instance
-        
+
         self.music_sync_active = False
         self.music_thread = None
         self.current_track_cache = None
@@ -148,13 +148,6 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
                 time.sleep(0.1)
                 self.window.destroy()
             threading.Thread(target=_destroy, daemon=True).start()
-
-    def drag_window(self, delta_x: int, delta_y: int) -> None:
-        if self.window:
-            try:
-                self.window.move(self.window.x + int(delta_x), self.window.y + int(delta_y))
-            except Exception as e:
-                logger.error(f"Failed to drag window: {e}")
 
     def set_solid_light(self, color: str, brightness: int, mode_type: int = 0) -> bool:
         logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness}, mode_type={mode_type})...")

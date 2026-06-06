@@ -127,6 +127,41 @@ class MediaSyncMixin(GallerySyncMixin):
             return json.dumps(self.current_track_cache)
         return json.dumps({})
 
+    def push_music_cover_now(self) -> str:
+        """Manual cover-art push triggered from the music card UI button.
+
+        Re-fetches album art for the current track, renders it at the
+        active device size, and pushes the frame to the device. Returns
+        a JSON status object the UI can toast on.
+        """
+        try:
+            cache = getattr(self, "current_track_cache", None)
+            if not cache or not cache.get("track"):
+                return json.dumps({"success": False, "error": "No track playing"})
+            if not self._has_push_target():
+                return json.dumps({"success": False, "error": "No device connected"})
+
+            track = cache["track"]
+            artist = cache.get("artist", "")
+            art_url = media_source.fetch_album_art_url(track, artist)
+            if not art_url:
+                return json.dumps({"success": False, "error": "Could not fetch album art"})
+
+            size = self._active_device_size()
+            out_path = media_source.render_and_downsample_artwork(art_url, size=size)
+            if not out_path or not out_path.exists():
+                return json.dumps({"success": False, "error": "Failed to render artwork"})
+
+            ok = self._push_frame(out_path, size)
+            preview_url = self._frame_to_data_url(out_path) if ok else ""
+            # Update cache so the UI shows the pushed preview
+            cache["artwork_url"] = art_url
+            cache["preview"] = preview_url
+            return json.dumps({"success": ok, "preview": preview_url})
+        except Exception as e:
+            logger.error(f"push_music_cover_now failed: {e}")
+            return json.dumps({"success": False, "error": str(e)})
+
     def _active_device_size(self, default: int = 16) -> int:
         try:
             if self.wall_slots:
@@ -145,7 +180,20 @@ class MediaSyncMixin(GallerySyncMixin):
         return bool(self.wall_slots) or bool(dev)
 
     def _push_frame(self, frame_path, size: int) -> bool:
-        """Push a rendered frame to the wall or the single active (BLE/LAN) device with auto-reconnect support."""
+        """Push a rendered frame to the wall or the single active (BLE/LAN) device with auto-reconnect support.
+
+        Round 4 note: cover-art, sysmon, stock-ticker, and notifications
+        all route through `dev.display.show_image` which uses the 0x49
+        multi-frame command (NOT 0x44). When reading device ACK logs, a
+        response like `01 06 00 04 31 55 50 e0 00 02` is the device
+        ACKing our 0x49 push — the `0x31` byte is **0x31 hexadecimal =
+        49 decimal**, which is the same as the `0x49` we sent. This is
+        a common decimal-vs-hex confusion in raw-log parsing. The status
+        byte `0x50` is the device's response code (unknown meaning,
+        not a documented error). Cover art and single-frame pushes
+        through this path are confirmed working on Timoo/Pixoo as of
+        2026-06-05.
+        """
         if self.wall_slots:
             if self._rebuild_wall_instance(size):
                 async def connect_and_show():

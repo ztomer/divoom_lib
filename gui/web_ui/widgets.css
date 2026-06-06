@@ -109,30 +109,50 @@
     object-fit: contain;
 }
 
-/* System monitor stats (CPU/MEM/BAT) */
-.sysmon-readout {
-    display: flex;
-    gap: 18px;
-    margin-bottom: 8px;
+/* System monitor stats (CPU/MEM/BAT) — colored bars, no white panel.
+   The label color matches the bar color so the user recognizes what they
+   see on the device (Kare: bitmap clarity, Rams #4 understandable). */
+.sysmon-bars {
+    width: 100%;
 }
 
-.sysmon-stat {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+.sysmon-bar-row {
+    display: grid;
+    grid-template-columns: 38px 1fr 42px;
+    align-items: center;
+    gap: 8px;
 }
 
-.sysmon-label {
+.sysmon-bar-label {
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+    font-family: var(--font-display);
 }
 
-.sysmon-stat b {
+.sysmon-bar-track {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    height: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.sysmon-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+}
+
+.sysmon-bar-value {
     font-family: var(--font-display);
-    font-size: 18px;
-    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+    min-width: 42px;
 }
 
 /* Saved stock tickers */
@@ -244,7 +264,10 @@ input:checked + .slider-round:before {
     gap: 12px;
 }
 
-/* Stock ticker panel preview mockups */
+/* Stock ticker panel preview mockups.
+   No aspect-ratio here — the parent flex row defines the height (align-items:stretch)
+   and the width is flex:1 with min-width:0 so the box shrinks to fit the card
+   instead of overflowing the column (Rams #5 unobtrusive). */
 .widget-preview-ticker {
     background: #000;
     border: 1px solid var(--border-color);
@@ -253,7 +276,8 @@ input:checked + .slider-round:before {
     display: flex;
     justify-content: center;
     align-items: center;
-    aspect-ratio: 2 / 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .ticker-arrow-mock {

@@ -1,6 +1,6 @@
 import pytest
 import os
-from PIL import Image, ImageDraw
+from PIL import Image
 from divoom_lib.utils import image_processing
 import tempfile
 import logging
@@ -32,89 +32,59 @@ def create_gif_image_file():
     os.remove(tmp.name)
 
 def test_process_image_static(create_static_image_file):
-    """Test process_image with a static PNG image."""
-    frames, frames_count = image_processing.process_image(create_static_image_file)
+    """process_image with a static PNG returns 1 frame with width/height/duration."""
+    frames, frames_count, width, height = image_processing.process_image(create_static_image_file)
     assert frames_count == 1
     assert len(frames) == 1
-    frame_data, frame_size = frames[0]
-    assert isinstance(frame_data, list)
-    assert frame_size == 16 * 16 * 3 # 16x16 pixels, 3 bytes per pixel (RGB)
+    rgb, w, h, duration_ms = frames[0]
+    assert isinstance(rgb, bytes)
+    assert len(rgb) == 16 * 16 * 3  # 16x16 pixels, 3 bytes per pixel (RGB)
+    assert width == 16
+    assert height == 16
+    assert w == 16 and h == 16
+    assert duration_ms == 1000  # default for static
     # Check a few pixel values (red image)
-    assert frame_data[0] == 255 # R
-    assert frame_data[1] == 0   # G
-    assert frame_data[2] == 0   # B
+    assert rgb[0] == 255  # R
+    assert rgb[1] == 0    # G
+    assert rgb[2] == 0    # B
 
 def test_process_image_gif(create_gif_image_file):
-    """Test process_image with an animated GIF image."""
-    frames, frames_count = image_processing.process_image(create_gif_image_file)
+    """process_image with a GIF returns N frames with per-frame durations."""
+    frames, frames_count, width, height = image_processing.process_image(create_gif_image_file)
     assert frames_count == 3
     assert len(frames) == 3
-    
-    # Check first frame (0,0,0)
-    frame_data_0, frame_size_0 = frames[0]
-    assert frame_size_0 == 16 * 16 * 3
-    assert frame_data_0[0] == 0
-    assert frame_data_0[1] == 0
-    assert frame_data_0[2] == 0
+    assert width == 16 and height == 16
 
-    # Check second frame (50,100,150)
-    frame_data_1, frame_size_1 = frames[1]
-    assert frame_size_1 == 16 * 16 * 3
-    assert frame_data_1[0] == 50
-    assert frame_data_1[1] == 100
-    assert frame_data_1[2] == 150
+    # First frame: (0, 0, 0)
+    rgb_0, w_0, h_0, dur_0 = frames[0]
+    assert len(rgb_0) == 16 * 16 * 3
+    assert rgb_0[0] == 0
+    assert rgb_0[1] == 0
+    assert rgb_0[2] == 0
+    assert dur_0 == 100  # GIF duration was 100ms
+
+    # Second frame: (50, 100, 150)
+    rgb_1, w_1, h_1, dur_1 = frames[1]
+    assert len(rgb_1) == 16 * 16 * 3
+    assert rgb_1[0] == 50
+    assert rgb_1[1] == 100
+    assert rgb_1[2] == 150
+    assert dur_1 == 100
 
 def test_process_image_file_not_found():
-    """Test process_image with a non-existent file."""
-    frames, frames_count = image_processing.process_image("non_existent_file.png")
+    """process_image with a non-existent file returns an empty result."""
+    frames, frames_count, width, height = image_processing.process_image("non_existent_file.png")
     assert frames_count == 0
     assert frames == []
+    assert width == 0 and height == 0
 
-def test_chunks():
-    """Test the chunks utility function."""
-    test_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    
-    # Perfect division
-    result = list(image_processing.chunks(test_list, 5))
-    assert result == [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]
-
-    # Uneven division
-    result = list(image_processing.chunks(test_list, 3))
-    assert result == [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10]]
-
-    # Chunk size larger than list
-    result = list(image_processing.chunks(test_list, 15))
-    assert result == [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]
-
-    # Empty list
-    result = list(image_processing.chunks([], 3))
-    assert result == []
-
-    # Chunk size 1
-    result = list(image_processing.chunks(test_list, 1))
-    assert result == [[1], [2], [3], [4], [5], [6], [7], [8], [9], [10]]
-
-def test_make_framepart():
-    """Test make_framepart function constructs correct byte array."""
-    total_size = 1024
-    frame_id = 0
-    data = [0xAA, 0xBB, 0xCC] # Example data bytes
-
-    # Expected structure:
-    # total_size (2 bytes, little-endian) -> 0x00 0x04
-    # frame_id (1 byte, big-endian, signed) -> 0x00
-    # len(data) (2 bytes, little-endian) -> 0x03 0x00
-    # data -> 0xAA 0xBB 0xCC
-    expected_frame = [0x00, 0x04, 0x00, 0x03, 0x00, 0xAA, 0xBB, 0xCC]
-    
-    result = image_processing.make_framepart(total_size, frame_id, data)
-    assert result == expected_frame
-
-    # Test with negative frame_id (for static images, -1)
-    total_size_static = 500
-    frame_id_static = -1
-    data_static = [0x11, 0x22]
-    # frame_id -1 (signed) -> 0xFF
-    expected_frame_static = [0xF4, 0x01, 0xFF, 0x02, 0x00, 0x11, 0x22]
-    result_static = image_processing.make_framepart(total_size_static, frame_id_static, data_static)
-    assert result_static == expected_frame_static
+def test_process_image_passes_time_to_static_frame():
+    """The `time` parameter sets the static frame's duration."""
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        Image.new('RGB', (4, 4), color='red').save(tmp.name)
+        try:
+            frames, count, w, h = image_processing.process_image(tmp.name, time=500)
+            assert count == 1
+            assert frames[0][3] == 500
+        finally:
+            os.remove(tmp.name)

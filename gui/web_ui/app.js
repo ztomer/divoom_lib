@@ -197,46 +197,22 @@ window.renderArrangerCanvas = function() {
 document.addEventListener("DOMContentLoaded", () => {
 
     // ── 0. FRAMELESS WINDOW DRAG (appbar) ──
-    // Susan Kare: minimal, predictable interaction. Dieter Rams #4: understandable.
-    // Uses document-level delegation so the handler survives any future
-    // appbar/template re-injection. clientX/Y is the pywebview-reliable axis
-    // (screenX is sometimes 0 in pywebview on macOS).
-    {
-        let isDragging = false;
-        let lastClientX = 0, lastClientY = 0;
-        let dragStartEl = null;
-
-        document.addEventListener("mousedown", (e) => {
-            if (e.button !== 0) return;
-            const appbar = e.target.closest(".integrated-appbar");
-            if (!appbar) return;
-            if (e.target.closest("button, select, input, .no-drag")) return;
-            isDragging = true;
-            dragStartEl = appbar;
-            lastClientX = e.clientX;
-            lastClientY = e.clientY;
-            e.preventDefault();
-        }, true);
-
-        document.addEventListener("mousemove", (e) => {
-            if (!isDragging || !dragStartEl) return;
-            const dx = e.clientX - lastClientX;
-            const dy = e.clientY - lastClientY;
-            lastClientX = e.clientX;
-            lastClientY = e.clientY;
-            if ((dx || dy) && window.pywebview?.api?.drag_window) {
-                window.pywebview.api.drag_window(dx, dy);
-            }
-        });
-
-        const stopDrag = () => {
-            isDragging = false;
-            dragStartEl = null;
-        };
-        document.addEventListener("mouseup", stopDrag);
-        document.addEventListener("mouseleave", stopDrag);
-        window.addEventListener("blur", stopDrag);
-    }
+    // The window drag is handled by pywebview's built-in drag-region
+    // mechanism: <header class="integrated-appbar pywebview-drag-region">
+    // matches the DRAG_REGION_SELECTOR, and customize.js
+    // (webview/js/customize.js:69-89) walks the DOM looking for that
+    // selector and dispatches `pywebviewMoveWindow` to the cocoa
+    // backend (BrowserView.move).
+    //
+    // macOS multi-monitor coordinate double-count: the bundled
+    // BrowserView.move adds `self.screen.origin.x` to the X coord
+    // the JS sends, which jumps the window off-screen when the
+    // window is on a secondary monitor with non-zero origin
+    // (upstream issue #1820, May 2026). We apply the
+    // upstream-recommended monkey-patch in gui_main.py before
+    // `webview.create_window` that drops the `self.screen.origin.x`
+    // term from BrowserView.move. The patch is a no-op on
+    // single-monitor setups.
 
     // Inject HTML Templates
     if (document.getElementById('monthly-best') && window.DivoomTemplates?.monthlyBest) {

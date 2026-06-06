@@ -17,7 +17,24 @@ class GallerySyncMixin:
         cache_file = Path.home() / ".config" / "divoom-control" / "gallery_cache.json"
         if cache_file.exists():
             try:
-                return cache_file.read_text(encoding="utf-8")
+                raw = cache_file.read_text(encoding="utf-8")
+                parsed = json.loads(raw)
+                # Rebuild from the on-disk cache directory if the JSON cache
+                # is empty, or only contains a manual/test entry (file_id="9999"
+                # is the convention from the NeonSkull test fixture — a real
+                # Divoom FileId is a CDN path like "group1_M00_..."). This
+                # prevents the gallery from rendering a single bogus item
+                # when the on-disk items are otherwise present.
+                cache_dir = Path.home() / ".config" / "divoom-control" / "cache_gallery"
+                if (not parsed
+                    or all(str(a.get("file_id", "")) == "9999" for a in parsed)):
+                    if cache_dir.exists() and any(cache_dir.iterdir()):
+                        logger.info(
+                            "Gallery JSON cache is empty/stale; rebuilding from "
+                            "on-disk cache_gallery directory."
+                        )
+                        return self.get_cached_gallery_files()
+                return raw
             except Exception as ce:
                 logger.warning(f"Failed to read gallery cache: {ce}")
         return "[]"

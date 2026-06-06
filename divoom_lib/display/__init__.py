@@ -1,4 +1,7 @@
 # divoom_lib/display/__init__.py
+import asyncio
+import time
+
 from .light import Light
 from .drawing import Drawing
 from .animation import Animation
@@ -6,7 +9,10 @@ from .text import Text
 from .display_animation import DisplayAnimation
 from .display_text import DisplayText
 
-from ..utils.image_processing import process_image, chunks, make_framepart
+from ..utils.image_processing import process_image
+from ..utils.divoom_image_encode import (
+    encode_animation,
+)
 from .. import models as constants
 from ..utils.converters import to_int_if_str, bool_to_byte
 from ..sender_protocol import CommandSender
@@ -73,32 +79,168 @@ class Display:
         return await self.communicator.send_command("set light mode", args)
 
     async def show_image(self, file: str, time: int | None = None) -> bool:
-        """Show image or animation on the Divoom device"""
+        """Show image or animation on the Divoom device.
+
+        The device expects a palette-quantized + bit-packed protocol,
+        NOT raw RGB. We use `divoom_image_encode` to produce the
+        on-wire bytes.
+
+        Live device verification (Timoo, June 2026): the device only
+        renders the image when sent as an animation (0x49), not as a
+        static image (0x44). We therefore route ALL frames through
+        `encode_animation`, which produces a single 0x49 packet for
+        1-frame inputs.
+
+        Round 4: routes multi-frame animations through the 0x8B
+        3-phase protocol (per futpib reference), since the 0x49
+        chunked approach is ACK'd by Timoo but doesn't cycle. For
+        single-frame static, keeps the 0x49 path that works.
+
+        Round 4: auto-detects 32×32 (Pixoo Max, Tivoo Max w/ extended
+        LED) from `DivoomConfig.screensize` and uses the 32×32 encoder
+        which emits the two required pre-frames + palette flag 0x03 +
+        2-byte color count.
+        """
         await self.show_design()
-        frames, framesCount = process_image(file, time=time)
+        frames, frames_count, _w, _h = process_image(file, time=time)
 
+        screensize = self._get_screensize()
+        if frames_count > 1 and screensize != 32:
+            # Round 4: try 0x8B 3-phase first; fall back to 0x49 on
+            # any send failure.
+            from .animation_8b import build_8b_phases
+            phases = build_8b_phases(frames)
+            if phases:
+                self.logger.info(
+                    f"show_image: routing {frames_count} frames via 0x8B 3-phase"
+                )
+                result: bool | None = None
+                for args in phases:
+                    result = await self.communicator.send_command(
+                        "app new send gif cmd", list(args)
+                    )
+                    if not result:
+                        self.logger.warning(
+                            "show_image: 0x8B failed, falling back to 0x49"
+                        )
+                        result = None
+                        break
+                if result is not None:
+                    return result
+
+        # 1-frame or fallback path: 0x49 chunked animation.
+        # Round 4: use 32×32 encoder if screensize=32.
+        if screensize == 32:
+            from ..utils.divoom_image_encode_32 import encode_animation_32
+            blobs = encode_animation_32(frames)
+        else:
+            blobs = encode_animation(frames)
         result = None
-        if framesCount > 1:
-            """Sending as Animation"""
-            frameParts = []
-            framePartsSize = 0
-
-            for pair in frames:
-                frameParts += pair[0]
-                framePartsSize += pair[1]
-
-            index = 0
-            for framePart in chunks(frameParts, self.communicator.chunksize):
-                frame = make_framepart(framePartsSize, index, framePart)
-                result = await self.communicator.send_command("set animation frame", frame)
-                index += 1
-
-        elif framesCount == 1:
-            """Sending as Image"""
-            pair = frames[-1]
-            frame = make_framepart(pair[1], -1, pair[0])
-            result = await self.communicator.send_command("set image", frame)
+        for packet in blobs:
+            result = await self.communicator.send_command(
+                "set animation frame", list(packet)
+            )
+            if not result:
+                return result
         return result
+
+    def _get_screensize(self) -> int:
+        """Read the active device's screensize from the config.
+
+        Defaults to 16. 32 = Pixoo Max / Tivoo Max w/ extended LED.
+        See `divoom_lib/models/commands.py` for the channel command ids.
+        """
+        cfg = getattr(self.communicator, "cfg", None)
+        if cfg is not None and hasattr(cfg, "screensize"):
+            return int(getattr(cfg, "screensize") or 16)
+        return 16
+
+    async def display_image(
+        self, file: str, time: int | None = None,
+        wait_for_display: bool = False, poll_timeout_s: float = 2.0,
+    ) -> bool:
+        """High-level wrapper for showing a user-provided image on the device.
+
+        Thin alias for `show_image` that:
+          1. Switches the device to the design channel (already done by
+             `show_image` -> `show_design`, which sends `0x45 0x05 ...`).
+          2. Encodes the file and pushes the bytes (`0x44` set image, or
+             `0x49` set animation frame for multi-frame files).
+          3. Optionally polls `get work mode` after the push to verify
+             the device has actually rendered the image.
+
+        The channel switch + push dance is the right primitive for
+        user-pushed content (cover art, custom art, stocks, sysmon,
+        notifications, weather, calendar). This wrapper exists so the
+        GUI's three push call sites (`_push_frame` for cover art /
+        stocks / sysmon) and any future widget dev can call one
+        function instead of duplicating the dance.
+
+        Args:
+            file: path to the image file. Any format PIL supports.
+            time: optional animation frame time (ms). If the file is
+                multi-frame, this controls the per-frame delay.
+            wait_for_display: if True, poll `get work mode` after the
+                push to confirm the device has rendered. Useful for
+                tests + slow BLE hosts. Adds one or more BLE
+                round-trips.
+            poll_timeout_s: how long to wait for the device to render
+                when `wait_for_display=True`. Default 2s.
+
+        Returns:
+            True on a successful push. If `wait_for_display=True`, the
+            return value reflects whether the device actually rendered
+            within the timeout (False if the device didn't switch to
+            the design channel, which would indicate a stuck
+            connection or a device-side error).
+        """
+        pushed = await self.show_image(file, time=time)
+        if not pushed:
+            return False
+        if not wait_for_display:
+            return True
+        # Use the running event loop's monotonic clock (NOT time.monotonic()
+        # — the `time` parameter above shadows the stdlib `time` module).
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + poll_timeout_s
+        target_mode = 0x05  # design / SOUND_USER channel
+        last_mode: int | None = None
+        while loop.time() < deadline:
+            try:
+                mode = await self._get_work_mode()
+            except Exception as e:
+                self.logger.warning(f"display_image: get_work_mode failed: {e}")
+                await asyncio.sleep(0.2)
+                continue
+            last_mode = mode
+            if mode == target_mode:
+                return True
+            await asyncio.sleep(0.2)
+        self.logger.warning(
+            f"display_image: device did not report work mode 0x{target_mode:02x} "
+            f"within {poll_timeout_s}s of push (last mode: "
+            f"{f'0x{last_mode:02x}' if last_mode is not None else 'unknown'})"
+        )
+        return False
+
+    async def _get_work_mode(self) -> int | None:
+        """Read the device's current work mode (0x13).
+
+        Returns the work mode byte, or None if the device didn't respond.
+        Used by `display_image` for the `wait_for_display` verification.
+        """
+        if self.communicator.lan:
+            return await self.communicator.lan.get_work_mode()
+        try:
+            response = await self.communicator.send_command_and_wait_for_response(
+                constants.COMMANDS["get work mode"], timeout=1.5
+            )
+        except Exception as e:
+            self.logger.debug(f"_get_work_mode: send failed: {e}")
+            return None
+        if response and len(response) >= 1:
+            return response[0]
+        return None
 
     async def show_light(self, color: str, brightness: int | None = None, power: bool | None = None, lightning_type: int | None = None) -> bool:
         """Show light on the Divoom device in the color"""

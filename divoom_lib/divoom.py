@@ -27,7 +27,10 @@ from .tools.timer import Timer
 from .tools.countdown import Countdown
 from .tools.noise import Noise
 from .display import Display
+from .display.design import Design
 from .system import System
+from .system.sound import SoundControl
+from .system.control import Control
 from .tool import Tool
 from .game import Game
 
@@ -55,7 +58,8 @@ class Divoom:
                 escapePayload=kwargs.get('escapePayload', False),
                 use_ios_le_protocol=kwargs.get('use_ios_le_protocol', None),
                 device_name=kwargs.get('device_name'),
-                client=kwargs.get('client')
+                client=kwargs.get('client'),
+                screensize=kwargs.get('screensize'),
             )
 
         # Optional LAN transport (WiFi-capable devices only)
@@ -108,8 +112,15 @@ class Divoom:
 
         self.display = Display(self)
         self.system = System(self)
+        self.sound = SoundControl(self)
+        self.control = Control(self)
         self.tool = Tool(self)
         self.game = Game(self)
+        self.design = Design(self)
+
+        # Frame-push chunk size (Kare: matches the original DivoomProtocol
+        # default). Used by display.show_image for image/animation splitting.
+        self.chunksize = kwargs.get('chunksize', models.DEFAULT_CHUNK_SIZE)
 
         self.logger.debug("Divoom.__init__ completed facade registration.")
 

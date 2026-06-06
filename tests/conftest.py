@@ -26,6 +26,7 @@ HARDWARE_TEST_MODULES = frozenset({
     "test_game_functions",
     "test_light_functions",
     "test_music_functions",
+    "test_push_protocol_diagnostic",
     "test_sleep_functions",
     "test_system_functions",
     "test_timeplan_functions",
