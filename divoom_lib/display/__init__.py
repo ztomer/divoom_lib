@@ -136,18 +136,21 @@ class Display:
         frames, frames_count, _w, _h = process_image(
             file, time=time, size=screensize
         )
-        if frames_count > 1 and screensize != 32:
-            # Round 4: route multi-frame via the 0x8B 3-phase protocol.
-            # Round 11 (items 1c/2a/9): use the proven streamer
-            # (Animation.stream_animation_8b) — BLE-safe chunking, chunk-index
-            # offset ids, write-with-response + pacing — instead of an ad-hoc
-            # tight loop that stalled the device. Fall back to 0x49 on failure.
+        if frames_count >= 1 and screensize != 32:
+            # Route ALL 16px pushes (single still AND multi-frame) through the
+            # 0x8B 3-phase protocol. This matches the futpib reference, whose
+            # `send_image` pushes a still PNG through the *same* animation path
+            # (`create_network_packets_from`) as a GIF — there is no separate
+            # single-frame command. The earlier code special-cased 1-frame into
+            # 0x49, which is why cover art (a single frame) did not render
+            # (R11 item 2a). Uses the proven streamer (chunk-index offset ids,
+            # 256-byte chunks, write-with-response + pacing). Falls back to 0x49.
             from .animation_8b import _build_animation_blob
             blob = _build_animation_blob(frames)
             anim = getattr(self.communicator, "animation", None)
             if blob and anim is not None:
                 self.logger.info(
-                    f"show_image: streaming {frames_count} frames via 0x8B "
+                    f"show_image: streaming {frames_count} frame(s) via 0x8B "
                     f"3-phase ({len(blob)} bytes)"
                 )
                 if await anim.stream_animation_8b(blob):

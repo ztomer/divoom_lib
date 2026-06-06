@@ -132,15 +132,15 @@ async def test_show_clock_emits_clock_frame():
 
 
 @pytest.mark.asyncio
-async def test_show_image_emits_0x49_frames():
-    """Regression: image push must use command 0x49 (was KeyError 'set image',
-    which silently broke album art / gallery / ticker / sysmon on-device).
+async def test_show_image_emits_0x8b_3phase():
+    """A 16px image push (single still OR animation) streams via the 0x8B
+    3-phase protocol, matching the futpib reference whose `send_image` routes a
+    still PNG through the same animation path as a GIF.
 
-    Command choice rationale: 0x44 is a single-frame static image; 0x49 is
-    the multi-frame animation (and also works for single-frame, as the device
-    auto-loops a 1-frame animation as a static image). Live device finding
-    on 2026-06-05: 0x44 + 0x49-format body renders only frame 0 and discards
-    the rest. 0x49 + 0x49-format body renders all frames correctly."""
+    Round 11 (item 2a): single frames previously used 0x49 and cover art did not
+    render on hardware; they now go through 0x8B like multi-frame. The three
+    phases are StartSeeding (CW0), SendingData (CW1, ≥1), TerminateSending (CW2).
+    """
     from PIL import Image
     p = Path("/tmp/e2e_img_test.png")
     Image.new("RGB", (16, 16), (255, 0, 0)).save(p)
@@ -150,8 +150,12 @@ async def test_show_image_emits_0x49_frames():
     assert mock.written, "no frames written"
     full = b"".join(data for _char, data in mock.written)
     msgs, _ = framing.parse_basic_protocol_frames(bytearray(full))
-    cmds = [m["command_id"] for m in msgs]
-    assert 0x49 in cmds
+    gif_cmd = models.COMMANDS["app new send gif cmd"]  # 0x8B
+    control_words = [m["payload"][0] for m in msgs if m["command_id"] == gif_cmd]
+    assert control_words, "no 0x8B frames emitted"
+    assert control_words[0] == 0x00, "first 0x8B phase must be StartSeeding"
+    assert control_words[-1] == 0x02, "last 0x8B phase must be TerminateSending"
+    assert 0x01 in control_words, "expected at least one SendingData phase"
 
 
 @pytest.mark.asyncio

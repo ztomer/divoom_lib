@@ -250,3 +250,17 @@ Findings:
   exact stall (1c/2a/9). **Fixed → 256** in both `Animation.stream_animation_8b`
   and the monthly-best daemon. (futpib also omits the Terminate phase; we keep it
   per the protocol doc, but drop it next if hardware still stalls at terminate.)
+
+#### Cover art still failed (single frame) → 2nd root cause
+
+User confirmed **cover art still doesn't render**. Cover art is a *single* 16px
+frame, and `show_image` special-cased `frames_count == 1` into the **0x49** path
+(0x8B was gated to `> 1`). futpib's `send_image` (lib.rs:572) proves the correct
+behavior: a still PNG is wrapped as a 1-frame `DivoomAnimation` and pushed
+through the **same** `create_network_packets_from` (0x8B) path as a GIF — there
+is *no* separate single-frame command. Fix: route **all** 16px pushes (1 frame
+and N frames) through `stream_animation_8b`; 0x49 remains only as a fallback.
+(32px still uses its dedicated 0x49 encoder.) e2e test updated to assert the
+single-still push emits the 0x8B Start/Data/Terminate phases. Suite 546/0.
+
+**⏳ Still needs hardware confirm** that cover art now renders via 0x8B.
