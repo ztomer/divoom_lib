@@ -340,8 +340,10 @@ def test_scoreboard_now_switches_channel():
         "wants clicking the card to switch the device to the scoreboard "
         "channel (0x06), not skip the switch."
     )
-    # Ambient should still be the only one skipped.
-    assert 'activeChannel === "ambient"' in src, (
+    # Ambient must remain skipped — now alongside Text (Round 7), since each
+    # has its own Apply/Push button rather than a channel switch.
+    assert ('activeChannel === "ambient"' in src
+            or '["ambient", "text"].includes' in src), (
         "channels.js: ambient must remain in the skip list (it has its own Apply button)."
     )
 

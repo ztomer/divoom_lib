@@ -36,6 +36,34 @@ class TestDivoomGuiAPI(unittest.TestCase):
             self.api.close_window()
             mock_thread.assert_called_once()
 
+    def test_push_text(self):
+        """R7 Text Channel: push_text runs the LPWA sequence ending with content."""
+        from divoom_lib.models import LPWA_CONTROL_CONTENT, LPWA_CONTROL_COLOR, LPWA_CONTROL_SPEED
+        dev = MagicMock()
+        dev.is_connected = True
+        dev.text.set_light_phone_word_attr = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.api.current_target_mode = "single"
+        with patch.object(type(self.api), "_active_device_size", return_value=16):
+            ok = self.api.push_text("HELLO", color="#FF0000", speed=40, effect_style=1)
+        self.assertTrue(ok)
+        calls = dev.text.set_light_phone_word_attr.call_args_list
+        controls = [c.args[0] for c in calls]
+        self.assertIn(LPWA_CONTROL_COLOR, controls)
+        self.assertIn(LPWA_CONTROL_SPEED, controls)
+        self.assertIn(LPWA_CONTROL_CONTENT, controls)
+        content_call = next(c for c in calls if c.args[0] == LPWA_CONTROL_CONTENT)
+        self.assertEqual(content_call.kwargs.get("text_content"), "HELLO")
+
+    def test_push_text_empty_noop(self):
+        """Empty text is a no-op (returns False, sends nothing)."""
+        dev = MagicMock()
+        dev.text.set_light_phone_word_attr = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.api.current_target_mode = "single"
+        self.assertFalse(self.api.push_text("   "))
+        dev.text.set_light_phone_word_attr.assert_not_called()
+
     @patch("gui_main.BleakScanner")
     def test_scan_devices(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""

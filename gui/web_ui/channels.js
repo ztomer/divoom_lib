@@ -47,10 +47,10 @@ document.addEventListener("DOMContentLoaded", () => {
             card.classList.add("active");
             window.DivoomState.activeChannel = card.getAttribute("data-channel");
             showChannelPanel(window.DivoomState.activeChannel);
-            // Ambient is the only "non-channel" card (it has its own Apply
-            // button). Every other card — Clock, VJ, EQ, Design,
+            // Ambient and Text are "non-channel" cards (each has its own
+            // Apply/Push button). Every other card — Clock, VJ, EQ, Design,
             // Scoreboard — fires switch_channel.
-            if (window.DivoomState.activeChannel === "ambient") return;
+            if (["ambient", "text"].includes(window.DivoomState.activeChannel)) return;
             if (!window.requireDevice()) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.switch_channel) {
                 window.pywebview.api.switch_channel(window.DivoomState.activeChannel).then(res => {
@@ -60,6 +60,29 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     });
+
+    // Round 7 — Text channel wiring (type & push scrolling text).
+    const textSpeedInput = document.getElementById("text-speed-input");
+    const textSpeedVal = document.getElementById("text-speed-val");
+    if (textSpeedInput && textSpeedVal) {
+        textSpeedInput.addEventListener("input", () => { textSpeedVal.textContent = textSpeedInput.value; });
+    }
+    const pushTextBtn = document.getElementById("push-text-btn");
+    if (pushTextBtn) {
+        pushTextBtn.addEventListener("click", () => {
+            const text = (document.getElementById("text-content-input")?.value || "").trim();
+            if (!text) { window.showToast("Enter some text first", "error"); return; }
+            if (!window.requireDevice()) return;
+            const color = document.getElementById("text-color-input")?.value || "#00ffcc";
+            const speed = parseInt(document.getElementById("text-speed-input")?.value) || 50;
+            const effect = parseInt(document.getElementById("text-effect-select")?.value);
+            if (window.pywebview?.api?.push_text) {
+                window.pywebview.api.push_text(text, color, 1, speed, isNaN(effect) ? 1 : effect).then(res => {
+                    window.showToast(res ? "Text pushed to device" : "Failed to push text", res ? "success" : "error", "🔵 BLE");
+                });
+            }
+        });
+    }
 
     // Round 6 — Scoreboard channel wiring. The scoreboard is a TOOL
     // (0x72 set tool, TOOL_TYPE_SCORE) on a channel (0x06). The channel

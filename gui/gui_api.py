@@ -231,6 +231,56 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             logger.error(f"Visualizer failed: {e}")
             return False
 
+    def push_text(self, text: str, color: str = "#FFFFFF", font_size: int = 1,
+                  speed: int = 50, effect_style: int = 1) -> bool:
+        """Round 7 — Text Channel: type & push scrolling text to the device.
+
+        Runs the full LPWA (0x87) sequence: display-box → font → color → speed →
+        effect → content. effect_style: 0 static, 1 scroll-left, 2 scroll-up,
+        3 hold, 4 marquee (device-dependent)."""
+        logger.info(f"GUI Action: Push text {text!r} (color={color}, speed={speed}, effect={effect_style})...")
+        from divoom_lib.models import (
+            LPWA_CONTROL_DISPLAY_BOX, LPWA_CONTROL_FONT, LPWA_CONTROL_COLOR,
+            LPWA_CONTROL_SPEED, LPWA_CONTROL_EFFECTS, LPWA_CONTROL_CONTENT,
+        )
+
+        async def _push(divoom, size: int) -> bool:
+            t = divoom.text
+            box = 0
+            await t.set_light_phone_word_attr(LPWA_CONTROL_DISPLAY_BOX, x=0, y=0,
+                                              width=size, height=size, text_box_id=box)
+            await t.set_light_phone_word_attr(LPWA_CONTROL_FONT, font_size=int(font_size), text_box_id=box)
+            await t.set_light_phone_word_attr(LPWA_CONTROL_COLOR, color=color, text_box_id=box)
+            await t.set_light_phone_word_attr(LPWA_CONTROL_SPEED, speed=int(speed), text_box_id=box)
+            await t.set_light_phone_word_attr(LPWA_CONTROL_EFFECTS, effect_style=int(effect_style))
+            res = await t.set_light_phone_word_attr(LPWA_CONTROL_CONTENT, text_content=str(text), text_box_id=box)
+            return res is not False
+
+        try:
+            if not text or not str(text).strip():
+                return False
+            if getattr(self, "current_target_mode", "single") == "wall":
+                if not self._rebuild_wall_instance():
+                    return False
+
+                async def run_all():
+                    results = []
+                    for entry in self.wall_instance.devices:
+                        divoom = entry[0]
+                        sz = entry[3] if len(entry) > 3 else 16
+                        results.append(await _push(divoom, int(sz)))
+                    return all(results)
+                return self._run_async(run_all())
+
+            target = self.current_divoom
+            if not target:
+                return False
+            size = self._active_device_size() if hasattr(self, "_active_device_size") else 16
+            return self._run_async(_push(target, int(size)))
+        except Exception as e:
+            logger.error(f"push_text failed: {e}")
+            return False
+
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:
