@@ -15,10 +15,14 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **Last round shipped:** Round 8 (device settings, FM, weather, memorial +
-  Tools sub-tabs). See `docs/PLANNING_ROUND8.md` §8. Timeplan UI deferred
-  (bridge exists, semantics unverified). Suite: 517 passed / 0 failed.
-- **Earlier:** Round 7 + 7.1.
+- **Last round shipped:** Round 9 (APK-only frontier). New lib code in
+  `divoom_lib/display/design.py`: `set_screen_dir` (0xBD 0x23), `set_screen_mirror`
+  (0xBD 0x24), `factory_reset` (0xBD 0x25,1). GUI: Tools→Device **Display** card
+  (orientation/mirror + token-gated factory reset). Brightness NOT re-added (it
+  already exists as 0x74). See `docs/PLANNING_ROUND9.md` §5. ANCS + cloud
+  deferred. Suite: **527 passed / 0 failed / 73 skipped**.
+- **Earlier:** Round 8 (device settings/FM/weather/memorial + Tools sub-tabs;
+  `docs/PLANNING_ROUND8.md` §8, timeplan UI deferred). Round 7 + 7.1.
   - R7: surfaced un-exposed `divoom_lib` modules in the GUI — Text Channel,
     Alarms, Sleep Aid, Tools (timer/countdown/noise). Bridges in
     `gui/gui_api.py`, UI + unit tests.
@@ -39,12 +43,13 @@ core rule in `AGENTS.md`).
    queries 0x42/0x46/0x13 get no parseable response — likely query-framing
    mismatch: query sent iOS-LE while device is Basic). Also gates the Alarms
    "Read from device" button. See `docs/DEVICE_VALIDATION_PLAN.md`.
-3. **Round 8 excavation done — plan ready, awaiting scope pick.** See
-   `docs/PLANNING_ROUND8.md`. Finding: the library implements ~140 device
-   methods; the GUI exposes ~58 — whole clusters un-surfaced. Top picks:
-   (1) Device Settings panel [12/24h, °C/°F, time-sync, name, auto-off,
-   screen on/off], (2) FM Radio tuner, (3) Weather push; then memorial/
-   timeplan (R9), SD player/game/drawing (later). Implement once user picks.
+3. **Next excavation frontier (R10 candidates):** R8 closed lib→GUI; R9 shipped
+   the screen-orientation 0xBD EXT work. Remaining APK-only items needing new lib
+   code (catalogued in `docs/PLANNING_ROUND9.md` §1): **ANCS notification
+   mirroring** (cmd 80, 14 app types — high value, needs macOS notification
+   plumbing → own round), the 200+ **cloud HTTP** endpoints (clock-face store /
+   weather city search / pomodoro / white-noise / TTS), SD player, game, drawing.
+   Timeplan UI still deferred (bridge exists, semantics unverified).
 4. Round 7 Phase 2/3 backlog also catalogued in `docs/PLANNING_ROUND7.md`.
 
 ## Hardware note

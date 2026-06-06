@@ -28,6 +28,12 @@ SUB_USER_DEFINE_TIME_SET = 0x14
 SUB_USER_DEFINE_TIME_GET = 0x15
 SUB_EQ = 0x1E
 SUB_LANGUAGE = 0x26
+# Round 9 — screen config + factory reset (confirmed against decompiled
+# CmdManager.java: Y2 line 1050 = [0x23, dir], Z2 line 1078 = [0x24, on],
+# factory reset line 968 = [0x25, 1]; a 0xFF arg is the read-back/query form).
+SUB_SCREEN_DIR = 0x23
+SUB_SCREEN_MIRROR = 0x24
+SUB_CLEAR_SYS = 0x25
 
 
 class Design:
@@ -109,3 +115,35 @@ class Design:
             "minute": response[1],
             "second": response[2] if len(response) > 2 else 0,
         }
+
+    async def set_screen_dir(self, direction: int) -> bool:
+        """Set screen orientation/rotation (0xBD 0x23).
+
+        Args:
+            direction: rotation step 0-3 (0°/90°/180°/270°). The app's
+                ``CmdManager.Y2`` forwards a single byte; exact value→angle
+                mapping is firmware-defined, verify on hardware. (0xFF is the
+                query form, not exposed here.)
+        """
+        d = int(direction) & 0xFF
+        self.logger.info(f"Setting screen direction to {d} (0xBD 0x23)...")
+        return await self._send_subcmd(SUB_SCREEN_DIR, [d])
+
+    async def set_screen_mirror(self, on: bool) -> bool:
+        """Set screen mirror/flip (0xBD 0x24).
+
+        Args:
+            on: True to mirror (flip) the display, False to restore.
+        """
+        self.logger.info(f"Setting screen mirror to {bool(on)} (0xBD 0x24)...")
+        return await self._send_subcmd(SUB_SCREEN_MIRROR, [1 if on else 0])
+
+    async def factory_reset(self) -> bool:
+        """Factory-reset the device (0xBD 0x25, payload 1).
+
+        DESTRUCTIVE and irreversible — wipes the device's stored config.
+        Callers MUST gate this behind explicit user confirmation; nothing in
+        this method asks. Mirrors ``CmdManager.java`` line 968 ``[37, 1]``.
+        """
+        self.logger.warning("Factory-resetting device (0xBD 0x25)...")
+        return await self._send_subcmd(SUB_CLEAR_SYS, [1])

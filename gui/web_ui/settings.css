@@ -294,6 +294,24 @@ body.theme-light .settings-tab-btn.active {
 .tools-subtab-content { display: none; }
 .tools-subtab-content.active { display: block; }
 
+/* Round 9 — Display card: destructive "danger zone" (factory reset) */
+.danger-zone {
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.05);
+}
+.glow-btn.danger {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: var(--transport-ext);
+}
+.glow-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.28);
+  color: #ffffff;
+}
+
 /* Braun Tabular Data lists */
 .braun-table {
     width: 100%;

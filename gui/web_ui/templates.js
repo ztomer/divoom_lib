@@ -126,6 +126,27 @@ window.DivoomTemplates = {
                     </div>
                 </div>
             </div>
+            <div class="card glass-card">
+                <div class="card-header"><h3>Display</h3></div>
+                <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <span class="form-label" style="font-size:12px; min-width:96px;">Orientation</span>
+                        <select id="screen-dir-select" class="text-input" style="flex:1; min-width:120px;">
+                            <option value="0">0° (normal)</option>
+                            <option value="1">90°</option>
+                            <option value="2">180°</option>
+                            <option value="3">270°</option>
+                        </select>
+                    </div>
+                    <label class="hc-toggle"><input type="checkbox" id="screen-mirror-toggle"> Mirror / flip display</label>
+                    <p class="panel-hint" style="margin:0;">Orientation support is device-dependent; the exact angle mapping may vary by model.</p>
+                    <div class="danger-zone">
+                        <span class="form-label" style="font-size:11px; color:var(--transport-ext); text-transform:uppercase; letter-spacing:0.06em;">Danger zone</span>
+                        <p class="panel-hint" style="margin:6px 0;">Factory reset wipes the device's stored configuration. This cannot be undone.</p>
+                        <button id="factory-reset-btn" class="glow-btn danger">Factory reset device…</button>
+                    </div>
+                </div>
+            </div>
         </div>
         </div>
 

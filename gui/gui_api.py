@@ -433,6 +433,28 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
                                                       int(week), int(channel), 0, 0, 10, 0),
             "timeplan")
 
+    # ── Round 9: display orientation + factory reset (0xBD EXT) ──────────
+    # (Brightness already has a full LAN/multi-target bridge — see set_brightness
+    #  below + the appbar slider; not re-added here.)
+    def set_screen_dir(self, direction) -> bool:
+        """Rotate the display (0xBD 0x23). direction = 0..3 (0/90/180/270°)."""
+        return self._tool_call(lambda d: d.design.set_screen_dir(int(direction)),
+                               "screen direction")
+
+    def set_screen_mirror(self, on) -> bool:
+        """Mirror/flip the display (0xBD 0x24)."""
+        return self._tool_call(lambda d: d.design.set_screen_mirror(self._as_bool(on)),
+                               "screen mirror")
+
+    def factory_reset(self, confirm="") -> bool:
+        """Factory-reset the device (0xBD 0x25). DESTRUCTIVE — refuses unless the
+        caller passes the literal token "RESET" (belt-and-suspenders behind the
+        UI double-confirm). Never invoked implicitly."""
+        if str(confirm) != "RESET":
+            logger.warning("factory_reset refused: missing/invalid confirm token")
+            return False
+        return self._tool_call(lambda d: d.design.factory_reset(), "factory reset")
+
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:

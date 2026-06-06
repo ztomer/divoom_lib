@@ -423,6 +423,48 @@ def test_no_battery_badge_intentionally_not_implemented():
 
 
 # ──────────────────────────────────────────────────────────────────
+# 5b. Round 9 — Display card (orientation / mirror / factory reset)
+# ──────────────────────────────────────────────────────────────────
+
+
+def test_r9_display_card_in_tools_device():
+    """The Tools→Device sub-tab has a Display card with orientation select,
+    mirror toggle, and a gated factory-reset button."""
+    src = TEMPLATES_JS.read_text()
+    assert 'id="screen-dir-select"' in src, "Display card missing orientation <select>."
+    assert 'id="screen-mirror-toggle"' in src, "Display card missing mirror toggle."
+    assert 'id="factory-reset-btn"' in src, "Display card missing factory-reset button."
+    assert "danger-zone" in src, "Factory reset should sit in a .danger-zone."
+
+
+def test_r9_settings_js_wires_display_and_guards_reset():
+    """settings.js wires orientation/mirror and double-confirms factory reset."""
+    src = SETTINGS_JS.read_text()
+    assert "set_screen_dir" in src, "settings.js does not call set_screen_dir."
+    assert "set_screen_mirror" in src, "settings.js does not call set_screen_mirror."
+    # Factory reset must be confirmed (dialog + typed RESET token) before calling.
+    assert "factory_reset" in src, "settings.js does not call factory_reset."
+    assert 'factory_reset?.("RESET")' in src, (
+        "factory_reset must be called with the literal 'RESET' token."
+    )
+    assert "window.prompt" in src and "RESET" in src, (
+        "Factory reset must require a typed RESET confirmation."
+    )
+
+
+def test_r9_gui_api_exposes_display_bridges():
+    """gui_api.py has set_screen_dir / set_screen_mirror / token-gated
+    factory_reset; brightness stays the existing LAN/multi-target bridge."""
+    src = GUI_API_PY.read_text()
+    assert re.search(r"def\s+set_screen_dir\s*\(", src), "missing set_screen_dir bridge."
+    assert re.search(r"def\s+set_screen_mirror\s*\(", src), "missing set_screen_mirror bridge."
+    assert re.search(r"def\s+factory_reset\s*\(", src), "missing factory_reset bridge."
+    assert 'str(confirm) != "RESET"' in src, (
+        "factory_reset must refuse unless the caller passes the 'RESET' token."
+    )
+
+
+# ──────────────────────────────────────────────────────────────────
 # 6. Playwright integration smoke (sanity check, optional)
 # ──────────────────────────────────────────────────────────────────
 

@@ -148,6 +148,33 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertFalse(self.api.set_hour_type(True))
         self.assertFalse(self.api.set_fm_frequency(900))
 
+    def test_r9_screen_dir_mirror(self):
+        """R9: screen dir/mirror reach d.design with bool/int coercion."""
+        dev = MagicMock()
+        dev.design.set_screen_dir = AsyncMock(return_value=True)
+        dev.design.set_screen_mirror = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.api.set_screen_dir(2); dev.design.set_screen_dir.assert_called_with(2)
+        self.api.set_screen_mirror("on"); dev.design.set_screen_mirror.assert_called_with(True)
+        self.api.set_screen_mirror(0); dev.design.set_screen_mirror.assert_called_with(False)
+
+    def test_r9_factory_reset_requires_token(self):
+        """R9: factory_reset only fires with the literal 'RESET' token."""
+        dev = MagicMock()
+        dev.design.factory_reset = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.factory_reset())          # no token
+        self.assertFalse(self.api.factory_reset("yes"))     # wrong token
+        dev.design.factory_reset.assert_not_called()
+        self.assertTrue(self.api.factory_reset("RESET"))    # correct token
+        dev.design.factory_reset.assert_called_once()
+
+    def test_r9_no_device(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.set_screen_dir(1))
+        self.assertFalse(self.api.set_screen_mirror(True))
+        self.assertFalse(self.api.factory_reset("RESET"))
+
     @patch("gui_main.BleakScanner")
     def test_scan_devices(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""

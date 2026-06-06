@@ -202,6 +202,45 @@ class TestDesign:
             COMMANDS["set design"], [0x14, 7, 30, 15]
         )
 
+    # ── Round 9: screen config + factory reset (0xBD EXT) ──────────────
+    @pytest.mark.asyncio
+    async def test_set_screen_dir(self, fake_divoom):
+        d = Design(fake_divoom)
+        ok = await d.set_screen_dir(2)
+        assert ok is True
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x23, 2]
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_screen_dir_masks_byte(self, fake_divoom):
+        d = Design(fake_divoom)
+        await d.set_screen_dir(259)  # 0x103 -> 0x03
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x23, 3]
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_screen_mirror_on_off(self, fake_divoom):
+        d = Design(fake_divoom)
+        await d.set_screen_mirror(True)
+        fake_divoom.send_command.assert_awaited_with(
+            COMMANDS["set design"], [0x24, 1]
+        )
+        await d.set_screen_mirror(False)
+        fake_divoom.send_command.assert_awaited_with(
+            COMMANDS["set design"], [0x24, 0]
+        )
+
+    @pytest.mark.asyncio
+    async def test_factory_reset(self, fake_divoom):
+        d = Design(fake_divoom)
+        ok = await d.factory_reset()
+        assert ok is True
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x25, 1]
+        )
+
 
 # ── Divoom facade wiring ────────────────────────────────────────────────────
 

@@ -491,6 +491,14 @@ document.addEventListener("DOMContentLoaded", () => {
     wireToggle("hour24-toggle", "set_hour_type");
     wireToggle("tempf-toggle", "set_temp_unit");
     wireToggle("lowpower-toggle", "set_low_power");
+    wireToggle("screen-mirror-toggle", "set_screen_mirror");
+
+    // Display orientation (0-3 = 0/90/180/270°).
+    const dirSel = document.getElementById("screen-dir-select");
+    if (dirSel) dirSel.addEventListener("change", () => {
+        if (dev()) api()?.set_screen_dir?.(parseInt(dirSel.value) || 0)
+            .then(r => toast(r, "Orientation set"));
+    });
 
     document.addEventListener("click", (e) => {
         if (e.target.closest("#sync-time-btn")) {
@@ -513,6 +521,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const hh = parseInt(document.getElementById("memorial-hour")?.value) || 0;
             const mi = parseInt(document.getElementById("memorial-min")?.value) || 0;
             api()?.set_memorial?.(0, enabled, mo, da, hh, mi, title).then(r => toast(r, "Anniversary saved"));
+        } else if (e.target.closest("#factory-reset-btn")) {
+            if (!dev()) return;
+            // Double-confirm: a dialog, then a typed token, then the bridge also
+            // requires the literal "RESET" string before it sends anything.
+            if (!window.confirm("Factory-reset this device? This wipes its stored config and cannot be undone.")) return;
+            const token = window.prompt('This is irreversible. Type RESET (all caps) to confirm:');
+            if (token !== "RESET") { window.showToast("Factory reset cancelled", "error"); return; }
+            api()?.factory_reset?.("RESET").then(r => toast(r, "Device factory-reset"));
         }
     });
 

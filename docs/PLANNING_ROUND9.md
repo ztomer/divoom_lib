@@ -151,6 +151,31 @@ behind an explicit double-confirm and is never auto-invoked.
   app's `Y2` just forwards the int. Verify exact mapping on hardware later; UI
   labels can be corrected without protocol change.
 
-## §5 Implementation outcome
+## §5 Implementation outcome — shipped 2026-06-06
 
-_(filled after shipping)_
+Picked A (screen orientation) + D (gated factory reset). **B (system brightness)
+was dropped from R9**: excavation revealed it already exists as
+`device.set_brightness` (0x74) with a full LAN/multi-target `gui_api.set_brightness`
+bridge + appbar slider — re-adding it would have shadowed the richer impl (caught
+by a failing test mid-implementation). So R9 = the genuinely-new 0xBD EXT work.
+
+Shipped (step by step):
+1. **lib** `divoom_lib/display/design.py`: `set_screen_dir` (0xBD 0x23),
+   `set_screen_mirror` (0xBD 0x24), `factory_reset` (0xBD 0x25,1). 5 unit tests
+   asserting exact bytes (`tests/test_round4_p1_helpers.py`).
+2. **bridges** `gui/gui_api.py`: `set_screen_dir`, `set_screen_mirror`,
+   `factory_reset(confirm)` — refuses unless `confirm == "RESET"`. 3 unit tests
+   incl. the token guard (`tests/test_gui_api.py`).
+3. **UI** Tools→Device **Display** card: orientation `<select>`, mirror toggle,
+   `.danger-zone` factory-reset button with `confirm()` + typed-"RESET" prompt.
+   `settings.js` wiring; `settings.css` danger styles. 3 static UI/exposure tests
+   (`tests/test_round6_layout_and_exposure.py`).
+
+Full suite: **527 passed / 0 failed / 73 skipped**.
+
+Deferred: C (ANCS notification mirroring) — own round; CMD-type top-level
+commands + 200+ cloud endpoints catalogued in §1 / APK report for later.
+
+Hardware to verify: exact direction-byte→angle mapping; whether the target
+device supports orientation/mirror at all (capability-gated; UI is set-only since
+read-back still times out, task #20).

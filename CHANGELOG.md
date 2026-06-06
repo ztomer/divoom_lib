@@ -6,6 +6,33 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 9 — 2026-06-06 (APK-only frontier: screen orientation + factory reset)
+
+R8 closed the lib→GUI gap; R9 targets capabilities the APK has but `divoom_lib`
+lacked — needing *new lib code*. Full inventory + confirmed payloads in
+`docs/PLANNING_ROUND9.md` (verified against decompiled `CmdManager.java`).
+
+### Added
+
+- **lib** `divoom_lib/display/design.py` (0xBD EXT dispatcher): `set_screen_dir`
+  (0xBD 0x23), `set_screen_mirror` (0xBD 0x24), `factory_reset` (0xBD 0x25,1).
+- **GUI** Tools→Device **Display** card: orientation select (0/90/180/270°),
+  mirror toggle, and a `.danger-zone` factory-reset button gated by a
+  `confirm()` + typed-"RESET" prompt. Bridge `factory_reset(confirm)` also
+  refuses unless the literal `"RESET"` token is passed (belt & suspenders).
+- 10 tests (5 lib byte-exact, 2 bridge incl. token guard, 3 static UI/exposure).
+
+### Notes
+
+- **Brightness was NOT re-added** — it already exists (`device.set_brightness`,
+  0x74) with a LAN/multi-target bridge + appbar slider. The excavation's main
+  correction: `SPP_SET_SYSTEM_BRIGHT` (116) == 0x74.
+- Deferred: ANCS notification mirroring (own round); cloud HTTP surface.
+
+Full suite: 527 passed / 0 failed / 73 skipped.
+
+---
+
 ## Round 8 — 2026-06-06 (Feature excavation: device settings, FM, weather, memorial)
 
 Excavated the lib↔GUI gap (`docs/PLANNING_ROUND8.md`): the library implements
