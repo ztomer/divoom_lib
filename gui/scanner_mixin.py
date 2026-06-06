@@ -178,6 +178,7 @@ class ScannerMixin:
             if connected:
                 try:
                     import configparser
+                    from pathlib import Path
                     config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
                     config_file.parent.mkdir(parents=True, exist_ok=True)
                     cfg = configparser.ConfigParser()

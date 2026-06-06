@@ -264,3 +264,21 @@ and N frames) through `stream_animation_8b`; 0x49 remains only as a fallback.
 single-still push emits the 0x8B Start/Data/Terminate phases. Suite 546/0.
 
 **⏳ Still needs hardware confirm** that cover art now renders via 0x8B.
+
+#### Cover art rendered but DISTORTED → 3rd root cause (the real one)
+
+Hardware showed the still now transfers + displays, but **scrambled**. The blob
+is structurally correct (matches `save_to_divoom_format`: no file header, frames
+back-to-back), so the defect was in **pixel bit-packing**: `encode_pixels` reset
+its accumulator at every byte and masked to 8 bits, **dropping the carry whenever
+`nb_bits` doesn't divide 8** (3/5/6/7 bits/pixel). A downsampled album cover has
+~43 colours → nb_bits=6 → every byte-spanning pixel corrupted. (Solid-colour test
+images use 1 colour → nb_bits=1, which divides 8, so tests + earlier "static
+works" never caught it.) futpib uses `bitstream_io::LittleEndian` = continuous
+LSB-first packing across byte boundaries. Rewrote `encode_pixels` to a continuous
+LSB-first accumulator; added a round-trip test for **every** width 1–8 plus
+hand-verified 3- and 6-bit cases. Also fixed an unrelated `Path` scoping
+`UnboundLocalError` in `scanner_mixin` connection-persist seen in the same log.
+Suite 556 passed / 0 failed.
+
+**⏳ Hardware:** confirm the album cover now renders un-distorted.

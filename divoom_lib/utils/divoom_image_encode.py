@@ -103,17 +103,19 @@ def encode_palette(palette: List[Tuple[int, int, int]]) -> bytes:
 
 
 def encode_pixels(pixels: List[int], nb_bits: int) -> bytes:
-    """Bit-pack pixel indices into bytes (LSB first into LSB-first bytes).
+    """Bit-pack pixel indices LSB-first, **continuously across byte boundaries**.
 
-    This matches the device's parser:
-      - For each output byte, pixels are placed starting at bit 0
-        (LSB) and filling upward.
-      - When a byte fills (after `8 // nb_bits` pixels), the next
-        pixel starts a fresh byte at bit 0.
+    This matches the device's parser and the futpib reference, which uses
+    ``bitstream_io::LittleEndian`` (``frame.rs`` build_pixel_data /
+    Frame::from_16x16): the first pixel occupies the lowest bits of byte 0, and
+    a pixel whose bits cross a byte boundary continues into the next byte — its
+    high bits are NOT dropped.
 
-    Concretely: for nbBits=1, each byte holds 8 pixels. For
-    nbBits=2, each byte holds 4 pixels. For nbBits=8, each byte
-    holds 1 pixel.
+    The previous implementation reset the accumulator at each byte and masked to
+    8 bits, which silently discarded the carry whenever ``nb_bits`` did not
+    divide 8 (i.e. 3/5/6/7 bits per pixel). That corrupted any image with
+    5–8, 17–32, 33–64, or 65–128 colours — e.g. a downsampled album cover with
+    ~43 colours (nb_bits=6) rendered as garbage (R11 cover-art distortion).
 
     Args:
         pixels:  list of palette indices, length w*h.
@@ -124,24 +126,24 @@ def encode_pixels(pixels: List[int], nb_bits: int) -> bytes:
     """
     if nb_bits < 1 or nb_bits > 8:
         raise ValueError(f"nb_bits must be in [1, 8], got {nb_bits}")
-    pixels_per_byte = 8 // nb_bits
+    max_val = (1 << nb_bits) - 1
     out = bytearray()
-    byte = 0
-    bit_pos = 0
+    acc = 0          # bit accumulator (LSB-first)
+    acc_bits = 0     # number of valid bits currently in `acc`
     for idx in pixels:
-        if idx < 0 or idx >= (1 << nb_bits):
+        if idx < 0 or idx > max_val:
             raise ValueError(
                 f"pixel index {idx} doesn't fit in {nb_bits} bits "
-                f"(max value {(1 << nb_bits) - 1})"
+                f"(max value {max_val})"
             )
-        byte |= (idx & ((1 << nb_bits) - 1)) << bit_pos
-        bit_pos += nb_bits
-        if bit_pos >= 8:
-            out.append(byte & 0xFF)
-            byte = 0
-            bit_pos = 0
-    if bit_pos > 0:
-        out.append(byte & 0xFF)
+        acc |= (idx & max_val) << acc_bits
+        acc_bits += nb_bits
+        while acc_bits >= 8:
+            out.append(acc & 0xFF)
+            acc >>= 8
+            acc_bits -= 8
+    if acc_bits > 0:
+        out.append(acc & 0xFF)
     return bytes(out)
 
 

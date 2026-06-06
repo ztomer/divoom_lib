@@ -186,6 +186,50 @@ def test_encode_pixels_1bit_unaligned():
     assert result[1] == 0x01  # 9th pixel at bit 0
 
 
+def _decode_pixels_lsb_first(data: bytes, nb_bits: int, count: int):
+    """Reference LSB-first continuous unpacker (mirrors bitstream_io LE)."""
+    out = []
+    acc = 0
+    acc_bits = 0
+    pos = 0
+    mask = (1 << nb_bits) - 1
+    for _ in range(count):
+        while acc_bits < nb_bits:
+            acc |= data[pos] << acc_bits
+            acc_bits += 8
+            pos += 1
+        out.append(acc & mask)
+        acc >>= nb_bits
+        acc_bits -= nb_bits
+    return out
+
+
+def test_encode_pixels_6bit_spans_byte_boundary():
+    """nb_bits=6: pixels cross byte boundaries; high bits must carry, not drop.
+
+    [1, 2, 3] → byte0 = 1 | (2<<6)=0x81; remaining bits of 2 (0b0000) + 3<<? ...
+    verified by hand: [0x81, 0x30, 0x00]."""
+    assert encode_pixels([1, 2, 3], 6) == bytes([0x81, 0x30, 0x00])
+
+
+def test_encode_pixels_3bit_spans_byte_boundary():
+    """nb_bits=3: [1,2,3,4] → [0xD1, 0x08] (hand-verified)."""
+    assert encode_pixels([1, 2, 3, 4], 3) == bytes([0xD1, 0x08])
+
+
+@pytest.mark.parametrize("nb_bits", [1, 2, 3, 4, 5, 6, 7, 8])
+def test_encode_pixels_round_trip_all_widths(nb_bits):
+    """Encoding then LSB-first decoding recovers the indices for every width —
+    this is the property the device's bitstream_io LE reader relies on."""
+    import random
+    rng = random.Random(nb_bits)
+    maxv = (1 << nb_bits) - 1
+    pixels = [rng.randint(0, maxv) for _ in range(256)]
+    encoded = encode_pixels(pixels, nb_bits)
+    assert len(encoded) == (256 * nb_bits + 7) // 8
+    assert _decode_pixels_lsb_first(encoded, nb_bits, 256) == pixels
+
+
 def test_encode_pixels_index_too_large_raises():
     """A pixel index that doesn't fit in nbBits is rejected."""
     with pytest.raises(ValueError, match="doesn't fit in 2 bits"):
