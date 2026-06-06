@@ -113,7 +113,10 @@ async def stream_raw_bin_payload(divoom: Divoom, file_data: bytes) -> bool:
     delay = 0.01 if is_ble else 0.0
     
     # 2. Transmit data in chunks (Control Word 1)
-    chunk_size = 200  # Safe BLE transfer chunk size
+    # MUST be 256: offset_id is a chunk INDEX and the device places chunk N at
+    # byte N*256 (per futpib reference). A smaller size leaves gaps and the
+    # transfer never completes (R11). The BLE framing layer handles MTU splitting.
+    chunk_size = 256
     offset_id = 0
     
     for i in range(0, file_size, chunk_size):

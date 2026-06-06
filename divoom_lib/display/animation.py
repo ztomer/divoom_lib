@@ -115,15 +115,22 @@ class Animation(AnimationUserDefine):
 
     async def stream_animation_8b(self, blob: bytes) -> bool:
         """Stream a pre-encoded animation frame blob via the 0x8B 3-phase
-        protocol, using the BLE-safe chunking + pacing proven by the
-        monthly-best daemon (``stream_raw_bin_payload``).
+        protocol, matching the **futpib** reference exactly
+        (``references/divoom-refs/futpib/src/lib.rs`` ``create_network_packets_from``
+        + ``protocol/animation.rs``), which is the canonical implementation of
+        the same StartSeeding/SendingData/Terminate framing this command uses.
 
-        Differences from a naive tight loop (which stalls the device — R11
-        items 1c/2a/9): ``file_offset_id`` is a sequential **chunk index**
-        (0,1,2,…) not a byte offset; chunks are 200 bytes (BLE-safe); each
-        BLE chunk is written **with response**; and the device gets time to
-        allocate buffers (0.5s after start) and settle (0.5s before terminate),
-        with a brief inter-chunk delay to avoid GATT congestion.
+        Per futpib: ``file_offset_id`` is a sequential **chunk index**
+        (0,1,2,…, u16 LE) and chunks are **256 bytes**. This pairing is
+        load-bearing: the device reconstructs the file by placing chunk *N* at
+        byte *N×256*, so a smaller chunk size (the monthly-best daemon used 200)
+        leaves permanent gaps and the transfer never completes — the stall in
+        R11 items 1c/2a/9.
+
+        On top of the wire format we add BLE robustness (not in futpib, which
+        targets a stream socket): write-with-response on BLE, 0.5s after start
+        for buffer allocation, 0.5s before terminate, and a brief inter-chunk
+        delay to avoid GATT congestion.
 
         Args:
             blob: concatenated per-frame bodies (see animation_8b._build_animation_blob).
@@ -148,7 +155,7 @@ class Animation(AnimationUserDefine):
         write_with_response = is_ble
         delay = 0.01 if is_ble else 0.0
 
-        chunk_size = 200  # BLE-safe payload size
+        chunk_size = 256  # MUST match futpib; device positions chunk N at N*256
         offset_id = 0
         for i in range(0, file_size, chunk_size):
             chunk = list(blob[i:i + chunk_size])

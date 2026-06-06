@@ -224,3 +224,29 @@ byte-offset ids + 256 chunks, but it's not on the live `show_image` path; left
 as-is (would need a dylib rebuild) — flagged for a future cleanup.
 
 **⏳ Needs:** user to confirm custom-art + live-cover push on the real device.
+
+#### Reference cross-check (after user flagged the monthly-best path as suspect)
+
+Compared our 0x8B path against the APK + the 3 new refs (futpib, hass-divoom,
+andreas-mausch):
+
+| Source | Protocol | Chunk | offset_id |
+|---|---|---|---|
+| **futpib** `lib.rs`+`animation.rs` | 0x8B 3-phase | **256** | **chunk index** (u16 LE) |
+| our 0x8B framing | 0x8B 3-phase | (was 200) | chunk index (u16) |
+| hass-divoom / node-divoom | 0x49 | 200 | chunk index (u8) |
+| APK `SPP_DRAWING_ENCODE_PLAY` (Q) | own | 200 | chunk index (u8) |
+| monthly-best daemon (ours) | 0x8B | **200 ❌** | chunk index |
+
+Findings:
+- Our **wire framing matches futpib exactly** (`file_size` u32 + `offset_id` u16
+  + control words 0/1/2).
+- Our **per-frame blob encoding matches futpib's `frame.rs::serialize`
+  byte-for-byte** (`AA`, len u16, time u16, reuse_palette, color_count, palette,
+  LSB-packed pixels; 256-colors→`0x00`). Verified field-by-field.
+- **The only defect was chunk size: 200 (copied from monthly-best) vs futpib's
+  256.** With index-based offset ids the device positions chunk *N* at byte
+  *N×256*; 200-byte chunks leave 56-byte gaps so the file never completes — the
+  exact stall (1c/2a/9). **Fixed → 256** in both `Animation.stream_animation_8b`
+  and the monthly-best daemon. (futpib also omits the Terminate phase; we keep it
+  per the protocol doc, but drop it next if hardware still stalls at terminate.)

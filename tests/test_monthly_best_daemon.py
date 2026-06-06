@@ -46,23 +46,30 @@ class TestMonthlyBestDaemon(unittest.IsolatedAsyncioTestCase):
         mock_divoom = MagicMock()
         mock_divoom.animation.app_new_send_gif_cmd = AsyncMock(return_value=True)
         
-        # 410 bytes payload (will trigger 3 chunks: 200, 200, 10 bytes)
-        file_data = b"X" * 410
-        
+        # 600 bytes payload → 3 chunks at the 256-byte size (256, 256, 88).
+        # (Chunk size MUST be 256 to match futpib; offset_id is a chunk index
+        # and the device positions chunk N at byte N*256 — R11 fix.)
+        file_data = b"X" * 600
+
         success = await monthly_best_daemon.stream_raw_bin_payload(mock_divoom, file_data)
         self.assertTrue(success)
-        
-        # Verify app_new_send_gif_cmd is called with CW 0 (start), CW 1 (data) x 3 times, CW 2 (terminate)
+
+        # CW 0 (start) + CW 1 (data) x 3 + CW 2 (terminate) = 5 calls
         self.assertEqual(mock_divoom.animation.app_new_send_gif_cmd.call_count, 5)
-        
-        # Verify CW 0 call
+
         mock_divoom.animation.app_new_send_gif_cmd.assert_any_call(
-            control_word=0, file_size=410
+            control_word=0, file_size=600
         )
-        # Verify CW 2 call
         mock_divoom.animation.app_new_send_gif_cmd.assert_any_call(
             control_word=2
         )
+        # Data phases must carry sequential chunk-INDEX offset ids (0,1,2).
+        data_offsets = [
+            c.kwargs.get("file_offset_id")
+            for c in mock_divoom.animation.app_new_send_gif_cmd.call_args_list
+            if c.kwargs.get("control_word") == 1
+        ]
+        self.assertEqual(data_offsets, [0, 1, 2])
 
 if __name__ == '__main__':
     unittest.main()
