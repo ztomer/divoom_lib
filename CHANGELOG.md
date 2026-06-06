@@ -26,6 +26,17 @@ Surfaces previously un-exposed `divoom_lib` modules in the GUI (see
   (mm:ss), noise meter. `set_timer()`/`set_countdown()`/`set_noise()` wrap
   `tools/{timer,countdown,noise}.py`.
 
+### Changed (Round 7.1)
+
+- **New "Tools" sidebar tab.** Alarms, Sleep Aid, and Tools
+  (timer/countdown/noise) moved out of Settings → Divoom into a dedicated
+  top-level **Tools** category (`gui/web_ui/templates.js:tools`, nav-btn +
+  `<section id="tools">` in index.html, injected in `app.js`). Alarm rows now
+  render on the `tab-changed` → `tools` event.
+- **Added `AGENTS.md` core rule:** after every round, update the cross-session
+  handoff (CHANGELOG + planning doc + commit) so the shared opencode/Claude
+  sessions can keep up. The git history + docs are the cross-session memory.
+
 ### Notes
 
 - Alarm read-back (0x42) needs the device to answer a query; on hardware

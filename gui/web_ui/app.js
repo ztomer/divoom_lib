@@ -224,6 +224,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById('settings') && window.DivoomTemplates?.settings) {
         document.getElementById('settings').innerHTML = window.DivoomTemplates.settings;
     }
+    if (document.getElementById('tools') && window.DivoomTemplates?.tools) {
+        document.getElementById('tools').innerHTML = window.DivoomTemplates.tools;
+    }
 
     // ── 5. CANVAS ARRANGER AND PRESETS BINDINGS ──
     const addArrangerBtn = document.getElementById("add-arranger-screen-btn");

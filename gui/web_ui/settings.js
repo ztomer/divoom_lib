@@ -395,11 +395,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function ensureAlarms() { if (!alarmsRendered) renderAlarmRows([]); }
 
+    // Alarms/Sleep/Tools now live in the Tools sidebar tab — render the alarm
+    // rows when that tab is opened.
+    window.addEventListener("tab-changed", (e) => {
+        if (e.detail && e.detail.tab === "tools") setTimeout(ensureAlarms, 0);
+    });
     document.addEventListener("click", (e) => {
-        const tab = e.target.closest(".settings-tab-btn");
-        if (tab && tab.getAttribute("data-settings-tab") === "settings-divoom") {
-            setTimeout(ensureAlarms, 0);
-        }
         const saveBtn = e.target.closest(".alarm-save");
         if (saveBtn) {
             if (window.requireDevice && !window.requireDevice()) return;
