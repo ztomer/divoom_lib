@@ -455,6 +455,22 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             return False
         return self._tool_call(lambda d: d.design.factory_reset(), "factory reset")
 
+    # ── Round 10: notification mirroring (SPP_SET_ANDROID_ANCS, 0x50) ─────
+    def send_notification(self, app_type, text="") -> bool:
+        """Manually trigger the device's notification display for an app type
+        (1-14, see NOTIFICATION_APPS). With text → icon+text form; else icon."""
+        t = int(app_type)
+        if not (1 <= t <= 14):
+            logger.warning(f"send_notification: app_type {t} out of range 1-14")
+            return False
+        msg = str(text or "").strip()
+        if msg:
+            return self._tool_call(
+                lambda d: d.notification.show_notification_text(t, msg),
+                "notification")
+        return self._tool_call(
+            lambda d: d.notification.show_notification(t), "notification")
+
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:

@@ -292,4 +292,5 @@ __all__ = [
     "WeatherType",
     "VJEffectType",
     "TIMEBOX_CONST",
+    "NOTIFICATION_APPS",
 ]

@@ -175,6 +175,32 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertFalse(self.api.set_screen_mirror(True))
         self.assertFalse(self.api.factory_reset("RESET"))
 
+    def test_r10_send_notification(self):
+        """R10: text vs icon-only path + app_type range guard."""
+        dev = MagicMock()
+        dev.notification.show_notification = AsyncMock(return_value=True)
+        dev.notification.show_notification_text = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        # icon-only when no text
+        self.api.send_notification(6)
+        dev.notification.show_notification.assert_called_with(6)
+        dev.notification.show_notification_text.assert_not_called()
+        # text path when text given
+        self.api.send_notification(7, "Hi")
+        dev.notification.show_notification_text.assert_called_with(7, "Hi")
+        # blank/whitespace text falls back to icon-only
+        self.api.send_notification(2, "   ")
+        dev.notification.show_notification.assert_called_with(2)
+        # out-of-range refused without sending
+        dev.notification.show_notification.reset_mock()
+        self.assertFalse(self.api.send_notification(0))
+        self.assertFalse(self.api.send_notification(15))
+        dev.notification.show_notification.assert_not_called()
+
+    def test_r10_no_device(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.send_notification(6))
+
     @patch("gui_main.BleakScanner")
     def test_scan_devices(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""

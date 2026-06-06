@@ -465,6 +465,35 @@ def test_r9_gui_api_exposes_display_bridges():
 
 
 # ──────────────────────────────────────────────────────────────────
+# 5c. Round 10 — Notification mirroring (ANCS) card
+# ──────────────────────────────────────────────────────────────────
+
+
+def test_r10_notification_card_in_tools_device():
+    """Tools→Device has a Notification card with app select, text, Send."""
+    src = TEMPLATES_JS.read_text()
+    assert 'id="notif-app-select"' in src, "Notification card missing app <select>."
+    assert 'id="notif-text"' in src, "Notification card missing text input."
+    assert 'id="notif-send"' in src, "Notification card missing Send button."
+
+
+def test_r10_settings_js_wires_notification():
+    src = SETTINGS_JS.read_text()
+    assert "send_notification" in src, "settings.js does not call send_notification."
+
+
+def test_r10_gui_api_and_lib_expose_notification():
+    api = GUI_API_PY.read_text()
+    assert re.search(r"def\s+send_notification\s*\(", api), "missing send_notification bridge."
+    # range guard present
+    assert "1 <= t <= 14" in api, "send_notification must guard app_type 1-14."
+    # command id registered
+    from pathlib import Path as _P
+    cmds = (REPO_ROOT / "divoom_lib" / "models" / "commands.py").read_text()
+    assert '"set android ancs": 0x50' in cmds, "0x50 ANCS command not registered."
+
+
+# ──────────────────────────────────────────────────────────────────
 # 6. Playwright integration smoke (sanity check, optional)
 # ──────────────────────────────────────────────────────────────────
 

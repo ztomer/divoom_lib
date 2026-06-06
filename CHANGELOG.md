@@ -6,6 +6,33 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 10 — 2026-06-06 (APK-only frontier: notification mirroring / ANCS)
+
+The headline APK feature (report §3): `SPP_SET_ANDROID_ANCS`. Shipped as a
+**manual trigger** (auto-sourcing macOS notifications deferred). Protocol
+re-verified against the decompiled source — see `docs/PLANNING_ROUND10.md`.
+
+### Added
+
+- **lib**: command `"set android ancs": 0x50`; `NOTIFICATION_APPS` (14 apps);
+  `divoom_lib/tools/notification.py` (`Notification.show_notification`,
+  `show_notification_text`) on facade `d.notification`.
+- **GUI**: `gui_api.send_notification(app_type, text="")` (guards 1-14) +
+  Tools→Device **Notification** card (app select, optional text, Send).
+- 11 tests (6 lib byte-exact incl. ≥8 wire-skip + 128-byte truncation, 2 bridge,
+  3 static UI/exposure).
+
+### Notes
+
+- **Report corrections:** command is **0x50** (report said 0x60); there is **no
+  RGB payload** — real forms are a single-byte index (slot 8 skipped on the wire)
+  and `[type, len, *utf8]`.
+- Deferred: auto-source real macOS notifications; cloud HTTP surface.
+
+Full suite: 538 passed / 0 failed / 73 skipped.
+
+---
+
 ## Round 9 — 2026-06-06 (APK-only frontier: screen orientation + factory reset)
 
 R8 closed the lib→GUI gap; R9 targets capabilities the APK has but `divoom_lib`

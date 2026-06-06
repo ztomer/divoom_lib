@@ -487,6 +487,27 @@ class VJEffectType:
     RainbowCross = 14
     RainbowShapes = 15
 
+# Notification mirroring app types (SPP_SET_ANDROID_ANCS, cmd 0x50).
+# Source: APK SppProc NOTIFICATION_APPS enum. NOTE: the device wire protocol
+# skips slot 8 — for app_type >= 8 the byte sent is app_type + 1 (replicated in
+# divoom_lib.tools.notification, matching CmdManager.a0).
+NOTIFICATION_APPS = {
+    "KAKAO": 1,
+    "INSTAGRAM": 2,
+    "SNAPCHAT": 3,
+    "FACEBOOK": 4,
+    "TWITTER": 5,
+    "WHATSAPP": 6,
+    "TEXT_MESSAGE": 7,
+    "SKYPE": 8,
+    "LINE": 9,
+    "WECHAT": 10,
+    "QQ": 11,
+    "VIBER": 12,
+    "MESSENGER": 13,
+    "OK": 14,
+}
+
 # TIMEBOX_CONST in Node.js library
 TIMEBOX_CONST = {
     "TimeType": TimeDisplayType,

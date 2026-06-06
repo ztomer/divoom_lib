@@ -147,6 +147,35 @@ window.DivoomTemplates = {
                     </div>
                 </div>
             </div>
+            <div class="card glass-card">
+                <div class="card-header"><h3>Notification</h3></div>
+                <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                    <p class="panel-hint" style="margin-top:0;">Trigger the device's notification display for an app. (Manual — does not mirror your Mac's real notifications.)</p>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <span class="form-label" style="font-size:12px; min-width:60px;">App</span>
+                        <select id="notif-app-select" class="text-input" style="flex:1; min-width:140px;">
+                            <option value="6">WhatsApp</option>
+                            <option value="7">Text message</option>
+                            <option value="2">Instagram</option>
+                            <option value="4">Facebook</option>
+                            <option value="5">Twitter</option>
+                            <option value="13">Messenger</option>
+                            <option value="3">Snapchat</option>
+                            <option value="8">Skype</option>
+                            <option value="9">LINE</option>
+                            <option value="10">WeChat</option>
+                            <option value="11">QQ</option>
+                            <option value="12">Viber</option>
+                            <option value="1">KakaoTalk</option>
+                            <option value="14">Other</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="notif-text" class="text-input" maxlength="128" style="flex:1; min-width:140px;" placeholder="Optional text">
+                        <button id="notif-send" class="glow-btn compact">Send</button>
+                    </div>
+                </div>
+            </div>
         </div>
         </div>
 

@@ -529,6 +529,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const token = window.prompt('This is irreversible. Type RESET (all caps) to confirm:');
             if (token !== "RESET") { window.showToast("Factory reset cancelled", "error"); return; }
             api()?.factory_reset?.("RESET").then(r => toast(r, "Device factory-reset"));
+        } else if (e.target.closest("#notif-send")) {
+            if (!dev()) return;
+            const t = parseInt(document.getElementById("notif-app-select")?.value) || 7;
+            const txt = document.getElementById("notif-text")?.value.trim() || "";
+            api()?.send_notification?.(t, txt).then(r => toast(r, "Notification sent"));
         }
     });
 

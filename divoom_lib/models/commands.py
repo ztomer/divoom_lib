@@ -41,6 +41,7 @@ COMMANDS = {
     "set light phone gif": 0x49,
     "set alarm gif": 0x51,
     "set temp unit": 0x4c,
+    "set android ancs": 0x50,
     "set boot gif": 0x52,
     "get memorial time": 0x53,
     "set memorial": 0x54,

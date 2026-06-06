@@ -26,6 +26,7 @@ from .tools.scoreboard import Scoreboard
 from .tools.timer import Timer
 from .tools.countdown import Countdown
 from .tools.noise import Noise
+from .tools.notification import Notification
 from .display import Display
 from .display.design import Design
 from .system import System
@@ -109,6 +110,7 @@ class Divoom:
         self.timer = Timer(self)
         self.countdown = Countdown(self)
         self.noise = Noise(self)
+        self.notification = Notification(self)
 
         self.display = Display(self)
         self.system = System(self)

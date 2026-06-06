@@ -15,14 +15,16 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **Last round shipped:** Round 9 (APK-only frontier). New lib code in
-  `divoom_lib/display/design.py`: `set_screen_dir` (0xBD 0x23), `set_screen_mirror`
-  (0xBD 0x24), `factory_reset` (0xBD 0x25,1). GUI: Tools→Device **Display** card
-  (orientation/mirror + token-gated factory reset). Brightness NOT re-added (it
-  already exists as 0x74). See `docs/PLANNING_ROUND9.md` §5. ANCS + cloud
-  deferred. Suite: **527 passed / 0 failed / 73 skipped**.
-- **Earlier:** Round 8 (device settings/FM/weather/memorial + Tools sub-tabs;
-  `docs/PLANNING_ROUND8.md` §8, timeplan UI deferred). Round 7 + 7.1.
+- **Last round shipped:** Round 10 (notification mirroring / ANCS). New lib:
+  cmd `"set android ancs": 0x50`, `NOTIFICATION_APPS`, `divoom_lib/tools/
+  notification.py` (`d.notification.show_notification` / `_text`). GUI:
+  `send_notification` bridge + Tools→Device **Notification** card. Manual trigger
+  only — auto-sourcing macOS notifications deferred. Protocol re-verified
+  (cmd 0x50, single-byte ≥8 skip OR type+len+utf8; report's 0x60/RGB were wrong).
+  See `docs/PLANNING_ROUND10.md` §5. Suite: **538 passed / 0 failed / 73 skipped**.
+- **Earlier:** Round 9 (screen orientation + factory reset, 0xBD EXT;
+  `docs/PLANNING_ROUND9.md`). Round 8 (device settings/FM/weather/memorial +
+  Tools sub-tabs; timeplan UI deferred). Round 7 + 7.1.
   - R7: surfaced un-exposed `divoom_lib` modules in the GUI — Text Channel,
     Alarms, Sleep Aid, Tools (timer/countdown/noise). Bridges in
     `gui/gui_api.py`, UI + unit tests.
