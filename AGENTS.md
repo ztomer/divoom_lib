@@ -5,20 +5,26 @@ Shared rules for any coding agent working in this repo (opencode, Claude, etc.).
 ## CORE RULE: keep the session handoff updated after every round
 
 This project is worked across multiple agents/sessions (opencode + Claude) that
-**share this git working tree**. After **each round of work**, before you stop,
-you MUST update the handoff so the *next* session — including the opencode
-session `ses_184471307ffeCUHgzv9w51O0oA` — can pick up without re-deriving state:
+**share this git working tree**. They CANNOT share a live session (separate
+conversation stores), so the handoff is file-based. **On entry, read
+`docs/SESSION_HANDOFF.md`.** After **each round of work**, before you stop, you
+MUST update the handoff so the *next* session — including the opencode session
+`ses_184471307ffeCUHgzv9w51O0oA` — can pick up without re-deriving state:
 
-1. **CHANGELOG.md** — add/extend the round's entry (what shipped, where, why).
-2. **docs/PLANNING_ROUNDn.md** — fill the "outcome / what shipped" section of the
+1. **docs/SESSION_HANDOFF.md** — update "Current state" + "Open threads / next
+   up". This is the canonical living state both tools read first.
+2. **CHANGELOG.md** — add/extend the round's entry (what shipped, where, why).
+3. **docs/PLANNING_ROUNDn.md** — fill the "outcome / what shipped" section of the
    current round's plan (and create the next round's plan when starting one).
-3. **Commit** the work with a clear, scoped message (one logical change per
+4. **Commit** the work with a clear, scoped message (one logical change per
    commit) so `git log` is a faithful, readable history of the round.
-4. **Tests green** before you call a round done (`python3 -m pytest`), and state
-   the pass/skip counts in the CHANGELOG note.
+5. **Tests green** before you call a round done (`python3 -m pytest`), and state
+   the pass/skip counts in the handoff + CHANGELOG.
 
-The git history + CHANGELOG + planning docs ARE the cross-session memory. Treat
-them as the source of truth; do not rely on conversation context surviving.
+The git history + `docs/SESSION_HANDOFF.md` + CHANGELOG ARE the cross-session
+memory. Treat them as the source of truth; do not rely on conversation context
+surviving. (Claude Code reads `CLAUDE.md` which points here; opencode reads this
+`AGENTS.md` directly.)
 
 > To resume the opencode session for context: `opencode export <sessionID>`
 > dumps it as JSON (`info` + `messages`).
