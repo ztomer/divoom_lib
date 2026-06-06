@@ -87,6 +87,39 @@ async def test_show_visualization_emits_eq_frames():
 
 
 @pytest.mark.asyncio
+async def test_show_scoreboard_emits_channel_0x06_frame():
+    """Round 6.1: show_scoreboard() switches the device to the
+    scoreboard tool channel (0x06). Wire bytes: set light mode [0x06,
+    0, 0, 0, 0, 0, 0, 0, 0, 0] (10-byte payload per show_clock /
+    show_visualization / show_effects / show_design)."""
+    dev, mock = await _connected_divoom()
+    await dev.display.show_scoreboard()
+    frames = _decoded_frames(mock)
+    cmds = [f["command_id"] for f in frames]
+    assert models.COMMANDS["set light mode"] in cmds
+    sb_cmd = next(f for f in frames if f["command_id"] == models.COMMANDS["set light mode"])
+    payload = list(sb_cmd["payload"])
+    assert payload[0] == 0x06, f"Expected channel id 0x06, got {payload[0]:#04x}"
+    # Pad-out: the rest should be zeros (we don't write scores here, just
+    # switch channels — scores are pushed by the 0x72 set-tool command).
+    assert payload[1:] == [0] * 9, f"Expected padded zeros, got {payload[1:]}"
+
+
+@pytest.mark.asyncio
+async def test_switch_channel_scoreboard_dispatches_to_show_scoreboard():
+    """Round 6.1: switch_channel('scoreboard') now routes to
+    show_scoreboard() (0x45 [0x06, ...]) instead of returning False."""
+    dev, mock = await _connected_divoom()
+    ok = await dev.display.switch_channel("scoreboard")
+    assert ok is True, "switch_channel('scoreboard') returned False"
+    frames = _decoded_frames(mock)
+    cmds = [f["command_id"] for f in frames]
+    assert models.COMMANDS["set light mode"] in cmds
+    sb_cmd = next(f for f in frames if f["command_id"] == models.COMMANDS["set light mode"])
+    assert list(sb_cmd["payload"])[0] == 0x06
+
+
+@pytest.mark.asyncio
 async def test_show_clock_emits_clock_frame():
     """2.f: clock dial 2 → 'set light mode' frame carrying the dial index."""
     dev, mock = await _connected_divoom()

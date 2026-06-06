@@ -21,7 +21,7 @@ class FakeApi:
         self.last_vj = number
         return True
 
-    def scan_devices_with_config(self, timeout: int, limit: int) -> str:
+    def scan_devices(self, timeout: int, limit: int) -> str:
         # Mirrors real methods that return a JSON string.
         return json.dumps([{"name": "Pixoo-mock", "timeout": timeout, "limit": limit}])
 
@@ -69,7 +69,7 @@ def test_method_listing_excludes_private(server):
     assert status == 200 and body["ok"]
     names = {m["name"] for m in body["methods"]}
     assert "set_vj_effect" in names
-    assert "scan_devices_with_config" in names
+    assert "scan_devices" in names
     assert "_private" not in names
 
 
@@ -84,7 +84,7 @@ def test_post_positional_and_json_string_decoded(server):
     _, base = server
     # Positional args via JSON array; result is a JSON *string* that the server
     # decodes into structured JSON for the caller.
-    status, body = _post(f"{base}/api/scan_devices_with_config", [3, 2])
+    status, body = _post(f"{base}/api/scan_devices", [3, 2])
     assert status == 200
     assert body["ok"] and body["result"][0] == {"name": "Pixoo-mock", "timeout": 3, "limit": 2}
 
@@ -109,7 +109,7 @@ def test_lists_real_api_surface():
         api = gui_main.DivoomGuiAPI()
     names = {m["name"] for m in list_methods(api)}
     for expected in ("set_vj_effect", "set_visualization", "set_clock",
-                     "switch_channel", "set_solid_light", "scan_devices_with_config"):
+                     "switch_channel", "set_solid_light", "scan_devices"):
         assert expected in names, f"{expected} not exposed"
     # window controls are denylisted
     assert "close_window" not in names

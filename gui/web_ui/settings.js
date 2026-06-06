@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (scanBtn) scanBtn.disabled = true;
         
         if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.scan_devices_with_config(timeout, limit)
+            window.pywebview.api.scan_devices(timeout, limit)
                 .then(devicesJson => {
                     if (scanSpinner) scanSpinner.style.display = "none";
                     if (scanBtn) scanBtn.disabled = false;
@@ -315,8 +315,54 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Poll every 5 seconds
     setInterval(refreshTransportStatus, 5000);
-    
+
     // Initializers on mount after small delays
     setTimeout(refreshTransportStatus, 1500);
     setTimeout(window.loadLanDevices, 1200);
+
+    // ── 4. ROUTINES (Round 6 — moved from Monthly Best) ──
+    // Auto-sync gallery schedule. The underlying API methods
+    // (get_hot_channel_config / save_hot_channel_config) are unchanged
+    // — the config key in `hotchannel_config.json` is also unchanged
+    // for backward compat with running daemons.
+    window.loadRoutinesAutoSync = function() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_hot_channel_config) {
+            window.pywebview.api.get_hot_channel_config().then(json => {
+                try {
+                    const cfg = JSON.parse(json);
+                    const en = document.getElementById("routines-auto-sync-enabled");
+                    const iv = document.getElementById("routines-auto-sync-interval");
+                    if (en) en.checked = !!cfg.enabled;
+                    if (iv) iv.value = String(cfg.interval);
+                } catch (e) { /* ignore */ }
+            });
+        }
+    }
+
+    const routinesSaveBtn = document.getElementById("routines-auto-sync-save");
+    if (routinesSaveBtn) {
+        routinesSaveBtn.addEventListener("click", () => {
+            const enabled = document.getElementById("routines-auto-sync-enabled")?.checked || false;
+            const interval = parseInt(document.getElementById("routines-auto-sync-interval")?.value) || 3600;
+            window.pywebview.api.save_hot_channel_config(JSON.stringify({ enabled, interval })).then(ok => {
+                const st = document.getElementById("routines-auto-sync-status");
+                if (st) st.textContent = ok ? (enabled ? "Saved — auto-sync on" : "Saved — auto-sync off") : "Failed to save";
+                window.showToast(ok ? "Schedule saved" : "Failed to save schedule", ok ? "success" : "error");
+            });
+        });
+    }
+
+    // Load the routines form when the Settings tab is opened OR when
+    // the Routines sub-tab is selected.
+    window.addEventListener("tab-changed", (e) => {
+        if (e.detail && e.detail.tab === "settings") {
+            setTimeout(window.loadRoutinesAutoSync, 0);
+        }
+    });
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".settings-tab-btn");
+        if (btn && btn.getAttribute("data-settings-tab") === "settings-routines") {
+            setTimeout(window.loadRoutinesAutoSync, 0);
+        }
+    });
 });

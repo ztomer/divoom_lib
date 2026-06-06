@@ -36,39 +36,21 @@ window.DivoomTemplates = {
                         </div>
                     </div>
 
-                    <!-- Right: Sync Controls Card -->
+                    <!-- Right: Devices Card (was 'Sync Targets & Schedule'; schedule
+                         moved to Settings → Routines, see §3 of docs/PLANNING_ROUND5.md) -->
                     <div class="card glass-card" style="display:flex; flex-direction:column;">
                         <div class="card-header flex-header">
-                            <h3>Sync Targets &amp; Schedule</h3>
+                            <h3>Devices</h3>
                             <button id="refresh-targets-btn" class="glow-btn compact ghost">Refresh</button>
                         </div>
                         <div class="card-body" style="overflow-y:auto;">
-                            <!-- Sync targets (4.c): explicit device multi-select -->
                             <div class="hot-channel" style="margin-top: 0; padding-top: 0; border-top: none;">
                                 <div id="sync-targets-list" class="sync-targets-list" style="margin-bottom: 12px;">
                                     <span class="empty-list">No devices — scan under Settings, or add a Wi-Fi screen.</span>
                                 </div>
 
                                 <div class="hc-actions">
-                                    <button id="sync-all-btn" class="glow-btn secondary" style="flex:1;">Sync All → Targets</button>
-                                </div>
-
-                                <!-- Automatic hot-channel schedule (4.d) -->
-                                <div class="hc-schedule">
-                                    <div class="hc-label">Automatic Hot-Channel Schedule</div>
-                                    <label class="hc-toggle">
-                                        <input type="checkbox" id="hc-enabled"> Enable scheduled sync (runs headless)
-                                    </label>
-                                    <label class="slider-label">Sync every
-                                        <select id="hc-interval" class="custom-select small">
-                                            <option value="3600">1 hour</option>
-                                            <option value="21600">6 hours</option>
-                                            <option value="43200">12 hours</option>
-                                            <option value="86400">24 hours</option>
-                                        </select>
-                                    </label>
-                                    <button id="hc-save-schedule-btn" class="glow-btn compact">Save Schedule</button>
-                                    <span id="hc-schedule-status" class="panel-hint"></span>
+                                    <button id="sync-all-btn" class="glow-btn secondary" style="flex:1;">Sync All → Devices</button>
                                 </div>
                             </div>
                         </div>
@@ -195,6 +177,7 @@ window.DivoomTemplates = {
                 <div class="settings-tabs-nav">
                     <button class="settings-tab-btn active" data-settings-tab="settings-devices">Devices</button>
                     <button class="settings-tab-btn" data-settings-tab="settings-divoom">Divoom</button>
+                    <button class="settings-tab-btn" data-settings-tab="settings-routines">Routines</button>
                     <button class="settings-tab-btn" data-settings-tab="settings-connectivity">Connectivity</button>
                     <button class="settings-tab-btn" data-settings-tab="settings-appearance">Appearance</button>
                 </div>
@@ -315,7 +298,43 @@ window.DivoomTemplates = {
                     </div>
                 </div>
 
-                <!-- 3. CONNECTIVITY TAB (Connectivity & Privacy legend moved here) -->
+                <!-- 3. ROUTINES TAB (Round 6 — moved from Monthly Best, see
+                     docs/PLANNING_ROUND5.md §3 Option B. Set-and-forget automation
+                     lives here, not with the live channels. Naming: "Auto-Sync
+                     Gallery" instead of "Hot-Channel Schedule" per user pick.) -->
+                <div class="settings-tab-content" id="settings-routines">
+                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
+                        <div class="card glass-card">
+                            <div class="card-header">
+                                <h3>Auto-Sync Gallery</h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="panel-hint" style="margin-top: 0;">Automatically re-fetch and push the Divoom Cloud gallery to your devices on a schedule. Runs in the background while the app is open.</p>
+                                <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom: 14px;">
+                                    <label class="hc-toggle" style="margin:0;">
+                                        <input type="checkbox" id="routines-auto-sync-enabled">
+                                        <span>Enable auto-sync</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom: 4px; display:block;">Sync every</label>
+                                    <select id="routines-auto-sync-interval" class="custom-select" style="width:100%;">
+                                        <option value="3600">1 hour</option>
+                                        <option value="21600">6 hours</option>
+                                        <option value="43200">12 hours</option>
+                                        <option value="86400">24 hours</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:10px; margin-top: 14px;">
+                                    <button id="routines-auto-sync-save" class="glow-btn" style="margin:0;">Save Schedule</button>
+                                    <span id="routines-auto-sync-status" class="panel-hint"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. CONNECTIVITY TAB (Connectivity & Privacy legend moved here) -->
                 <div class="settings-tab-content" id="settings-connectivity">
                     <h3 style="font-size:13px; margin-bottom:12px; color:rgba(255,255,255,0.6);">Connectivity & Privacy</h3>
                     <div class="connectivity-legend">
@@ -362,7 +381,7 @@ window.DivoomTemplates = {
                     </div>
                 </div>
 
-                <!-- 4. APPEARANCE TAB -->
+                <!-- 5. APPEARANCE TAB -->
                 <div class="settings-tab-content" id="settings-appearance">
                     <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
                         <!-- Aesthetic Theme Mode -->

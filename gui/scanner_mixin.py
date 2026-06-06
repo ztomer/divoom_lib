@@ -11,9 +11,6 @@ logger = logging.getLogger("divoom_gui")
 
 class ScannerMixin:
     """Mixin for Bluetooth scanning, discovery, and device selection."""
-    def scan_devices(self) -> str:
-        return self.scan_devices_with_config(timeout=15, limit=4)
-
     def save_scan_settings(self, timeout: int, limit: int) -> bool:
         try:
             import configparser
@@ -33,7 +30,7 @@ class ScannerMixin:
             logger.warning(f"Failed to save scan config: {e}")
             return False
 
-    def scan_devices_with_config(self, timeout: int, limit: int) -> str:
+    def scan_devices(self, timeout: int = 15, limit: int = 4) -> str:
         logger.info(f"GUI Action: Scanning devices with timeout={timeout}, limit={limit}...")
         self.save_scan_settings(timeout, limit)
 

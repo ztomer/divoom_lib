@@ -37,7 +37,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
             mock_thread.assert_called_once()
 
     @patch("gui_main.BleakScanner")
-    def test_scan_devices_with_config(self, mock_scanner_cls):
+    def test_scan_devices(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""
         mock_scanner = MagicMock()
         mock_scanner.start = AsyncMock()
@@ -49,7 +49,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
             mock_discovery.return_value = [{"name": "Pixoo-mock", "address": "AA:BB:CC:DD:EE:FF"}]
             
             # 1. Run limit=0 fallback path
-            res = self.api.scan_devices_with_config(timeout=2, limit=0)
+            res = self.api.scan_devices(timeout=2, limit=0)
             res_list = json.loads(res)
             self.assertEqual(len(res_list), 1)
             self.assertEqual(res_list[0]["name"], "Pixoo-mock")
@@ -64,7 +64,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
                 return mock_scanner
 
             mock_scanner_cls.side_effect = side_effect
-            res_cb = self.api.scan_devices_with_config(timeout=2, limit=1)
+            res_cb = self.api.scan_devices(timeout=2, limit=1)
             res_cb_list = json.loads(res_cb)
             self.assertEqual(len(res_cb_list), 1)
             self.assertEqual(res_cb_list[0]["name"], "Pixoo-Test")

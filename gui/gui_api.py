@@ -276,13 +276,13 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
                         tasks.append(divoom.lan.set_brightness(val))
                     else:
                         tasks.append(divoom.device.set_brightness(val))
-                
+
                 async def run_brightness():
                     results = await asyncio.gather(*tasks, return_exceptions=True)
                     return all(res is True or isinstance(res, dict) for res in results)
-                
+
                 return self._run_async(run_brightness())
-            
+
             target = self.current_divoom
             if not target:
                 return False
@@ -292,6 +292,131 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
                 return self._run_async(target.device.set_brightness(val))
         except Exception as e:
             logger.error(f"Brightness setting failed: {e}")
+            return False
+
+    def get_brightness(self) -> int | None:
+        """Read the device's current brightness (0-100). Returns None on failure.
+
+        New in Round 7 (docs/PLANNING_ROUND7.md §3). Used by the appbar
+        brightness slider to initialize to the actual device value on
+        startup, matching the volume-slider pattern from Round 6.
+
+        Wire: 0x46 get light mode (parsed by divoom_lib.device.get_brightness).
+        LAN devices return a dict from the LAN transport; we extract the
+        'brightness' field if present, else fall back to None.
+        """
+        logger.info("GUI Action: Getting current brightness...")
+        try:
+            target = self.current_divoom
+            if not target:
+                return None
+            return self._run_async(target.device.get_brightness())
+        except Exception as e:
+            logger.error(f"Brightness get failed: {e}")
+            return None
+
+    def get_work_mode(self) -> int | None:
+        """Read the device's current work mode (0-15). Returns None on failure.
+
+        New in Round 7. Used by the Control Panel to highlight the
+        channel card that matches the device's currently-active channel.
+        Wire: 0x13 get work mode. Returns the work mode integer
+        (0=clock, 1=lightning, 2=cloud, 3=vj, 4=visualizer, 5=design,
+        6=scoreboard, 7=animation, etc.).
+        """
+        logger.info("GUI Action: Getting current work mode...")
+        try:
+            target = self.current_divoom
+            if not target:
+                return None
+            return self._run_async(target.device.get_work_mode())
+        except Exception as e:
+            logger.error(f"Work mode get failed: {e}")
+            return None
+
+    def get_scoreboard_state(self) -> dict | None:
+        """Read the current scoreboard state from the device.
+
+        New in Round 7. Returns a dict with `on_off`, `red_score`,
+        `blue_score` keys, or None on failure. Used by the scoreboard
+        panel to initialize the red/blue inputs to the actual device
+        state (matching the volume/brightness slider patterns).
+
+        Wire: 0x71 0x04 (get tool info, TOOL_TYPE_SCORE).
+        """
+        logger.info("GUI Action: Getting current scoreboard state...")
+        try:
+            target = self.current_divoom
+            if not target:
+                return None
+            return self._run_async(target.scoreboard.get_scoreboard())
+        except Exception as e:
+            logger.error(f"Scoreboard get failed: {e}")
+            return None
+
+    def set_volume(self, volume: int) -> bool:
+        """Set the device volume (0-15).
+
+        New in Round 6 (docs/PLANNING_ROUND5.md §6.1). The wire command
+        is 0x08 set volume. Validated to 0-15; out-of-range is clamped.
+        """
+        logger.info(f"GUI Action: Setting volume to {volume}...")
+        try:
+            val = max(0, min(15, int(volume)))
+            if getattr(self, "current_target_mode", "single") == "wall":
+                if not self._rebuild_wall_instance():
+                    return False
+                tasks = []
+                for divoom, _, _, _, _, _ in self.wall_instance.devices:
+                    tasks.append(divoom.music.set_volume(val))
+
+                async def run_volume():
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    return all(res is True for res in results)
+
+                return self._run_async(run_volume())
+
+            target = self.current_divoom
+            if not target:
+                return False
+            return self._run_async(target.music.set_volume(val))
+        except Exception as e:
+            logger.error(f"Volume setting failed: {e}")
+            return False
+
+    def get_volume(self) -> int | None:
+        """Read the device volume (0-15). Returns None on failure.
+
+        New in Round 6. Used by the appbar volume slider to initialize
+        to the actual device value on startup. Wire command is 0x09
+        get volume.
+        """
+        logger.info("GUI Action: Getting current volume...")
+        try:
+            target = self.current_divoom
+            if not target:
+                return None
+            return self._run_async(target.music.get_volume())
+        except Exception as e:
+            logger.error(f"Volume get failed: {e}")
+            return None
+
+    def set_scoreboard(self, on_off: int, red: int = 0, blue: int = 0) -> bool:
+        """Set the scoreboard tool (0x72 set tool, TOOL_TYPE_SCORE).
+
+        New in Round 6 (docs/PLANNING_ROUND5.md §6.1). The scoreboard
+        is a tool, not a channel — it has its own panel in the Control
+        Center and its own show/hide buttons. Wire details in
+        divoom_lib/tools/scoreboard.py.
+        """
+        logger.info(f"GUI Action: Setting scoreboard on_off={on_off} red={red} blue={blue}...")
+        try:
+            target = self.current_divoom
+            if not target:
+                return False
+            return self._run_async(target.scoreboard.set_scoreboard(int(on_off), int(red), int(blue)))
+        except Exception as e:
+            logger.error(f"Scoreboard set failed: {e}")
             return False
 
     def display_custom_art(self, file_path: str) -> bool:

@@ -47,8 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
             card.classList.add("active");
             window.DivoomState.activeChannel = card.getAttribute("data-channel");
             showChannelPanel(window.DivoomState.activeChannel);
-            // Ambient is a light mode applied via its own button, not a device
-            // channel switch, so don't fire switch_channel for it.
+            // Ambient is the only "non-channel" card (it has its own Apply
+            // button). Every other card — Clock, VJ, EQ, Design,
+            // Scoreboard — fires switch_channel.
             if (window.DivoomState.activeChannel === "ambient") return;
             if (!window.requireDevice()) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.switch_channel) {
@@ -59,6 +60,28 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     });
+
+    // Round 6 — Scoreboard channel wiring. The scoreboard is a TOOL
+    // (0x72 set tool, TOOL_TYPE_SCORE) on a channel (0x06). The channel
+    // switch is handled above (the channel-card click fires
+    // switch_channel("scoreboard")). The number inputs below auto-push
+    // score updates on `change` — same pattern as the clock color input
+    // and the ambient color input: no "Show" or "Hide" button. Kare:
+    // matches the other channels' "edit-and-it-applies" pattern.
+    const scoreboardRedInput = document.getElementById("scoreboard-red");
+    const scoreboardBlueInput = document.getElementById("scoreboard-blue");
+    function pushScoreboard() {
+        if (!window.requireDevice()) return;
+        const red = parseInt(scoreboardRedInput?.value) || 0;
+        const blue = parseInt(scoreboardBlueInput?.value) || 0;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_scoreboard) {
+            window.pywebview.api.set_scoreboard(1, red, blue).then(res => {
+                window.showToast(res ? `Score: ${red}–${blue}` : "Failed to set scoreboard", res ? "success" : "🔵 BLE");
+            });
+        }
+    }
+    if (scoreboardRedInput) scoreboardRedInput.addEventListener("change", pushScoreboard);
+    if (scoreboardBlueInput) scoreboardBlueInput.addEventListener("change", pushScoreboard);
 
     // Selector-grid builder helper
     function buildSelectorGrid(containerId, items, onSelect, activeIndex = 0, previewMap = null) {

@@ -68,6 +68,33 @@ class Display:
         args = [0x05] + [0x00] * 9
         return await self.communicator.send_command("set light mode", args)
 
+    async def show_scoreboard(self) -> bool:
+        """Switch the device to the Scoreboard tool channel (0x06).
+
+        The scoreboard is a tool (0x72 set tool, TOOL_TYPE_SCORE), not a
+        display channel in the strict sense — but the device surfaces it
+        in the channel-switch UI as channel id 0x06, so we route it through
+        `set light mode` (0x45) with the same 10-byte padding pattern as
+        show_clock / show_visualization / show_effects / show_design.
+
+        After this call, the device is parked on the scoreboard channel
+        and the actual scores are pushed via the 0x72 set-tool command
+        (`divoom.scoreboard.set_scoreboard`).
+        """
+        if self.communicator.lan:
+            # LAN devices use a generic set_channel API; 0x06 is the
+            # scoreboard channel id per the LAN protocol map.
+            try:
+                await self.communicator.lan.set_channel(6)
+            except Exception as e:
+                self.logger.warning(f"LAN set_channel(6) failed: {e}")
+                return False
+            return True
+        # Under protocol.md: Scoreboard channel is command 0x45, payload [0x06]
+        # Pad payload to 10 bytes to ensure the device switches channels successfully
+        args = [0x06] + [0x00] * 9
+        return await self.communicator.send_command("set light mode", args)
+
     async def show_effects(self, number: int) -> bool:
         """Show VJ effects on the Divoom device"""
         if self.communicator.lan:
@@ -291,13 +318,13 @@ class Display:
         return await self.communicator.send_command("set light mode", args)
 
     async def switch_channel(self, channel: str) -> bool:
-        """Switches display active channel mode (Clock, Visualizer, VJ, Design)."""
+        """Switches display active channel mode (Clock, Visualizer, VJ, Design, Scoreboard)."""
         channel_lower = channel.lower()
         if self.communicator.lan:
             if channel_lower == "vj":
                 self.logger.warning("VJ effects are not supported on Wi-Fi (LAN) devices.")
                 return False
-            mapping = {"clock": 0, "visualizer": 2, "design": 3}
+            mapping = {"clock": 0, "visualizer": 2, "design": 3, "scoreboard": 6}
             if channel_lower not in mapping:
                 return False
             val = mapping[channel_lower]
@@ -312,6 +339,8 @@ class Display:
             return await self.show_effects(number=0)
         elif channel_lower == "design":
             return await self.show_design()
+        elif channel_lower == "scoreboard":
+            return await self.show_scoreboard()
         return False
 
 __all__ = ["Display", "Light", "Drawing", "Animation", "Text"]

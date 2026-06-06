@@ -432,6 +432,68 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Volume slider (Round 6 — new functionality exposure).
+    // Protocol range is 0-15 (divoom.music.set_volume). Kare: show the
+    // raw value as "N/15" so the user knows the device's actual range.
+    // Send on `change` (not `input`) to avoid spamming 0x08 writes.
+    const appbarVolumeSlider = document.getElementById("appbar-volume-slider");
+    const appbarVolumeValue = document.getElementById("appbar-volume-value");
+    if (appbarVolumeSlider) {
+        appbarVolumeSlider.addEventListener("input", (e) => {
+            const val = e.target.value;
+            if (appbarVolumeValue) appbarVolumeValue.textContent = `${val}/15`;
+        });
+        appbarVolumeSlider.addEventListener("change", (e) => {
+            const val = parseInt(e.target.value);
+            if (!window.DivoomState.appConnected) return;
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_volume) {
+                window.pywebview.api.set_volume(val).then(res => {
+                    if (res) window.showToast(`Volume set to ${val}/15`, "success", "🔵 BLE");
+                });
+            }
+        });
+    }
+
+    // On startup, read the current volume and update the slider to match.
+    // This gives the user a "what's my device doing right now" glance.
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.get_volume) {
+        window.pywebview.api.get_volume().then(val => {
+            if (val !== null && val !== undefined && appbarVolumeSlider) {
+                appbarVolumeSlider.value = val;
+                if (appbarVolumeValue) appbarVolumeValue.textContent = `${val}/15`;
+            }
+        });
+    }
+
+    // On startup, read the current brightness and update the slider to
+    // match (Round 7 — matches the volume slider pattern from Round 6).
+    // Kare: pixel-perfect parity between GUI and device state.
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.get_brightness) {
+        window.pywebview.api.get_brightness().then(val => {
+            if (val !== null && val !== undefined && globalBrightnessSlider) {
+                globalBrightnessSlider.value = val;
+                if (globalBrightnessValue) globalBrightnessValue.textContent = val + "%";
+            }
+        });
+    }
+
+    // On startup, read the current work mode and highlight the active
+    // channel card in the Control Panel (Round 7).
+    // 0=clock, 1=lightning, 2=cloud, 3=vj, 4=visualizer, 5=design,
+    // 6=scoreboard. Ambient has no mode int (it's a tool, not a channel).
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.get_work_mode) {
+        window.pywebview.api.get_work_mode().then(mode => {
+            if (mode === null || mode === undefined) return;
+            const modeToChannel = {0: "clock", 3: "vj", 4: "visualizer", 5: "design", 6: "scoreboard"};
+            const channel = modeToChannel[mode];
+            if (!channel) return;
+            // Deactivate all cards, then activate the matching one.
+            document.querySelectorAll(".channel-card").forEach(c => c.classList.remove("active"));
+            const card = document.querySelector(`.channel-card[data-channel="${channel}"]`);
+            if (card) card.classList.add("active");
+        });
+    }
+
     const sidebarDeviceSelect = document.getElementById("sidebar-device-select");
     if (sidebarDeviceSelect) {
         sidebarDeviceSelect.addEventListener("change", (e) => {

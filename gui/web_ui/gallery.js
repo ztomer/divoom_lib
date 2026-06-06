@@ -161,10 +161,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const name = document.createElement("span");
             name.className = "target-name";
             name.textContent = c.name;
-            const addr = document.createElement("span");
-            addr.className = "target-addr";
-            addr.textContent = c.address;
-            row.append(cb, accent, name, addr);
+            // Round 6 (docs/PLANNING_ROUND5.md §3.b): drop the BT MAC
+            // address from the target row. The address is already shown
+            // in Settings → Bluetooth Scanner, and at 23% column width
+            // the 17-char monospace string crowded the device name.
+            row.append(cb, accent, name);
             el.appendChild(row);
         });
     }
@@ -187,35 +188,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const refreshTargetsBtn = document.getElementById("refresh-targets-btn");
     if (refreshTargetsBtn) refreshTargetsBtn.addEventListener("click", window.updateSyncTargetList);
 
-    window.loadHotChannelSchedule = function() {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_hot_channel_config) {
-            window.pywebview.api.get_hot_channel_config().then(json => {
-                try {
-                    const cfg = JSON.parse(json);
-                    const en = document.getElementById("hc-enabled");
-                    const iv = document.getElementById("hc-interval");
-                    const cl = document.getElementById("gallery-classify");
-                    if (en) en.checked = !!cfg.enabled;
-                    if (iv) iv.value = String(cfg.interval);
-                    if (cl && cfg.classify != null) cl.value = String(cfg.classify);
-                } catch (e) { /* ignore */ }
-            });
-        }
-    }
-
-    const hcSaveBtn = document.getElementById("hc-save-schedule-btn");
-    if (hcSaveBtn) {
-        hcSaveBtn.addEventListener("click", () => {
-            const enabled = document.getElementById("hc-enabled")?.checked || false;
-            const interval = parseInt(document.getElementById("hc-interval")?.value) || 3600;
-            const classify = parseInt(document.getElementById("gallery-classify")?.value) || 18;
-            window.pywebview.api.save_hot_channel_config(JSON.stringify({ enabled, interval, classify })).then(ok => {
-                const st = document.getElementById("hc-schedule-status");
-                if (st) st.textContent = ok ? (enabled ? "Saved — scheduled" : "Saved — disabled") : "Failed to save";
-                window.showToast(ok ? "Schedule saved" : "Failed to save schedule", ok ? "success" : "error");
-            });
-        });
-    }
+    // Note: the auto-sync schedule moved to Settings → Routines in Round 6
+    // (docs/PLANNING_ROUND5.md §3 Option B). Its JS handlers now live in
+    // settings.js and the API methods (get_hot_channel_config /
+    // save_hot_channel_config) are unchanged.
 
     window.onGalleryItemLoaded = function(classify, targetSize, index, total, itemB64) {
         try {
@@ -334,9 +310,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Mount initializers
+    // Note: loadHotChannelSchedule was renamed to loadRoutinesAutoSync and
+    // moved to settings.js. It loads on tab change / Routines sub-tab
+    // click, so we don't pre-emptively call it here.
     setTimeout(() => {
         window.updateSyncTargetList();
-        window.loadHotChannelSchedule();
         window.loadCachedGalleryOnStartup();
     }, 1500);
 });

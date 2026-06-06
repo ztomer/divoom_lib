@@ -6,7 +6,222 @@ shipped milestone (per the project planning docs).
 
 ---
 
-## Round 5 — 2026-06-06 (drag fix completion)
+## Round 6 — 2026-06-06 (Monthly Best layout simplification + new functionality exposure)
+
+### Changed — Monthly Best layout (Option B from `docs/PLANNING_ROUND5.md` §3)
+
+- **Right card renamed "Sync Targets & Schedule" → "Devices".**
+  The header now matches its sole remaining content. Found in
+  `gui/web_ui/templates.js:monthly-best-layout`.
+- **Schedule UI block removed from Monthly Best.** The
+  `hc-schedule` block, the "Enable scheduled sync (runs headless)"
+  checkbox, and the Save Schedule button are all gone from the
+  Monthly Best template. The block was moved wholesale to
+  Settings → Routines (see "Added" below).
+- **Per-row MAC address removed from sync-target rows.** The
+  `renderSyncTargets` function in `gui/web_ui/gallery.js` no
+  longer creates a `.target-addr` element, and the
+  `.target-addr` CSS class is removed from `gallery.css`. The
+  MAC is already visible in Settings → Bluetooth Scanner.
+- **Grid proportions changed to a true halve.**
+  `gallery.css:.monthly-best-layout` now uses
+  `grid-template-columns: 1.6fr 0.6fr` (gallery 73% / devices
+  27%). Previous `1.4fr 1fr` was 58/42; the right card is now
+  genuinely the minor column.
+- **"Sync All → Targets" button label renamed to
+  "Sync All → Devices".** Found in `templates.js:monthly-best`.
+- **Orphaned schedule handlers removed from `gallery.js`.**
+  The `loadHotChannelSchedule` function and the
+  `hc-save-schedule-btn` click handler are gone. Settings.js
+  loads the form on tab change / sub-tab click instead.
+
+### Added — Settings → Routines sub-tab (auto-sync gallery)
+
+- **"Routines" sub-tab in Settings nav.** New button between
+  "Divoom" and "Connectivity" in `templates.js:settings-nav`.
+- **`#settings-routines` content block.** New "Auto-Sync
+  Gallery" card with an enabled checkbox
+  (`#routines-auto-sync-enabled`), an interval select
+  (`#routines-auto-sync-interval` with options 1h / 6h / 12h /
+  24h), a Save button (`#routines-auto-sync-save`), and a
+  status line. The form sends `{ enabled, interval }` (the
+  old `classify` field is dropped — it was a developer-term
+  leak).
+- **JS handler in `settings.js`.** New
+  `window.loadRoutinesAutoSync` loads the config on the
+  `tab-changed` event (to settings) or on click of the
+  Routines sub-tab. The form save pushes to the existing
+  `get_hot_channel_config` / `save_hot_channel_config` API
+  methods (`gui/gallery_sync.py:415-426` — API unchanged
+  for backward-compat; the persisted JSON key is also
+  unchanged).
+- **Dropped developer term "headless".** The old "Enable
+  scheduled sync (runs headless)" label is replaced with
+  the user-friendly "Enable auto-sync to gallery".
+
+### Added — Volume slider in appbar
+
+- **`#appbar-volume-slider` + `#appbar-volume-value`.** New
+  slider in `gui/web_ui/index.html:appbar` (positioned
+  after the brightness slider). Range 0–15 (the protocol's
+  actual range, per `divoom.music.set_volume`, 0x08). Kare:
+  show the raw value, no magic normalization. The volume
+  is intentionally a separate slider from brightness
+  (0–100) — different ranges, different semantics.
+- **Handler in `gui/web_ui/app.js`.** `input` event updates
+  the `N/15` display; `change` event calls
+  `window.pywebview.api.set_volume(val)`. On startup,
+  `get_volume()` initializes the slider to the device's
+  current value. `change` (not `input`) is used to push to
+  avoid spamming 0x08 writes during slider drag.
+- **Speaker SVG icon** (Apple SF Symbols–style) replaces
+  the previous brightness-adjacent UI element.
+
+### Added — Scoreboard channel-card in Control Panel
+
+- **New channel-card with `data-channel="scoreboard"`.**
+  Positioned after the Ambient card in
+  `gui/web_ui/index.html:channel-grid`. SVG scoreboard
+  icon.
+- **`#panel-scoreboard` markup.** 2 number inputs
+  (`#scoreboard-red` 0–999, `#scoreboard-blue` 0–999).
+  No Show / Hide / Enabled buttons — see "Round 6.1
+  behavior fix" below for why.
+- **Click the card → switches the device to the
+  scoreboard channel (0x06).** This is the same pattern
+  as Clock, VJ, EQ, and Design: clicking the card fires
+  `switch_channel("scoreboard")`, which dispatches to
+  the new `divoom_lib.display.show_scoreboard()` method.
+  The scoreboard channel sits in the same `set light
+  mode` (0x45) family as the other channels; the wire
+  payload is `[0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0]`
+  (10 bytes, same padding as show_clock /
+  show_visualization / show_effects / show_design).
+- **Edit a number → auto-pushes the score** via the
+  0x72 set-tool command (`set_scoreboard(1, red, blue)`).
+  Same pattern as the clock color input and the
+  ambient color input: change event fires the API
+  call, no separate "Apply" button.
+
+### Round 6.1 — 2026-06-06 (scoreboard behavior fix)
+
+User feedback: "scoreboard should switch to the channel
+and push changes automatically without the user pressing
+the show scoreboard button — this is how all the other
+channels behave." The Round 6 initial implementation had
+a Show button + an Enabled checkbox + a Hide button
+(unlike every other channel). The fix:
+
+- **Removed `scoreboard-show-btn`, `scoreboard-hide-btn`,
+  and `scoreboard-enabled` from the HTML panel.** The
+  panel now contains only the 2 number inputs.
+- **Removed scoreboard from the no-`switch_channel`
+  skip list** in `channels.js`. The card click now
+  fires `switch_channel("scoreboard")`, which lands in
+  the new `show_scoreboard()` method.
+- **Show/Hide button handlers removed** from
+  `channels.js`. Replaced with a single
+  `pushScoreboard()` function wired to the `change`
+  event of both number inputs.
+- **New `divoom_lib/display/show_scoreboard()` method**
+  + `switch_channel("scoreboard")` dispatch.
+- **Why no "Hide" button**: per user, "hide is
+  essentially 'clear' since it clears the score" —
+  clearing the score is what setting both inputs to 0
+  already does. No separate Clear button is needed.
+
+### Added — `gui_api.py` methods
+
+- **`set_volume(self, volume: int) -> bool`** — clamps to
+  0–15. Wall-mode fan-out (one write per device). Music
+  fallback (writes to `divoom.music.set_volume`).
+- **`get_volume(self) -> int | None`** — returns the
+  device's current volume or None if unreachable.
+- **`set_scoreboard(self, on_off: int, red: int = 0, blue: int = 0) -> bool`** —
+  calls `target.scoreboard.set_scoreboard(on_off, red, blue)`
+  with 0x72 set-tool framing. Clamps red/blue to 0–999.
+
+### Documented gaps (intentional)
+
+- **No battery badge in appbar.** User requested a
+  device-battery indicator (planning doc §6.1 Phase 1),
+  but `divoom_lib` has NO protocol command for device
+  battery level. The only related commands are
+  0xB2 / 0xB3 (low-power auto-dim switch), which control
+  the device's dim behavior — they do NOT report battery
+  level. The Divoom Cloud mobile app shows device battery
+  over the cloud, not BLE / SPP. Adding a fake battery
+  badge (e.g. showing the laptop's battery) would be
+  misleading. **The test
+  `test_no_battery_badge_intentionally_not_implemented`
+  guards against this.** To unblock: (1) find a protocol
+  command (possibly in Divoom Cloud over HTTPS), (2)
+  implement in `divoom_lib`, (3) add a GUI badge, (4)
+  add `get_battery()` in `gui_api.py`, (5) update the
+  guard test to assert the new badge exists.
+
+### Files
+
+- `gui/web_ui/templates.js` — Monthly Best card renamed,
+  schedule block removed, Routines sub-tab added.
+- `gui/web_ui/gallery.js` — orphaned schedule handlers
+  removed; the dead `window.loadHotChannelSchedule()`
+  call in the 1500ms mount timer is replaced with a
+  comment pointing to settings.js.
+- `gui/web_ui/gallery.css` — grid `1.4fr 1fr` → `1.6fr 0.6fr`,
+  `.target-addr` rule removed.
+- `gui/web_ui/settings.js` — `loadRoutinesAutoSync` and
+  save handler added; 2 event listeners (tab-changed +
+  click on routines sub-tab) at end of DOMContentLoaded.
+- `gui/web_ui/index.html` — volume slider in appbar,
+  Scoreboard channel-card + panel.
+- `gui/web_ui/app.js` — volume slider `input`/`change`
+  handlers + `get_volume` startup init.
+- `gui/web_ui/channels.js` — scoreboard removed from
+  no-`switch_channel` list (Round 6.1); show/hide button
+  handlers replaced with `pushScoreboard()` wired to the
+  number inputs' `change` events.
+- `gui/gui_api.py` — `set_volume`, `get_volume`,
+  `set_scoreboard` added.
+- `divoom_lib/display/__init__.py` — new
+  `show_scoreboard()` method + `switch_channel("scoreboard")`
+  dispatch (Round 6.1).
+- `tests/test_round6_layout_and_exposure.py` — **19 new
+  regression tests** (static-analysis + Playwright smoke).
+- `tests/test_e2e_mock_device.py` — **2 new e2e tests** for
+  show_scoreboard + switch_channel("scoreboard") wire
+  bytes (Round 6.1).
+
+### Test count
+
+- Round 6 initial: 505 passed / 73 skipped / 0 failed
+  (+19 Round 6 regression tests).
+- Round 6.1: **507 passed / 73 skipped / 0 failed** (+2
+  e2e tests for show_scoreboard / switch_channel).
+- No regressions. Wall-clock full suite: ~70s.
+
+### Live device
+
+- Volume slider and scoreboard show/hide: NOT yet
+  live-tested. The transport-level correctness of the
+  underlying protocol calls is covered by the existing
+  `divoom_lib` unit tests (mock transport) and
+  `test_e2e_mock_device.py`. Manual device verification
+  is recommended before the next GUI deployment.
+
+### Design notes
+
+- The Monthly Best dialectic (4 options A/B/C/D) is
+  documented in `docs/PLANNING_ROUND5.md` §3. Option B
+  (this implementation) was the user pick via 4-option
+  confirmation: schedule moves to Settings, all 5
+  asks in Phase 1, "Auto-Sync Gallery" naming, no
+  relocation hint. Kare: pixel-perfect clarity
+  (N/15 raw, no normalization). Rams: simpler
+  right card (73/27, not 58/42), `1.6fr 0.6fr` is
+  the "good" (true halve) pattern.
+
+---
 
 ### Fixed
 
