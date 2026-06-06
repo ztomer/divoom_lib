@@ -82,6 +82,28 @@ volume bridge.
 Pick the Round 8 scope (defaults: Picks 1–3). See the AskUserQuestion that
 accompanies this doc.
 
-## §8 Implementation outcome
+## §8 Implementation outcome — shipped 2026-06-06
 
-_(filled after shipping)_
+User picked **everything**, placement **new sub-tabs in the Tools tab**.
+
+Shipped:
+- **Tools tab → sub-tabs** (Utilities / Device / Radio). Existing Alarms/Sleep/
+  Tools moved under **Utilities**; new **Device** + **Radio** sub-tabs.
+- **Device Settings** card: 24-hour toggle, °F toggle, low-power toggle, device
+  name, auto-power-off, **Sync time from this Mac**.
+- **Weather** card: push weather to device.
+- **Anniversary/Memorial** card: enable, title, date, time, Save.
+- **FM Radio** card: frequency (MHz) + Tune + presets.
+- **Backend bridges** (`gui_api.py`): `set_hour_type`, `set_temp_unit`,
+  `set_low_power`, `set_device_name`, `set_auto_power_off`, `sync_time`,
+  `push_weather`, `set_memorial`, `set_fm_frequency`, `set_timeplan`. +4 unit
+  tests (10 device/FM/memorial/timeplan/sync/auto-off cases).
+
+Deferred:
+- **Timeplan UI** — backend `set_timeplan` bridge exists + tested at call level,
+  but `set_time_manage_info`'s mode/type semantics are unverified, so no UI card
+  was shipped (would be a hallucinated control). Revisit with hardware (R9).
+- SD player, Game/Magic-8-Ball, Drawing/Sand, 0xBD EXT (rotate/mirror/factory) —
+  Phase 2/3.
+
+Full suite: **517 passed / 0 failed / 73 skipped**.

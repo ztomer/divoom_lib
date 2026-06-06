@@ -467,4 +467,70 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.showToast(r ? `Noise meter ${action}` : "Failed", r ? "success" : "error", "🔵 BLE"));
         }
     });
+
+    // ── Round 8: Tools sub-tab nav (Utilities / Device / Radio) ────────
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".tools-subtab-btn");
+        if (!btn) return;
+        document.querySelectorAll(".tools-subtab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tools-subtab-content").forEach(c => c.classList.remove("active"));
+        btn.classList.add("active");
+        const target = document.getElementById(btn.getAttribute("data-tools-tab"));
+        if (target) target.classList.add("active");
+    });
+
+    // ── Round 8: Device settings / weather / memorial / FM ─────────────
+    function api() { return window.pywebview && window.pywebview.api; }
+    function dev() { return !window.requireDevice || window.requireDevice(); }
+    function toast(r, ok, fail) { window.showToast(r ? ok : (fail || "Failed"), r ? "success" : "error", "🔵 BLE"); }
+
+    const wireToggle = (id, fn) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("change", () => { if (dev()) api()?.[fn]?.(el.checked).then(r => toast(r, "Saved")); });
+    };
+    wireToggle("hour24-toggle", "set_hour_type");
+    wireToggle("tempf-toggle", "set_temp_unit");
+    wireToggle("lowpower-toggle", "set_low_power");
+
+    document.addEventListener("click", (e) => {
+        if (e.target.closest("#sync-time-btn")) {
+            if (dev()) api()?.sync_time?.().then(r => toast(r, "Time synced"));
+        } else if (e.target.closest("#device-name-save")) {
+            const name = document.getElementById("device-name-input")?.value.trim();
+            if (!name) { window.showToast("Enter a name", "error"); return; }
+            if (dev()) api()?.set_device_name?.(name).then(r => toast(r, "Name saved"));
+        } else if (e.target.closest("#auto-off-save")) {
+            const m = parseInt(document.getElementById("auto-off-min")?.value) || 0;
+            if (dev()) api()?.set_auto_power_off?.(m).then(r => toast(r, m ? `Auto-off ${m}min` : "Auto-off disabled"));
+        } else if (e.target.closest("#push-weather-btn")) {
+            if (dev()) api()?.push_weather?.().then(r => toast(r, "Weather pushed"));
+        } else if (e.target.closest("#memorial-save")) {
+            if (!dev()) return;
+            const enabled = document.getElementById("memorial-enabled")?.checked;
+            const title = document.getElementById("memorial-title")?.value.trim() || "";
+            const mo = parseInt(document.getElementById("memorial-month")?.value) || 1;
+            const da = parseInt(document.getElementById("memorial-day")?.value) || 1;
+            const hh = parseInt(document.getElementById("memorial-hour")?.value) || 0;
+            const mi = parseInt(document.getElementById("memorial-min")?.value) || 0;
+            api()?.set_memorial?.(0, enabled, mo, da, hh, mi, title).then(r => toast(r, "Anniversary saved"));
+        }
+    });
+
+    // FM radio — frequency (MHz → MHz×10) + presets.
+    function tuneFM(mhz) {
+        const x10 = Math.round(parseFloat(mhz) * 10);
+        if (dev()) api()?.set_fm_frequency?.(x10).then(r => toast(r, `Tuned ${mhz} MHz`));
+    }
+    document.addEventListener("click", (e) => {
+        if (e.target.closest("#fm-tune-btn")) {
+            tuneFM(document.getElementById("fm-freq")?.value || "101.5");
+        } else {
+            const preset = e.target.closest(".fm-preset");
+            if (preset) {
+                const f = preset.getAttribute("data-freq");
+                const inp = document.getElementById("fm-freq"); if (inp) inp.value = f;
+                tuneFM(f);
+            }
+        }
+    });
 });

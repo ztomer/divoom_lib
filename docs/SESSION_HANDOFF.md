@@ -15,7 +15,10 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **Last round shipped:** Round 7 + 7.1.
+- **Last round shipped:** Round 8 (device settings, FM, weather, memorial +
+  Tools sub-tabs). See `docs/PLANNING_ROUND8.md` §8. Timeplan UI deferred
+  (bridge exists, semantics unverified). Suite: 517 passed / 0 failed.
+- **Earlier:** Round 7 + 7.1.
   - R7: surfaced un-exposed `divoom_lib` modules in the GUI — Text Channel,
     Alarms, Sleep Aid, Tools (timer/countdown/noise). Bridges in
     `gui/gui_api.py`, UI + unit tests.

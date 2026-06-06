@@ -273,6 +273,27 @@ body.theme-light .settings-tab-btn.active {
   display: block;
 }
 
+/* Round 8 — Tools sub-tabs (Utilities / Device / Radio) reuse the settings
+   sub-tab look but a distinct hook so the two nav handlers don't collide. */
+.tools-subtab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.tools-subtab-btn:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.04); }
+.tools-subtab-btn.active { background: var(--primary); color: #ffffff; }
+.tools-subtab-content { display: none; }
+.tools-subtab-content.active { display: block; }
+
 /* Braun Tabular Data lists */
 .braun-table {
     width: 100%;

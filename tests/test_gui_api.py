@@ -105,6 +105,49 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.api.set_noise("start"); dev.noise.set_noise.assert_called_with(1)
         self.api.set_noise("stop"); dev.noise.set_noise.assert_called_with(2)
 
+    def test_r8_device_settings(self):
+        """R8: hour/temp/name/fm map to the right facade calls + bool coercion."""
+        dev = MagicMock()
+        dev.system.set_hour_type = AsyncMock(return_value=True)
+        dev.device.set_temp_type = AsyncMock(return_value=True)
+        dev.device.set_device_name = AsyncMock(return_value=True)
+        dev.radio.set_radio_frequency = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.api.set_hour_type(True); dev.system.set_hour_type.assert_called_with(1)
+        self.api.set_hour_type("false"); dev.system.set_hour_type.assert_called_with(0)
+        self.api.set_temp_unit(True); dev.device.set_temp_type.assert_called_with(1)
+        self.api.set_device_name("Bedroom"); dev.device.set_device_name.assert_called_with("Bedroom")
+        self.api.set_fm_frequency(1015); dev.radio.set_radio_frequency.assert_called_with(1015)
+
+    def test_r8_memorial_and_timeplan(self):
+        """R8: memorial + timeplan pass through with status/have-flag derivation."""
+        dev = MagicMock()
+        dev.alarm.set_memorial_time = AsyncMock(return_value=True)
+        dev.timeplan.set_time_manage_info = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.api.set_memorial(0, True, 12, 25, 9, 0, "Xmas")
+        dev.alarm.set_memorial_time.assert_called_with(0, 1, 12, 25, 9, 0, 1, "Xmas")
+        self.api.set_timeplan(1, True, 7, 30, 0b0011111, 0)
+        dev.timeplan.set_time_manage_info.assert_called_with(1, 7, 30, 31, 0, 0, 0, 10, 0)
+
+    def test_r8_sync_time_and_auto_off_instantiated(self):
+        """R8: time-sync + auto-power-off use the un-faceted helper classes."""
+        dev = MagicMock()
+        self.api.current_divoom = dev
+        with patch("divoom_lib.system.date_time.DateTimeCommand") as DT:
+            DT.return_value.update_date_time = AsyncMock(return_value=True)
+            self.assertTrue(self.api.sync_time())
+            DT.assert_called_once_with(dev)
+        with patch("divoom_lib.system.device_settings.DeviceSettings") as DS:
+            DS.return_value.set_auto_power_off = AsyncMock(return_value=True)
+            self.assertTrue(self.api.set_auto_power_off(60))
+            DS.return_value.set_auto_power_off.assert_called_with(60)
+
+    def test_r8_no_device(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.set_hour_type(True))
+        self.assertFalse(self.api.set_fm_frequency(900))
+
     @patch("gui_main.BleakScanner")
     def test_scan_devices(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""

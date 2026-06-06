@@ -375,6 +375,64 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             logger.error(f"tool {label} failed: {e}")
             return False
 
+    # ── Round 8: Device settings / FM / weather / memorial / timeplan ─────
+    # All are one-shot SET commands routed through the single active device.
+
+    @staticmethod
+    def _as_bool(v) -> bool:
+        return v in (True, 1, "1", "true", "True", "on", "yes")
+
+    def set_hour_type(self, is_24h) -> bool:
+        """12/24-hour clock format (0x2c)."""
+        return self._tool_call(lambda d: d.system.set_hour_type(1 if self._as_bool(is_24h) else 0), "hour type")
+
+    def set_temp_unit(self, fahrenheit) -> bool:
+        """Temperature unit °C/°F (0x2b)."""
+        return self._tool_call(lambda d: d.device.set_temp_type(1 if self._as_bool(fahrenheit) else 0), "temp unit")
+
+    def sync_time(self) -> bool:
+        """Push the host clock to the device (0x18)."""
+        from divoom_lib.system.date_time import DateTimeCommand
+        return self._tool_call(lambda d: DateTimeCommand(d).update_date_time(), "time sync")
+
+    def set_device_name(self, name: str) -> bool:
+        return self._tool_call(lambda d: d.device.set_device_name(str(name)), "device name")
+
+    def set_auto_power_off(self, minutes: int) -> bool:
+        from divoom_lib.system.device_settings import DeviceSettings
+        return self._tool_call(lambda d: DeviceSettings(d).set_auto_power_off(int(minutes)), "auto power off")
+
+    def set_low_power(self, on) -> bool:
+        from divoom_lib.system.device_settings import DeviceSettings
+        return self._tool_call(lambda d: DeviceSettings(d).set_low_power_switch(1 if self._as_bool(on) else 0), "low power")
+
+    def push_weather(self) -> bool:
+        """Push current weather to the device's weather widget."""
+        from divoom_lib.system.temp_weather import TempWeatherCommand
+        return self._tool_call(lambda d: TempWeatherCommand(d).update_temp_weather(), "weather")
+
+    def set_fm_frequency(self, freq_x10: int) -> bool:
+        """Tune the FM radio. freq_x10 = MHz×10 (e.g. 875 = 87.5 MHz)."""
+        return self._tool_call(lambda d: d.radio.set_radio_frequency(int(freq_x10)), "fm")
+
+    def set_memorial(self, index, enabled, month, day, hour, minute, title="") -> bool:
+        """Anniversary/memorial countdown slot (0x54)."""
+        on = 1 if self._as_bool(enabled) else 0
+        have = 1 if title else 0
+        return self._tool_call(
+            lambda d: d.alarm.set_memorial_time(int(index), on, int(month), int(day),
+                                                int(hour), int(minute), have, str(title)),
+            "memorial")
+
+    def set_timeplan(self, index, enabled, hour, minute, week=0, channel=0) -> bool:
+        """Scheduled time-plan slot: at hour:minute on weekdays `week`, switch to
+        `channel` (0x56). Basic mapping; mode=channel, defaults for the rest."""
+        status = 1 if self._as_bool(enabled) else 0
+        return self._tool_call(
+            lambda d: d.timeplan.set_time_manage_info(status, int(hour), int(minute),
+                                                      int(week), int(channel), 0, 0, 10, 0),
+            "timeplan")
+
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:

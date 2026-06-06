@@ -6,6 +6,35 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 8 — 2026-06-06 (Feature excavation: device settings, FM, weather, memorial)
+
+Excavated the lib↔GUI gap (`docs/PLANNING_ROUND8.md`): the library implements
+~140 device methods, the GUI exposed ~58. Surfaced more, in a restructured
+Tools tab.
+
+### Added
+
+- **Tools tab → sub-tabs** (Utilities / Device / Radio). Alarms/Sleep/Tools
+  moved under **Utilities**.
+- **Device Settings** (Device sub-tab): 24-hour toggle (0x2c), °F toggle (0x2b),
+  low-power toggle, device name (0x75), auto-power-off (0xab), **Sync time from
+  this Mac** (0x18). Bridges in `gui_api.py`; un-faceted helpers (`DateTimeCommand`,
+  `DeviceSettings`) instantiated on the active device.
+- **Weather** push (`update_temp_weather`).
+- **Anniversary/Memorial** editor (`scheduling/alarm.set_memorial_time`, 0x54).
+- **FM Radio** tuner + presets (`media/radio.set_radio_frequency`).
+
+### Deferred
+
+- **Timeplan UI**: `set_timeplan` bridge shipped + unit-tested, but
+  `set_time_manage_info` mode/type semantics are unverified — no UI card (avoid a
+  hallucinated control). Revisit with hardware. SD player / Game / Drawing /
+  0xBD EXT remain Phase 2/3.
+
+Full suite: 517 passed / 0 failed.
+
+---
+
 ## Round 7 — 2026-06-06 (Feature harvest: surface un-exposed divoom_lib modules)
 
 Surfaces previously un-exposed `divoom_lib` modules in the GUI (see

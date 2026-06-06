@@ -3,6 +3,12 @@
 window.DivoomTemplates = {
     tools: `
         <div class="header-section"><h1>Tools</h1></div>
+        <div class="settings-tabs-nav">
+            <button class="tools-subtab-btn active" data-tools-tab="tools-utilities">Utilities</button>
+            <button class="tools-subtab-btn" data-tools-tab="tools-device">Device</button>
+            <button class="tools-subtab-btn" data-tools-tab="tools-radio">Radio</button>
+        </div>
+        <div class="tools-subtab-content active" id="tools-utilities">
         <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
                         <!-- Round 7: Alarms editor (10 slots) -->
                         <div class="card glass-card">
@@ -65,6 +71,85 @@ window.DivoomTemplates = {
                                 </div>
                             </div>
                         </div>
+        </div>
+        </div>
+
+        <!-- DEVICE sub-tab -->
+        <div class="tools-subtab-content" id="tools-device">
+        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
+            <div class="card glass-card">
+                <div class="card-header"><h3>Device Settings</h3></div>
+                <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+                    <label class="hc-toggle"><input type="checkbox" id="hour24-toggle"> 24-hour clock</label>
+                    <label class="hc-toggle"><input type="checkbox" id="tempf-toggle"> Fahrenheit (°F)</label>
+                    <label class="hc-toggle"><input type="checkbox" id="lowpower-toggle"> Low-power mode</label>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <span class="form-label" style="font-size:12px; min-width:96px;">Device name</span>
+                        <input type="text" id="device-name-input" class="text-input" maxlength="24" style="flex:1; min-width:140px;" placeholder="Name">
+                        <button id="device-name-save" class="glow-btn compact">Save</button>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <span class="form-label" style="font-size:12px; min-width:96px;">Auto power-off</span>
+                        <input type="number" id="auto-off-min" class="text-input" min="0" max="240" value="0" style="width:80px;" title="minutes (0 = off)">
+                        <span style="font-size:12px; color:var(--text-muted);">min</span>
+                        <button id="auto-off-save" class="glow-btn compact">Save</button>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button id="sync-time-btn" class="glow-btn" style="flex:1;">Sync time from this Mac</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card glass-card">
+                <div class="card-header"><h3>Weather</h3></div>
+                <div class="card-body">
+                    <p class="panel-hint" style="margin-top:0;">Push the current weather to the device's weather widget (pairs with the °C/°F toggle).</p>
+                    <button id="push-weather-btn" class="glow-btn">Push weather to device</button>
+                </div>
+            </div>
+            <div class="card glass-card">
+                <div class="card-header"><h3>Anniversary / Memorial</h3></div>
+                <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                    <label class="hc-toggle"><input type="checkbox" id="memorial-enabled" checked> Enabled</label>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="memorial-title" class="text-input" maxlength="16" style="flex:1; min-width:120px;" placeholder="Title (e.g. Birthday)">
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <span class="form-label" style="font-size:12px;">Date</span>
+                        <input type="number" id="memorial-month" class="text-input" min="1" max="12" value="1" style="width:60px;" title="month">
+                        <span>/</span>
+                        <input type="number" id="memorial-day" class="text-input" min="1" max="31" value="1" style="width:60px;" title="day">
+                        <span class="form-label" style="font-size:12px; margin-left:8px;">at</span>
+                        <input type="number" id="memorial-hour" class="text-input" min="0" max="23" value="9" style="width:60px;" title="hour">
+                        <span>:</span>
+                        <input type="number" id="memorial-min" class="text-input" min="0" max="59" value="0" style="width:60px;" title="minute">
+                        <button id="memorial-save" class="glow-btn compact" style="margin-left:auto;">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- RADIO sub-tab -->
+        <div class="tools-subtab-content" id="tools-radio">
+        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
+            <div class="card glass-card">
+                <div class="card-header"><h3>FM Radio</h3></div>
+                <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+                    <p class="panel-hint" style="margin-top:0;">Tune the device's FM radio (FM-capable models only — Tivoo / Ditoo).</p>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="number" id="fm-freq" class="text-input" min="87.5" max="108.0" step="0.1" value="101.5" style="width:100px;">
+                        <span style="font-size:12px; color:var(--text-muted);">MHz</span>
+                        <button id="fm-tune-btn" class="glow-btn compact">Tune</button>
+                    </div>
+                    <div id="fm-presets" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="glow-btn compact secondary fm-preset" data-freq="88.1">88.1</button>
+                        <button class="glow-btn compact secondary fm-preset" data-freq="95.5">95.5</button>
+                        <button class="glow-btn compact secondary fm-preset" data-freq="101.5">101.5</button>
+                        <button class="glow-btn compact secondary fm-preset" data-freq="104.3">104.3</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         </div>
     `,
     monthlyBest: `
