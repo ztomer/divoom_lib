@@ -1,3 +1,5 @@
+import asyncio
+
 from divoom_lib.sender_protocol import CommandSender
 from divoom_lib.models import (
     COMMANDS,
@@ -110,6 +112,66 @@ class Animation(AnimationUserDefine):
             return False
 
         return await self.communicator.send_command(COMMANDS["app new send gif cmd"], args, write_with_response=write_with_response)
+
+    async def stream_animation_8b(self, blob: bytes) -> bool:
+        """Stream a pre-encoded animation frame blob via the 0x8B 3-phase
+        protocol, using the BLE-safe chunking + pacing proven by the
+        monthly-best daemon (``stream_raw_bin_payload``).
+
+        Differences from a naive tight loop (which stalls the device — R11
+        items 1c/2a/9): ``file_offset_id`` is a sequential **chunk index**
+        (0,1,2,…) not a byte offset; chunks are 200 bytes (BLE-safe); each
+        BLE chunk is written **with response**; and the device gets time to
+        allocate buffers (0.5s after start) and settle (0.5s before terminate),
+        with a brief inter-chunk delay to avoid GATT congestion.
+
+        Args:
+            blob: concatenated per-frame bodies (see animation_8b._build_animation_blob).
+
+        Returns:
+            True if all three phases were acked, else False.
+        """
+        file_size = len(blob)
+        if file_size <= 0:
+            return False
+
+        if not await self.app_new_send_gif_cmd(
+            control_word=ANSGC_CONTROL_START_SENDING, file_size=file_size
+        ):
+            self.logger.error("0x8B start phase failed")
+            return False
+        await asyncio.sleep(0.5)  # let the device allocate buffers
+
+        is_lan = getattr(self.communicator, "lan", None) is not None
+        is_spp = getattr(self.communicator, "use_spp", False)
+        is_ble = not is_lan and not is_spp
+        write_with_response = is_ble
+        delay = 0.01 if is_ble else 0.0
+
+        chunk_size = 200  # BLE-safe payload size
+        offset_id = 0
+        for i in range(0, file_size, chunk_size):
+            chunk = list(blob[i:i + chunk_size])
+            if not await self.app_new_send_gif_cmd(
+                control_word=ANSGC_CONTROL_SENDING_DATA,
+                file_size=file_size,
+                file_offset_id=offset_id,
+                file_data=chunk,
+                write_with_response=write_with_response,
+            ):
+                self.logger.error(f"0x8B data chunk {offset_id} failed")
+                return False
+            offset_id += 1
+            if delay > 0:
+                await asyncio.sleep(delay)
+
+        await asyncio.sleep(0.5)  # let the device settle before terminate
+        if not await self.app_new_send_gif_cmd(
+            control_word=ANSGC_CONTROL_TERMINATE_SENDING
+        ):
+            self.logger.error("0x8B terminate phase failed")
+            return False
+        return True
 
     async def set_rhythm_gif(self, pos: int, total_length: int, gif_id: int, data: list) -> bool:
         """

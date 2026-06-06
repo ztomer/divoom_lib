@@ -190,6 +190,12 @@ def encode_static_image(rgb_bytes: bytes, w: int, h: int) -> bytes:
     #   NN + COLOR + PIXEL. The 6 zero bytes in 'AA0000000000' represent
     #   the LLLL (2) + 000000 (3) + AA (1) = 6 byte placeholders.
     llll = 7 + len(color_data) + len(pixel_data)
+    if llll > 0xFFFF:
+        raise ValueError(
+            f"encoded image body is {llll} bytes, exceeds the 2-byte length "
+            f"field (max 65535). Resize the image to the device pixel grid "
+            f"(e.g. 16x16/32x32) before encoding."
+        )
     # NN is u8; 256 colors is encoded as 0 per the device's protocol.
     nn = len(palette) if len(palette) < 256 else 0
     header = bytes([0xAA]) + _u16_le(llll) + bytes([0x00, 0x00, 0x00, nn])
@@ -232,12 +238,20 @@ def encode_animation_frame(
     # + 6 hex chars from "AA 00 00 00 00 00" placeholder = 14 + 6N + 2p
     # hex chars; / 2 = 7 + 3N + p bytes).
     llll = 7 + len(color_data) + len(pixel_data)
+    if llll > 0xFFFF:
+        raise ValueError(
+            f"encoded frame body is {llll} bytes, exceeds the 2-byte length "
+            f"field (max 65535). Resize the image to the device pixel grid "
+            f"(e.g. 16x16/32x32) before encoding."
+        )
+    # Frame time is a u16 (TTTT); clamp to avoid 'int too big to convert'.
+    t = max(0, min(0xFFFF, int(time_ms)))
     # NN is u8; 256 colors is encoded as 0 per the device's protocol.
     nn = len(palette) if len(palette) < 256 else 0
     header = (
         bytes([0xAA])
         + _u16_le(llll)
-        + _u16_le(time_ms)
+        + _u16_le(t)
         + bytes([0x00, nn])  # RR=0 (reset palette), NN
     )
     return header + color_data + pixel_data

@@ -182,6 +182,45 @@ Target information architecture:
 4. Sequencing/hardware: confirm phase order + that you can test the BLE push
    fixes on the real device.
 
+## Design decisions (answered 2026-06-06)
+
+1. **Virtual Wall toolbar:** icons **+ labels** (icon next to a short word).
+2. **Unified sub-tab style:** delegated to me → unify on the **segmented pill
+   bar** (the existing Settings/Braun pattern, already the dominant style) so the
+   change is consistency + dedup, not a new look. One shared component.
+3. **Volume slider:** keep **plain** (Rams).
+4. **Sequencing:** **bugs first** — user will confirm BLE push fixes on real
+   hardware as they land. Then UI phases.
+
 ## §outcome
 
 _(filled as phases ship)_
+
+### Phase 1 — push-bug cluster ✅ code-complete (awaiting hardware confirm)
+
+Two distinct root causes found + fixed:
+
+- **1b `int too big to convert`:** `show_image` encoded at the source's *native*
+  resolution; a full-res gallery gif overflowed the 2-byte per-frame length
+  (`LLLL`)/time (`TTTT`) fields. Fix: `process_image(..., size=screensize)` now
+  resizes every frame to the device grid (NEAREST) before encoding, and clamps
+  frame duration to `[1, 65535]`. Belt-and-suspenders: `encode_animation_frame`/
+  `encode_static_image` clamp `time` to u16 and raise a *clear* error if a body
+  still exceeds 65535.
+- **1c/2a/9 transfer stall:** the `show_image` 0x8B loop sent phases tightly with
+  **byte-offset** ids and 256-byte chunks and no pacing — the device stalled
+  waiting. Fix: extracted the **proven** monthly-best streamer into
+  `Animation.stream_animation_8b()` (chunk-**index** offset ids, 200-byte
+  BLE-safe chunks, write-with-response, 0.5s buffer/settle + 0.01s inter-chunk
+  pacing) and routed `show_image` through it. Cover art / stocks / sysmon all
+  share this path, so 2a/9 are covered by the same fix.
+
+Tests: +9 (resize/clamp in `test_image_processing.py`, u16 clamp + length-guard
+in `test_divoom_image_encode.py`, streamer phases/index ids in
+`test_animation_8b_stream.py`). Suite 546 passed / 0 failed.
+
+Note: the **native** C chunker (`divoom_encode_animation_8b`) still uses
+byte-offset ids + 256 chunks, but it's not on the live `show_image` path; left
+as-is (would need a dylib rebuild) — flagged for a future cleanup.
+
+**⏳ Needs:** user to confirm custom-art + live-cover push on the real device.

@@ -88,3 +88,53 @@ def test_process_image_passes_time_to_static_frame():
             assert frames[0][3] == 500
         finally:
             os.remove(tmp.name)
+
+
+# ── Round 11 (item 1b): device-size resize + duration clamp ─────────────
+
+def test_process_image_resizes_to_device_size():
+    """A large source is resized to (size,size) before encoding — this is the
+    fix for the 'int too big to convert' overflow on full-res gallery gifs."""
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        Image.new('RGB', (240, 240), color='blue').save(tmp.name)
+        try:
+            frames, count, w, h = image_processing.process_image(tmp.name, size=16)
+            assert (w, h) == (16, 16)
+            rgb, fw, fh, _ = frames[0]
+            assert (fw, fh) == (16, 16)
+            assert len(rgb) == 16 * 16 * 3
+        finally:
+            os.remove(tmp.name)
+
+
+def test_process_image_clamps_frame_duration_to_u16():
+    """Frame duration is a 2-byte field; oversized GIF durations are clamped
+    so encode_animation_frame never sees > 65535 (no overflow)."""
+    with tempfile.NamedTemporaryFile(suffix=".gif", delete=False) as tmp:
+        imgs = [Image.new('RGB', (16, 16), color=(i, 0, 0)) for i in range(2)]
+        # duration far beyond the u16 max
+        imgs[0].save(tmp.name, save_all=True, append_images=imgs[1:],
+                     duration=100000, loop=0)
+        try:
+            frames, count, w, h = image_processing.process_image(tmp.name, size=16)
+            for _, _, _, dur in frames:
+                assert 1 <= dur <= 0xFFFF
+        finally:
+            os.remove(tmp.name)
+
+
+def test_process_image_large_gif_encodes_without_overflow():
+    """End-to-end regression: a large multi-frame gif, resized to the device
+    grid, encodes via the animation encoder without 'int too big to convert'."""
+    from divoom_lib.display.animation_8b import _build_animation_blob
+    with tempfile.NamedTemporaryFile(suffix=".gif", delete=False) as tmp:
+        imgs = [Image.new('RGB', (200, 200), color=(i * 40, 10, 10)) for i in range(5)]
+        imgs[0].save(tmp.name, save_all=True, append_images=imgs[1:],
+                     duration=120, loop=0)
+        try:
+            frames, count, w, h = image_processing.process_image(tmp.name, size=16)
+            assert count == 5 and (w, h) == (16, 16)
+            blob = _build_animation_blob(frames)  # must NOT raise
+            assert len(blob) > 0
+        finally:
+            os.remove(tmp.name)

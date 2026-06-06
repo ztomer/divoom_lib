@@ -3,8 +3,12 @@ from PIL import Image
 
 from .divoom_image_encode import Frame
 
+# Frame duration is encoded as a 2-byte (u16) field on the wire, so it must
+# fit in [1, 65535] ms — see divoom_image_encode.encode_animation_frame (TTTT).
+_MAX_FRAME_MS = 0xFFFF
 
-def process_image(file, time: int | None = None):
+
+def process_image(file, time: int | None = None, size: int | None = None):
     """Processes an image file (GIF or static image) into a format suitable for Divoom devices.
 
     Args:
@@ -12,6 +16,13 @@ def process_image(file, time: int | None = None):
         time: Optional default frame duration in milliseconds. Used for
             static images (where PIL doesn't provide a duration) and as
             a fallback for GIF frames with no per-frame duration set.
+        size: Optional target device pixel size (e.g. 16 or 32). When set,
+            every frame is resized to (size, size) with NEAREST resampling
+            BEFORE encoding. This is required for correctness — the device
+            renders at its native pixel grid, and encoding a full-resolution
+            source overflows the 2-byte per-frame length field (the
+            "int too big to convert" crash). When None, frames keep their
+            native resolution (legacy behavior).
 
     Returns:
         (frames, frames_count, width, height):
@@ -39,15 +50,28 @@ def process_image(file, time: int | None = None):
     width, height = img.size
     frames: list[Frame] = []
 
+    def _clamp_ms(ms: int) -> int:
+        # u16 field; also avoid 0 (some firmware treats 0 as "no animation").
+        return max(1, min(_MAX_FRAME_MS, int(ms)))
+
+    def _to_rgb_bytes(frame_img):
+        rgb_img = frame_img.convert("RGB")
+        if size is not None and rgb_img.size != (size, size):
+            rgb_img = rgb_img.resize((size, size), Image.Resampling.NEAREST)
+        return rgb_img.tobytes()
+
+    out_w = size if size is not None else width
+    out_h = size if size is not None else height
+
     if hasattr(img, "is_animated") and img.is_animated:
         for frame_idx in range(img.n_frames):
             img.seek(frame_idx)
-            rgb = img.convert("RGB").tobytes()
+            rgb = _to_rgb_bytes(img)
             # PIL exposes per-frame duration in ms via .info.get("duration")
             duration = img.info.get("duration", default_duration_ms)
-            frames.append((rgb, width, height, int(duration)))
+            frames.append((rgb, out_w, out_h, _clamp_ms(duration)))
     else:
-        rgb = img.convert("RGB").tobytes()
-        frames.append((rgb, width, height, default_duration_ms))
+        rgb = _to_rgb_bytes(img)
+        frames.append((rgb, out_w, out_h, _clamp_ms(default_duration_ms)))
 
-    return frames, len(frames), width, height
+    return frames, len(frames), out_w, out_h

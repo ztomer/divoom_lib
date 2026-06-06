@@ -129,31 +129,32 @@ class Display:
         2-byte color count.
         """
         await self.show_design()
-        frames, frames_count, _w, _h = process_image(file, time=time)
-
         screensize = self._get_screensize()
+        # Resize to the device pixel grid BEFORE encoding. Without this, a
+        # full-resolution source (e.g. a gallery gif) overflows the 2-byte
+        # per-frame length field → "int too big to convert" (R11 item 1b).
+        frames, frames_count, _w, _h = process_image(
+            file, time=time, size=screensize
+        )
         if frames_count > 1 and screensize != 32:
-            # Round 4: try 0x8B 3-phase first; fall back to 0x49 on
-            # any send failure.
-            from .animation_8b import build_8b_phases
-            phases = build_8b_phases(frames)
-            if phases:
+            # Round 4: route multi-frame via the 0x8B 3-phase protocol.
+            # Round 11 (items 1c/2a/9): use the proven streamer
+            # (Animation.stream_animation_8b) — BLE-safe chunking, chunk-index
+            # offset ids, write-with-response + pacing — instead of an ad-hoc
+            # tight loop that stalled the device. Fall back to 0x49 on failure.
+            from .animation_8b import _build_animation_blob
+            blob = _build_animation_blob(frames)
+            anim = getattr(self.communicator, "animation", None)
+            if blob and anim is not None:
                 self.logger.info(
-                    f"show_image: routing {frames_count} frames via 0x8B 3-phase"
+                    f"show_image: streaming {frames_count} frames via 0x8B "
+                    f"3-phase ({len(blob)} bytes)"
                 )
-                result: bool | None = None
-                for args in phases:
-                    result = await self.communicator.send_command(
-                        "app new send gif cmd", list(args)
-                    )
-                    if not result:
-                        self.logger.warning(
-                            "show_image: 0x8B failed, falling back to 0x49"
-                        )
-                        result = None
-                        break
-                if result is not None:
-                    return result
+                if await anim.stream_animation_8b(blob):
+                    return True
+                self.logger.warning(
+                    "show_image: 0x8B stream failed, falling back to 0x49"
+                )
 
         # 1-frame or fallback path: 0x49 chunked animation.
         # Round 4: use 32×32 encoder if screensize=32.

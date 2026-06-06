@@ -403,3 +403,29 @@ def test_frame_dataclass_for_type_hint():
     f: Frame = (bytes([0xFF, 0x00, 0x00]), 1, 1, 100)
     assert len(f) == 4
     assert f[3] == 100
+
+
+# ── Round 11 (item 1b): u16 time clamp + length guard ───────────────────
+
+
+def test_encode_animation_frame_clamps_oversized_time():
+    """A frame time > 65535 must not raise 'int too big to convert' — it is
+    clamped into the 2-byte TTTT field."""
+    rgb = bytes([10, 20, 30]) * (16 * 16)
+    payload = encode_animation_frame(rgb, 16, 16, 999999)  # previously crashed
+    assert payload[3:5] == bytes([0xFF, 0xFF])  # TTTT clamped to 0xFFFF
+
+
+def test_encode_animation_frame_rejects_oversized_body():
+    """A body too large for the 2-byte length field raises a clear ValueError
+    instead of the opaque 'int too big to convert'.
+
+    Construct 256x256 = 65536 pixels using ~150 colors so nb_bits=8 (1 byte
+    per pixel) → body ≈ 7 + 450 + 65536 > 65535.
+    """
+    rgb = bytearray()
+    for i in range(256 * 256):
+        c = i % 150  # 150 distinct colors → palette < 256, nb_bits = 8
+        rgb.extend([c, c, c])
+    with pytest.raises(ValueError, match="exceeds the 2-byte length"):
+        encode_animation_frame(bytes(rgb), 256, 256, 100)
