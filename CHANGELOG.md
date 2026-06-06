@@ -6,6 +6,34 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 7 — 2026-06-06 (Feature harvest: surface un-exposed divoom_lib modules)
+
+Surfaces previously un-exposed `divoom_lib` modules in the GUI (see
+`docs/PLANNING_ROUND7.md`). Each feature: backend bridge in
+`gui/gui_api.py` + UI + unit tests.
+
+### Added
+
+- **Text Channel** — new "Text" channel card/panel (input, color, effect,
+  speed). `push_text()` runs the full LPWA (0x87) sequence
+  (display-box→font→color→speed→effect→content) over `display/text.py`.
+- **Alarms editor** — Settings → Divoom: 10-slot list (enable, hour:minute,
+  weekday mask, Save; "Read from device"). `get_alarms()`/`set_alarm()` wrap
+  `scheduling/alarm.py` (0x42/0x43).
+- **Sleep Aid** — Settings → Divoom: minutes + color + volume, Start/Stop.
+  `start_sleep()`/`stop_sleep()` wrap `scheduling/sleep.py`.
+- **Tools** — Settings → Divoom: stopwatch (start/stop/reset), countdown
+  (mm:ss), noise meter. `set_timer()`/`set_countdown()`/`set_noise()` wrap
+  `tools/{timer,countdown,noise}.py`.
+
+### Notes
+
+- Alarm read-back (0x42) needs the device to answer a query; on hardware
+  those time out (see `docs/DEVICE_VALIDATION_PLAN.md`), so the editor is
+  set-oriented. Full suite: 513 passed / 0 failed.
+
+---
+
 ## Round 6 — 2026-06-06 (Monthly Best layout simplification + new functionality exposure)
 
 ### Changed — Monthly Best layout (Option B from `docs/PLANNING_ROUND5.md` §3)

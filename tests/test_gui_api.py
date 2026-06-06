@@ -64,6 +64,47 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertFalse(self.api.push_text("   "))
         dev.text.set_light_phone_word_attr.assert_not_called()
 
+    def test_set_alarm(self):
+        """R7 Alarms: set_alarm maps enabled→status and weekday mask through."""
+        dev = MagicMock()
+        dev.alarm.set_alarm = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        ok = self.api.set_alarm(2, True, 7, 30, 0b0011111)  # weekdays Mon-Fri
+        self.assertTrue(ok)
+        dev.alarm.set_alarm.assert_called_once_with(2, 1, 7, 30, 31, 0, 0)
+
+    def test_set_alarm_no_device(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.set_alarm(0, True, 6, 0, 0))
+
+    def test_sleep_start_stop(self):
+        """R7 Sleep Aid: start_sleep passes minutes/volume/color; stop sets on=0."""
+        dev = MagicMock()
+        dev.sleep.show_sleep = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertTrue(self.api.start_sleep(20, "#ff0000", 8))
+        kw = dev.sleep.show_sleep.call_args.kwargs
+        self.assertEqual(kw.get("sleeptime"), 20)
+        self.assertEqual(kw.get("volume"), 8)
+        self.assertEqual(kw.get("on"), 1)
+        self.assertEqual(list(kw.get("color")), [255, 0, 0])
+        self.assertTrue(self.api.stop_sleep())
+        self.assertEqual(dev.sleep.show_sleep.call_args.kwargs.get("on"), 0)
+
+    def test_tools_timer_countdown_noise(self):
+        """R7 Tools: action strings map to the right ctrl flags."""
+        dev = MagicMock()
+        dev.timer.set_timer = AsyncMock(return_value=True)
+        dev.countdown.set_countdown = AsyncMock(return_value=True)
+        dev.noise.set_noise = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.api.set_timer("start"); dev.timer.set_timer.assert_called_with(1)
+        self.api.set_timer("reset"); dev.timer.set_timer.assert_called_with(2)
+        self.api.set_countdown("start", 5, 30); dev.countdown.set_countdown.assert_called_with(0, 5, 30)
+        self.api.set_countdown("stop", 5, 30); dev.countdown.set_countdown.assert_called_with(1, 5, 30)
+        self.api.set_noise("start"); dev.noise.set_noise.assert_called_with(1)
+        self.api.set_noise("stop"); dev.noise.set_noise.assert_called_with(2)
+
     @patch("gui_main.BleakScanner")
     def test_scan_devices(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""

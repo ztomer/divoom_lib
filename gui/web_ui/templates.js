@@ -295,6 +295,67 @@ window.DivoomTemplates = {
                                 <div id="divoom-cloud-status-box" style="margin-top: 15px; padding: 12px; border-radius: 6px; font-size: 12px; font-weight: 600; display: none; align-items: center; gap: 8px;"></div>
                             </div>
                         </div>
+                        <!-- Round 7: Alarms editor (10 slots) -->
+                        <div class="card glass-card">
+                            <div class="card-header flex-header">
+                                <h3>Alarms</h3>
+                                <button id="alarms-refresh-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Read from device</button>
+                            </div>
+                            <div class="card-body">
+                                <p class="panel-hint" style="margin-top:0;">Connect a device, set a time + weekdays, then Save each alarm.</p>
+                                <div id="alarms-list" class="alarms-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                            </div>
+                        </div>
+                        <!-- Round 7: Sleep Aid -->
+                        <div class="card glass-card">
+                            <div class="card-header"><h3>Sleep Aid</h3></div>
+                            <div class="card-body" id="sleep-aid-body">
+                                <p class="panel-hint" style="margin-top:0;">Fade the screen to a color over a sleep timer.</p>
+                                <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+                                    <div class="form-group" style="margin:0;">
+                                        <label class="form-label" style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">Minutes</label>
+                                        <input type="number" id="sleep-minutes" min="0" max="120" value="30" class="text-input" style="width:90px;">
+                                    </div>
+                                    <div class="form-group" style="margin:0;">
+                                        <label class="form-label" style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">Color</label>
+                                        <input type="color" id="sleep-color" value="#2040ff" style="background:none; border:none; width:44px; height:28px; cursor:pointer; padding:0;">
+                                    </div>
+                                    <div class="form-group" style="margin:0; flex:1; min-width:120px;">
+                                        <label class="form-label" style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">Volume <span id="sleep-vol-val">10</span></label>
+                                        <input type="range" id="sleep-volume" min="0" max="16" value="10" style="width:100%;">
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:10px; margin-top:14px;">
+                                    <button id="sleep-start-btn" class="glow-btn" style="flex:1;">Start Sleep</button>
+                                    <button id="sleep-stop-btn" class="glow-btn secondary" style="flex:1;">Stop</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Round 7: Tools (timer / countdown / noise) -->
+                        <div class="card glass-card">
+                            <div class="card-header"><h3>Tools</h3></div>
+                            <div class="card-body" id="tools-body" style="display:flex; flex-direction:column; gap:14px;">
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <span class="form-label" style="font-size:12px; font-weight:600; min-width:80px;">Stopwatch</span>
+                                    <button class="glow-btn compact tool-timer-btn" data-action="start">Start</button>
+                                    <button class="glow-btn compact secondary tool-timer-btn" data-action="stop">Stop</button>
+                                    <button class="glow-btn compact secondary tool-timer-btn" data-action="reset">Reset</button>
+                                </div>
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <span class="form-label" style="font-size:12px; font-weight:600; min-width:80px;">Countdown</span>
+                                    <input type="number" id="countdown-min" min="0" max="99" value="5" class="text-input" style="width:60px;" title="minutes">
+                                    <span>:</span>
+                                    <input type="number" id="countdown-sec" min="0" max="59" value="0" class="text-input" style="width:60px;" title="seconds">
+                                    <button id="countdown-start-btn" class="glow-btn compact">Start</button>
+                                    <button id="countdown-stop-btn" class="glow-btn compact secondary">Stop</button>
+                                </div>
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <span class="form-label" style="font-size:12px; font-weight:600; min-width:80px;">Noise meter</span>
+                                    <button id="noise-start-btn" class="glow-btn compact">Start</button>
+                                    <button id="noise-stop-btn" class="glow-btn compact secondary">Stop</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

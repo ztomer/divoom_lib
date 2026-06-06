@@ -365,4 +365,105 @@ document.addEventListener("DOMContentLoaded", () => {
             setTimeout(window.loadRoutinesAutoSync, 0);
         }
     });
+
+    // ── Round 7: Alarms editor (10 slots) ──────────────────────────────
+    const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    let alarmsRendered = false;
+    function renderAlarmRows(alarms) {
+        const list = document.getElementById("alarms-list");
+        if (!list) return;
+        list.innerHTML = "";
+        for (let i = 0; i < 10; i++) {
+            const a = (alarms && alarms[i]) || {};
+            const week = a.week || 0;
+            const days = WEEKDAYS.map((d, b) =>
+                `<label class="alarm-day"><input type="checkbox" data-bit="${b}" ${week & (1 << b) ? "checked" : ""}>${d}</label>`).join("");
+            const row = document.createElement("div");
+            row.className = "alarm-row";
+            row.dataset.index = i;
+            row.style.cssText = "display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.06);";
+            row.innerHTML =
+                `<input type="checkbox" class="alarm-enabled" ${a.status ? "checked" : ""} title="Enable">` +
+                `<input type="number" class="alarm-hour text-input" min="0" max="23" value="${a.hour ?? 7}" style="width:54px; text-align:center;">` +
+                `<span>:</span>` +
+                `<input type="number" class="alarm-min text-input" min="0" max="59" value="${String(a.minute ?? 0).padStart(2,'0')}" style="width:54px; text-align:center;">` +
+                `<span class="alarm-days" style="display:flex; gap:4px; font-size:10px; flex-wrap:wrap;">${days}</span>` +
+                `<button class="glow-btn compact alarm-save" style="margin-left:auto;">Save</button>`;
+            list.appendChild(row);
+        }
+        alarmsRendered = true;
+    }
+    function ensureAlarms() { if (!alarmsRendered) renderAlarmRows([]); }
+
+    document.addEventListener("click", (e) => {
+        const tab = e.target.closest(".settings-tab-btn");
+        if (tab && tab.getAttribute("data-settings-tab") === "settings-divoom") {
+            setTimeout(ensureAlarms, 0);
+        }
+        const saveBtn = e.target.closest(".alarm-save");
+        if (saveBtn) {
+            if (window.requireDevice && !window.requireDevice()) return;
+            const row = saveBtn.closest(".alarm-row");
+            const idx = parseInt(row.dataset.index);
+            const enabled = row.querySelector(".alarm-enabled").checked;
+            const hour = parseInt(row.querySelector(".alarm-hour").value) || 0;
+            const minute = parseInt(row.querySelector(".alarm-min").value) || 0;
+            let week = 0;
+            row.querySelectorAll(".alarm-days input:checked").forEach(cb => { week |= (1 << parseInt(cb.dataset.bit)); });
+            window.pywebview?.api?.set_alarm?.(idx, enabled, hour, minute, week).then(res =>
+                window.showToast(res ? `Alarm ${idx + 1} saved` : "Failed to save alarm", res ? "success" : "error", "🔵 BLE"));
+        }
+    });
+    const alarmsRefreshBtn = document.getElementById("alarms-refresh-btn");
+    if (alarmsRefreshBtn) {
+        alarmsRefreshBtn.addEventListener("click", () => {
+            window.pywebview?.api?.get_alarms?.().then(json => {
+                try { renderAlarmRows(JSON.parse(json)); } catch (e) { renderAlarmRows([]); }
+            });
+        });
+    }
+
+    // ── Round 7: Sleep Aid ─────────────────────────────────────────────
+    const sleepVol = document.getElementById("sleep-volume");
+    const sleepVolVal = document.getElementById("sleep-vol-val");
+    if (sleepVol && sleepVolVal) sleepVol.addEventListener("input", () => { sleepVolVal.textContent = sleepVol.value; });
+    document.addEventListener("click", (e) => {
+        if (e.target.closest("#sleep-start-btn")) {
+            if (window.requireDevice && !window.requireDevice()) return;
+            const m = parseInt(document.getElementById("sleep-minutes")?.value) || 30;
+            const c = document.getElementById("sleep-color")?.value || "#2040ff";
+            const v = parseInt(document.getElementById("sleep-volume")?.value) || 10;
+            window.pywebview?.api?.start_sleep?.(m, c, v).then(r =>
+                window.showToast(r ? "Sleep started" : "Failed to start sleep", r ? "success" : "error", "🔵 BLE"));
+        } else if (e.target.closest("#sleep-stop-btn")) {
+            window.pywebview?.api?.stop_sleep?.().then(r =>
+                window.showToast(r ? "Sleep stopped" : "Failed", r ? "success" : "error", "🔵 BLE"));
+        }
+    });
+
+    // ── Round 7: Tools (timer / countdown / noise) ─────────────────────
+    document.addEventListener("click", (e) => {
+        const timerBtn = e.target.closest(".tool-timer-btn");
+        if (timerBtn) {
+            if (window.requireDevice && !window.requireDevice()) return;
+            window.pywebview?.api?.set_timer?.(timerBtn.dataset.action).then(r =>
+                window.showToast(r ? `Stopwatch ${timerBtn.dataset.action}` : "Failed", r ? "success" : "error", "🔵 BLE"));
+            return;
+        }
+        if (e.target.closest("#countdown-start-btn") || e.target.closest("#countdown-stop-btn")) {
+            if (window.requireDevice && !window.requireDevice()) return;
+            const action = e.target.closest("#countdown-stop-btn") ? "stop" : "start";
+            const mm = parseInt(document.getElementById("countdown-min")?.value) || 0;
+            const ss = parseInt(document.getElementById("countdown-sec")?.value) || 0;
+            window.pywebview?.api?.set_countdown?.(action, mm, ss).then(r =>
+                window.showToast(r ? `Countdown ${action}` : "Failed", r ? "success" : "error", "🔵 BLE"));
+            return;
+        }
+        if (e.target.closest("#noise-start-btn") || e.target.closest("#noise-stop-btn")) {
+            if (window.requireDevice && !window.requireDevice()) return;
+            const action = e.target.closest("#noise-stop-btn") ? "stop" : "start";
+            window.pywebview?.api?.set_noise?.(action).then(r =>
+                window.showToast(r ? `Noise meter ${action}` : "Failed", r ? "success" : "error", "🔵 BLE"));
+        }
+    });
 });

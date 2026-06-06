@@ -281,6 +281,100 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             logger.error(f"push_text failed: {e}")
             return False
 
+    # ── Round 7: Alarms (scheduling/alarm.py, 0x42/0x43) ──────────────────
+
+    def get_alarms(self) -> str:
+        """Read the device's 10 alarm slots as JSON. May be empty if the device
+        doesn't answer the 0x42 query (see read-back limitation)."""
+        try:
+            target = self.current_divoom
+            if not target:
+                return json.dumps([])
+            alarms = self._run_async(target.alarm.get_alarm_time())
+            return json.dumps(alarms or [])
+        except Exception as e:
+            logger.error(f"get_alarms failed: {e}")
+            return json.dumps([])
+
+    def set_alarm(self, index: int, enabled, hour: int, minute: int,
+                  week: int = 0, mode: int = 0, trigger_mode: int = 0) -> bool:
+        """Set one alarm slot (0x43). `week` is a 7-bit weekday mask (bit0=Mon)."""
+        logger.info(f"GUI Action: Set alarm {index} {int(hour):02d}:{int(minute):02d} "
+                    f"enabled={enabled} week={week}...")
+        try:
+            status = 1 if (enabled in (True, 1, "1", "true", "True")) else 0
+            target = self.current_divoom
+            if not target:
+                return False
+            return bool(self._run_async(target.alarm.set_alarm(
+                int(index), status, int(hour), int(minute), int(week),
+                int(mode), int(trigger_mode))))
+        except Exception as e:
+            logger.error(f"set_alarm failed: {e}")
+            return False
+
+    # ── Round 7: Sleep Aid (scheduling/sleep.py) ──────────────────────────
+
+    def start_sleep(self, minutes: int = 30, color: str = "#2040ff", volume: int = 10) -> bool:
+        """Begin the sleep fade: dim to `color` over `minutes`, at `volume`."""
+        logger.info(f"GUI Action: Start sleep {minutes}min color={color} vol={volume}...")
+        try:
+            target = self.current_divoom
+            if not target:
+                return False
+            from divoom_lib.utils.converters import color_to_rgb_list
+            rgb = color_to_rgb_list(color)
+            return bool(self._run_async(target.sleep.show_sleep(
+                sleeptime=int(minutes), volume=int(volume), color=rgb, on=1)))
+        except Exception as e:
+            logger.error(f"start_sleep failed: {e}")
+            return False
+
+    def stop_sleep(self) -> bool:
+        logger.info("GUI Action: Stop sleep...")
+        try:
+            target = self.current_divoom
+            if not target:
+                return False
+            return bool(self._run_async(target.sleep.show_sleep(on=0)))
+        except Exception as e:
+            logger.error(f"stop_sleep failed: {e}")
+            return False
+
+    # ── Round 7: Tools — timer / countdown / noise (tools/*) ──────────────
+
+    def set_timer(self, action: str = "start") -> bool:
+        """Stopwatch control: action in {start, stop, reset}."""
+        from divoom_lib.models import (
+            STI_CTRL_FLAG_TIMER_STARTED, STI_CTRL_FLAG_TIMER_PAUSED, STI_CTRL_FLAG_TIMER_RESET)
+        flag = {"start": STI_CTRL_FLAG_TIMER_STARTED, "stop": STI_CTRL_FLAG_TIMER_PAUSED,
+                "reset": STI_CTRL_FLAG_TIMER_RESET}.get(action, STI_CTRL_FLAG_TIMER_STARTED)
+        return self._tool_call(lambda d: d.timer.set_timer(flag), f"timer {action}")
+
+    def set_countdown(self, action: str = "start", minutes: int = 5, seconds: int = 0) -> bool:
+        """Countdown control: action in {start, stop}."""
+        from divoom_lib.models import STI_CTRL_FLAG_COUNTDOWN_START, STI_CTRL_FLAG_COUNTDOWN_CANCEL
+        flag = STI_CTRL_FLAG_COUNTDOWN_CANCEL if action == "stop" else STI_CTRL_FLAG_COUNTDOWN_START
+        return self._tool_call(lambda d: d.countdown.set_countdown(flag, int(minutes), int(seconds)),
+                               f"countdown {action} {minutes}:{seconds}")
+
+    def set_noise(self, action: str = "start") -> bool:
+        """Noise meter control: action in {start, stop}."""
+        from divoom_lib.models import STI_CTRL_FLAG_NOISE_START, STI_CTRL_FLAG_NOISE_STOP
+        flag = STI_CTRL_FLAG_NOISE_STOP if action == "stop" else STI_CTRL_FLAG_NOISE_START
+        return self._tool_call(lambda d: d.noise.set_noise(flag), f"noise {action}")
+
+    def _tool_call(self, fn, label: str) -> bool:
+        logger.info(f"GUI Action: Tool {label}...")
+        try:
+            target = self.current_divoom
+            if not target:
+                return False
+            return bool(self._run_async(fn(target)))
+        except Exception as e:
+            logger.error(f"tool {label} failed: {e}")
+            return False
+
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:
