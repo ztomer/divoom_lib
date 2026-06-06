@@ -36,8 +36,13 @@ core rule in `AGENTS.md`).
    queries 0x42/0x46/0x13 get no parseable response — likely query-framing
    mismatch: query sent iOS-LE while device is Basic). Also gates the Alarms
    "Read from device" button. See `docs/DEVICE_VALIDATION_PLAN.md`.
-3. Round 7 Phase 2/3 backlog (hour-type toggle, auto power-off, low-power,
-   boot GIF, timeplan, FM, screen rotate/mirror…) in `docs/PLANNING_ROUND7.md`.
+3. **Round 8 excavation done — plan ready, awaiting scope pick.** See
+   `docs/PLANNING_ROUND8.md`. Finding: the library implements ~140 device
+   methods; the GUI exposes ~58 — whole clusters un-surfaced. Top picks:
+   (1) Device Settings panel [12/24h, °C/°F, time-sync, name, auto-off,
+   screen on/off], (2) FM Radio tuner, (3) Weather push; then memorial/
+   timeplan (R9), SD player/game/drawing (later). Implement once user picks.
+4. Round 7 Phase 2/3 backlog also catalogued in `docs/PLANNING_ROUND7.md`.
 
 ## Hardware note
 
