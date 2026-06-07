@@ -1,310 +1,141 @@
-# Divoom Lib
+# divoom-control
 
-This Python library provides a high-level API to interact with Divoom devices over Bluetooth Low Energy (BLE). It allows you to control various aspects of your Divoom device, such as displaying images and animations, changing channels, setting the brightness, and more.
+Control Divoom pixel-display devices (Pixoo / Tivoo / Timebox / Ditoo …) from
+your Mac — both as a **Python library** and a **desktop Control Center app**.
+
+The project has three parts:
+
+1. **`divoom_lib/`** — a high-level async Python library that speaks the Divoom
+   BLE protocol (and LAN where supported): channels, image/animation push, text,
+   clock, brightness, alarms, FM radio, notifications, and more.
+2. **`gui/`** — a [pywebview](https://pywebview.flowrl.com/) desktop **Control
+   Center** (macOS) with a glassmorphic UI: live previews, the channel grid,
+   live widgets (album art / stocks / system monitor), a gallery, a multi-panel
+   "virtual wall", and a tools/settings area. Plus an optional native menubar app.
+3. **Native C accelerators** (`gui/libdivoom_compact.dylib`, built from
+   `divoom_lib/native_src/` + `gui/compact.c`) — palette encoder, LANCZOS
+   downsampler, and frame escaping. Every accelerated path has a pure-Python
+   fallback, and both are held to the same correctness tests (see *Testing*).
+
+> Unofficial project, not affiliated with Divoom. Use at your own risk.
+
+---
 
 ## Features
 
-* **Device Discovery:** Discover Divoom devices on your network.
-* **Display Control:**
-  * Show images and animations.
-  * Display text with different fonts and colors.
-  * Clear the display.
-* **Channel Control:**
-  * Switch between different channels (Clock, Cloud, VJ Effect, etc.).
-  * Get the current channel.
-* **System Control:**
-  * Set brightness.
-  * Get device time.
-  * Set device time.
-* **Extensible:** The library is designed to be extensible with new commands and features.
+- **Discovery** — scan for Divoom devices over BLE; manage known LAN devices.
+- **Channels** — Clock, Cloud, VJ Effects, EQ/visualizer, Ambient light,
+  Scoreboard, Text.
+- **Image & animation push** — static images and GIFs, encoded to the device's
+  palette format and streamed via the 0x8B 3-phase protocol (16px today; 32px
+  encoder included).
+- **Live widgets** — auto-push **album cover art** on track change (Spotify /
+  Apple Music), **stock tickers**, and a **system monitor**.
+- **Gallery** — browse + sync the Divoom "monthly best" gallery to the device.
+- **Virtual wall** — drive a multi-panel grid as one composite display.
+- **Tools** — alarms, sleep aid, timer / countdown / noise meter, FM radio,
+  anniversary/memorial countdown.
+- **Device settings** — brightness, 12/24h, °C/°F, screen orientation & mirror,
+  device name, auto-power-off, time sync, weather push, factory reset.
+- **Notification mirroring** — trigger the device's notification display.
+
+---
 
 ## Requirements
 
-* Python 3.7+
-* `bleak` library
+- **macOS** for the GUI, the menubar app, and macOS media/now-playing sync.
+  The `divoom_lib` library itself is cross-platform (anything `bleak` supports).
+- **Python 3.10+** (the code uses `X | None` type syntax).
+- Python deps in `requirements.txt` (`bleak`, `aiohttp`, `pillow`, `pywebview`, …).
+- A C compiler (clang) is optional — only needed to build the native
+  accelerators; without it everything falls back to pure Python.
 
-## Installation
+## Install
 
 ```bash
-pip install bleak divoom-lib
+pip install -r requirements.txt
+# optional: build the native accelerators (Python fallback works without this)
+bash scripts/build_libdivoom.sh
 ```
 
-## Usage
+## Run the Control Center (GUI)
 
-The `examples` directory contains several scripts that demonstrate how to use the library. Here are a few examples:
+```bash
+python3 gui/gui_main.py
+```
 
-### Discovering Devices
+> On macOS, BLE access is gated by per-app permission (TCC). The first scan
+> prompts for Bluetooth permission; grant it to the launching terminal/app.
 
-To discover Divoom devices on your network, you can use the `discover_device` function from the `divoom_lib.utils.discovery` module.
+## Use the library
 
 ```python
 import asyncio
+from divoom_lib.divoom import Divoom
 from divoom_lib.utils.discovery import discover_device
 
 async def main():
-    device, device_id = await discover_device()
-    if device:
-        print(f"Found device: {device.name} ({device.address})")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Connecting to a Device
-
-To connect to a Divoom device, you need its MAC address. You can get the MAC address from the discovery process.
-
-```python
-import asyncio
-from divoom_lib.divoom import Divoom
-
-async def main():
-    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
-    divoom = Divoom(mac=device_address)
-
+    device, _ = await discover_device()            # scan over BLE
+    divoom = Divoom(mac=device.address)
+    await divoom.connect()
     try:
-        await divoom.protocol.connect()
-        print("Connected!")
+        await divoom.display.show_image("art.gif")     # push a static image / GIF
+        await divoom.device.set_brightness(80)
+        await divoom.notification.show_notification(6) # WhatsApp icon
     finally:
-        if divoom.protocol.is_connected:
-            await divoom.protocol.disconnect()
-            print("Disconnected.")
+        await divoom.disconnect()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())
 ```
 
-### Setting the Brightness
+More runnable scripts are in `examples/`.
 
-To set the brightness of the device, you can use the `set_brightness` method from the `divoom.device` object.
+---
 
-```python
-import asyncio
-from divoom_lib.divoom import Divoom
+## Testing
 
-async def main():
-    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
-    divoom = Divoom(mac=device_address)
-
-    try:
-        await divoom.protocol.connect()
-        await divoom.device.set_brightness(50)
-    finally:
-        if divoom.protocol.is_connected:
-            await divoom.protocol.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Showing a Light
-
-To show a solid color light, you can use the `show_light` method from the `divoom.light` object.
-
-```python
-import asyncio
-from divoom_lib.divoom import Divoom
-
-async def main():
-    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
-    divoom = Divoom(mac=device_address)
-
-    try:
-        await divoom.protocol.connect()
-        await divoom.light.show_light(color=(255, 0, 0))
-    finally:
-        if divoom.protocol.is_connected:
-            await divoom.protocol.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Displaying Text
-
-To display text on the device, you can use the `show_text` method from the `divoom.text` object.
-
-```python
-import asyncio
-from divoom_lib.divoom import Divoom
-
-async def main():
-    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
-    divoom = Divoom(mac=device_address)
-
-    try:
-        await divoom.protocol.connect()
-        await divoom.text.show_text(text="Hello World", color=(0, 255, 0))
-    finally:
-        if divoom.protocol.is_connected:
-            await divoom.protocol.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Displaying an Image
-
-To display an image, you can use the `show_image` method from the `divoom.image` object. Note: You'll need the `Pillow` library installed.
-
-```python
-import asyncio
-from divoom_lib.divoom import Divoom
-from PIL import Image
-
-async def main():
-    device_address = "XX:XX:XX:XX:XX:XX"  # Replace with your device's address
-    divoom = Divoom(mac=device_address)
-
-    try:
-        await divoom.protocol.connect()
-        # Create a simple red image
-        image = Image.new('RGB', (16, 16), color = 'red')
-        # Assuming show_image is available in divoom.image or similar
-        # If not, we might need to use divoom.animation.show_image or similar
-        # Based on file list, there is divoom_lib/display/animation.py and drawing.py
-        # Let's check divoom.py again to see where image methods are exposed.
-        # divoom.animation = Animation(self)
-        # divoom.drawing = Drawing(self)
-        # I'll assume for now it's under animation or drawing, but let's stick to text for now if I'm unsure.
-        # Wait, I saw `process_image` in the user rules memory.
-        # Let's check divoom_lib/display/animation.py later.
-        # For now, I'll just add the text example and maybe a time example.
-    finally:
-        if divoom.protocol.is_connected:
-            await divoom.protocol.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-## Premium Desktop GUI & Multi-Device Wall Coordinator
-
-We have introduced a comprehensive desktop app suite and coordinator layer allowing you to orchestrate local Divoom environments:
-
-### 1. Stunning Glassmorphic Dashboard
-Run the root launcher to start the interactive desktop control center:
 ```bash
-./run_gui.sh
-```
-*   **Active BLE Scanner**: Fully configurable scanning timeout and target limit overrides.
-*   **Display Wall Coordinate Arranger**: Map multiple Divoom screens in 2D space. The grid automatically loads visually gorgeous, high-resolution visual model mockups of your devices.
-*   **Ambient Solid Lights & Color Pickers**: Select custom RGB color spectrums and change brightness.
-*   **Clock Style Previews**: Pre-rendered mockups showing different styled clock faces.
-*   **Batch Monthly Best Sync**: Replicates top community-curated pixel art across all arranged screens in parallel async tasks.
-
-### 2. Multi-Device display wall (`DivoomWall`)
-Coordinates multiple physical Divoom displays as a single large virtual canvas using standard coordinates `(x, y)` and crops canvases using `NEAREST` Pillow scaling.
-```python
-from divoom_lib.wall import DivoomWall
-
-configs = [
-    {"mac": "XX:XX:XX:XX:XX:X1", "x": 0, "y": 0, "size": 16},
-    {"mac": "XX:XX:XX:XX:XX:X2", "x": 1, "y": 0, "size": 16}
-]
-wall = DivoomWall(configs)
-await wall.connect()
-await wall.show_image("artwork.gif")
+make test            # builds the native dylib, then runs the unit suite
+# or directly:
+python3 -m pytest -q
+python3 -m pytest -q --run-hardware   # also run BLE integration tests (needs a device)
 ```
 
-### 3. AppleScript Cover Downsampler & Stock Tickers
-*   **macOS Song Tracking**: Automatically reads active tracks from Spotify or Apple Music using AppleScript, fetches their artwork via iTunes, downsamples them to pixel formats, and streams them.
-*   **Yahoo Stock Ticker**: Renders quotes and trend symbols for stock/crypto indexes (`BTC-USD`, `AAPL`) onto retro 16x16 canvas frames.
-
-### 4. Cocoa macOS Menubar & UNIX Socket IPC
-*   Start the native status bar application (`👾`) using PyObjC:
-    ```bash
-    python3 gui/menubar.py
-    ```
-*   **UNIX Domain Sockets**: Listens at `/tmp/divoom.sock` for remote IPC JSON controls:
-    ```bash
-    echo '{"command": "set_light", "args": {"color": "FF00CC", "brightness": 90}}' | nc -U /tmp/divoom.sock
-    ```
-*   **Model Context Protocol (MCP)**: Native JSON-RPC tool schemas to interface Divoom devices directly with AI coding assistants.
+~690 tests. The unit suite needs no hardware (BLE integration tests are skipped
+by default). `conftest.py` automatically rebuilds the native dylib if it's
+missing or older than its C sources, so the **encoder correctness suite runs
+against both the C and the Python implementations** (`test_encoder_both_impls.py`)
+— this is the guard that keeps the two implementations from drifting.
 
 ---
 
-## Architectural Evolution & Code Quality Standards
+## Project layout
 
-This library has undergone a rigorous, dual-persona code review and comprehensive refactoring inspired by **Linus Torvalds** (performance, memory allocations, low-level I/O efficiency) and **Robert C. Martin ("Uncle Bob")** (SOLID principles, clean decoupling, single responsibility, clean APIs).
+```
+divoom_lib/            Async BLE/LAN library
+  divoom.py              Divoom facade (.display, .device, .system, .alarm,
+                         .radio, .notification, .design, …)
+  framing.py             SPP framing/escaping (C-accelerated + Python fallback)
+  connection.py          transport + command send/response
+  display/               channels, images, animation (0x8B/0x49), text, drawing
+  system/                device settings, time, weather, sound
+  scheduling/            alarms, sleep, timeplan
+  media/                 music/volume, FM radio
+  tools/                 timer, countdown, noise, notification
+  utils/                 image encode/decode, downsample, discovery, media source
+  native/ + native_src/  ctypes wrappers + C sources for the encoders/downsampler
+gui/                   Desktop Control Center (pywebview) + menubar app
+  gui_main.py            launcher + Python↔JS bridge
+  web_ui/                frontend (app.js, channels.js, widgets.js, …)
+  libdivoom_compact.dylib  built native library
+scripts/build_libdivoom.sh   builds the dylib
+references/             protocol references (decompiled APK, other implementations)
+docs/                   SESSION_HANDOFF, planning rounds, validation notes
+tests/                  pytest suite
+```
 
-### 1. Linus & Uncle Bob Code Review Remediations
-All findings from the deep-dive code review have been fully addressed and verified with a 100% green test suite:
-*   **Zero-Copy Byte Native Parsing (Linus)**: The receive buffer `message_buf` was migrated from a fragmented list of integer objects to an optimized `bytearray`. Redundant array reallocations and slices were eliminated using in-place deletion (`del buf[:n]`).
-*   **Direct Binary Builders (Linus)**: Round-trip hex-string formatting on active BLE send paths (`"".join(f"{b:02x}")` to `bytes.fromhex`) was replaced with direct binary construction, reducing execution latency and garbage collection churn during heavy animation streaming.
-*   **Non-Blocking Async Cache I/O (Linus)**: Synchronous disk reads/writes in the device configurations were offloaded to worker threads via `asyncio.to_thread` to prevent disk flush stalls from blocking incoming BLE notifications.
-*   **Dependency Inversion Principle (Uncle Bob)**: Circular references between the main `Divoom` orchestrator and its sub-modules (such as `Light`, `Animation`, `Alarm`) were broken. All modules are now loosely coupled and type-hinted against a narrow `CommandSender` abstract Protocol.
-*   **Domain Exception Hierarchy (Uncle Bob)**: Stringly-typed standard exceptions were replaced with custom, domain-specific exceptions (e.g., `DeviceConnectionError`, `DeviceAddressMissingError`) subclassing their original built-ins for backwards compatibility.
-*   **Code Duplication Elimination**: Redundant duplicate logic between `Divoom` and `DivoomProtocol` was resolved. `DivoomProtocol` now inherits from `Divoom`, delegating low-level framing and escape operations to a shared, pure-functional `framing.py` module.
+## Contributing / working notes
 
-### 2. Strict Coding Standards: The 500 LOC Limit
-To ensure maximum readability, strict modularity, and rapid semantic searchability for both human developers and AI coding agents:
-*   **Hard Limit**: No single Python, JavaScript, or CSS source file in the library may exceed **500 Lines of Code (LOC)**.
-*   **Enforcement**: Any file growing beyond 500 LOC must be partitioned into logically encapsulated sub-modules or helper packages (e.g. separating the core connection, packet framing, and display utilities).
-
-### 3. Developer & AI Agent Experience Reflections
-To make working with this codebase significantly easier, faster, and more robust in future iterations, we recommend prioritizing:
-*   **Unified Declarative Command Registry**: Constructing a central declarative command registry (e.g., JSON schema or typed Python dataclasses) mapping command IDs to byte packing schemas. This would allow contributors (and AI agents) to add new reverse-engineered features instantly without tracing circular methods.
-*   **High-Fidelity BLE Loopback Simulator**: Expanding `MockBleakClient` into a comprehensive loopback socket server that returns authentic Divoom response packets for channels, clocks, and custom visuals, letting tests run at memory-speed without real hardware.
-*   **Modular Decoupling of God Objects**: Further migrating high-level sub-modules to use a lightweight connection proxy delegate rather than interacting with the parent orchestrator object, enabling total isolation in imports and testing.
-
----
-
-## Library Structure
-
-The library is organized into the following modules:
-
-* `divoom_lib/`: The main library code.
-  * `divoom.py`: The main `Divoom` facade class.
-  * `connection.py`: The `DivoomConnection` manager class.
-  * `bt_spp_transport.py`: BT Classic SPP RFCOMM transport wrapper.
-  * `lan_transport.py`: Local Wi-Fi HTTP transport client.
-  * `framing.py`: Pure functional package formatting helper functions.
-  * `sender_protocol.py`: `CommandSender` PEP-544 abstract protocol interface.
-  * `exceptions.py`: Custom domain exception classes.
-  * `protocol.py`: Backward-compatibility wrapper for `DivoomProtocol`.
-  * `models/`: Folder containing configuration models, constants, and command schemas.
-  * `wall.py`: Display wall coordinator class (`DivoomWall`).
-  * `display/`: Modules for controlling the display.
-    * `light.py`: Light/ambient channel commands.
-    * `animation.py` / `display_animation.py`: Animation and GIF playback.
-    * `drawing.py`: Matrix pixel drawing controls.
-    * `text.py` / `display_text.py`: Canvas text generation and formatting.
-  * `media/`: Modules for controlling media playback.
-    * `music.py`: Audio control, speaker profiles, and volume commands.
-    * `radio.py`: FM radio controls.
-  * `scheduling/`: Modules for scheduling events.
-    * `alarm.py`: Alarm settings.
-    * `sleep.py`: Sleep profiles.
-    * `timeplan.py`: Automated timeplans.
-  * `system/`: Modules for controlling system settings.
-    * `device.py`: General brightness and orientation settings.
-    * `time.py`: Timezone, time updates, and date syncing.
-    * `bluetooth.py`: Device-level BT settings.
-  * `tools/`: Modules for controlling tools.
-    * `scoreboard.py`: Scoreboard tool.
-    * `timer.py`: Timer tool.
-    * `countdown.py`: Countdown tool.
-    * `noise.py`: Noise decibel meter tool.
-  * `utils/`: Utility functions for discovery, image processing, device database lookup, macOS media sync, etc.
-* `gui/`: Interactive Desktop applications.
-  * `gui_main.py`: PyWebView control bridge backend.
-  * `menubar.py`: Native Cocoa Status Bar App & UNIX Domain Socket IPC.
-  * `presets.json`: Screen grid presets cache.
-  * `web_ui/`: Glassmorphic fronted dashboard.
-* `examples/`: Example scripts.
-* `docs/`: Documentation files.
-
-## Contributing
-
-Contributions are welcome! If you want to contribute to the project, please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Make your changes and commit them.
-4. Push your changes to your fork.
-5. Create a pull request.
-
-## Disclaimer
-
-This project is unofficial and not affiliated with Divoom Technology Co., Ltd. Use at your own risk.
+This repo is worked by multiple agents and sessions sharing one git tree. See
+**`AGENTS.md`** for the conventions and **`docs/SESSION_HANDOFF.md`** for current
+state and open threads. Keep tests green and update the handoff each round.
