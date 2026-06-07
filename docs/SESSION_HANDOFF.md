@@ -53,8 +53,8 @@ core rule in `AGENTS.md`).
 - **Earlier:** R10 ANCS notifications; R9 screen orientation + factory reset
   (0xBD EXT); R8 device settings/FM/weather/memorial + Tools sub-tabs; R7 surfaced
   text/alarms/sleep/tools. See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
-- **Git:** the R8→R11 arc (~25 commits) is **not yet pushed to origin** (push
-  pending user confirmation — §E of Round 12).
+- **Git:** R8→R12 arc (~30 commits) **PUSHED to origin** (`2041d6c3`). Branch
+  is in sync with `origin/main` as of 2026-06-06.
 
 ## Open threads / next up (see docs/PLANNING_ROUND12.md for the full plan)
 
