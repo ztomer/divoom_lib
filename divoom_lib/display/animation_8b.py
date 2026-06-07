@@ -79,7 +79,11 @@ def _phase_start(file_size: int) -> bytes:
 
 
 def _phase_data(file_size: int, offset_id: int, data: bytes) -> bytes:
-    """SendingData phase payload (7 + len(data) bytes)."""
+    """SendingData phase payload (7 + len(data) bytes).
+
+    `offset_id` is the sequential chunk INDEX (0,1,2,...), not a byte offset —
+    see build_8b_phases / futpib.
+    """
     return (
         bytes([CONTROL_SENDING_DATA])
         + file_size.to_bytes(4, "little")
@@ -106,9 +110,12 @@ def build_8b_phases(frames: List[Frame]) -> List[bytes]:
     blob = _build_animation_blob(frames)
     file_size = len(blob)
     phases: List[bytes] = [_phase_start(file_size)]
-    for offset in range(0, file_size, SENDING_DATA_CHUNK_SIZE):
+    # offset_id is the chunk INDEX (0,1,2,...), matching futpib + the live
+    # streamer Animation.stream_animation_8b. The device places chunk N at byte
+    # N*SENDING_DATA_CHUNK_SIZE, so a byte offset here would leave gaps and stall.
+    for index, offset in enumerate(range(0, file_size, SENDING_DATA_CHUNK_SIZE)):
         chunk = blob[offset : offset + SENDING_DATA_CHUNK_SIZE]
-        phases.append(_phase_data(file_size, offset, chunk))
+        phases.append(_phase_data(file_size, index, chunk))
     phases.append(_phase_terminate())
     return phases
 

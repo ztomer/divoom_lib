@@ -144,10 +144,11 @@ def test_8b_multi_frame_phases_match_python():
     # 3 × 139-byte frames = 417 bytes → 2 data chunks (256 + 161)
     data_phases = c_phases[1:-1]
     assert len(data_phases) == 2
-    # First chunk: offset_id=0
+    # offset_id is a chunk INDEX (futpib), not a byte offset.
+    # First chunk: index 0
     assert data_phases[0][5:7] == (0).to_bytes(2, "little")
-    # Second chunk: offset_id=256
-    assert data_phases[1][5:7] == (256).to_bytes(2, "little")
+    # Second chunk: index 1
+    assert data_phases[1][5:7] == (1).to_bytes(2, "little")
 
 
 def test_8b_chunks_at_256_boundary():

@@ -268,15 +268,19 @@ int divoom_encode_animation_8b(
     write_8b_start(out_buf + out_off, file_size);
     out_off += 5;
 
-    uint16_t offset_id = 0;
+    /* offset_id is the sequential chunk INDEX (0,1,2,...), per the futpib
+     * reference (create_network_packets_from) and the Python streamer
+     * Animation.stream_animation_8b. The device positions chunk N at byte
+     * N*DIVOOM_8B_CHUNK_SIZE (256), so the chunk size and index must agree —
+     * an earlier version sent a byte offset here, which left gaps and stalled
+     * the transfer. */
     for (int i = 0; i < n_chunks; i++) {
         int chunk_size = total_len - offset;
         if (chunk_size > DIVOOM_8B_CHUNK_SIZE) chunk_size = DIVOOM_8B_CHUNK_SIZE;
-        write_8b_data(out_buf + out_off, file_size, offset_id,
+        write_8b_data(out_buf + out_off, file_size, (uint16_t)i,
                       frames_blob + offset, chunk_size);
         out_off += 7 + chunk_size;
         offset += chunk_size;
-        offset_id = (uint16_t)(offset_id + chunk_size);
     }
 
     write_8b_terminate(out_buf + out_off);
