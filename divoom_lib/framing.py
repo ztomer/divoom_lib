@@ -80,7 +80,11 @@ def encode_basic_payload(payload_bytes: list, escape: bool = False) -> bytes:
     idx = 3
     if escape:
         esc1, esc2, esc3 = models.ESCAPE_BYTE_1, models.ESCAPE_BYTE_2, models.ESCAPE_BYTE_3
-        seq1, seq2, seq3 = models.ESCAPE_SEQUENCE_1, models.ESCAPE_SEQUENCE_2, models.ESCAPE_SEQUENCE_3
+        # bytes(), not list — assigning a list to a memoryview slice raises
+        # TypeError (the C path normally masks this; see test_framing_both_impls).
+        seq1 = bytes(models.ESCAPE_SEQUENCE_1)
+        seq2 = bytes(models.ESCAPE_SEQUENCE_2)
+        seq3 = bytes(models.ESCAPE_SEQUENCE_3)
         for b in payload_bytes:
             if b == esc1:
                 mv[idx:idx+2] = seq1
@@ -148,7 +152,7 @@ def encode_ios_le_payload(payload_bytes: list, packet_number: int = 0x00000000) 
     buf = bytearray(total_len)
     mv = memoryview(buf)
     
-    mv[0:4] = models.IOS_LE_MESSAGE_HEADER
+    mv[0:4] = bytes(models.IOS_LE_MESSAGE_HEADER)  # bytes(), not list (memoryview slice)
     
     length_field = total_len - 7
     mv[4] = length_field & 0xFF
