@@ -15,6 +15,23 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **In flight — R16 daemon (P1+P2 shipped) → folding into R17 (3-way split).**
+  Architecture correction from the user: the macOS notification monitor + ALL
+  background device-driving must live in a **headless daemon**, not the GUI
+  (presentation only). R16 P1 (`gui/daemon_protocol.py` — NDJSON command +
+  subscribe/stream + `DaemonClient`) and P2 (`gui/daemon.py` — `DivoomDaemon`
+  owns device + monitor + routing + event socket; `divoom-control daemon` CLI;
+  monitor/device-sender injectable) are SHIPPED + tested (13 daemon tests).
+  Suite **959 passed / 0 failed**.
+  - **Next = R17, a 3-way package split** (`divoom_lib` / `divoom_daemon` /
+    `divoom_gui`), decided with the user: daemon absorbs ALL background work
+    (notifications + live widgets + gallery/monthly-best); **physical split
+    first**, then behavior migration; **three top-level packages**. R16 P3/P4
+    (menubar + GUI → daemon clients) are folded into R17 Phase 5. See
+    **`docs/PLANNING_ROUND17.md`** for the dependency-safe, incremental,
+    shim-based phase plan + the measured hazards (10 test path-hacks, 9 dylib
+    refs → dylib moves to `divoom_lib/`, pyproject rewrite). **Not started.**
+
 - **Last round shipped:** Round 15 (§1+§7, §2, §3, §4, §5, §6 SHIPPED —
   round complete). 829 → 946 passed, +117 tests, zero regressions.
   **§6 menubar (event-driven, no polling):** the menubar status item shows
