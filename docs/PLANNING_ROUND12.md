@@ -93,4 +93,17 @@ sub-tab style = **segmented pill**; volume slider stays **plain**.
   drag-region has no no-drag check); 4e brightness thumb tracks value (white→black)
   with contrasting border, volume left plain. +1 UI test. Suite 670/0.
   **⏳ Visual check:** appbar layout + corner indicators want an eyes-on pass.
-- **§A Phases 4–7 / §D / §E:** not started — staged below.
+- **§A Phase 4 done:** 5b scoreboard restyled — large, centred, stacked BLUE-over-RED
+  team rows with 40px numerals.
+- **§A Phase 5 done:** item 6 — one unified Virtual Wall toolbar (icons+labels:
+  Add screen / Clear / editable preset name / Save / Load); "Canvas" + "Layout &
+  Presets" headings dropped; Save reads the editable name.
+- **§A Phase 6 done:** item 7 font sweep — global rule so input/select/textarea/
+  button inherit `--font-sans` (controls were rendering in the browser default).
+- **§A Phase 7 (item 8 tools regroup) — NOT started.** The big IA move: Tools →
+  {Time (alarms+anniversary), Sleep, FM, timer/countdown/noise}; Weather → Live
+  Widgets; Device settings (+Display+Notification) → Settings→Devices; unify all
+  sub-tabs on the segmented-pill style (8f). Relocates cards across top-level
+  tabs + rewrites R8/R9/R10 location tests → its own focused, visually-verified
+  pass. Suite after P2–P6: **672 passed / 0 failed**.
+- **§D / §E:** not started.

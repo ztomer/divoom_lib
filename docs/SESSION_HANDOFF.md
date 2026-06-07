@@ -35,9 +35,14 @@ core rule in `AGENTS.md`).
   ambient color gating + drop "Custom", scoreboard Reset). **§A Phase 3** shipped
   (appbar: corner transports, right-aligned sliders, slider drag-fix, unified
   value font, brightness-mapped thumb). Suite **670 passed / 0 failed**.
-  **⏳ Phase 2 + 3 UI want a visual pass (run `python3 gui/gui_main.py`).**
-  Next: §A Phases 4–7 (scoreboard restyle, wall toolbar icons+labels, font sweep,
-  tools regroup + unified segmented-pill tabs) → §D → §E (handoff + push arc).
+  **§A Phases 4–6** shipped: scoreboard restyle (stacked BLUE-over-RED), unified
+  Virtual Wall toolbar (icons+labels, editable preset name, "Canvas" heading
+  dropped), font sweep (controls inherit `--font-sans`). Suite **672 passed / 0
+  failed**. **⏳ Phases 2–6 are UI changes — run `python3 gui/gui_main.py` for a
+  visual pass.** Next: **§A Phase 7** (item 8 tools regroup: Tools→Time/Sleep/FM,
+  Weather→Live Widgets, Device settings→Settings→Devices, unified segmented-pill
+  tabs — relocates cards across tabs + rewrites location tests, own pass) → §D →
+  §E (push the ~33-commit arc to origin, needs user OK).
 - **Earlier:** R10 ANCS notifications; R9 screen orientation + factory reset
   (0xBD EXT); R8 device settings/FM/weather/memorial + Tools sub-tabs; R7 surfaced
   text/alarms/sleep/tools. See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
