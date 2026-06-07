@@ -97,7 +97,37 @@ here. R16 P3/P4/P5 are folded into Phase 5/7 of this round.
   (`divoom_lib`/`divoom_daemon`/`divoom_gui`), ships the dylib with divoom_lib +
   web_ui with divoom_gui; `divoom-control` + `divoom-control daemon` entry points
   verified; all three packages import.
-- **P5 — the behavior migration — NOT started.** This is the actual behavioural
+- **P5 — IN PROGRESS. Mechanism shipped + tested; gui_api flip blocked on a
+  discovered constraint (decision pending).**
+  - **Daemon side SHIPPED** (`feat(R17-P5): daemon device_call RPC`): generic
+    `device_call` ({method,args,kwargs} → dotted-method dispatch on the daemon's
+    owned `Divoom`, awaited, JSON-coerced), `connect`/`disconnect`/`device_status`,
+    a dedicated device asyncio loop that survives across calls. +4 tests.
+  - **GUI client side SHIPPED** (`feat(R17-P5): GUI daemon bridge`): `ensure_daemon()`
+    auto-spawns a detached daemon if none is live; `DaemonDeviceProxy` makes
+    `proxy.display.show_light(...)` issue a `device_call` so the existing
+    `_run_async(target.X.Y(...))` call-sites work unchanged once `target` is a
+    proxy. +8 tests. Suite 975/0/75.
+  - **BLOCKER discovered — the cutover cannot be partial.** Because BLE is
+    single-owner, if the GUI flips its *single-device* path to the daemon but
+    keeps owning the device anywhere else, the two processes contend for the
+    connection — worse than today. Two gui_api subsystems still own BLE directly
+    and have no daemon equivalent yet:
+      1. **Wall / multi-device** (`wall_instance` = a `DivoomWall` holding several
+         live `Divoom` connections; `_rebuild_wall_instance()` + iteration over
+         `wall_instance.devices`). Needs the daemon to own a wall composition +
+         a multi-device call protocol — a real protocol extension, not a flip.
+      2. **Scanning + connect** (`scanner_mixin` constructs `Divoom(...).connect()`
+         and sets `current_divoom`) — must become `client.connect(mac)` + a
+         daemon-owned scan RPC.
+      3. **LAN/status internals** (`current_divoom._conn.mac`, `.lan.device_ip`,
+         `._lan =` in transport-status / lan-config) — must be served by
+         `device_status` fields, not device attribute reads.
+  - **Therefore the full flip = daemon also owns wall+scan+LAN, plus runtime
+    verification against the live pywebview app + real hardware** (which can't be
+    unit-tested). Scoping decision surfaced to the user.
+
+- (superseded) **P5 — the behavior migration — NOT started.** This was the actual behavioural
   daemonisation and the one remaining large piece. **Key constraint:** the BLE
   device connection can only be held by ONE process, so the daemon and the GUI
   cannot both own the device. The correct model is **daemon = single device

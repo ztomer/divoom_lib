@@ -6,6 +6,44 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 16-17 — 2026-06-07 (headless daemon + 3-way package split + single-owner cutover mechanism)
+
+The project became three top-level packages — `divoom_lib` (pure protocol +
+native dylib), `divoom_daemon` (headless device owner + macOS notification
+routing + event socket), `divoom_gui` (pywebview presentation, thin client) —
+and gained a headless daemon with a Unix-socket NDJSON protocol. See
+`docs/PLANNING_ROUND16.md` + `docs/PLANNING_ROUND17.md`.
+
+- **R16 — daemon core**: `daemon_protocol.py` (NDJSON framing, request/response
+  + `subscribe`/stream, `DaemonClient`) + `daemon.py` (server owning the device
+  + macOS notification monitor) + a `divoom-control daemon` CLI subcommand.
+- **R17 P1-P4,P6 — physical 3-way split**: moved the daemon core, macOS
+  notification + menubar modules into `divoom_daemon/`; moved the native dylib +
+  `compact.c` into `divoom_lib/` (its true home; fixed all 9 path refs); renamed
+  `gui/` → `divoom_gui/` (+ 19 test path-hacks); rewrote `pyproject.toml` to find
+  all three packages with per-package data. Browser-verified via the Playwright
+  DOM tests. Suite held 959 → 963 / 0.
+- **R17 P5 — single-owner cutover mechanism (device_call RPC)**: BLE is
+  single-owner, so the daemon becomes the sole device owner and the GUI proxies
+  device methods. **Daemon side**: generic `device_call` (dotted-method dispatch
+  + await + JSON-coerce), `connect`/`disconnect`/`device_status`, a dedicated
+  device asyncio loop surviving across calls. **GUI side** (`daemon_bridge.py`):
+  `ensure_daemon()` auto-spawns a detached daemon; `DaemonDeviceProxy` makes
+  `proxy.x.y(...)` issue a `device_call` so existing `_run_async(target.X.Y(...))`
+  call-sites work unchanged. +12 tests, suite → 975 / 0 / 75.
+- **R17 P5 — known blocker**: flipping `gui_api` itself is gated on migrating the
+  remaining BLE-owning subsystems (wall/multi-device, scanning+connect,
+  LAN/status internals) into the daemon — a partial flip would make two
+  processes contend for the connection. Plus runtime verification against the
+  live app + hardware. Mechanism is in place; the flip is scoped in
+  `PLANNING_ROUND17.md §outcome P5`.
+- **R18 — product fixes** (landed alongside): weather auto-fetch + device re-push
+  + IP geolocation (no more hard-coded "Berlin"); system-monitor frame grey-box
+  removal; smaller stock arrow + tiny stock-name font; Tools/Settings tab icons;
+  fit-to-content tab bar + theme selector; **credentials-erase fix**
+  (`presets_manager.save_credentials` preserves a blank password instead of
+  wiping it + only invalidates the token cache on real change).
+
 ## Round 15 — 2026-06-07 (UI unification, monthly best, weather widget, settings refactor, MCP server, menubar)
 
 Six user-driven changes plus a new MCP server feature. The unifying
