@@ -35,16 +35,29 @@ class PresetsManagerMixin:
             if "divoom" not in cfg:
                 cfg["divoom"] = {}
             cfg["divoom"]["email"] = email
-            cfg["divoom"]["password"] = password
-            
+            # Never wipe the stored password with a blank one. The settings form
+            # never re-populates the password field (security), so a plain re-save
+            # submits password="" — overwriting it here used to erase the
+            # credential, and the next 23h token-cache expiry then degraded the
+            # account to a guest token ("credentials get erased from time to
+            # time"). Only update the password when a non-empty one is provided.
+            password_changed = bool(password)
+            if password_changed:
+                cfg["divoom"]["password"] = password
+
             with open(config_file, "w") as f:
                 cfg.write(f)
-                
-            auth_cache = Path.home() / ".config" / "divoom-control" / "auth_token.json"
-            if auth_cache.exists():
-                auth_cache.unlink()
-                
-            self.cached_creds = divoom_auth.get_credentials(force_refresh=True)
+
+            # Only invalidate the cached token + force re-auth when we actually
+            # have a new password to log in with. Otherwise keep the working cache
+            # (force-refreshing with no password would fall back to guest).
+            if password_changed:
+                auth_cache = Path.home() / ".config" / "divoom-control" / "auth_token.json"
+                if auth_cache.exists():
+                    auth_cache.unlink()
+                self.cached_creds = divoom_auth.get_credentials(force_refresh=True)
+            else:
+                self.cached_creds = divoom_auth.get_credentials()
             return self.cached_creds.is_valid()
         except Exception as e:
             logger.error(f"Failed to save credentials: {e}")
