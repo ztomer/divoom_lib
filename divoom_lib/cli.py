@@ -102,6 +102,14 @@ def build_parser() -> argparse.ArgumentParser:
     # at the handler level (see cmd_pair). Defining them again here would
     # conflict with the inherited definitions.
     sub.add_parser("pair", parents=[shared], help="Pair a MAC address with a device type (saves to registry).")
+
+    # MCP server (R15 §5): stdio JSON-RPC server. Connects to the
+    # device via BLE/SPP and exposes 12 tools to MCP-compatible clients
+    # (Claude Desktop, Cursor, Cline, Continue, etc.).
+    sub.add_parser(
+        "mcp-server", parents=[shared],
+        help="Start the MCP stdio JSON-RPC server (use --mac to pick a device).",
+    )
     return p
 
 
@@ -382,6 +390,32 @@ async def cmd_identify(args: argparse.Namespace) -> int:
     return 0
 
 
+async def cmd_mcp_server(args: argparse.Namespace) -> int:
+    """Start the MCP stdio JSON-RPC server (R15 §5).
+
+    Connects to the requested device (auto-discovers if --mac is
+    omitted), builds the tool catalog, and runs the server loop
+    reading JSON-RPC messages from stdin. Exits cleanly when the
+    parent process closes stdin."""
+    d, mac = await _resolve_device(args)
+    try:
+        from divoom_lib.mcp_server import MCPServer
+        from divoom_lib.mcp_tools import build_tool_catalog
+
+        server = MCPServer(
+            server_info={"name": "divoom-control", "version": "0.15.0"},
+        )
+        server.tools = build_tool_catalog(d)
+        sys.stderr.write(
+            f"MCP server starting: mac={mac}, tools={len(server.tools)}\n"
+        )
+        sys.stderr.flush()
+        await server.run_stdio()
+        return 0
+    finally:
+        await d.disconnect()
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────
 
 
@@ -397,6 +431,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace], Awaitable[int]]] = {
     "push-gif":      cmd_push_gif,
     "pair":          cmd_pair,
     "identify":      cmd_identify,
+    "mcp-server":    cmd_mcp_server,
 }
 
 

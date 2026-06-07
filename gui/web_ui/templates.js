@@ -656,6 +656,26 @@ window.DivoomTemplates = {
                             </div>
                         </div>
                     </div>
+
+                    <!-- R15 §5: MCP server (Model Context Protocol) — exposes
+                         12 device-control tools over stdio JSON-RPC. Connect
+                         Claude Desktop, Cursor, Cline, or Continue to control
+                         the device with natural language. See docs/MCP_SERVER.md. -->
+                    <div class="card glass-card" style="margin-top:18px;">
+                        <div class="card-header flex-header">
+                            <h3>MCP Server</h3>
+                            <span class="status-pill" id="mcp-status-pill">stopped</span>
+                        </div>
+                        <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+                            <p class="panel-hint" style="margin:0;">Spawns <code>divoom-control mcp-server</code> as a subprocess. Point any MCP-compatible client at this machine's <code>divoom-control</code> binary; see <code>docs/MCP_SERVER.md</code> for setup.</p>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <button id="mcp-start-btn" class="glow-btn">Start</button>
+                                <button id="mcp-stop-btn" class="glow-btn secondary" disabled>Stop</button>
+                                <span id="mcp-status-detail" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; margin-left:8px;">PID: --</span>
+                            </div>
+                            <pre id="mcp-log" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px; margin: 0; white-space: pre-wrap;">No log entries yet.</pre>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 5. APPEARANCE TAB -->

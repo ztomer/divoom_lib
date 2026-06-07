@@ -666,4 +666,59 @@ document.addEventListener("DOMContentLoaded", () => {
             if (macRulesMsg) { macRulesMsg.textContent = "reset to defaults"; macRulesMsg.dataset.state = "ok"; }
         });
     }
+
+    // ── R15 §5: MCP server toggle ────────────────────────────────
+    const mcpStartBtn = document.getElementById("mcp-start-btn");
+    const mcpStopBtn = document.getElementById("mcp-stop-btn");
+    const mcpStatusPill = document.getElementById("mcp-status-pill");
+    const mcpStatusDetail = document.getElementById("mcp-status-detail");
+    const mcpLog = document.getElementById("mcp-log");
+
+    function renderMcpStatus(s) {
+        if (!s) return;
+        const running = !!s.running;
+        if (mcpStatusPill) {
+            mcpStatusPill.textContent = running ? "running" : "stopped";
+            mcpStatusPill.dataset.state = running ? "ok" : "idle";
+        }
+        if (mcpStatusDetail) {
+            mcpStatusDetail.textContent = s.pid ? `PID: ${s.pid}  mac: ${s.mac || "--"}` : "PID: --";
+        }
+        if (mcpLog) {
+            const lines = Array.isArray(s.last_log_lines) ? s.last_log_lines : [];
+            mcpLog.textContent = lines.length ? lines.join("\n") : "No log entries yet.";
+        }
+        if (mcpStartBtn) mcpStartBtn.disabled = running;
+        if (mcpStopBtn) mcpStopBtn.disabled = !running;
+    }
+
+    function refreshMcpStatus() {
+        if (!api()?.mcp_server_status) return;
+        Promise.resolve(api().mcp_server_status()).then(s => renderMcpStatus(s));
+    }
+
+    if (mcpStartBtn) {
+        mcpStartBtn.addEventListener("click", () => {
+            if (!api()?.start_mcp_server) return;
+            mcpStartBtn.disabled = true;
+            Promise.resolve(api().start_mcp_server("")).then(s => renderMcpStatus(s));
+        });
+    }
+    if (mcpStopBtn) {
+        mcpStopBtn.addEventListener("click", () => {
+            if (!api()?.stop_mcp_server) return;
+            mcpStopBtn.disabled = true;
+            Promise.resolve(api().stop_mcp_server()).then(s => renderMcpStatus(s));
+        });
+    }
+    // Refresh on tab activation only — no background polling. The
+    // status card shows current state on entry; it updates after
+    // Start/Stop click. If the subprocess dies between activations,
+    // the next visit will show the new state.
+    refreshMcpStatus();
+    window.addEventListener("tab-changed", (e) => {
+        if (e.detail && e.detail.tab === "settings") {
+            refreshMcpStatus();
+        }
+    });
 });

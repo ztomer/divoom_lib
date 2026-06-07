@@ -878,7 +878,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
                 if not self._rebuild_wall_instance():
                     return False
                 return self._run_async(self.wall_instance.show_image(file_path))
-            
+
             target = self.current_divoom
             if not target:
                 return False
@@ -886,3 +886,38 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         except Exception as e:
             logger.error(f"Failed to display custom art: {e}")
             return False
+
+    # ── Round 15 §5: MCP server subprocess control ────────────────────
+    #
+    # The GUI spawns ``python -m divoom_lib.cli mcp-server --mac <MAC>``
+    # as a subprocess and tracks it via MCPController. pywebview's
+    # event loop and the MCP server's stdio loop would otherwise fight
+    # over file descriptors — subprocess isolation is the clean fix.
+
+    def start_mcp_server(self, mac: str = "") -> dict:
+        """Start the MCP stdio server subprocess (R15 §5).
+
+        ``mac`` is optional; falls back to the active device's MAC if
+        empty. Returns a status dict (see ``mcp_server_status()``)."""
+        from gui.mcp_control import MCPController, status_to_dict
+        ctl = MCPController.instance()
+        target_mac = mac or (self.current_divoom.mac if self.current_divoom else "")
+        if not target_mac:
+            return status_to_dict(ctl.status()) | {"error": "no MAC available"}
+        return status_to_dict(ctl.start(mac=target_mac))
+
+    def stop_mcp_server(self) -> dict:
+        """Stop the MCP server subprocess (no-op if not running)."""
+        from gui.mcp_control import MCPController, status_to_dict
+        ctl = MCPController.instance()
+        return status_to_dict(ctl.stop())
+
+    def is_mcp_server_running(self) -> bool:
+        """True if the subprocess is alive."""
+        from gui.mcp_control import MCPController
+        return MCPController.instance().is_running()
+
+    def mcp_server_status(self) -> dict:
+        """Snapshot of the subprocess state (JSON-friendly)."""
+        from gui.mcp_control import MCPController, status_to_dict
+        return status_to_dict(MCPController.instance().status())
