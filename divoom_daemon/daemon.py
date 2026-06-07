@@ -46,6 +46,7 @@ class DivoomDaemon:
         *,
         monitor=None,
         device_sender: Optional[Callable[[int, str], None]] = None,
+        device=None,
     ):
         self.mac = mac
         self.socket_path = socket_path
@@ -56,6 +57,12 @@ class DivoomDaemon:
         self._server: Optional[socket.socket] = None
         self._running = False
         self._error: Optional[str] = None
+        # R17 P5: the daemon is the SINGLE owner of the BLE device. The GUI is a
+        # thin client that proxies device methods through the `device_call` RPC.
+        self._device = device                   # injectable (tests); else lazy BLE
+        self._device_lock = threading.Lock()
+        self._loop = None                       # dedicated asyncio loop for device ops
+        self._loop_thread = None
 
     # ── monitor (lazy, macOS) ────────────────────────────────────────────
     def _get_monitor(self):
@@ -140,7 +147,124 @@ class DivoomDaemon:
             return self._cmd_stop()
         if command == "set_routing":
             return self._cmd_set_routing(args)
+        if command == "device_call":
+            return self._cmd_device_call(args)
+        if command == "connect":
+            return self._cmd_connect(args)
+        if command == "disconnect":
+            return self._cmd_disconnect()
+        if command == "device_status":
+            return {"success": True, "connected": self._device_connected()}
         return {"success": False, "error": f"unknown command: {command}"}
+
+    # ── device ownership (R17 P5: the daemon is the single BLE owner) ─────
+    def _device_loop(self):
+        """A dedicated asyncio loop so the BLE connection persists across calls."""
+        with self._device_lock:
+            if self._loop is not None:
+                return self._loop
+            import asyncio
+            loop = asyncio.new_event_loop()
+            ready = threading.Event()
+
+            def _run():
+                asyncio.set_event_loop(loop)
+                ready.set()
+                loop.run_forever()
+
+            self._loop_thread = threading.Thread(target=_run, daemon=True, name="daemon-device-loop")
+            self._loop_thread.start()
+            ready.wait(2.0)
+            self._loop = loop
+            return self._loop
+
+    def _run_device(self, coro):
+        """Run a device coroutine on the persistent device loop, blocking for the result."""
+        import asyncio
+        loop = self._device_loop()
+        return asyncio.run_coroutine_threadsafe(coro, loop).result()
+
+    def _device_connected(self) -> bool:
+        d = self._device
+        return bool(d is not None and getattr(d, "is_connected", False))
+
+    async def _ensure_device_async(self, mac: Optional[str] = None):
+        """Return a connected device, creating + connecting one if needed.
+        Honors an injected device (tests) without touching BLE."""
+        if self._device is not None:
+            if not getattr(self._device, "is_connected", False) and hasattr(self._device, "connect"):
+                try:
+                    await self._device.connect()
+                except Exception:
+                    pass
+            return self._device
+        from divoom_lib.divoom import Divoom            # pragma: no cover (needs BLE)
+        from divoom_lib.utils import discovery          # pragma: no cover
+        target = mac or self.mac
+        if not target:
+            devs = await discovery.discover_all_divoom_devices(timeout=3.0)
+            if not devs:
+                raise RuntimeError("no Divoom device found")
+            target = devs[0]["address"]
+            self.mac = target
+        self._device = Divoom(mac=target, logger=logger, use_ios_le_protocol=False)
+        await self._device.connect()
+        return self._device
+
+    @staticmethod
+    def _json_safe(value):
+        """Coerce a device-call result to something JSON-serializable."""
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        if isinstance(value, (list, tuple)):
+            return [DivoomDaemon._json_safe(v) for v in value]
+        if isinstance(value, dict):
+            return {str(k): DivoomDaemon._json_safe(v) for k, v in value.items()}
+        if isinstance(value, (bytes, bytearray)):
+            return list(value)
+        return str(value)
+
+    def _cmd_device_call(self, args: dict) -> dict:
+        """Generic RPC: resolve a dotted method on the owned device and await it.
+        e.g. {"method": "display.show_light", "args": ["00FFCC", 100]}."""
+        method = args.get("method")
+        call_args = args.get("args", []) or []
+        call_kwargs = args.get("kwargs", {}) or {}
+        if not method:
+            return {"success": False, "error": "device_call requires 'method'"}
+
+        async def _do():
+            device = await self._ensure_device_async(args.get("mac"))
+            target = device
+            for part in str(method).split("."):
+                target = getattr(target, part)
+            result = target(*call_args, **call_kwargs)
+            if hasattr(result, "__await__"):
+                result = await result
+            return result
+
+        try:
+            result = self._run_device(_do())
+            return {"success": True, "result": self._json_safe(result)}
+        except Exception as e:
+            logger.warning(f"device_call {method} failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    def _cmd_connect(self, args: dict) -> dict:
+        try:
+            self._run_device(self._ensure_device_async(args.get("mac")))
+            return {"success": True, "connected": self._device_connected(), "mac": self.mac}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _cmd_disconnect(self) -> dict:
+        d = self._device
+        if d is not None and hasattr(d, "disconnect"):
+            try:
+                self._run_device(d.disconnect())
+            except Exception as e:
+                logger.debug(f"disconnect: {e}")
+        return {"success": True, "connected": False}
 
     def _cmd_start(self) -> dict:
         try:
@@ -270,8 +394,13 @@ class DivoomDaemon:
     def stop(self) -> None:
         self._running = False
         mon = self._monitor
-        if mon is not None and mon.is_running:
+        if mon is not None and getattr(mon, "is_running", False):
             mon.stop()
+        if self._loop is not None:
+            try:
+                self._loop.call_soon_threadsafe(self._loop.stop)
+            except Exception:
+                pass
         if self._server is not None:
             try:
                 self._server.close()

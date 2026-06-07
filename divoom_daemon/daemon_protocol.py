@@ -104,6 +104,15 @@ class DaemonClient:
         except (OSError, ValueError) as e:
             return {"success": False, "error": str(e)}
 
+    def device_call(self, method: str, args: list | None = None,
+                    kwargs: dict | None = None) -> dict:
+        """Proxy a device method through the daemon (R17 P5): the daemon owns the
+        BLE connection and runs ``divoom.<method>(*args, **kwargs)``. Returns the
+        daemon reply ``{"success", "result"|"error"}``."""
+        return self.send_command("device_call", {
+            "method": method, "args": args or [], "kwargs": kwargs or {},
+        })
+
     def subscribe(
         self,
         on_event: Callable[[dict], None],
