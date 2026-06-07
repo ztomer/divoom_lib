@@ -102,6 +102,17 @@ body {
     -webkit-app-region: no-drag;
 }
 
+/* R11 item 7 — font sweep: form controls do NOT inherit font-family by default
+   (browsers force their own UI font on input/select/textarea/button), which is
+   why some controls rendered in the wrong font. Inherit it from <body> so the
+   whole app uses --font-sans from one source of truth. */
+input,
+select,
+textarea,
+button {
+    font-family: inherit;
+}
+
 /* Matte Minimal Background */
 .glass-bg {
     position: absolute;
