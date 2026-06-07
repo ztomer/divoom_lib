@@ -89,9 +89,22 @@ here. R16 P3/P4/P5 are folded into Phase 5/7 of this round.
   downscaler, build script, conftest, pyproject + its test); rebuilt + verified.
   (Also swept in 9 pre-existing `verify_*.py` root→`scripts/` pure renames.)
 - Suite after each: **959 passed / 0 failed / 75 skipped.**
-- **P4 — NOT started** (the big ripple): rename `gui/` → `divoom_gui/`; move
-  `gui_main`/`gui_api`/`presets_manager`/`web_ui` (the background modules
-  media_sync/gallery_sync/scanner_mixin/media_decoder/control_server/mcp_control
-  ride along until P5). Fix the **10 test path-hacks** + menubar's
-  `../gui/gui_main` path + pyproject `gui`→`divoom_gui`. Own focused pass.
-- **P5/P6/P7 — NOT started** (behavior migration, pyproject finalize, close).
+- **P4 SHIPPED** (`refactor(R17-P4)`): renamed `gui/` → `divoom_gui/` (+ __init__).
+  Repathed every reference (19 test path-hacks, `from gui.` imports, menubar's
+  launch path, scripts, pyproject). Browser-verified via the Playwright DOM tests
+  (which load `divoom_gui/web_ui/index.html`). Suite 963 / 0.
+- **P6 SHIPPED** (folded in): pyproject now finds all three packages
+  (`divoom_lib`/`divoom_daemon`/`divoom_gui`), ships the dylib with divoom_lib +
+  web_ui with divoom_gui; `divoom-control` + `divoom-control daemon` entry points
+  verified; all three packages import.
+- **P5 — the behavior migration — NOT started.** This is the actual behavioural
+  daemonisation and the one remaining large piece. **Key constraint:** the BLE
+  device connection can only be held by ONE process, so the daemon and the GUI
+  cannot both own the device. The correct model is **daemon = single device
+  owner; GUI = thin RPC client.** Concretely: a generic `device_call` RPC on the
+  daemon (`{method, args}` executed on its owned `Divoom`), and `gui_api` device
+  methods become thin proxies through `DaemonClient` (no direct BLE in the GUI);
+  scanning/connection/wall/LAN ownership moves to the daemon; menubar + GUI
+  subscribe for status; remove R15 §6's `gui_api._push_menubar_status`. Large,
+  high-risk rewrite of the 935-line `gui_api` — do it as its own careful, tested
+  program, not rushed.

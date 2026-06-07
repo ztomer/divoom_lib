@@ -26,9 +26,18 @@ core rule in `AGENTS.md`).
   password field, so a plain re-save wrote `password=""`; the 23h token-cache
   expiry then degraded the account to a guest token. `save_credentials` now keeps
   a stored password on blank re-saves. +3 regression tests.
-- **R17 (3-way split) P1-P3 SHIPPED; P4 (rename gui/→divoom_gui/) NOT started.**
-  Daemon package + macos_notifications/menubar moved; dylib relocated to
-  divoom_lib. See `docs/PLANNING_ROUND17.md` §outcome.
+- **R17 (3-way split) — PHYSICAL split DONE (P1-P4, P6).** `divoom_lib` /
+  `divoom_daemon` / `divoom_gui` are three top-level packages; the daemon core +
+  notifications + menubar live in divoom_daemon; the dylib in divoom_lib; gui/ is
+  renamed divoom_gui/. pyproject finds all three; entry points verified. Suite
+  **963 / 0 / 75** (Playwright DOM tests browser-verify the rename). **P5 (the
+  behavioural daemonisation) is the one remaining large piece** — see below.
+  - **P5 blocker/decision:** the BLE connection is single-owner, so the daemon
+    and GUI can't both hold the device. Correct model = **daemon owns the device;
+    GUI is a thin RPC client** (generic `device_call` RPC + `gui_api` proxies, no
+    direct BLE in the GUI; scanning/wall/LAN move to the daemon). It's a large,
+    high-risk rewrite of the 935-line `gui_api` — needs its own tested program.
+    See `docs/PLANNING_ROUND17.md` §outcome P5.
 
 - **In flight — R16 daemon (P1+P2 shipped) → folding into R17 (3-way split).**
   Architecture correction from the user: the macOS notification monitor + ALL
