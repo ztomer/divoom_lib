@@ -9,6 +9,45 @@ This is a large round → **phased**, each phase committed separately with tests
 green (core rule). Design calls invoke **Dieter Rams** ("Less, but better";
 honest; unobtrusive) + **Susan Kare** (clear, friendly, iconic, pixel-precise).
 
+## Cross-path audit of the image pipeline (after the cover-art bug hunt)
+
+"Do other image paths share these bugs?" — yes; swept them all. The three root
+causes (resize-before-encode, 256/chunk-index 0x8B, continuous LSB packing) live
+in shared code, so most paths were fixed transitively, but the **native C
+encoder reimplemented the packing bug independently**.
+
+| Path | Encoder used | Status |
+|---|---|---|
+| Cover art / stocks / sysmon (`media_sync`) | `display.show_image` | ✅ fixed (shared) |
+| Custom art (`gui_api.display_custom_art`) | `display.show_image` | ✅ fixed (shared) |
+| Gallery sync (`gallery_sync`) | resizes → `display.show_image` | ✅ fixed (shared) |
+| Virtual Wall (`wall.show_image`) | per-panel → `display.show_image` | ✅ fixed (shared) |
+| 32px encoder (`divoom_image_encode_32`) | reuses `encode_pixels`/`build_palette` | ✅ fixed (shared) |
+| Monthly-best daemon | own 0x8B streamer | ✅ fixed earlier (256/index) |
+| **Native C** (`image_encode.c` ×2, `image_encode_32.c`) | own C packing loop | ✅ **fixed now** + dylib rebuilt |
+| Native C 0x8B chunker (`divoom_encode_animation_8b`) | byte-offset+256 | ⚠️ **dormant** — no live caller (live 0x8B is Python `stream_animation_8b`); left as-is, flagged |
+
+**Native C fix:** all three C packing loops had the identical
+"reset accumulator per byte + mask to 8 bits → drop carry for nb_bits∉{1,2,4,8}"
+bug (its design contract was "byte-for-byte equal to Python", matched to the
+*buggy* Python). Rewrote to a continuous LSB accumulator, rebuilt
+`gui/libdivoom_compact.dylib`. The native parity tests already parametrize
+byte-spanning colour counts (100→7b, 64→6b, 32→5b, 5→3b) and now pass — i.e. C
+== fixed Python. (They likely passed before only because the committed dylib
+wasn't loading on this arch, so the live path was the Python fallback.)
+
+### Reusable lessons / checklist for any new device-image path
+1. **Resize to the device pixel grid (16/32) before encoding** — never encode a
+   source at native resolution (overflows the 2-byte LLLL/TTTT fields).
+2. **Clamp frame duration to u16** (`encode_animation_frame` now does this).
+3. **Push via `display.show_image`** (single + multi frame) — don't hand-roll a
+   0x49/0x8B sender. show_image picks 0x8B (16px) via the proven streamer.
+4. **0x8B = 256-byte chunks + chunk-INDEX offset id** (futpib), never byte-offset.
+5. **Bit-pack pixels continuously LSB-first across byte boundaries** — the single
+   most error-prone primitive; covered by a round-trip test for every width 1-8.
+6. **Don't fork the encoder.** The C/Python split already drifted once; if perf
+   needs C, keep the parity test as the contract and run it in CI.
+
 ---
 
 ## Item 1 — Channels / Custom art

@@ -168,19 +168,19 @@ int divoom_encode_animation_frame_32(
     int mask = (1 << nb_bits) - 1;
     {
         int byte_idx = 0;
-        uint8_t byte = 0;
-        int bit_pos = 0;
+        unsigned int acc = 0;   /* LSB-first bit accumulator, continuous across bytes */
+        int acc_bits = 0;
         for (int i = 0; i < num_pixels; i++) {
-            byte |= (uint8_t)((indices[i] & mask) << bit_pos);
-            bit_pos += nb_bits;
-            if (bit_pos >= 8) {
-                pixel_data[byte_idx++] = byte;
-                byte = 0;
-                bit_pos = 0;
+            acc |= (unsigned int)(indices[i] & mask) << acc_bits;
+            acc_bits += nb_bits;
+            while (acc_bits >= 8) {
+                pixel_data[byte_idx++] = (uint8_t)(acc & 0xFF);
+                acc >>= 8;
+                acc_bits -= 8;
             }
         }
-        if (bit_pos > 0) {
-            pixel_data[byte_idx++] = byte;
+        if (acc_bits > 0) {
+            pixel_data[byte_idx++] = (uint8_t)(acc & 0xFF);
         }
     }
 
