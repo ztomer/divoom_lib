@@ -139,8 +139,10 @@ def test_pyproject_package_data_includes_dylib_and_web_ui() -> None:
     p = REPO_ROOT / "pyproject.toml"
     data = tomllib.loads(p.read_text())
     pd = data.get("tool", {}).get("setuptools", {}).get("package-data", {})
-    # R17: the dylib ships with divoom_lib (its true home); web_ui with gui.
+    # R17: the native lib ships with divoom_lib (its true home); web_ui with gui.
+    # R20: per-platform extensions are all shipped (.dylib/.so/.dll).
     assert "*.dylib" in pd.get("divoom_lib", [])
+    assert "*.so" in pd.get("divoom_lib", [])
     assert "web_ui/*" in pd.get("divoom_gui", [])
 
 

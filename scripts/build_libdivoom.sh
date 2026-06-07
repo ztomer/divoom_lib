@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build script for libdivoom_compact.dylib
-# Combines four C sources into a single dylib (all under divoom_lib — R17):
+# Build script for the native libdivoom_compact shared library.
+# Combines four C sources into a single shared library (all under divoom_lib — R17):
 #   - divoom_lib/native_src/compact.c          (tile compacting + framing — encode_basic/ios_le)
 #   - divoom_lib/native_src/downsample.c       (LANCZOS3 downscale — used by the library)
 #   - divoom_lib/native_src/image_encode.c     (16x16 palette encoder for 0x44/0x49)
@@ -9,39 +9,57 @@
 # compact.c exports encode_basic_payload + encode_ios_le_payload used by
 # divoom_lib/framing.py.
 #
+# Cross-platform (R20): produces a .dylib on macOS and a .so on Linux. The
+# Python loaders resolve the right name via divoom_lib/native_lib.py.
+#
 # Usage:  ./scripts/build_libdivoom.sh
-# Output: ./divoom_lib/libdivoom_compact.dylib (overwrites existing)
+# Output: ./divoom_lib/libdivoom_compact.{dylib|so} (overwrites existing)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LIB_DIR="${PROJECT_ROOT}/divoom_lib"
 NATIVE_SRC_DIR="${LIB_DIR}/native_src"
-OUT="${LIB_DIR}/libdivoom_compact.dylib"
 
-CC="${CC:-clang}"
-CFLAGS=(
-  -O3
-  -fPIC
-  -dynamiclib
-  -Wall
-  -Wextra
-  -Wno-unused-parameter
-)
-ARCH_FLAGS=()
-LD_FLAGS=(
-  -dynamiclib
-  -Wl,-install_name,@rpath/libdivoom_compact.dylib
-  -Wl,-undefined,dynamic_lookup
-)
-
-# Detect arch — M-series gets NEON, Intel gets SSE2.
+OS="$(uname -s)"
 ARCH="$(uname -m)"
+
+CFLAGS=(-O3 -fPIC -Wall -Wextra -Wno-unused-parameter)
+ARCH_FLAGS=()
+LD_FLAGS=()
+
+case "${OS}" in
+  Darwin)
+    CC="${CC:-clang}"
+    OUT="${LIB_DIR}/libdivoom_compact.dylib"
+    CFLAGS+=(-dynamiclib)
+    LD_FLAGS=(
+      -dynamiclib
+      -Wl,-install_name,@rpath/libdivoom_compact.dylib
+      -Wl,-undefined,dynamic_lookup
+    )
+    ;;
+  Linux)
+    CC="${CC:-cc}"
+    OUT="${LIB_DIR}/libdivoom_compact.so"
+    CFLAGS+=(-shared)
+    LD_FLAGS=(-shared -lm)
+    ;;
+  *)
+    echo "Unsupported OS: ${OS}. Building a generic .so with -shared." >&2
+    CC="${CC:-cc}"
+    OUT="${LIB_DIR}/libdivoom_compact.so"
+    CFLAGS+=(-shared)
+    LD_FLAGS=(-shared)
+    ;;
+esac
+
+# Detect arch — ARM gets NEON, x86_64 gets SSE2.
 case "${ARCH}" in
   arm64|aarch64)
     ARCH_FLAGS=(-march=armv8-a+simd)
     ;;
-  x86_64)
+  x86_64|amd64)
     ARCH_FLAGS=(-msse2)
     ;;
   *)
@@ -49,7 +67,7 @@ case "${ARCH}" in
     ;;
 esac
 
-echo "Building ${OUT} for ${ARCH}…"
+echo "Building ${OUT} for ${OS}/${ARCH} with ${CC}…"
 "${CC}" "${CFLAGS[@]}" "${ARCH_FLAGS[@]}" \
   -I"${NATIVE_SRC_DIR}" \
   "${NATIVE_SRC_DIR}/compact.c" \
@@ -60,4 +78,6 @@ echo "Building ${OUT} for ${ARCH}…"
   -o "${OUT}"
 
 echo "Done."
-file "${OUT}"
+if command -v file >/dev/null 2>&1; then
+  file "${OUT}"
+fi

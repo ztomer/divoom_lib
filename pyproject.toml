@@ -95,10 +95,13 @@ include = ["divoom_lib*", "divoom_daemon*", "divoom_gui*"]
 exclude = ["tests*", "examples*", "references*", "scripts*", "docs*"]
 
 [tool.setuptools.package-data]
-# R17: the native dylib ships with `divoom_lib` (its true home — it bundles
+# R17: the native lib ships with `divoom_lib` (its true home — it bundles
 # divoom_lib/native_src/*.c). The web UI ships with the `divoom_gui` package.
+# R20: per-platform extensions — .dylib (macOS), .so (Linux), .dll (Windows).
 divoom_lib = [
     "*.dylib",
+    "*.so",
+    "*.dll",
 ]
 divoom_gui = [
     "web_ui/*",

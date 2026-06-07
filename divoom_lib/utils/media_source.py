@@ -7,6 +7,7 @@ and stock/crypto tickers, rendering them dynamically onto pixel grids.
 
 import os
 import subprocess
+import sys
 import urllib.request
 import json
 import logging
@@ -19,7 +20,13 @@ def get_current_playing_track() -> dict | None:
     """
     Queries Spotify and Apple Music on macOS using AppleScript.
     Returns: {"track": str, "artist": str, "source": str} or None.
+
+    macOS-only (AppleScript/osascript). On Linux/Windows there is no portable
+    now-playing source wired up yet, so this returns None (cover-art sync simply
+    no-ops). A future MPRIS/playerctl backend could fill this in on Linux.
     """
+    if sys.platform != "darwin":
+        return None
     # 1. Check Spotify
     spotify_script = """
     if application "Spotify" is running then

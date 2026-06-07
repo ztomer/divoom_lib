@@ -19,6 +19,7 @@ import hmac
 import logging
 import os
 import socket
+import sys
 import tempfile
 import threading
 from pathlib import Path
@@ -509,6 +510,16 @@ class DivoomDaemon:
             return {"success": False, "reachable": False, "error": str(e)}
 
     def _cmd_start(self) -> dict:
+        # Notification monitoring is macOS-only (reads the Notification Center
+        # SQLite DB). On other platforms with no injected monitor, report a clean
+        # "unsupported" idle state rather than an error — the rest of the daemon
+        # (device control, network server) works fine on Linux.
+        if self._monitor is None and sys.platform != "darwin":
+            self._error = None
+            logger.info("notification monitor unsupported on %s; running idle", sys.platform)
+            ev = self.status_event()
+            self.broadcast(ev)
+            return {"success": True, **ev, "unsupported": True}
         try:
             mon = self._get_monitor()
             if not mon.is_running:

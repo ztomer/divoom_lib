@@ -1,4 +1,13 @@
+#include <string.h>
+
+// NEON is used to copy each 16-pixel (48-byte) tile row on ARM (Apple silicon
+// + aarch64 Linux). On other targets (x86_64 Linux/macOS) we fall back to a
+// byte-identical memcpy, so the library is portable. <arm_neon.h> only exists
+// on ARM toolchains, so the include must be guarded too.
+#if defined(__ARM_NEON) || defined(__aarch64__)
 #include <arm_neon.h>
+#define DIVOOM_HAVE_NEON 1
+#endif
 
 // ── Image Layout Constants ──────────────────────────────────────────
 #define TILE_SIZE          16
@@ -49,8 +58,10 @@ void compact_tiles(const unsigned char* frame_data, int frame_data_len,
                 int out_y = grid_y * TILE_SIZE + y;
                 int out_pos = (out_y * width + out_x) * CHANNELS_RGB;
                 
-                // Explicitly copy an entire 16-pixel row (48 bytes) using three 128-bit vector registers.
+                // Copy an entire 16-pixel row (48 bytes). NEON on ARM; a
+                // byte-identical memcpy everywhere else.
                 if (in_pos + TILE_ROW_BYTES <= frame_data_len && out_pos + TILE_ROW_BYTES <= max_out_pos) {
+#ifdef DIVOOM_HAVE_NEON
                     uint8x16_t v0 = vld1q_u8(frame_data + in_pos + VEC_OFFSET_0);
                     uint8x16_t v1 = vld1q_u8(frame_data + in_pos + VEC_OFFSET_1);
                     uint8x16_t v2 = vld1q_u8(frame_data + in_pos + VEC_OFFSET_2);
@@ -58,6 +69,9 @@ void compact_tiles(const unsigned char* frame_data, int frame_data_len,
                     vst1q_u8(output_pixels + out_pos + VEC_OFFSET_0, v0);
                     vst1q_u8(output_pixels + out_pos + VEC_OFFSET_1, v1);
                     vst1q_u8(output_pixels + out_pos + VEC_OFFSET_2, v2);
+#else
+                    memcpy(output_pixels + out_pos, frame_data + in_pos, TILE_ROW_BYTES);
+#endif
                 }
             }
             tile_idx++;

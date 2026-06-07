@@ -15,12 +15,16 @@ hardware tests are skipped by default. Run them against a real device with::
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_DYLIB = _REPO_ROOT / "divoom_lib" / "libdivoom_compact.dylib"
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from divoom_lib.native_lib import library_path as _native_library_path
+_DYLIB = _native_library_path()  # platform-aware (.dylib/.so/.dll)
 _BUILD_SCRIPT = _REPO_ROOT / "scripts" / "build_libdivoom.sh"
 _C_SOURCES = [
     _REPO_ROOT / "divoom_lib" / "native_src" / "compact.c",
@@ -55,7 +59,7 @@ def pytest_configure(config):
             cwd=str(_REPO_ROOT), check=True,
             capture_output=True, text=True, timeout=120,
         )
-        print("conftest: rebuilt libdivoom_compact.dylib (was missing/stale)")
+        print(f"conftest: rebuilt {_DYLIB.name} (was missing/stale)")
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
         # No compiler / build failure: the native tests will skip; Python still runs.
         print(f"conftest: native dylib build skipped ({type(e).__name__})")

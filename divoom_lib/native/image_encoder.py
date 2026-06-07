@@ -45,10 +45,12 @@ from ..utils.divoom_image_encode_32 import (  # noqa: F401
 _lib = None
 _lib_load_error: str | None = None
 
-# The dylib lives in divoom_lib/ (R17): it bundles native_src/compact.c
+# The native lib lives in divoom_lib/ (R17): it bundles native_src/compact.c
 # (tile-compacting + framing) with native_src/{downsample,image_encode}.c into
-# one shared library. native/ -> parent.parent == divoom_lib/.
-_DYLIB_PATH = Path(__file__).parent.parent / "libdivoom_compact.dylib"
+# one shared library. native_lib.library_path() resolves the per-platform name
+# (.dylib/.so/.dll).
+from divoom_lib.native_lib import library_path
+_DYLIB_PATH = library_path()
 
 # Animation packet chunk size (must match C DIVOOM_ANIMATION_CHUNK_SIZE)
 ANIMATION_CHUNK_SIZE = 200
