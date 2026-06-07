@@ -1,9 +1,13 @@
 /* gallery.css — Cloud Community Gallery and Monthly Best layouts */
 
 /* Gallery grid lists */
+/* R15 §2: cap the box at 168px (was 1fr) so a wide Monthly Best panel
+ * doesn't grow the tiles past 168px each — keeping the preview tile
+ * aspect-ratio legible. 110px floor is the smallest preview + name we
+ * can fit comfortably. */
 .gallery-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(110px, 168px));
     gap: 12px;
     max-height: 400px;
     overflow-y: auto;

@@ -17,42 +17,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // ── 1. CLOUD GALLERY FETCH AND SYNC ──
-    const loadGalleryBtn = document.getElementById("load-gallery-btn");
-    if (loadGalleryBtn) {
-        loadGalleryBtn.addEventListener("click", () => {
-            const classify = parseInt(document.getElementById("gallery-classify")?.value || "18");
-            if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">Fetching public community gallery...</div>`;
-            window.DivoomState.loadedArtworks = [];
-            window.DivoomState.selectedArtworkIndex = null;
-            
-            let targetSize = 16;
-            const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
-            if (bannerResText.includes("64")) {
-                targetSize = 64;
-            } else if (bannerResText.includes("32")) {
-                targetSize = 32;
-            }
-            
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.fetch_gallery(classify, targetSize)
-                    .then(artworksJson => {
-                        const artworks = JSON.parse(artworksJson);
-                        if (artworks.error) {
-                            window.showToast(artworks.error, "error");
-                            if (galleryContainer) {
-                                galleryContainer.innerHTML = `<div class="empty-list" style="color:#ef4444; padding:20px; font-weight:600; text-align:center;">️ ${artworks.error}</div>`;
-                            }
-                            return;
-                        }
-                        
-                        window.DivoomState.loadedArtworks = artworks;
-                        window.DivoomState.selectedArtworkIndex = null;
-                        renderGallery(artworks);
-                        window.showToast("Gallery loaded from cache", "success", " Cloud");
-                    });
-            }
-        });
+    // R15 §2: the gallery now auto-loads on tab activation + on classify
+    // change. The "Fetch Gallery" button is hidden (kept in the DOM as
+    // a ghost for backwards compat) so the auto-fetch flow can still
+    // .click() it from a single place. `loadGallery()` is the canonical
+    // entry point and is also exposed on `window` for tests.
+    function readTargetSize() {
+        const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
+        if (bannerResText.includes("64")) return 64;
+        if (bannerResText.includes("32")) return 32;
+        return 16;
     }
+
+    function loadGallery() {
+        const classify = parseInt(document.getElementById("gallery-classify")?.value || "18");
+        if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">Fetching public community gallery...</div>`;
+        window.DivoomState.loadedArtworks = [];
+        window.DivoomState.selectedArtworkIndex = null;
+        const targetSize = readTargetSize();
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.fetch_gallery(classify, targetSize)
+                .then(artworksJson => {
+                    const artworks = JSON.parse(artworksJson);
+                    if (artworks.error) {
+                        window.showToast(artworks.error, "error");
+                        if (galleryContainer) {
+                            galleryContainer.innerHTML = `<div class="empty-list" style="color:#ef4444; padding:20px; font-weight:600; text-align:center;">️ ${artworks.error}</div>`;
+                        }
+                        return;
+                    }
+                    window.DivoomState.loadedArtworks = artworks;
+                    window.DivoomState.selectedArtworkIndex = null;
+                    renderGallery(artworks);
+                    window.showToast("Gallery loaded from cache", "success", " Cloud");
+                });
+        }
+    }
+
+    // Expose for tests + the auto-fetch hooks below.
+    window.loadGallery = loadGallery;
+
+    // The button is hidden in the UI (R15 §2) but is still in the DOM as
+    // a ghost so existing click-style call sites in dev tools still work.
+    const loadGalleryBtn = document.getElementById("load-gallery-btn");
+    if (loadGalleryBtn) loadGalleryBtn.addEventListener("click", loadGallery);
+
+    // R15 §2: auto-fetch on classify change.
+    const classifySelect = document.getElementById("gallery-classify");
+    if (classifySelect) classifySelect.addEventListener("change", loadGallery);
 
     function renderGallery(artworks) {
         if (galleryContainer) galleryContainer.innerHTML = "";
@@ -185,25 +197,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    const refreshTargetsBtn = document.getElementById("refresh-targets-btn");
-    if (refreshTargetsBtn) refreshTargetsBtn.addEventListener("click", window.updateSyncTargetList);
-
-    // Note: the auto-sync schedule moved to Settings → Routines in Round 6
-    // (docs/PLANNING_ROUND5.md §3 Option B). Its JS handlers now live in
-    // settings.js and the API methods (get_hot_channel_config /
-    // save_hot_channel_config) are unchanged.
+    // R15 §2: the "Refresh" button on the Devices card was removed; the
+    // list auto-refreshes on a 30s timer + on tab activation.
+    // `updateSyncTargetList` is still exposed for callers that need a
+    // manual refresh (e.g. settings.js).
 
     window.onGalleryItemLoaded = function(classify, targetSize, index, total, itemB64) {
         try {
             const currentClassify = parseInt(document.getElementById("gallery-classify")?.value || "18");
-            let currentTargetSize = 16;
-            const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
-            if (bannerResText.includes("64")) {
-                currentTargetSize = 64;
-            } else if (bannerResText.includes("32")) {
-                currentTargetSize = 32;
-            }
-            
+            const currentTargetSize = readTargetSize();
             if (currentClassify !== classify || currentTargetSize !== targetSize) return;
             
             const rawJson = atob(itemB64);
@@ -241,14 +243,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (galleryContainer) {
                 galleryContainer.appendChild(item);
                 lazyLoadAnimatedPreview(item, art.file_id, currentIdx);
-                
-                const loadBtn = document.getElementById("load-gallery-btn");
-                if (loadBtn) {
-                    loadBtn.textContent = `Loading ${index + 1}/${total}...`;
-                    if (index + 1 === total) {
-                        loadBtn.textContent = "Fetch Gallery";
-                    }
-                }
             }
         } catch (e) {
             console.error("Failed to render progressive gallery item:", e);
@@ -259,23 +253,13 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const rawJson = atob(b64Data);
             const artworks = JSON.parse(rawJson);
-            
             const currentClassify = parseInt(document.getElementById("gallery-classify")?.value || "18");
-            let currentTargetSize = 16;
-            const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
-            if (bannerResText.includes("64")) {
-                currentTargetSize = 64;
-            } else if (bannerResText.includes("32")) {
-                currentTargetSize = 32;
-            }
-            
+            const currentTargetSize = readTargetSize();
             if (currentClassify === classify && currentTargetSize === targetSize) {
                 window.DivoomState.loadedArtworks = artworks;
                 window.DivoomState.selectedArtworkIndex = null;
                 renderGallery(artworks);
                 window.showToast("Gallery updated with latest monthly best! ", "success");
-                const loadBtn = document.getElementById("load-gallery-btn");
-                if (loadBtn) loadBtn.textContent = "Fetch Gallery";
             }
         } catch (e) {
             console.error("Failed to process background gallery fetch:", e);
@@ -299,14 +283,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // Auto-fetch Monthly Best on tab select
+    // R15 §2: Auto-fetch Monthly Best on tab activation.
+    // `loadGallery()` is idempotent — if a fetch is already in flight
+    // (or the list is non-empty), the fetch is still a no-op refresh,
+    // which is the desired behavior on tab re-entry.
     window.addEventListener("tab-changed", (e) => {
-        if (e.detail.tab === "monthly-best") {
-            const loadBtn = document.getElementById("load-gallery-btn");
-            if (loadBtn && loadBtn.textContent === "Fetch Gallery") {
-                loadBtn.click();
-            }
-        }
+        if (e.detail.tab === "monthly-best") loadGallery();
     });
 
     // Mount initializers
