@@ -276,3 +276,63 @@ class DivoomWall:
             tasks.append(divoom.display.show_visualization(number=number))
         results = await asyncio.gather(*tasks)
         return all(results)
+
+    async def set_brightness(self, brightness: int) -> bool:
+        """Sets brightness across all screens (LAN transport when available,
+        else BLE), matching the GUI's per-device transport choice."""
+        self.logger.info(f"Setting brightness {brightness} across all screens...")
+        tasks = []
+        for divoom, x, y, size, width, height in self.devices:
+            if getattr(divoom, "lan", None):
+                tasks.append(divoom.lan.set_brightness(brightness))
+            else:
+                tasks.append(divoom.device.set_brightness(brightness))
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return all(res is True or isinstance(res, dict) for res in results)
+
+    async def set_volume(self, volume: int) -> bool:
+        """Sets volume across all screens in the wall."""
+        self.logger.info(f"Setting volume {volume} across all screens...")
+        tasks = []
+        for divoom, x, y, size, width, height in self.devices:
+            tasks.append(divoom.music.set_volume(volume))
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return all(res is True for res in results)
+
+    async def switch_channel(self, channel: str) -> bool:
+        """Switches all screens in the wall to the same channel."""
+        self.logger.info(f"Switching all screens to channel {channel}...")
+        tasks = []
+        for divoom, x, y, size, width, height in self.devices:
+            tasks.append(divoom.display.switch_channel(channel))
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return all(res is True or isinstance(res, dict) for res in results)
+
+    async def push_text(self, text: str, color: str = "#FFFFFF", font_size: int = 1,
+                        speed: int = 50, effect_style: int = 1) -> bool:
+        """Pushes the same scrolling text to every screen, using each screen's
+        own pixel size for the display box (the LPWA 0x87 sequence)."""
+        from divoom_lib.models import (
+            LPWA_CONTROL_DISPLAY_BOX, LPWA_CONTROL_FONT, LPWA_CONTROL_COLOR,
+            LPWA_CONTROL_SPEED, LPWA_CONTROL_EFFECTS, LPWA_CONTROL_CONTENT,
+        )
+        self.logger.info(f"Pushing text {text!r} across all screens...")
+
+        async def _push(divoom, size: int) -> bool:
+            t = divoom.text
+            box = 0
+            await t.set_light_phone_word_attr(LPWA_CONTROL_DISPLAY_BOX, x=0, y=0,
+                                              width=size, height=size, text_box_id=box)
+            await t.set_light_phone_word_attr(LPWA_CONTROL_FONT, font_size=int(font_size), text_box_id=box)
+            await t.set_light_phone_word_attr(LPWA_CONTROL_COLOR, color=color, text_box_id=box)
+            await t.set_light_phone_word_attr(LPWA_CONTROL_SPEED, speed=int(speed), text_box_id=box)
+            await t.set_light_phone_word_attr(LPWA_CONTROL_EFFECTS, effect_style=int(effect_style))
+            res = await t.set_light_phone_word_attr(LPWA_CONTROL_CONTENT, text_content=str(text), text_box_id=box)
+            return res is not False
+
+        results = []
+        for entry in self.devices:
+            divoom = entry[0]
+            sz = entry[3] if len(entry) > 3 else 16
+            results.append(await _push(divoom, int(sz)))
+        return all(results)

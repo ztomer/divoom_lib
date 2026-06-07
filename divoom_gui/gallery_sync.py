@@ -7,7 +7,7 @@ import urllib.request
 import threading
 from pathlib import Path
 from divoom_lib import divoom_auth
-import media_decoder
+from divoom_lib import media_decoder
 
 logger = logging.getLogger("divoom_gui")
 
@@ -263,86 +263,32 @@ class GallerySyncMixin:
         return cached_data
 
     def batch_sync_artwork(self, artwork_json: str) -> bool:
+        """R17 P5 full cutover: the daemon owns the device, so it downloads +
+        decodes + resizes + streams the asset against its real device/wall
+        (binary never crosses the socket). The GUI just resolves the target
+        (single vs. wall) and the single-device size."""
         logger.info(f"GUI Action: Batch syncing artwork details: {artwork_json}")
         try:
             art = json.loads(artwork_json)
             file_id = art["file_id"]
-            
-            logger.info(f"Downloading gallery asset from CDN: {file_id}...")
-            dl_url = f"https://fin.divoom-gz.com/{file_id}"
-            d_req = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
-            
-            with urllib.request.urlopen(d_req, timeout=10) as d_resp:
-                file_bytes = d_resp.read()
-                if len(file_bytes) < 4:
+            client = self._client()
+            if client is None:
+                logger.error("Batch sync failed: no daemon available")
+                return False
+
+            is_wall = (getattr(self, "current_target_mode", "single") == "wall"
+                       or (not self.current_divoom and self.wall_slots))
+            if is_wall:
+                if not self._rebuild_wall_instance():
                     return False
-                
-                targets = []
-                if getattr(self, "current_target_mode", "single") == "wall" or (not self.current_divoom and self.wall_slots):
-                    if not self._rebuild_wall_instance():
-                        return False
-                    targets = [d for d, _, _, _, _, _ in self.wall_instance.devices]
-                elif self.current_divoom and (self.current_divoom.is_connected or getattr(self.current_divoom, "lan", None) is not None):
-                    targets = [self.current_divoom]
-                else:
-                    return False
-                    
-                extracted_gif = media_decoder.extract_gif_from_magic_43(file_bytes)
-                is_gif = False
-                gif_data = None
-                
-                if extracted_gif:
-                    is_gif = True
-                    gif_data = extracted_gif
-                elif file_bytes.startswith(b"GIF89a") or file_bytes.startswith(b"GIF87a"):
-                    is_gif = True
-                    gif_data = file_bytes
-                
-                async def run_sync():
-                    import asyncio
-                    sync_tasks = []
-                    for divoom in targets:
-                        if is_gif:
-                            target_size = self._get_device_size(divoom._conn.mac)
-                            temp_dir = Path(__file__).parent.parent / "scratch"
-                            temp_dir.mkdir(parents=True, exist_ok=True)
-                            
-                            temp_input = temp_dir / f"sync_in_{divoom._conn.mac}.gif"
-                            temp_input.write_bytes(gif_data)
-                            
-                            temp_output = temp_dir / f"sync_out_{divoom._conn.mac}.gif"
-                            
-                            try:
-                                from PIL import Image
-                                with Image.open(temp_input) as img:
-                                    frames = []
-                                    durations = []
-                                    for frame_idx in range(img.n_frames):
-                                        img.seek(frame_idx)
-                                        resized_frame = img.resize((target_size, target_size), Image.Resampling.NEAREST)
-                                        frames.append(resized_frame.convert("RGB"))
-                                        durations.append(img.info.get("duration", 100))
-                                    
-                                    frames[0].save(
-                                        temp_output,
-                                        save_all=True,
-                                        append_images=frames[1:],
-                                        duration=durations,
-                                        loop=0
-                                    )
-                                logger.info(f"Sync: Resized GIF to {target_size}x{target_size} for {divoom._conn.mac}")
-                                sync_tasks.append(divoom.display.show_image(str(temp_output)))
-                            except Exception as resize_err:
-                                logger.error(f"Failed to resize GIF: {resize_err}")
-                                sync_tasks.append(divoom.display.show_image(str(temp_input)))
-                        else:
-                            from divoom_lib.monthly_best_daemon import stream_raw_bin_payload
-                            sync_tasks.append(stream_raw_bin_payload(divoom, file_bytes))
-                            
-                    results = await asyncio.gather(*sync_tasks, return_exceptions=True)
-                    return all(res is True for res in results)
-                    
-                return self._run_async(run_sync())
+                reply = client.sync_artwork(file_id, target="wall")
+            elif self.current_divoom and (self.current_divoom.is_connected
+                                          or getattr(self.current_divoom, "lan", None)):
+                size = self._active_device_size() if hasattr(self, "_active_device_size") else 16
+                reply = client.sync_artwork(file_id, default_size=int(size), target="device")
+            else:
+                return False
+            return bool(reply.get("success"))
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
             return False

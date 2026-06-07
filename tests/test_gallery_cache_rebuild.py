@@ -22,13 +22,16 @@ from unittest.mock import patch
 import pytest
 
 # Stub the C dylib (not available in the test environment) so that the
-# top-level `import media_decoder` inside gui/gallery_sync.py succeeds.
-if "media_decoder" not in sys.modules:
-    _shim = types.ModuleType("media_decoder")
+# top-level `from divoom_lib import media_decoder` inside
+# divoom_gui/gallery_sync.py succeeds without loading the native lib.
+if "divoom_lib.media_decoder" not in sys.modules:
+    import divoom_lib
+    _shim = types.ModuleType("divoom_lib.media_decoder")
     _shim.extract_image_from_magic_43 = lambda b: None
     _shim.extract_gif_from_magic_43 = lambda b: None
     _shim.decode_and_save_preview = lambda *a, **k: None
-    sys.modules["media_decoder"] = _shim
+    sys.modules["divoom_lib.media_decoder"] = _shim
+    divoom_lib.media_decoder = _shim
 
 
 def _import_gallery_sync():

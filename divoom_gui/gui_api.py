@@ -55,6 +55,10 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         self.current_track_cache = None
         self.current_target_mode = "single"
 
+        # R17 P5 full cutover: the daemon is the SOLE BLE owner. The GUI proxies
+        # all device work through it (auto-spawning one if needed).
+        self._daemon_client = None
+
         # Load credentials on startup
         try:
             self.cached_creds = divoom_auth.get_credentials()
@@ -74,6 +78,22 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             except Exception as e:
                 logger.warning(f"Failed to load virtual device: {e}")
 
+    def _client(self):
+        """Return a live DaemonClient, auto-spawning the daemon if needed (R17
+        P5). Cached; ``None`` only if the daemon can't be reached/started."""
+        from divoom_gui.daemon_bridge import ensure_daemon
+        if self._daemon_client is None:
+            self._daemon_client = ensure_daemon()
+        return self._daemon_client
+
+    def _device_status(self) -> dict:
+        """Snapshot of the daemon-owned device: {connected, mac, lan_ip, wall}."""
+        client = self._client()
+        if client is None:
+            return {"connected": False, "mac": None, "lan_ip": None, "wall": False}
+        st = client.device_status()
+        return st if st.get("success") else {"connected": False, "mac": None, "lan_ip": None, "wall": False}
+
     def _run_async(self, coro):
         future = asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
         return future.result()
@@ -86,15 +106,17 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
 
     def get_transport_status(self) -> str:
         """Return live status of all four transport layers as JSON."""
-        ble_connected = bool(self.current_divoom and self.current_divoom.is_connected)
-        lan_ip = self.current_divoom.lan.device_ip if (self.current_divoom and self.current_divoom.lan) else None
+        st = self._device_status()
+        lan_ip = st.get("lan_ip")
+        mac = st.get("mac")
+        ble_connected = bool(st.get("connected") and not lan_ip)
         cloud_ok = bool(self.cached_creds and self.cached_creds.is_valid())
         # Note: the GUI's updateTransportPanel (settings.js) reads only
         # ``available`` and ``detail`` from this dict. ``badge`` (emoji)
         # and ``color`` (its hex) were removed in R14 §6; the GUI uses
         # CSS-driven dots via the `transport-dot active/inactive` class.
         return json.dumps({
-            "ble": {"available": ble_connected, "label": "Bluetooth", "description": "Bluetooth — 100% local, never leaves your machine.", "detail": self.current_divoom._conn.mac if ble_connected and self.current_divoom else None},
+            "ble": {"available": ble_connected, "label": "Bluetooth", "description": "Bluetooth — 100% local, never leaves your machine.", "detail": mac if ble_connected else None},
             "lan": {"available": bool(lan_ip), "label": "Local Network", "description": "Local Network — 100% local, WiFi-capable devices only.", "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured"},
             "cloud": {"available": cloud_ok, "label": "Divoom Cloud", "description": "Divoom Cloud — appin.divoom-gz.com, Divoom's servers, requires account.", "detail": "Authenticated" if cloud_ok else "Not authenticated"},
             "external": {"available": True, "label": "Public Cloud", "description": "Public Cloud — 3rd-party APIs (weather, stocks), no login required.", "detail": "Available"}
@@ -115,27 +137,24 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             cfg["lan"]["local_token"] = str(local_token)
             with open(config_file, "w") as f:
                 cfg.write(f)
-
-            # Hot-attach to current device if connected
-            if self.current_divoom and device_ip:
-                from divoom_lib.lan_transport import LanTransport
-                self.current_divoom._lan = LanTransport(
-                    device_ip=device_ip,
-                    local_token=local_token,
-                    logger=logger,
-                )
+            # The daemon owns the device; the saved LAN config is applied the
+            # next time a LAN device is connected (connect_device(lan_ip=...)).
             return True
         except Exception as e:
             logger.error(f"Failed to save LAN config: {e}")
             return False
 
     def probe_lan(self) -> str:
-        logger.info("GUI Action: Probing LAN transport reachability...")
+        logger.info("GUI Action: Probing LAN transport reachability (daemon)...")
         try:
-            if not self.current_divoom or not self.current_divoom.lan:
+            client = self._client()
+            if client is None:
+                return json.dumps({"reachable": False, "detail": "Daemon unavailable."})
+            reply = client.probe_lan()
+            ip = reply.get("device_ip")
+            if not ip and not reply.get("reachable"):
                 return json.dumps({"reachable": False, "detail": "No LAN IP configured. Save a device IP first."})
-            ok = self._run_async(self.current_divoom.lan.probe())
-            ip = self.current_divoom.lan.device_ip
+            ok = bool(reply.get("reachable"))
             return json.dumps({
                 "reachable": ok,
                 "detail": f"{' Connected' if ok else ' Unreachable'} — {ip}:9000",
@@ -194,15 +213,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
-                tasks = []
-                for divoom, _, _, _, _, _ in self.wall_instance.devices:
-                    tasks.append(divoom.display.switch_channel(channel))
-                
-                async def run_switch():
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-                    return all(res is True or isinstance(res, dict) for res in results)
-                
-                return self._run_async(run_switch())
+                return self._run_async(self.wall_instance.switch_channel(channel))
 
             target = self.current_divoom
             if not target:
@@ -273,15 +284,9 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
-
-                async def run_all():
-                    results = []
-                    for entry in self.wall_instance.devices:
-                        divoom = entry[0]
-                        sz = entry[3] if len(entry) > 3 else 16
-                        results.append(await _push(divoom, int(sz)))
-                    return all(results)
-                return self._run_async(run_all())
+                return self._run_async(self.wall_instance.push_text(
+                    str(text), color=color, font_size=int(font_size),
+                    speed=int(speed), effect_style=int(effect_style)))
 
             target = self.current_divoom
             if not target:
@@ -734,18 +739,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
-                tasks = []
-                for divoom, _, _, _, _, _ in self.wall_instance.devices:
-                    if divoom.lan:
-                        tasks.append(divoom.lan.set_brightness(val))
-                    else:
-                        tasks.append(divoom.device.set_brightness(val))
-
-                async def run_brightness():
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-                    return all(res is True or isinstance(res, dict) for res in results)
-
-                return self._run_async(run_brightness())
+                return self._run_async(self.wall_instance.set_brightness(val))
 
             target = self.current_divoom
             if not target:
@@ -830,15 +824,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             if getattr(self, "current_target_mode", "single") == "wall":
                 if not self._rebuild_wall_instance():
                     return False
-                tasks = []
-                for divoom, _, _, _, _, _ in self.wall_instance.devices:
-                    tasks.append(divoom.music.set_volume(val))
-
-                async def run_volume():
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-                    return all(res is True for res in results)
-
-                return self._run_async(run_volume())
+                return self._run_async(self.wall_instance.set_volume(val))
 
             target = self.current_divoom
             if not target:

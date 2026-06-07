@@ -141,6 +141,14 @@ class DaemonClient:
     def probe_lan(self) -> dict:
         return self.send_command("probe_lan")
 
+    def sync_artwork(self, file_id: str, *, default_size: int = 16,
+                     target: str = "device") -> dict:
+        """Ask the daemon to download a gallery asset and stream it to the owned
+        device/wall (binary stays in the daemon process)."""
+        return self.send_command("sync_artwork", {
+            "file_id": file_id, "default_size": default_size, "target": target,
+        })
+
     def subscribe(
         self,
         on_event: Callable[[dict], None],

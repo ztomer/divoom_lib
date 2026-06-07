@@ -119,6 +119,52 @@ class TestDivoomWall(unittest.IsolatedAsyncioTestCase):
         for mc in mock_clients:
             mc.display.show_clock.assert_called_once_with(clock=2)
 
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_wall_switch_channel_volume_brightness(self, mock_divoom_class):
+        """R17 P5: wall-level fan-out methods added so the daemon-owned wall is
+        callable via a single device_call (no GUI-side per-device iteration)."""
+        mock_clients = []
+        for _ in range(4):
+            mc = MagicMock()
+            mc.lan = None
+            mc.display.switch_channel = AsyncMock(return_value=True)
+            mc.music.set_volume = AsyncMock(return_value=True)
+            mc.device.set_brightness = AsyncMock(return_value=True)
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+
+        wall = DivoomWall(self.device_configs)
+
+        self.assertTrue(await wall.switch_channel("cloud"))
+        for mc in mock_clients:
+            mc.display.switch_channel.assert_called_once_with("cloud")
+
+        self.assertTrue(await wall.set_volume(7))
+        for mc in mock_clients:
+            mc.music.set_volume.assert_called_once_with(7)
+
+        # No LAN transport on any panel -> BLE device.set_brightness path.
+        self.assertTrue(await wall.set_brightness(55))
+        for mc in mock_clients:
+            mc.device.set_brightness.assert_called_once_with(55)
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_wall_push_text(self, mock_divoom_class):
+        """Wall push_text runs the LPWA sequence on every screen with its size."""
+        from divoom_lib.models import LPWA_CONTROL_CONTENT
+        mock_clients = []
+        for _ in range(4):
+            mc = MagicMock()
+            mc.text.set_light_phone_word_attr = AsyncMock(return_value=True)
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+
+        wall = DivoomWall(self.device_configs)
+        self.assertTrue(await wall.push_text("HI", color="#00FF00", speed=30))
+        for mc in mock_clients:
+            controls = [c.args[0] for c in mc.text.set_light_phone_word_attr.call_args_list]
+            self.assertIn(LPWA_CONTROL_CONTENT, controls)
+
 
 class TestWallResolution(unittest.TestCase):
     """R13 §1 — the wall_resolution() helper. It must be derived from

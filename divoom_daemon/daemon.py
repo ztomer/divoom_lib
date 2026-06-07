@@ -164,6 +164,8 @@ class DivoomDaemon:
             return self._cmd_wall_configure(args)
         if command == "probe_lan":
             return self._cmd_probe_lan()
+        if command == "sync_artwork":
+            return self._cmd_sync_artwork(args)
         return {"success": False, "error": f"unknown command: {command}"}
 
     # ── device ownership (R17 P5: the daemon is the single BLE owner) ─────
@@ -359,10 +361,15 @@ class DivoomDaemon:
         """Build + connect a daemon-owned DivoomWall from {mac: slot} config."""
         slots = args.get("slots") or {}
         cell = int(args.get("cell_size", 16) or 16)
-        self._wall_slots = slots
         if not slots:
+            self._wall_slots = {}
             self._wall = None
             return {"success": True, "wall": False}
+        # Idempotent: reuse a live wall with the same layout.
+        if (self._wall is not None and slots == self._wall_slots
+                and getattr(self._wall, "is_connected", False)):
+            return {"success": True, "wall": True}
+        self._wall_slots = slots
 
         async def _build():                              # pragma: no cover (needs BLE)
             from divoom_lib.wall import DivoomWall
@@ -383,6 +390,76 @@ class DivoomDaemon:
             logger.warning(f"wall_configure failed: {e}")
             self._wall = None
             return {"success": False, "error": str(e), "wall": False}
+
+    def _cmd_sync_artwork(self, args: dict) -> dict:
+        """Download a gallery asset and stream it to the owned device or wall.
+
+        The GUI no longer holds device objects, so the per-device resize +
+        binary streaming runs here against the daemon's real targets (binary
+        never crosses the socket). ``target``: "device" or "wall".
+        ``default_size`` is used for the single device (the wall uses each
+        screen's configured size)."""
+        file_id = args.get("file_id")
+        default_size = int(args.get("default_size", 16) or 16)
+        which = args.get("target", "device")
+        if not file_id:
+            return {"success": False, "error": "sync_artwork requires 'file_id'"}
+
+        async def _do():                                 # pragma: no cover (needs BLE)
+            import urllib.request
+            from pathlib import Path as _P
+            from divoom_lib import media_decoder
+            from divoom_lib.monthly_best_daemon import stream_raw_bin_payload
+
+            dl_url = f"https://fin.divoom-gz.com/{file_id}"
+            req = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                file_bytes = resp.read()
+            if len(file_bytes) < 4:
+                return False
+
+            # Resolve targets as (device, size) against the real owned objects.
+            if which == "wall":
+                if self._wall is None:
+                    raise RuntimeError("no wall configured")
+                targets = [(d, sz) for d, _x, _y, sz, _w, _h in self._wall.devices]
+            else:
+                device = await self._ensure_device_async(args.get("mac"))
+                targets = [(device, default_size)]
+
+            extracted = media_decoder.extract_gif_from_magic_43(file_bytes)
+            is_gif = bool(extracted) or file_bytes[:6] in (b"GIF89a", b"GIF87a")
+            gif_data = extracted or file_bytes
+
+            tmp = _P(__file__).parent.parent / "scratch"
+            tmp.mkdir(parents=True, exist_ok=True)
+            results = []
+            for divoom, size in targets:
+                mac = getattr(getattr(divoom, "_conn", None), "mac", None) or "dev"
+                if is_gif:
+                    from PIL import Image
+                    src = tmp / f"sync_in_{mac}.gif"
+                    src.write_bytes(gif_data)
+                    out = tmp / f"sync_out_{mac}.gif"
+                    with Image.open(src) as img:
+                        frames, durations = [], []
+                        for i in range(img.n_frames):
+                            img.seek(i)
+                            frames.append(img.resize((int(size), int(size)), Image.Resampling.NEAREST).convert("RGB"))
+                            durations.append(img.info.get("duration", 100))
+                        frames[0].save(out, save_all=True, append_images=frames[1:],
+                                       duration=durations, loop=0)
+                    results.append(await divoom.display.show_image(str(out)))
+                else:
+                    results.append(await stream_raw_bin_payload(divoom, file_bytes))
+            return all(r is True for r in results)
+
+        try:
+            ok = self._run_device(_do())
+            return {"success": bool(ok)}
+        except Exception as e:
+            logger.warning(f"sync_artwork failed: {e}")
+            return {"success": False, "error": str(e)}
 
     def _cmd_probe_lan(self) -> dict:
         d = self._device

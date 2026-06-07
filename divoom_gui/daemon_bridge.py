@@ -92,32 +92,72 @@ class _DeviceCallError(RuntimeError):
     """Raised inside the proxy awaitable when the daemon reports failure."""
 
 
+class _LanView:
+    """Minimal stand-in for ``divoom.lan`` so introspection reads still work."""
+    def __init__(self, device_ip: str | None):
+        self.device_ip = device_ip
+
+    def __bool__(self):
+        return bool(self.device_ip)
+
+
+class _ConnView:
+    """Minimal stand-in for ``divoom._conn`` (only ``.mac`` is read by the GUI)."""
+    def __init__(self, mac: str | None):
+        self.mac = mac
+
+
+# Root-only synthetic attributes answered from `device_status` rather than a
+# dotted method call.
+_STATUS_ATTRS = ("is_connected", "lan", "_conn")
+
+
 class DaemonDeviceProxy:
-    """Attribute/method stand-in for a ``Divoom`` that routes through a daemon.
+    """Attribute/method stand-in for a ``Divoom`` (or ``DivoomWall``) that routes
+    through a daemon.
 
     ``proxy.display.show_light(color, b)`` records the dotted path
     ``"display.show_light"`` and returns an awaitable that, when run, issues a
     ``device_call`` RPC and returns the daemon's ``result`` (raising on failure).
     Arbitrary nesting works: ``proxy.lan.set_brightness(v)`` →
     ``"lan.set_brightness"``.
+
+    ``target`` is "device" (the single owned Divoom) or "wall" (the daemon-owned
+    DivoomWall). Root-level introspection reads (``is_connected``/``lan``/
+    ``_conn``) are answered synchronously from ``device_status``.
     """
 
-    def __init__(self, client: DaemonClient, _path: str = "") -> None:
+    def __init__(self, client: DaemonClient, _path: str = "", *, target: str = "device") -> None:
         object.__setattr__(self, "_client", client)
         object.__setattr__(self, "_path", _path)
+        object.__setattr__(self, "_target", target)
 
-    def __getattr__(self, name: str) -> "DaemonDeviceProxy":
+    def _status(self) -> dict:
+        return self._client.device_status()
+
+    def __getattr__(self, name: str) -> Any:
+        # Root-level synthetic introspection reads (device only).
+        if name in _STATUS_ATTRS and self._path == "":
+            st = self._status()
+            if name == "is_connected":
+                key = "wall" if self._target == "wall" else "connected"
+                return bool(st.get(key, False))
+            if name == "lan":
+                return _LanView(st.get("lan_ip"))
+            if name == "_conn":
+                return _ConnView(st.get("mac"))
         if name.startswith("_"):
             raise AttributeError(name)
         path = f"{self._path}.{name}" if self._path else name
-        return DaemonDeviceProxy(self._client, path)
+        return DaemonDeviceProxy(self._client, path, target=self._target)
 
     def __call__(self, *args: Any, **kwargs: Any):
         method = self._path
         client = self._client
+        target = self._target
 
         async def _invoke():
-            reply = client.device_call(method, list(args), dict(kwargs))
+            reply = client.device_call(method, list(args), dict(kwargs), target=target)
             if not reply.get("success", False):
                 raise _DeviceCallError(reply.get("error", f"device_call {method} failed"))
             return reply.get("result")
