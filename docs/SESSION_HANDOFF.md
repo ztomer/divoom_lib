@@ -15,44 +15,42 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **Last round shipped:** Round 10 (notification mirroring / ANCS). New lib:
-  cmd `"set android ancs": 0x50`, `NOTIFICATION_APPS`, `divoom_lib/tools/
-  notification.py` (`d.notification.show_notification` / `_text`). GUI:
-  `send_notification` bridge + Tools→Device **Notification** card. Manual trigger
-  only — auto-sourcing macOS notifications deferred. Protocol re-verified
-  (cmd 0x50, single-byte ≥8 skip OR type+len+utf8; report's 0x60/RGB were wrong).
-  See `docs/PLANNING_ROUND10.md` §5. Suite: **538 passed / 0 failed / 73 skipped**.
-- **Earlier:** Round 9 (screen orientation + factory reset, 0xBD EXT;
-  `docs/PLANNING_ROUND9.md`). Round 8 (device settings/FM/weather/memorial +
-  Tools sub-tabs; timeplan UI deferred). Round 7 + 7.1.
-  - R7: surfaced un-exposed `divoom_lib` modules in the GUI — Text Channel,
-    Alarms, Sleep Aid, Tools (timer/countdown/noise). Bridges in
-    `gui/gui_api.py`, UI + unit tests.
-  - R7.1: moved Alarms/Sleep/Tools into a dedicated **Tools** sidebar tab;
-    added `AGENTS.md` cross-session core rule.
-- **Tests:** full suite **513 passed / 0 failed / 73 skipped**
-  (`python3 -m pytest`). Hardware tests skip by default.
-- **Git:** `main` is **ahead of `origin/main` by 4** commits (not yet pushed):
-  checkpoint `7b69a5b3`, Text `f223a0b3`, Alarms/Sleep/Tools `19beb1fa`,
-  Tools-tab+AGENTS `f3579dac`.
+- **Last round shipped:** Round 11 (push-path bug fixes) + docs. Fixed the live
+  image push end-to-end (cover art / custom art / gallery / wall) — three root
+  causes, all now aligned to the futpib reference: (1) resize-to-device-grid
+  before encoding (the "int too big to convert" crash); (2) 0x8B = 256-byte
+  chunks + chunk-index offset id (the transfer stall); (3) continuous LSB-first
+  pixel packing (the distortion). Also: cover art auto-pushes on track change +
+  immediately on enable (manual button removed); native C encoder had the same
+  packing bug → fixed + dylib rebuilt; **both C and Python encoders are now held
+  to one correctness suite** (`tests/test_encoder_both_impls.py`); `conftest.py`
+  auto-rebuilds a stale dylib; added `Makefile` + GitHub Actions; README rewritten.
+  See `docs/PLANNING_ROUND11.md`. Suite: **614 passed / 0 failed / 73 skipped**.
+- **In progress:** Round 12 (consolidation + continuation), order C→A→D→E→B.
+  See `docs/PLANNING_ROUND12.md`. New: `docs/ENGINEERING_NOTES.md` (invariants,
+  linked from AGENTS.md).
+- **Earlier:** R10 ANCS notifications; R9 screen orientation + factory reset
+  (0xBD EXT); R8 device settings/FM/weather/memorial + Tools sub-tabs; R7 surfaced
+  text/alarms/sleep/tools. See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
+- **Git:** the R8→R11 arc (~25 commits) is **not yet pushed to origin** (push
+  pending user confirmation — §E of Round 12).
 
-## Open threads / next up
+## Open threads / next up (see docs/PLANNING_ROUND12.md for the full plan)
 
-1. **Channel-switch hardware bug (Divoom Max):** first channel switch
-   (watchface) works, subsequent switches don't. Not yet root-caused on
-   hardware. All switches are `set light mode` (0x45) fire-and-forget.
-2. **get_* read-back times out on real devices** (task: `divoom_lib` get
-   queries 0x42/0x46/0x13 get no parseable response — likely query-framing
-   mismatch: query sent iOS-LE while device is Basic). Also gates the Alarms
-   "Read from device" button. See `docs/DEVICE_VALIDATION_PLAN.md`.
-3. **Next excavation frontier (R10 candidates):** R8 closed lib→GUI; R9 shipped
-   the screen-orientation 0xBD EXT work. Remaining APK-only items needing new lib
-   code (catalogued in `docs/PLANNING_ROUND9.md` §1): **ANCS notification
-   mirroring** (cmd 80, 14 app types — high value, needs macOS notification
-   plumbing → own round), the 200+ **cloud HTTP** endpoints (clock-face store /
-   weather city search / pomodoro / white-noise / TTS), SD player, game, drawing.
-   Timeplan UI still deferred (bridge exists, semantics unverified).
-4. Round 7 Phase 2/3 backlog also catalogued in `docs/PLANNING_ROUND7.md`.
+1. **R11 GUI overhaul Phases 2–7 not done** (§A): sticky push footer, ambient
+   color visibility + drop "Custom", scoreboard reset+restyle, appbar tweaks,
+   virtual-wall toolbar (icons+labels), font sweep, tools regroup + unified
+   segmented-pill tabs.
+2. **Hardware verification pending** (§B, user-run): album cover renders
+   un-distorted; custom-art/live push end-to-end.
+3. **get_* read-back times out on real devices** (task #20): get queries
+   0x42/0x46/0x13 get no parseable response (likely query-framing mismatch).
+   Gates every "read from device". See `docs/DEVICE_VALIDATION_PLAN.md`.
+4. **Channel-switch hardware bug (Divoom Max):** first switch works, rest don't;
+   not root-caused. All switches are `set light mode` (0x45) fire-and-forget.
+5. **Deferred features** (§D): Timeplan UI (semantics unverified); SD player /
+   game / drawing (lib→GUI exposure); auto-source real macOS notifications; the
+   200+ cloud HTTP endpoints (own round).
 
 ## Hardware note
 

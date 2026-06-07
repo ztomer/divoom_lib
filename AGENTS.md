@@ -26,13 +26,20 @@ memory. Treat them as the source of truth; do not rely on conversation context
 surviving. (Claude Code reads `CLAUDE.md` which points here; opencode reads this
 `AGENTS.md` directly.)
 
+**Also read `docs/ENGINEERING_NOTES.md` on entry** — hard-won invariants (image
+pipeline, 0x8B protocol, dual-impl anti-drift, "ACK ≠ success", when to use C).
+These are lessons paid for in real shipped bugs; don't relearn them.
+
 > To resume the opencode session for context: `opencode export <sessionID>`
 > dumps it as JSON (`info` + `messages`).
 
 ## Project conventions
 
-- **Device protocol truth**: `divoom_lib/` + `apk/APK_INTELLIGENCE_REPORT.md` +
-  `references/`. Don't invent command IDs/enums — cite the source.
+- **Device protocol truth**: the decompiled APK (`references/apk/decompiled_src/`)
+  + `references/divoom-refs/` (futpib, hass-divoom, …). Don't invent command
+  IDs/enums — cite the source. NOTE: `references/apk/APK_INTELLIGENCE_REPORT.md`
+  is a convenience summary and has been **wrong** on details — verify against the
+  decompiled source. See `docs/ENGINEERING_NOTES.md`.
 - **GUI**: PyWebView. Python bridge in `gui/gui_api.py` (+ mixins); web UI in
   `gui/web_ui/` (modular css/js; large views live in `templates.js`).
 - **Hardware**: macOS Bluetooth TCC is per responsible-process; drive real BLE
