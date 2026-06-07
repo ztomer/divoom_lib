@@ -400,7 +400,8 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.api.current_target_mode = "wall"
 
         self.assertTrue(self.api.set_solid_light("00FFCC", 100))
-        fake.device_call.assert_called_with("set_light", ["00FFCC", 100], {}, target="wall")
+        fake.device_call.assert_called_with("set_light", ["00FFCC", 100], {},
+                                            target="wall", blobs=None)
 
         self.assertTrue(self.api.set_clock(3))
         # show_clock is called with clock=3 (kwargs)

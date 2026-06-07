@@ -24,15 +24,23 @@ import sys
 import time
 from typing import Any
 
-from divoom_daemon.daemon_protocol import DEFAULT_SOCKET_PATH, DaemonClient
+from divoom_daemon.daemon_protocol import (
+    DEFAULT_SOCKET_PATH,
+    ENV_HOST,
+    DaemonClient,
+)
 
 logger = logging.getLogger("divoom_gui")
 
 
+def _client_alive(client: DaemonClient) -> bool:
+    reply = client.send_command("device_status")
+    return bool(reply.get("success", False)) or ("connected" in reply)
+
+
 def daemon_alive(socket_path: str = DEFAULT_SOCKET_PATH, timeout: float = 0.5) -> bool:
     """True if a daemon answers ``device_status`` on ``socket_path``."""
-    reply = DaemonClient(socket_path, timeout=timeout).send_command("device_status")
-    return bool(reply.get("success", False)) or ("connected" in reply)
+    return _client_alive(DaemonClient(socket_path, timeout=timeout))
 
 
 def spawn_daemon(
@@ -72,8 +80,16 @@ def ensure_daemon(
     """Return a :class:`DaemonClient` for a *live* daemon, auto-spawning one if
     needed. Returns ``None`` if no daemon could be reached/started.
 
-    Idempotent: if a daemon is already up, returns immediately without spawning.
+    If ``DIVOOM_DAEMON_HOST`` is set, target that *remote* daemon over TCP and
+    never spawn (it's on another host). Otherwise use the local Unix socket and
+    auto-spawn. Idempotent: a live daemon returns immediately.
     """
+    if os.environ.get(ENV_HOST):
+        remote = DaemonClient.from_env(socket_path)
+        if _client_alive(remote):
+            return remote
+        logger.error("Remote daemon at %s:%s not reachable", remote.host, remote.port)
+        return None
     if daemon_alive(socket_path):
         return DaemonClient(socket_path)
     if not spawn:
@@ -155,9 +171,26 @@ class DaemonDeviceProxy:
         method = self._path
         client = self._client
         target = self._target
+        call_args = list(args)
+
+        # Remote daemon (TCP): no shared filesystem, so any positional arg that
+        # is a local file path must be shipped as a blob (the daemon writes it to
+        # a temp file and substitutes the path back in). Local Unix clients pass
+        # the path directly — the daemon reads the same disk.
+        blobs: dict[int, bytes] | None = None
+        if getattr(client, "is_remote", False):
+            for i, a in enumerate(call_args):
+                try:
+                    if isinstance(a, str) and os.path.isfile(a):
+                        with open(a, "rb") as f:
+                            blobs = blobs or {}
+                            blobs[i] = f.read()
+                except OSError:
+                    pass
 
         async def _invoke():
-            reply = client.device_call(method, list(args), dict(kwargs), target=target)
+            reply = client.device_call(method, call_args, dict(kwargs),
+                                       target=target, blobs=blobs)
             if not reply.get("success", False):
                 raise _DeviceCallError(reply.get("error", f"device_call {method} failed"))
             return reply.get("result")

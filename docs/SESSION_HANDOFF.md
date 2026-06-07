@@ -15,6 +15,26 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R19 — daemon as a headless NETWORK server SHIPPED. Suite 986 / 0 / 75.**
+  (User: "why JSON for on-device RPC? + I want the daemon to run headless over
+  the network." Decisions: TCP alongside Unix · LAN + token · ship image bytes.)
+  - JSON answer: NDJSON is the *control plane* (small, debuggable, transport-
+    agnostic); device pixels/GIFs are the *data plane*, kept out of JSON (binary
+    needs base64). See `docs/PLANNING_ROUND19.md`.
+  - `DivoomDaemon(host, port, token)`: binds Unix (always) + an AF_INET listener
+    when host/port set. TCP requests need a token (`hmac.compare_digest`); Unix
+    stays trusted (no token). **Fail-closed**: TCP without a token won't start.
+    Token falls back to `DIVOOM_DAEMON_TOKEN`. CLI: `divoom-control daemon
+    --host 0.0.0.0 --port 9009 --token <secret>`.
+  - Binary over the wire: `device_call` gained `blobs={argIdx: b64bytes}`; the
+    daemon writes each to a temp file and substitutes the path. `DaemonClient`
+    encodes blobs; `DaemonDeviceProxy` auto-ships local-file args as blobs when
+    `is_remote` (TCP) — so media/gallery/cover-art work remotely with no call-site
+    changes. `DaemonClient.from_env()` + `ensure_daemon()` target a remote daemon
+    when `DIVOOM_DAEMON_HOST` is set (and never spawn).
+  - +7 tests (`tests/test_daemon_network.py`). **Not hardware-verified; token is
+    plaintext over TCP (add TLS for untrusted nets — follow-up).**
+
 - **R17 P5 — FULL CUTOVER SHIPPED. The daemon is the sole BLE owner; the GUI is
   a thin client. Suite 980 / 0 / 75.** (User chose "do the full flip now.")
   - Daemon (`9cd76a73`, `abc83a20`, `8cb8e10e`): `device_call` (dotted dispatch,

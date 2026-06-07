@@ -15,11 +15,20 @@ The server lives in ``divoom_daemon/daemon.py``; clients are the menubar + the G
 """
 from __future__ import annotations
 
+import base64
 import json
+import os
 import socket
 from typing import Any, Callable, Iterable
 
 DEFAULT_SOCKET_PATH = "/tmp/divoom.sock"
+DEFAULT_TCP_PORT = 9009
+
+# Env overrides so any DaemonClient (incl. the GUI) can target a remote daemon
+# instead of the local Unix socket.
+ENV_HOST = "DIVOOM_DAEMON_HOST"
+ENV_PORT = "DIVOOM_DAEMON_PORT"
+ENV_TOKEN = "DIVOOM_DAEMON_TOKEN"
 
 # Event types streamed to subscribers.
 EVENT_STATUS = "status"
@@ -54,8 +63,12 @@ def iter_messages(buffer: bytes) -> tuple[list[dict], bytes]:
 
 
 # ── message/event constructors ──────────────────────────────────────────
-def make_request(command: str, args: dict | None = None) -> dict:
-    return {"command": command, "args": args or {}}
+def make_request(command: str, args: dict | None = None,
+                 token: str | None = None) -> dict:
+    req: dict = {"command": command, "args": args or {}}
+    if token:
+        req["token"] = token
+    return req
 
 
 def make_status_event(state: str, counters: dict | None = None) -> dict:
@@ -81,18 +94,49 @@ class DaemonClient:
     state (it may not be launched yet).
     """
 
-    def __init__(self, socket_path: str = DEFAULT_SOCKET_PATH, timeout: float = 2.0):
+    def __init__(self, socket_path: str = DEFAULT_SOCKET_PATH, timeout: float = 2.0,
+                 *, host: str | None = None, port: int | None = None,
+                 token: str | None = None):
         self.socket_path = socket_path
         self.timeout = timeout
+        self.host = host
+        self.port = port
+        self.token = token
+
+    @classmethod
+    def from_env(cls, socket_path: str = DEFAULT_SOCKET_PATH,
+                 timeout: float = 2.0) -> "DaemonClient":
+        """Build a client from env: if DIVOOM_DAEMON_HOST is set, target that
+        remote daemon over TCP (with DIVOOM_DAEMON_TOKEN); else the local Unix
+        socket."""
+        host = os.environ.get(ENV_HOST) or None
+        port = int(os.environ.get(ENV_PORT, DEFAULT_TCP_PORT)) if host else None
+        token = os.environ.get(ENV_TOKEN) or None
+        return cls(socket_path, timeout, host=host, port=port, token=token)
+
+    @property
+    def is_remote(self) -> bool:
+        """True when this client talks to a daemon over TCP (no shared
+        filesystem — image args must be shipped as blobs, not paths)."""
+        return bool(self.host and self.port)
+
+    def _connect(self) -> socket.socket:
+        """Open a connection to the daemon (TCP if host/port set, else Unix)."""
+        if self.is_remote:
+            s = socket.create_connection((self.host, self.port), timeout=self.timeout)
+        else:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(self.timeout)
+            s.connect(self.socket_path)
+        return s
 
     def send_command(self, command: str, args: dict | None = None) -> dict:
         """One-shot request/response. Returns the daemon's reply dict, or
         ``{"success": False, "error": ...}`` if the daemon isn't reachable."""
         try:
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            with self._connect() as s:
                 s.settimeout(self.timeout)
-                s.connect(self.socket_path)
-                s.sendall(encode_message(make_request(command, args)))
+                s.sendall(encode_message(make_request(command, args, self.token)))
                 buf = b""
                 while b"\n" not in buf:
                     chunk = s.recv(4096)
@@ -105,15 +149,26 @@ class DaemonClient:
             return {"success": False, "error": str(e)}
 
     def device_call(self, method: str, args: list | None = None,
-                    kwargs: dict | None = None, *, target: str = "device") -> dict:
+                    kwargs: dict | None = None, *, target: str = "device",
+                    blobs: dict[int, bytes] | None = None) -> dict:
         """Proxy a device method through the daemon (R17 P5): the daemon owns the
         BLE connection and runs ``divoom.<method>(*args, **kwargs)``. ``target``
         selects the single device ("device") or the daemon-owned wall ("wall").
-        Returns the daemon reply ``{"success", "result"|"error"}``."""
-        return self.send_command("device_call", {
+
+        ``blobs`` maps an arg index → raw bytes; the daemon materializes each to
+        a temp file and substitutes that arg with the path. This is how a remote
+        client ships an image over the wire (the GUI and daemon don't share a
+        filesystem when the daemon is on another host). Returns the daemon reply
+        ``{"success", "result"|"error"}``."""
+        payload = {
             "method": method, "args": args or [], "kwargs": kwargs or {},
             "target": target,
-        })
+        }
+        if blobs:
+            payload["blobs"] = {
+                str(i): base64.b64encode(b).decode("ascii") for i, b in blobs.items()
+            }
+        return self.send_command("device_call", payload)
 
     # ── device ownership / lifecycle (R17 P5 full cutover) ────────────────
     def connect_device(self, *, mac: str | None = None, lan_ip: str | None = None,
@@ -161,10 +216,9 @@ class DaemonClient:
         Blocking — callers run it on their own thread.
         """
         try:
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            with self._connect() as s:
                 s.settimeout(self.timeout)
-                s.connect(self.socket_path)
-                s.sendall(encode_message(make_request(SUBSCRIBE_COMMAND)))
+                s.sendall(encode_message(make_request(SUBSCRIBE_COMMAND, token=self.token)))
                 s.settimeout(1.0)  # short read timeout so should_stop() is responsive
                 buf = b""
                 while True:

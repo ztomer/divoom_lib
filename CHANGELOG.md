@@ -6,6 +6,29 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 19 — 2026-06-07 (daemon as a headless network server: TCP + token + binary blobs)
+
+The daemon can now run as a headless LAN server, not just a local Unix socket.
+See `docs/PLANNING_ROUND19.md`.
+
+- **Why JSON**: NDJSON is the control plane (small, debuggable, transport-
+  agnostic); device pixels/GIFs are the data plane, deliberately kept out of JSON.
+- **TCP listener alongside Unix** (`DivoomDaemon(host, port, token)`): one accept
+  thread per listener; `divoom-control daemon --host 0.0.0.0 --port 9009 --token`.
+- **LAN + token auth**: TCP requests must carry the shared token
+  (`hmac.compare_digest`); Unix connections stay trusted (local fs perms). The
+  TCP listener is **fail-closed** — it refuses to start without a token. Token
+  falls back to `DIVOOM_DAEMON_TOKEN`.
+- **Binary over the wire**: `device_call` gained `blobs={argIdx: base64}`; the
+  daemon materializes each to a temp file and substitutes the path. The GUI's
+  `DaemonDeviceProxy` auto-ships local-file args as blobs when talking to a remote
+  (TCP) daemon, so media/gallery/cover-art push works remotely with no call-site
+  changes. `DaemonClient.from_env()`/`ensure_daemon()` target a remote daemon when
+  `DIVOOM_DAEMON_HOST` is set.
+- +7 tests (`tests/test_daemon_network.py`); suite → 986 / 0 / 75. **Not yet
+  hardware-verified; token travels plaintext over TCP — add TLS for untrusted
+  networks (follow-up).**
+
 ## Round 16-17 — 2026-06-07 (headless daemon + 3-way package split + single-owner cutover mechanism)
 
 The project became three top-level packages — `divoom_lib` (pure protocol +

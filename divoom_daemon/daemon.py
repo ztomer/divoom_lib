@@ -14,9 +14,12 @@ testable without AppKit or a real BLE device.
 """
 from __future__ import annotations
 
+import base64
+import hmac
 import logging
 import os
 import socket
+import tempfile
 import threading
 from pathlib import Path
 from typing import Callable, Optional
@@ -47,9 +50,20 @@ class DivoomDaemon:
         monitor=None,
         device_sender: Optional[Callable[[int, str], None]] = None,
         device=None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        token: Optional[str] = None,
     ):
         self.mac = mac
         self.socket_path = socket_path
+        # Optional TCP listener (R19): the daemon can be a headless network
+        # server alongside the local Unix socket. `token` (env-overridable)
+        # authenticates every TCP request; Unix connections are trusted (local
+        # filesystem perms already gate them).
+        self.host = host
+        self.port = port
+        self.token = token if token is not None else (os.environ.get("DIVOOM_DAEMON_TOKEN") or None)
+        self._listeners: list[socket.socket] = []
         self._monitor = monitor                 # injectable; lazily built if None
         self._device_sender = device_sender     # injectable; default = real BLE send
         self._subscribers: list[socket.socket] = []
@@ -241,11 +255,28 @@ class DivoomDaemon:
         ``target``: "device" (default, the single Divoom) or "wall" (the
         daemon-owned DivoomWall)."""
         method = args.get("method")
-        call_args = args.get("args", []) or []
+        call_args = list(args.get("args", []) or [])
         call_kwargs = args.get("kwargs", {}) or {}
         which = args.get("target", "device")
         if not method:
             return {"success": False, "error": "device_call requires 'method'"}
+
+        # Materialize any shipped binary blobs (remote clients have no shared
+        # filesystem) to temp files and substitute them into the positional args.
+        for idx_str, b64 in (args.get("blobs") or {}).items():
+            try:
+                idx = int(idx_str)
+                data = base64.b64decode(b64)
+                suffix = Path(str(call_args[idx])).suffix if idx < len(call_args) and call_args[idx] else ".bin"
+                fd, tmp_path = tempfile.mkstemp(prefix="divoom_blob_", suffix=suffix or ".bin")
+                with os.fdopen(fd, "wb") as f:
+                    f.write(data)
+                if idx < len(call_args):
+                    call_args[idx] = tmp_path
+                else:
+                    call_args.append(tmp_path)
+            except (ValueError, TypeError, IndexError) as e:
+                return {"success": False, "error": f"bad blob {idx_str}: {e}"}
 
         async def _do():
             if which == "wall":
@@ -537,8 +568,17 @@ class DivoomDaemon:
             if conn in self._subscribers:
                 self._subscribers.remove(conn)
 
+    # ── auth ─────────────────────────────────────────────────────────────
+    def _authorized(self, req: dict) -> bool:
+        """A TCP request is authorized iff it carries the right token. With no
+        token configured, the TCP listener refuses everything (fail closed)."""
+        if not self.token:
+            return False
+        supplied = req.get("token")
+        return isinstance(supplied, str) and hmac.compare_digest(supplied, self.token)
+
     # ── connection handling ──────────────────────────────────────────────
-    def _handle_conn(self, conn: socket.socket) -> None:
+    def _handle_conn(self, conn: socket.socket, *, require_auth: bool = False) -> None:
         try:
             conn.settimeout(5.0)
             buf = b""
@@ -555,6 +595,14 @@ class DivoomDaemon:
             req = msgs[0]
             command = req.get("command")
             args = req.get("args", {}) or {}
+
+            if require_auth and not self._authorized(req):
+                try:
+                    conn.sendall(encode_message({"success": False, "error": "unauthorized"}))
+                except OSError:
+                    pass
+                conn.close()
+                return
 
             if command == SUBSCRIBE_COMMAND:
                 # Held-open stream: send current status, then block until close.
@@ -580,6 +628,20 @@ class DivoomDaemon:
             except OSError:
                 pass
 
+    def _accept_loop(self, listener: socket.socket, *, require_auth: bool) -> None:
+        while self._running:
+            listener.settimeout(1.0)
+            try:
+                conn, _ = listener.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            threading.Thread(
+                target=self._handle_conn, args=(conn,),
+                kwargs={"require_auth": require_auth}, daemon=True,
+            ).start()
+
     def serve_forever(self) -> None:
         if os.path.exists(self.socket_path):
             try:
@@ -589,16 +651,32 @@ class DivoomDaemon:
         self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._server.bind(self.socket_path)
         self._server.listen(8)
+        self._listeners = [self._server]
         self._running = True
         logger.info(f"Divoom daemon listening on {self.socket_path}")
+
+        # Optional TCP listener (R19 headless network server). Token-gated.
+        tcp = None
+        if self.host and self.port:
+            if not self.token:
+                logger.error("TCP listener requested without a token; refusing to "
+                             "expose the daemon unauthenticated. Set DIVOOM_DAEMON_TOKEN "
+                             "or pass --token.")
+            else:
+                tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                tcp.bind((self.host, int(self.port)))
+                tcp.listen(8)
+                self._listeners.append(tcp)
+                logger.info(f"Divoom daemon listening on tcp://{self.host}:{self.port} (token required)")
+
         try:
-            while self._running:
-                self._server.settimeout(1.0)
-                try:
-                    conn, _ = self._server.accept()
-                except socket.timeout:
-                    continue
-                threading.Thread(target=self._handle_conn, args=(conn,), daemon=True).start()
+            if tcp is not None:
+                threading.Thread(target=self._accept_loop, args=(tcp,),
+                                 kwargs={"require_auth": True}, daemon=True,
+                                 name="daemon-tcp-accept").start()
+            # Unix accept loop runs on this (main) thread.
+            self._accept_loop(self._server, require_auth=False)
         finally:
             self.stop()
 
@@ -612,6 +690,12 @@ class DivoomDaemon:
                 self._loop.call_soon_threadsafe(self._loop.stop)
             except Exception:
                 pass
+        for lst in self._listeners:
+            try:
+                lst.close()
+            except OSError:
+                pass
+        self._listeners = []
         if self._server is not None:
             try:
                 self._server.close()
@@ -620,9 +704,12 @@ class DivoomDaemon:
             self._server = None
 
 
-def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH) -> int:
+def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH,
+        host: Optional[str] = None, port: Optional[int] = None,
+        token: Optional[str] = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-    daemon = DivoomDaemon(mac=mac, socket_path=socket_path)
+    daemon = DivoomDaemon(mac=mac, socket_path=socket_path,
+                          host=host, port=port, token=token)
     # Auto-start the notification listener on launch (best-effort; idle on non-mac).
     daemon._cmd_start()
     try:

@@ -119,6 +119,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the headless daemon (device + macOS notification routing + event socket).",
     )
     p_daemon.add_argument("--socket", default="/tmp/divoom.sock", help="Unix socket path.")
+    p_daemon.add_argument("--host", default=None,
+                          help="Also listen on this TCP host (e.g. 0.0.0.0 for LAN). "
+                               "Requires --token or DIVOOM_DAEMON_TOKEN.")
+    p_daemon.add_argument("--port", type=int, default=9009,
+                          help="TCP port for the network listener (default 9009).")
+    p_daemon.add_argument("--token", default=None,
+                          help="Shared secret required for TCP clients "
+                               "(falls back to DIVOOM_DAEMON_TOKEN).")
     return p
 
 
@@ -434,7 +442,10 @@ async def cmd_daemon(args: argparse.Namespace) -> int:
         sys.path.insert(0, str(repo_root))
     from divoom_daemon.daemon import run as run_daemon
     return run_daemon(mac=getattr(args, "mac", None),
-                      socket_path=getattr(args, "socket", "/tmp/divoom.sock"))
+                      socket_path=getattr(args, "socket", "/tmp/divoom.sock"),
+                      host=getattr(args, "host", None),
+                      port=getattr(args, "port", 9009),
+                      token=getattr(args, "token", None))
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────
