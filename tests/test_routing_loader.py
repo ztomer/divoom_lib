@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from gui.macos_notifications import (
+from divoom_daemon.macos_notifications import (
     DEFAULT_ROUTING,
     MacAppRouter,
     ROUTING_PATH,
@@ -111,7 +111,7 @@ def test_load_logs_warning_on_corrupt_file(tmp_path: Path, caplog) -> None:
     import logging
     p = tmp_path / "routing.json"
     p.write_text("not json at all")
-    with caplog.at_level(logging.WARNING, logger="gui.macos_notifications"):
+    with caplog.at_level(logging.WARNING, logger="divoom_daemon.macos_notifications"):
         load_routing_table(p)
     assert any("corrupt" in m.lower() for m in caplog.text.splitlines()), caplog.text
 
@@ -224,7 +224,7 @@ def test_env_var_overrides_default_path(
     # is to pass routing_path explicitly. The env var is only
     # honored by reloading the module; document that behavior.
     from importlib import reload
-    import gui.macos_notifications as m
+    import divoom_daemon.macos_notifications as m
     reload(m)
     try:
         assert str(m.ROUTING_PATH) == str(custom)

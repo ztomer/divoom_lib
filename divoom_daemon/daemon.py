@@ -60,7 +60,7 @@ class DivoomDaemon:
     # ── monitor (lazy, macOS) ────────────────────────────────────────────
     def _get_monitor(self):
         if self._monitor is None:
-            from gui.macos_notifications import MacAppRouter, MacNotificationMonitor
+            from divoom_daemon.macos_notifications import MacAppRouter, MacNotificationMonitor
             self._monitor = MacNotificationMonitor(router=MacAppRouter(), poll_interval=1.0)
         return self._monitor
 
@@ -166,7 +166,7 @@ class DivoomDaemon:
 
     def _cmd_set_routing(self, args: dict) -> dict:
         try:
-            from gui.macos_notifications import save_routing_table, MacAppRouter
+            from divoom_daemon.macos_notifications import save_routing_table, MacAppRouter
             rules = args.get("rules") or []
             save_routing_table([tuple(r) for r in rules])
             mon = self._get_monitor()

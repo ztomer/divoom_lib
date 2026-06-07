@@ -210,7 +210,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
         result = self.api.stop_notification_listener()
         self.assertFalse(result["running"])
 
-    @patch("gui.macos_notifications.MacNotificationMonitor")
+    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
     def test_r13_start_notification_listener_wires_sink(self, mock_monitor_cls):
         """start_notification_listener constructs a monitor with a sink
         that schedules a coroutine on the main loop, then calls .start()."""
@@ -235,7 +235,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
             sink(6, "Alice", "Hello world\nsecond line")
             mock_sched.assert_called_once()
 
-    @patch("gui.macos_notifications.MacNotificationMonitor")
+    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
     def test_r13_start_notification_listener_idempotent(self, mock_monitor_cls):
         """If the monitor is already running, start() is a no-op."""
         mock_monitor = mock_monitor_cls.return_value
@@ -245,7 +245,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertTrue(result["running"])
         mock_monitor.start.assert_not_called()
 
-    @patch("gui.macos_notifications.MacNotificationMonitor")
+    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
     def test_r13_start_notification_listener_filenotfound(self, mock_monitor_cls):
         """If start() raises FileNotFoundError, return error dict."""
         mock_monitor = mock_monitor_cls.return_value
@@ -258,7 +258,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
     def test_r13_stop_notification_listener_calls_monitor_stop(self):
         """Stop calls monitor.stop() on the existing monitor."""
         # Create a monitor first via start (mocked).
-        with patch("gui.macos_notifications.MacNotificationMonitor") as mock_cls:
+        with patch("divoom_daemon.macos_notifications.MacNotificationMonitor") as mock_cls:
             mock_monitor = mock_cls.return_value
             mock_monitor.is_running = False
             mock_monitor.db_path = "/fake/db.sqlite"
@@ -270,7 +270,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
 
     # ── R14 §3: status snapshot + routing save (Settings card) ────────
 
-    @patch("gui.macos_notifications.MacNotificationMonitor")
+    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
     def test_r14_get_notification_listener_status_shape(self, mock_monitor_cls):
         """The status dict has every key the JS side renders."""
         mock_monitor = mock_monitor_cls.return_value
@@ -303,9 +303,9 @@ class TestDivoomGuiAPI(unittest.TestCase):
         # Rules still load from the file (or defaults) even off-macOS.
         self.assertIsInstance(s["rules"], list)
 
-    @patch("gui.macos_notifications.MacNotificationMonitor")
-    @patch("gui.macos_notifications.save_routing_table")
-    @patch("gui.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
+    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
+    @patch("divoom_daemon.macos_notifications.save_routing_table")
+    @patch("divoom_daemon.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
     def test_r14_save_notification_routing_roundtrip(self, mock_save, mock_monitor_cls):
         """save_notification_routing persists and returns the cleaned rules."""
         mock_monitor = mock_monitor_cls.return_value
@@ -313,7 +313,7 @@ class TestDivoomGuiAPI(unittest.TestCase):
         mock_monitor._router.rules = []
         mock_save.return_value = "/tmp/fake-routing.json"
 
-        with patch("gui.macos_notifications.load_routing_table", return_value=[("whatsapp", 6)]):
+        with patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[("whatsapp", 6)]):
             result = self.api.save_notification_routing('[["whatsapp", 6]]')
 
         self.assertIsNone(result["error"])
@@ -322,22 +322,22 @@ class TestDivoomGuiAPI(unittest.TestCase):
         # Hot-reload: a fresh MacAppRouter.from_file replaced the old one.
         self.assertEqual(len(mock_monitor._router.rules), 1)
 
-    @patch("gui.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
+    @patch("divoom_daemon.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
     def test_r14_save_notification_routing_rejects_invalid_json(self):
         """Invalid JSON returns the previous rules and a non-null error."""
         bad = "this is not json"
-        with patch("gui.macos_notifications.load_routing_table", return_value=[("whatsapp", 6)]):
+        with patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[("whatsapp", 6)]):
             result = self.api.save_notification_routing(bad)
         self.assertIsNotNone(result["error"])
         self.assertIn("Invalid", result["error"])
         self.assertEqual(result["rules"], [["whatsapp", 6]])
 
-    @patch("gui.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
+    @patch("divoom_daemon.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
     def test_r14_save_notification_routing_drops_bad_entries_silently(self):
         """Bad entries are dropped (the loader warns) and the clean
         list is returned. The save still succeeds — empty rule list
         is a valid config (drop everything)."""
-        with patch("gui.macos_notifications.load_routing_table", return_value=[]):
+        with patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[]):
             result = self.api.save_notification_routing('[["x", 999]]')
         self.assertIsNone(result["error"])
         # The bad entry was dropped; the saved rules list is empty.

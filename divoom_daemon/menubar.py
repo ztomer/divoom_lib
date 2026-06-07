@@ -26,7 +26,7 @@ sys.path.append(str(Path(__file__).parent.parent / "api_scraper"))
 
 from divoom_lib.divoom import Divoom
 from divoom_lib.utils import discovery
-from gui.menubar_status import (
+from divoom_daemon.menubar_status import (
     SOCKET_PATH as _STATUS_SOCKET_PATH,
     STATE_IDLE,
     format_status_title,
@@ -195,12 +195,12 @@ class DivoomMenuBarAgent(NSObject):
     def openNotifications_(self, sender):
         """Open the GUI focused on Live Widgets -> Notifications (R15 §6)."""
         logger.info("Cocoa Action: Opening Notifications view...")
-        gui_path = Path(__file__).parent / "gui_main.py"
+        gui_path = Path(__file__).parent.parent / "gui" / "gui_main.py"
         subprocess.Popen(open_notifications_command(sys.executable, str(gui_path)))
 
     def launchDashboard_(self, sender):
         logger.info("Cocoa Action: Launching pywebview Dashboard...")
-        gui_path = Path(__file__).parent / "gui_main.py"
+        gui_path = Path(__file__).parent.parent / "gui" / "gui_main.py"
         subprocess.Popen([sys.executable, str(gui_path)])
 
     def stopSocketServer_(self, sender):

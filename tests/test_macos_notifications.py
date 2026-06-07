@@ -25,7 +25,7 @@ from typing import Optional
 
 import pytest
 
-from gui.macos_notifications import (
+from divoom_daemon.macos_notifications import (
     DEFAULT_ROUTING,
     MacAppRouter,
     MacNotificationMonitor,
@@ -307,7 +307,7 @@ def test_find_notification_db_path_returns_none_off_macos() -> None:
 
 
 def test_module_exports_expected_symbols() -> None:
-    import gui.macos_notifications as m
+    import divoom_daemon.macos_notifications as m
     assert callable(m.MacNotificationMonitor)
     assert callable(m.MacAppRouter)
     assert callable(m.parse_notification_record)

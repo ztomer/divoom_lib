@@ -16,7 +16,7 @@ import pytest
 sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent.parent / "gui"))
 
-from gui.menubar_status import (
+from divoom_daemon.menubar_status import (
     STATE_ACTIVE, STATE_IDLE, STATE_ERROR,
     derive_state, format_status_title, status_color, hex_to_rgb01,
     open_notifications_command, push_notification_status, build_status_payload,

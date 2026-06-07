@@ -544,10 +544,10 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
 
     def _notification_monitor(self):
         """Lazy accessor for the macOS monitor singleton. Imports
-        ``gui.macos_notifications`` lazily so non-macOS hosts don't
+        ``divoom_daemon.macos_notifications`` lazily so non-macOS hosts don't
         fail to import this module."""
         if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:
-            from gui.macos_notifications import MacAppRouter, MacNotificationMonitor
+            from divoom_daemon.macos_notifications import MacAppRouter, MacNotificationMonitor
             router = MacAppRouter()
             self._mac_monitor = MacNotificationMonitor(router=router, poll_interval=1.0)
         return self._mac_monitor
@@ -578,7 +578,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         `status` unchanged so callers can ``return self._push_menubar_status(...)``.
         Silent no-op if the menubar agent isn't running."""
         try:
-            from gui.menubar_status import derive_state, push_notification_status
+            from divoom_daemon.menubar_status import derive_state, push_notification_status
             push_notification_status(derive_state(status), status.get("counters"))
         except Exception as e:
             logger.debug(f"menubar status push skipped: {e}")
@@ -630,7 +630,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
               "error": str | None,
             }
         """
-        from gui.macos_notifications import ROUTING_PATH, load_routing_table
+        from divoom_daemon.macos_notifications import ROUTING_PATH, load_routing_table
         if sys.platform != "darwin":
             return {
                 "platform_supported": False,
@@ -668,7 +668,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         unchanged and a non-null ``error`` string — the GUI shows the
         error and keeps the user's draft.
         """
-        from gui.macos_notifications import (
+        from divoom_daemon.macos_notifications import (
             ROUTING_PATH, load_routing_table, save_routing_table,
         )
         import json as _json
@@ -687,7 +687,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             }
         # Hot-reload the running monitor's router.
         monitor = self._notification_monitor()
-        from gui.macos_notifications import MacAppRouter
+        from divoom_daemon.macos_notifications import MacAppRouter
         monitor._router = MacAppRouter.from_file(path)
         logger.info(f"save_notification_routing: saved {len(parsed)} rules to {path}")
         return {
