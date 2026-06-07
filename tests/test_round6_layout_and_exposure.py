@@ -32,14 +32,14 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-INDEX_HTML = REPO_ROOT / "gui" / "web_ui" / "index.html"
-TEMPLATES_JS = REPO_ROOT / "gui" / "web_ui" / "templates.js"
-GALLERY_CSS = REPO_ROOT / "gui" / "web_ui" / "gallery.css"
-GALLERY_JS = REPO_ROOT / "gui" / "web_ui" / "gallery.js"
-SETTINGS_JS = REPO_ROOT / "gui" / "web_ui" / "settings.js"
-APP_JS = REPO_ROOT / "gui" / "web_ui" / "app.js"
-CHANNELS_JS = REPO_ROOT / "gui" / "web_ui" / "channels.js"
-GUI_API_PY = REPO_ROOT / "gui" / "gui_api.py"
+INDEX_HTML = REPO_ROOT / "divoom_gui" / "web_ui" / "index.html"
+TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
+GALLERY_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.css"
+GALLERY_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.js"
+SETTINGS_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.js"
+APP_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "app.js"
+CHANNELS_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "channels.js"
+GUI_API_PY = REPO_ROOT / "divoom_gui" / "gui_api.py"
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -506,7 +506,7 @@ def test_r10_gui_api_and_lib_expose_notification():
 # 5d. Round 11 Phase 2 — quick GUI wins
 # ──────────────────────────────────────────────────────────────────
 
-CHANNELS_CSS = REPO_ROOT / "gui" / "web_ui" / "channels.css"
+CHANNELS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "channels.css"
 
 
 def test_r11_ambient_color_controls_gated_and_no_custom_label():
@@ -541,7 +541,7 @@ def test_r11_custom_art_push_is_pinned_footer():
     )
 
 
-APPBAR_CSS = REPO_ROOT / "gui" / "web_ui" / "appbar.css"
+APPBAR_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "appbar.css"
 
 
 def test_r11_appbar_phase3():
@@ -604,9 +604,9 @@ def test_r18_subtabs_have_icons_and_fit_content():
                 "settings-appearance"):
         m = re.search(rf'data-(?:tools|settings)-tab="{did}"[^>]*>(.*?)</button>', src, re.DOTALL)
         assert m and "tab-icon" in m.group(1), f"{did} tab button is missing a .tab-icon"
-    tabs_css = (REPO_ROOT / "gui" / "web_ui" / "tabs.css").read_text()
+    tabs_css = (REPO_ROOT / "divoom_gui" / "web_ui" / "tabs.css").read_text()
     assert "fit-content" in tabs_css, ".tabs-row should size to content (item b)"
-    settings_css = (REPO_ROOT / "gui" / "web_ui" / "settings.css").read_text()
+    settings_css = (REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css").read_text()
     assert re.search(r"\.theme-buttons\s*\{[^}]*inline-flex", settings_css), \
         "theme selector should size to content (item b)"
 
@@ -676,7 +676,7 @@ async def test_monthly_best_layout_renders_cleanly():
 # 5e. Round 12 §A Phase 7 — tools regroup + unified segmented-pill
 # ──────────────────────────────────────────────────────────────────
 
-SETTINGS_CSS = REPO_ROOT / "gui" / "web_ui" / "settings.css"
+SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
 
 
 def test_r12_tools_subtab_uses_sessions_not_tools_inner_collision():
@@ -719,7 +719,7 @@ def test_r15_unified_segmented_pill_css():
     Settings / Theme. `settings.css` keeps the legacy class names as
     aliases so older markup (or external themes) still render."""
     repo_root = Path(__file__).parent.parent
-    tabs_css = (repo_root / "gui" / "web_ui" / "tabs.css").read_text()
+    tabs_css = (repo_root / "divoom_gui" / "web_ui" / "tabs.css").read_text()
     settings_css = SETTINGS_CSS.read_text()
 
     # tabs.css defines the unified `.tabs-row` and `.tab-btn` rules.

@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 
-WEB_UI = Path(__file__).resolve().parent.parent / "gui" / "web_ui"
+WEB_UI = Path(__file__).resolve().parent.parent / "divoom_gui" / "web_ui"
 STYLE_CSS = WEB_UI / "style.css"
 INDEX_HTML = WEB_UI / "index.html"
 

@@ -31,9 +31,9 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-INDEX_HTML = REPO_ROOT / "gui" / "web_ui" / "index.html"
-APP_JS = REPO_ROOT / "gui" / "web_ui" / "app.js"
-GUI_MAIN = REPO_ROOT / "gui" / "gui_main.py"
+INDEX_HTML = REPO_ROOT / "divoom_gui" / "web_ui" / "index.html"
+APP_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "app.js"
+GUI_MAIN = REPO_ROOT / "divoom_gui" / "gui_main.py"
 
 
 def _read_cocoa_browser_view_move_source():
@@ -114,12 +114,12 @@ def test_app_js_has_no_custom_drag_handler():
     """
     src = APP_JS.read_text()
     assert "pywebview.api.drag_window" not in src, (
-        "gui/web_ui/app.js still calls pywebview.api.drag_window — this is "
+        "divoom_gui/web_ui/app.js still calls pywebview.api.drag_window — this is "
         "an OLD custom drag path. Delete the drag handler block; the "
         "window drag is handled natively by pywebview's drag region."
     )
     assert 'e.target.closest(".integrated-appbar")' not in src, (
-        "gui/web_ui/app.js still walks the DOM for .integrated-appbar to "
+        "divoom_gui/web_ui/app.js still walks the DOM for .integrated-appbar to "
         "attach a drag handler — this is the OLD custom drag path. "
         "pywebview handles drag detection natively for elements with "
         "the .pywebview-drag-region class."
@@ -131,7 +131,7 @@ def test_gui_api_has_no_drag_window():
     drag is handled by pywebview's bundled mechanism + the #1820
     patch in gui_main.py. A custom Python drag_window would be
     dead code (and is the source of multiple regressions)."""
-    sys.path.insert(0, str(REPO_ROOT / "gui"))
+    sys.path.insert(0, str(REPO_ROOT / "divoom_gui"))
     import gui_api as _api_mod
     assert not hasattr(_api_mod.DivoomGuiAPI, "drag_window"), (
         "DivoomGuiAPI.drag_window still exists — this is the OLD custom "
@@ -167,7 +167,7 @@ def test_pywebview_1820_detection_matches_source():
 
     # What our detection helper says.
     sys.path.insert(0, str(REPO_ROOT))
-    sys.path.insert(0, str(REPO_ROOT / "gui"))
+    sys.path.insert(0, str(REPO_ROOT / "divoom_gui"))
     # Import the helper without triggering main()/webview.start().
     import importlib
     if "gui_main" in sys.modules:
@@ -219,7 +219,7 @@ def test_pywebview_1820_detection_simulates_upstream_fix():
     try:
         # Re-import the helper so it picks up the new source.
         sys.path.insert(0, str(REPO_ROOT))
-        sys.path.insert(0, str(REPO_ROOT / "gui"))
+        sys.path.insert(0, str(REPO_ROOT / "divoom_gui"))
         import importlib
         if "gui_main" in sys.modules:
             importlib.reload(sys.modules["gui_main"])

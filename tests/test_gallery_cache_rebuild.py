@@ -34,7 +34,7 @@ if "media_decoder" not in sys.modules:
 def _import_gallery_sync():
     """Import gui/gallery_sync.py. media_decoder stub is set up at module load."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from gui.gallery_sync import GallerySyncMixin
+    from divoom_gui.gallery_sync import GallerySyncMixin
     return GallerySyncMixin
 
 

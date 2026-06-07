@@ -26,7 +26,7 @@ from pathlib import Path
 playwright = pytest.importorskip("playwright.sync_api", reason="playwright not installed")
 sync_playwright = playwright.sync_playwright
 
-WEB_UI_DIR = Path(__file__).resolve().parents[1] / "gui" / "web_ui"
+WEB_UI_DIR = Path(__file__).resolve().parents[1] / "divoom_gui" / "web_ui"
 
 
 def _free_port() -> int:

@@ -33,7 +33,7 @@ except ImportError:
     sync_playwright = None
 
 
-WEB_UI_DIR = Path(__file__).resolve().parents[1] / "gui" / "web_ui"
+WEB_UI_DIR = Path(__file__).resolve().parents[1] / "divoom_gui" / "web_ui"
 
 
 def _free_port() -> int:

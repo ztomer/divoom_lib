@@ -911,7 +911,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
 
         ``mac`` is optional; falls back to the active device's MAC if
         empty. Returns a status dict (see ``mcp_server_status()``)."""
-        from gui.mcp_control import MCPController, status_to_dict
+        from divoom_gui.mcp_control import MCPController, status_to_dict
         ctl = MCPController.instance()
         target_mac = mac or (self.current_divoom.mac if self.current_divoom else "")
         if not target_mac:
@@ -920,16 +920,16 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
 
     def stop_mcp_server(self) -> dict:
         """Stop the MCP server subprocess (no-op if not running)."""
-        from gui.mcp_control import MCPController, status_to_dict
+        from divoom_gui.mcp_control import MCPController, status_to_dict
         ctl = MCPController.instance()
         return status_to_dict(ctl.stop())
 
     def is_mcp_server_running(self) -> bool:
         """True if the subprocess is alive."""
-        from gui.mcp_control import MCPController
+        from divoom_gui.mcp_control import MCPController
         return MCPController.instance().is_running()
 
     def mcp_server_status(self) -> dict:
         """Snapshot of the subprocess state (JSON-friendly)."""
-        from gui.mcp_control import MCPController, status_to_dict
+        from divoom_gui.mcp_control import MCPController, status_to_dict
         return status_to_dict(MCPController.instance().status())

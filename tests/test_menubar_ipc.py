@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).parent.parent))
-sys.path.append(str(Path(__file__).parent.parent / "gui"))
+sys.path.append(str(Path(__file__).parent.parent / "divoom_gui"))
 
 from divoom_daemon.menubar_status import (
     STATE_ACTIVE, STATE_IDLE, STATE_ERROR,

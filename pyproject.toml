@@ -91,16 +91,16 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["divoom_lib*", "divoom_daemon*", "gui*"]
+include = ["divoom_lib*", "divoom_daemon*", "divoom_gui*"]
 exclude = ["tests*", "examples*", "references*", "scripts*", "docs*"]
 
 [tool.setuptools.package-data]
-# R17: the native dylib now ships with `divoom_lib` (its true home — it bundles
-# divoom_lib/native_src/*.c). The web UI ships with the `gui` package.
+# R17: the native dylib ships with `divoom_lib` (its true home — it bundles
+# divoom_lib/native_src/*.c). The web UI ships with the `divoom_gui` package.
 divoom_lib = [
     "*.dylib",
 ]
-gui = [
+divoom_gui = [
     "web_ui/*",
 ]
 

@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).parent.parent))
-sys.path.append(str(Path(__file__).parent.parent / "gui"))
+sys.path.append(str(Path(__file__).parent.parent / "divoom_gui"))
 
 from divoom_daemon.daemon import DivoomDaemon, STATE_ACTIVE, STATE_IDLE
 from divoom_daemon.daemon_protocol import DaemonClient, EVENT_STATUS, EVENT_NOTIFICATION

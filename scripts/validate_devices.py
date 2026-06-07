@@ -36,7 +36,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 sys.path.append(str(ROOT))
-sys.path.append(str(ROOT / "gui"))
+sys.path.append(str(ROOT / "divoom_gui"))
 
 from divoom_lib.divoom import Divoom              # noqa: E402
 from divoom_lib.utils import discovery             # noqa: E402

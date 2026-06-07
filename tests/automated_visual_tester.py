@@ -15,7 +15,7 @@ import json
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
-from gui.gui_main import DivoomGuiAPI
+from divoom_gui.gui_main import DivoomGuiAPI
 import webview
 
 def print_info(message):
@@ -191,7 +191,7 @@ class HeadlessGuiTester:
             window.destroy()
 
     def start(self):
-        web_ui_dir = Path(__file__).parent.parent / "gui" / "web_ui"
+        web_ui_dir = Path(__file__).parent.parent / "divoom_gui" / "web_ui"
         index_html = web_ui_dir / "index.html"
 
         # Start visual cycle thread

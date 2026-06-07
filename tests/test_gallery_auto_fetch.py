@@ -19,9 +19,9 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-TEMPLATES_JS = REPO_ROOT / "gui" / "web_ui" / "templates.js"
-GALLERY_JS = REPO_ROOT / "gui" / "web_ui" / "gallery.js"
-GALLERY_CSS = REPO_ROOT / "gui" / "web_ui" / "gallery.css"
+TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
+GALLERY_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.js"
+GALLERY_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.css"
 
 
 # ── 1. No visible "Fetch Gallery" button ──────────────────────────────

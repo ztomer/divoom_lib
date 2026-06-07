@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).parent.parent))
-sys.path.append(str(Path(__file__).parent.parent / "gui"))
+sys.path.append(str(Path(__file__).parent.parent / "divoom_gui"))
 
 from divoom_daemon.daemon_protocol import (
     EVENT_STATUS, EVENT_NOTIFICATION, SUBSCRIBE_COMMAND,

@@ -16,7 +16,7 @@ Why subprocess, not in-process:
 
 Usage::
 
-    from gui.mcp_control import MCPController
+    from divoom_gui.mcp_control import MCPController
     ctl = MCPController()
     if not ctl.is_running():
         ctl.start(mac="11:75:58:3f:fd:aa")

@@ -17,8 +17,8 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-TEMPLATES_JS = REPO_ROOT / "gui" / "web_ui" / "templates.js"
-SETTINGS_CSS = REPO_ROOT / "gui" / "web_ui" / "settings.css"
+TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
+SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
 
 from divoom_lib.hotchannel_config import (
     DEFAULTS,

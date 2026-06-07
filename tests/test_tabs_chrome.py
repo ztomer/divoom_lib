@@ -13,11 +13,11 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-TABS_CSS = REPO_ROOT / "gui" / "web_ui" / "tabs.css"
-SETTINGS_CSS = REPO_ROOT / "gui" / "web_ui" / "settings.css"
-CHANNELS_CSS = REPO_ROOT / "gui" / "web_ui" / "channels.css"
-INDEX_HTML = REPO_ROOT / "gui" / "web_ui" / "index.html"
-TEMPLATES_JS = REPO_ROOT / "gui" / "web_ui" / "templates.js"
+TABS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "tabs.css"
+SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
+CHANNELS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "channels.css"
+INDEX_HTML = REPO_ROOT / "divoom_gui" / "web_ui" / "index.html"
+TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
 
 
 # ── tabs.css basics ───────────────────────────────────────────────────

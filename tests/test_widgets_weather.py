@@ -17,9 +17,9 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-TEMPLATES_JS = REPO_ROOT / "gui" / "web_ui" / "templates.js"
-WIDGETS_JS = REPO_ROOT / "gui" / "web_ui" / "widgets.js"
-SETTINGS_JS = REPO_ROOT / "gui" / "web_ui" / "settings.js"
+TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
+WIDGETS_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "widgets.js"
+SETTINGS_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.js"
 
 
 def _live_widgets_block() -> str:

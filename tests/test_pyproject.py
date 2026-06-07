@@ -141,7 +141,7 @@ def test_pyproject_package_data_includes_dylib_and_web_ui() -> None:
     pd = data.get("tool", {}).get("setuptools", {}).get("package-data", {})
     # R17: the dylib ships with divoom_lib (its true home); web_ui with gui.
     assert "*.dylib" in pd.get("divoom_lib", [])
-    assert "web_ui/*" in pd.get("gui", [])
+    assert "web_ui/*" in pd.get("divoom_gui", [])
 
 
 # ── legacy shell wrapper ──────────────────────────────────────────────

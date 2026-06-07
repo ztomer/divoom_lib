@@ -28,7 +28,7 @@ from pathlib import Path
 
 # The real index.html lives in gui/web_ui/. We load it via file://
 # so the test is self-contained.
-INDEX_HTML = Path(__file__).parent.parent / "gui" / "web_ui" / "index.html"
+INDEX_HTML = Path(__file__).parent.parent / "divoom_gui" / "web_ui" / "index.html"
 
 
 @pytest.mark.asyncio

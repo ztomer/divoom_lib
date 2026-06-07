@@ -8,7 +8,7 @@ import pytest
 
 # Add paths to imports
 sys.path.append(str(Path(__file__).parent.parent))
-sys.path.append(str(Path(__file__).parent.parent / "gui"))
+sys.path.append(str(Path(__file__).parent.parent / "divoom_gui"))
 
 from gui_main import DivoomGuiAPI
 
