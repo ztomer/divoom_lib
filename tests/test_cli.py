@@ -25,6 +25,7 @@ from pathlib import Path
 import pytest
 
 from divoom_lib import cli as cli_module
+from unittest.mock import AsyncMock, MagicMock
 from divoom_lib.models.capabilities import (
     BASELINE,
     Capabilities,
@@ -217,6 +218,69 @@ async def test_cmd_set_brightness_rejects_out_of_range() -> None:
     with pytest.raises(SystemExit) as exc:
         await cli_module.cmd_set_brightness(ns)
     assert exc.value.code == 2
+
+
+# ── set-temperature (R14 §1) ───────────────────────────────────────────
+
+
+class _FakeDivoomForWeather:
+    """Minimal fake that mimics the parts of Divoom that
+    ``cmd_set_temperature`` touches: ``capabilities`` and ``weather``."""
+
+    def __init__(self, *, has_weather: bool = True) -> None:
+        self.capabilities = MagicMock()
+        self.capabilities.has_weather = has_weather
+        self.weather = MagicMock()
+        # side_effect so it can raise (out-of-range) or return True
+        self.weather.set = AsyncMock(side_effect=self._validate_and_set)
+        self._disconnected = False
+
+    async def _validate_and_set(self, temperature: int, weather_id: int) -> bool:
+        # Mirror Weather.set's validation so the CLI behavior is testable.
+        if not -127 <= int(temperature) <= 128:
+            raise ValueError(f"temperature {temperature} out of range [-127..128]")
+        return True
+
+    async def disconnect(self) -> None:
+        self._disconnected = True
+
+
+async def test_cmd_set_temperature_calls_weather_set(monkeypatch) -> None:
+    fake = _FakeDivoomForWeather()
+    monkeypatch.setattr(cli_module, "_resolve_device", AsyncMock(return_value=(fake, "AA:BB:CC:DD:EE:FF")))
+
+    p = cli_module.build_parser()
+    ns = p.parse_args(["set-temperature", "18", "--mac", "AA:BB:CC:DD:EE:FF", "--weather", "clear"])
+    rc = await cli_module.cmd_set_temperature(ns)
+    assert rc == 0
+    fake.weather.set.assert_called_once_with(18, 1)  # clear=1
+
+
+async def test_cmd_set_temperature_rejects_when_no_capability(monkeypatch) -> None:
+    fake = _FakeDivoomForWeather(has_weather=False)
+    monkeypatch.setattr(cli_module, "_resolve_device", AsyncMock(return_value=(fake, "AA:BB:CC:DD:EE:FF")))
+
+    p = cli_module.build_parser()
+    ns = p.parse_args(["set-temperature", "18", "--mac", "AA:BB:CC:DD:EE:FF"])
+    with pytest.raises(SystemExit) as exc:
+        await cli_module.cmd_set_temperature(ns)
+    assert exc.value.code == 1
+
+
+async def test_cmd_set_temperature_rejects_out_of_range(monkeypatch) -> None:
+    fake = _FakeDivoomForWeather()
+    monkeypatch.setattr(cli_module, "_resolve_device", AsyncMock(return_value=(fake, "AA:BB:CC:DD:EE:FF")))
+
+    p = cli_module.build_parser()
+    ns = p.parse_args(["set-temperature", "200", "--mac", "AA:BB:CC:DD:EE:FF"])
+    with pytest.raises((SystemExit, ValueError)):
+        await cli_module.cmd_set_temperature(ns)
+
+
+def test_set_temperature_registered_in_dispatch_table() -> None:
+    """R14 §1 — the new subcommand is wired in ``COMMANDS``."""
+    assert "set-temperature" in cli_module.COMMANDS
+    assert cli_module.COMMANDS["set-temperature"] is cli_module.cmd_set_temperature
 
 
 # ── Module / package surface ───────────────────────────────────────────

@@ -85,6 +85,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_al = sub.add_parser("set-alarm", parents=[shared], help="Set a one-shot alarm at HH:MM.")
     p_al.add_argument("time", help="HH:MM (24h)")
 
+    p_wx = sub.add_parser("set-temperature", parents=[shared], help="Set the device's weather channel (temperature + icon).")
+    p_wx.add_argument("temperature", type=int, help="Temperature in Celsius (range: -127..128).")
+    p_wx.add_argument(
+        "--weather", default="clear", choices=["clear", "cloudy", "thunderstorm", "rain", "snow", "fog"],
+        help="Weather condition (default: clear).",
+    )
+
     p_img = sub.add_parser("push-image", parents=[shared], help="Push a local image to the device.")
     p_img.add_argument("path", type=Path)
 
@@ -264,6 +271,34 @@ async def cmd_set_alarm(args: argparse.Namespace) -> int:
         await d.disconnect()
 
 
+# R14 §1 — weather command (0x5F).
+WEATHER_NAME_TO_ID = {
+    "clear":        1,
+    "cloudy":       3,
+    "thunderstorm": 5,
+    "rain":         6,
+    "snow":         8,
+    "fog":          9,
+}
+
+
+async def cmd_set_temperature(args: argparse.Namespace) -> int:
+    """Set the device's weather channel: temperature + icon (0x5F)."""
+    d, mac = await _resolve_device(args)
+    try:
+        if not d.capabilities.has_weather:
+            _err(f"device {mac} has no weather channel (capabilities.has_weather=False)", 1)
+        weather_id = WEATHER_NAME_TO_ID[args.weather]
+        ok = await d.weather.set(args.temperature, weather_id)
+        _print(
+            f"set weather: temperature={args.temperature}°C, weather={args.weather} ({weather_id}) (ok={ok})",
+            as_json=args.json,
+        )
+        return 0 if ok else 1
+    finally:
+        await d.disconnect()
+
+
 async def cmd_push_image(args: argparse.Namespace) -> int:
     path: Path = args.path
     if not path.exists():
@@ -357,6 +392,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace], Awaitable[int]]] = {
     "set-brightness":cmd_set_brightness,
     "set-radio":     cmd_set_radio,
     "set-alarm":     cmd_set_alarm,
+    "set-temperature": cmd_set_temperature,
     "push-image":    cmd_push_image,
     "push-gif":      cmd_push_gif,
     "pair":          cmd_pair,

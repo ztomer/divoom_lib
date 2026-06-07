@@ -416,3 +416,54 @@ body.theme-light #widget-device-select {
       color: #1c1d21 !important;
     }
 }
+
+/* R14 §3 — macOS notification mirroring card.
+   The status pill lives in the card header; the rules editor lives
+   in a <details> body (collapsed by default to keep the card tidy). */
+.card-header { display: flex; align-items: center; justify-content: space-between; }
+.status-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+}
+.status-pill[data-state="running"] {
+  border-color: rgba(94, 222, 145, 0.55);
+  color: #5ede91;
+  background: rgba(94, 222, 145, 0.10);
+}
+.status-pill[data-state="stopped"] {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.55);
+}
+.status-pill[data-state="error"] {
+  border-color: rgba(232, 92, 92, 0.55);
+  color: #e85c5c;
+  background: rgba(232, 92, 92, 0.10);
+}
+.status-pill[data-state="unsupported"] {
+  border-color: rgba(255, 200, 100, 0.55);
+  color: #ffc864;
+  background: rgba(255, 200, 100, 0.08);
+}
+#macnotif-detail {
+  white-space: pre;
+  line-height: 1.5;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+#macnotif-rules-msg[data-state="ok"]    { color: #5ede91; }
+#macnotif-rules-msg[data-state="warn"]  { color: #ffc864; }
+#macnotif-rules-msg[data-state="error"] { color: #e85c5c; }
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details[open] > summary { color: var(--text-muted); }
+

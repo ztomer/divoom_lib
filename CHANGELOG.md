@@ -6,6 +6,59 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 14 — 2026-06-07 (R13 follow-ups: weather, routing JSON, GUI card, packaging)
+
+Four deliverables closing out the R13 follow-up list. **+74 tests**,
+suite 755 → 829 passed. See `docs/PLANNING_ROUND14.md` for the
+full plan + outcome.
+
+- **§1 — `Weather` facade**: new `divoom_lib/system/weather.py` with a
+  clean `Weather` class (`set`, `set_temperature`, `set_weather`).
+  Wired to the Divoom facade as `divoom.weather`. The old
+  `TempWeatherCommand` is now a thin shim — fixes the latent
+  `number2HexString()` bug (function lives in
+  `divoom_lib/utils/converters.py`, not on the Divoom instance) that
+  would have crashed at first `update_temp_weather()` call. CLI
+  `set-temperature` subcommand added. `examples/set_weather.py`
+  re-added (R13 §2 had deferred it). +27 tests.
+- **§2 — Custom routing JSON loader** (`gui/macos_notifications.py`):
+  `load_routing_table(path)` / `save_routing_table(rules, path)`;
+  honors `DIVOOM_CONTROL_ROUTING` env var, defaults to
+  `~/.config/divoom-control/notification_routing.json` (same
+  XDG-convention dir as `devices.json`). Corrupt-file tolerant —
+  warn + fall back to `DEFAULT_ROUTING`. Validates `app_type` ∈
+  `NOTIFICATION_APPS` (1-14); bad entries are dropped with a
+  warning, not crashed. Atomic save via `.tmp` + `replace()`. New
+  `MacAppRouter.from_file(path)` classmethod. `MacNotificationMonitor`
+  loads from the custom file by default. +19 tests.
+- **§3 — GUI Settings → Devices card**: new "macOS Notifications"
+  card under Settings → Devices with toggle, live status pill
+  (running / stopped / error / unsupported), counters (seen /
+  routed / dropped), and a routing JSON editor (textarea + Save /
+  Reset to defaults). `gui_api` adds `get_notification_listener_status()`
+  and `save_notification_routing(json_text)` with hot-reload (the
+  running monitor's router is replaced, no listener restart
+  required). JSON editor was chosen over per-app checkboxes
+  because the rules ARE JSON and a checkbox matrix would be a
+  parallel state to keep in sync. +5 gui_api tests.
+- **§4 — `pyproject.toml`**: first packaging file in the repo.
+  setuptools backend, PEP 621 metadata, version `0.14.0`,
+  `requires-python = ">=3.10"`. Core deps from `requirements.txt`.
+  `[gui]` extra: `pywebview` + `pyobjc-framework-Cocoa`
+  (darwin-gated). `[test]` / `[dev]` extras.
+  `[project.scripts]` registers `divoom-control = divoom_lib.cli:main`
+  as a real console script. `tool.setuptools.package-data` ships
+  the `libdivoom_compact.dylib` + `web_ui/*` with the `gui`
+  package. Verified `pip install -e .` + the resulting
+  `divoom-control --help` works. The legacy shell wrapper
+  `./divoom-control` is kept for in-tree dev without an editable
+  install. +12 packaging tests.
+
+**Test count:** 755 → 829 (+74). **Suite:** 829 passed, 75 skipped,
+0 failed. Zero regressions across R8→R14.
+
+---
+
 ## Round 13 — 2026-06-06 (capability detection + examples/CLI + macOS notifications)
 
 Three deliverables, all on the kill-criterion-aware path. See

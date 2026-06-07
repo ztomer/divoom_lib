@@ -468,6 +468,33 @@ window.DivoomTemplates = {
                                 </div>
                             </div>
                         </div>
+                        <!-- R14 §3 — macOS Notification Mirroring -->
+                        <div class="card glass-card">
+                            <div class="card-header">
+                                <h3>macOS Notifications</h3>
+                                <span class="status-pill" id="macnotif-status-pill">unknown</span>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="panel-hint" style="margin-top:0;">Mirror incoming macOS notifications onto the device. Uses a private SQLite DB that Apple does not document — see <code>docs/NOTIFICATIONS_SETUP.md</code> for tradeoffs.</p>
+                                <label class="hc-toggle">
+                                    <input type="checkbox" id="macnotif-toggle">
+                                    <span id="macnotif-toggle-label">Mirror macOS notifications</span>
+                                </label>
+                                <div id="macnotif-detail" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px;">
+                                    Status: loading...
+                                </div>
+                                <details>
+                                    <summary class="form-label" style="cursor:pointer; user-select:none;">Routing rules</summary>
+                                    <p class="panel-hint" style="margin-top:6px;">Each rule maps a macOS app/bundle-id substring to a Divoom notification type. First match wins. Edit JSON; <em>Save</em> persists to <code id="macnotif-routing-path">~/.config/divoom-control/notification_routing.json</code> and hot-reloads.</p>
+                                    <textarea id="macnotif-rules-json" class="text-input" rows="10" spellcheck="false" style="font-family: var(--font-mono); font-size: 11px; width: 100%; resize: vertical; min-height: 180px;"></textarea>
+                                    <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+                                        <button id="macnotif-rules-save" class="glow-btn compact">Save</button>
+                                        <button id="macnotif-rules-reset" class="glow-btn compact secondary">Reset to defaults</button>
+                                        <span id="macnotif-rules-msg" class="panel-hint" style="font-size: 11px;"></span>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

@@ -268,6 +268,81 @@ class TestDivoomGuiAPI(unittest.TestCase):
             self.assertFalse(result["running"])
             mock_monitor.stop.assert_called_once()
 
+    # ── R14 §3: status snapshot + routing save (Settings card) ────────
+
+    @patch("gui.macos_notifications.MacNotificationMonitor")
+    def test_r14_get_notification_listener_status_shape(self, mock_monitor_cls):
+        """The status dict has every key the JS side renders."""
+        mock_monitor = mock_monitor_cls.return_value
+        mock_monitor.is_running = True
+        mock_monitor.db_path = "/fake/db.sqlite"
+        mock_monitor.records_seen = 12
+        mock_monitor.records_routed = 8
+        mock_monitor.records_dropped = 4
+        # _router.rules is a list of tuples.
+        mock_monitor._router.rules = [("whatsapp", 6), ("com.apple.mail", 7)]
+
+        s = self.api.get_notification_listener_status()
+
+        self.assertTrue(s["platform_supported"])
+        self.assertTrue(s["running"])
+        self.assertEqual(s["db_path"], "/fake/db.sqlite")
+        self.assertEqual(s["counters"], {"seen": 12, "routed": 8, "dropped": 4})
+        # Rules is a list of [str, int] pairs (not tuples) for JSON.
+        self.assertEqual(s["rules"], [["whatsapp", 6], ["com.apple.mail", 7]])
+        self.assertIn("routing_path", s)
+        self.assertIsNone(s["error"])
+
+    @patch("sys.platform", new="linux")
+    def test_r14_status_unsupported_off_macos(self):
+        """On non-darwin, status reports unsupported and the toggle is disabled upstream."""
+        s = self.api.get_notification_listener_status()
+        self.assertFalse(s["platform_supported"])
+        self.assertFalse(s["running"])
+        self.assertIsNotNone(s["error"])
+        # Rules still load from the file (or defaults) even off-macOS.
+        self.assertIsInstance(s["rules"], list)
+
+    @patch("gui.macos_notifications.MacNotificationMonitor")
+    @patch("gui.macos_notifications.save_routing_table")
+    @patch("gui.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
+    def test_r14_save_notification_routing_roundtrip(self, mock_save, mock_monitor_cls):
+        """save_notification_routing persists and returns the cleaned rules."""
+        mock_monitor = mock_monitor_cls.return_value
+        mock_monitor.is_running = False
+        mock_monitor._router.rules = []
+        mock_save.return_value = "/tmp/fake-routing.json"
+
+        with patch("gui.macos_notifications.load_routing_table", return_value=[("whatsapp", 6)]):
+            result = self.api.save_notification_routing('[["whatsapp", 6]]')
+
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["rules"], [["whatsapp", 6]])
+        mock_save.assert_called_once()
+        # Hot-reload: a fresh MacAppRouter.from_file replaced the old one.
+        self.assertEqual(len(mock_monitor._router.rules), 1)
+
+    @patch("gui.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
+    def test_r14_save_notification_routing_rejects_invalid_json(self):
+        """Invalid JSON returns the previous rules and a non-null error."""
+        bad = "this is not json"
+        with patch("gui.macos_notifications.load_routing_table", return_value=[("whatsapp", 6)]):
+            result = self.api.save_notification_routing(bad)
+        self.assertIsNotNone(result["error"])
+        self.assertIn("Invalid", result["error"])
+        self.assertEqual(result["rules"], [["whatsapp", 6]])
+
+    @patch("gui.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
+    def test_r14_save_notification_routing_drops_bad_entries_silently(self):
+        """Bad entries are dropped (the loader warns) and the clean
+        list is returned. The save still succeeds — empty rule list
+        is a valid config (drop everything)."""
+        with patch("gui.macos_notifications.load_routing_table", return_value=[]):
+            result = self.api.save_notification_routing('[["x", 999]]')
+        self.assertIsNone(result["error"])
+        # The bad entry was dropped; the saved rules list is empty.
+        self.assertEqual(result["rules"], [])
+
     @patch("gui_main.BleakScanner")
     def test_scan_devices(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""

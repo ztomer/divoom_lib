@@ -554,4 +554,117 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
     });
+
+    // ── R14 §3 — macOS notification mirroring (Settings → Devices card) ──
+    const macToggle    = document.getElementById("macnotif-toggle");
+    const macDetail    = document.getElementById("macnotif-detail");
+    const macPill      = document.getElementById("macnotif-status-pill");
+    const macRulesJson = document.getElementById("macnotif-rules-json");
+    const macRulesSave = document.getElementById("macnotif-rules-save");
+    const macRulesReset = document.getElementById("macnotif-rules-reset");
+    const macRulesMsg  = document.getElementById("macnotif-rules-msg");
+    const macRoutingPathEl = document.getElementById("macnotif-routing-path");
+
+    function setMacPill(state) {
+        if (!macPill) return;
+        macPill.textContent = state;
+        macPill.dataset.state = state.toLowerCase();
+    }
+
+    function renderMacNotifStatus(s) {
+        if (!s) return;
+        if (macRoutingPathEl && s.routing_path) macRoutingPathEl.textContent = s.routing_path;
+        if (!s.platform_supported) {
+            if (macToggle) { macToggle.disabled = true; macToggle.checked = false; }
+            setMacPill("unsupported");
+            if (macDetail) macDetail.textContent = "macOS notifications are only available on macOS.";
+            return;
+        }
+        if (macToggle) macToggle.disabled = false;
+        if (s.running) {
+            setMacPill("running");
+            if (macToggle) macToggle.checked = true;
+        } else {
+            setMacPill(s.error ? "error" : "stopped");
+            if (macToggle) macToggle.checked = false;
+        }
+        const c = s.counters || { seen: 0, routed: 0, dropped: 0 };
+        if (macDetail) {
+            macDetail.textContent = [
+                `status:    ${s.running ? "running" : (s.error || "stopped")}`,
+                `db:        ${s.db_path || "(not found)"}`,
+                `seen:      ${c.seen}`,
+                `routed:    ${c.routed}`,
+                `dropped:   ${c.dropped}`,
+            ].join("\n");
+        }
+        if (macRulesJson && s.rules && !macRulesJson.dataset.dirty) {
+            macRulesJson.value = JSON.stringify(s.rules, null, 2);
+        }
+    }
+
+    function refreshMacNotifStatus() {
+        const a = api();
+        if (!a?.get_notification_listener_status) return;
+        a.get_notification_listener_status().then(renderMacNotifStatus);
+    }
+
+    refreshMacNotifStatus();
+    // Refresh counters every 5s while the user is on the Devices card.
+    setInterval(refreshMacNotifStatus, 5000);
+
+    if (macToggle) {
+        macToggle.addEventListener("change", async () => {
+            const a = api();
+            if (!a) return;
+            try {
+                if (macToggle.checked) {
+                    const r = await a.start_notification_listener();
+                    if (r && r.error) { macToggle.checked = false; toast(r.error, "Mirror failed"); }
+                } else {
+                    await a.stop_notification_listener();
+                }
+            } finally {
+                refreshMacNotifStatus();
+            }
+        });
+    }
+
+    if (macRulesJson) {
+        macRulesJson.addEventListener("input", () => {
+            macRulesJson.dataset.dirty = "1";
+            if (macRulesMsg) { macRulesMsg.textContent = "unsaved changes"; macRulesMsg.dataset.state = "warn"; }
+        });
+    }
+
+    if (macRulesSave) {
+        macRulesSave.addEventListener("click", async () => {
+            const a = api();
+            if (!a?.save_notification_routing) return;
+            const r = await a.save_notification_routing(macRulesJson.value || "[]");
+            if (r.error) {
+                if (macRulesMsg) { macRulesMsg.textContent = r.error; macRulesMsg.dataset.state = "error"; }
+                return;
+            }
+            delete macRulesJson.dataset.dirty;
+            macRulesJson.value = JSON.stringify(r.rules, null, 2);
+            if (macRulesMsg) { macRulesMsg.textContent = "saved"; macRulesMsg.dataset.state = "ok"; }
+        });
+    }
+
+    if (macRulesReset) {
+        macRulesReset.addEventListener("click", async () => {
+            const a = api();
+            if (!a?.save_notification_routing) return;
+            // Pass an empty list to revert to DEFAULT_ROUTING.
+            const r = await a.save_notification_routing("[]");
+            if (r.error) {
+                if (macRulesMsg) { macRulesMsg.textContent = r.error; macRulesMsg.dataset.state = "error"; }
+                return;
+            }
+            delete macRulesJson.dataset.dirty;
+            macRulesJson.value = JSON.stringify(r.rules, null, 2);
+            if (macRulesMsg) { macRulesMsg.textContent = "reset to defaults"; macRulesMsg.dataset.state = "ok"; }
+        });
+    }
 });

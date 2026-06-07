@@ -33,6 +33,7 @@ from .display.design import Design
 from .system import System
 from .system.sound import SoundControl
 from .system.control import Control
+from .system.weather import Weather
 from .tool import Tool
 from .game import Game
 
@@ -109,6 +110,7 @@ class Divoom:
         self.alarm = Alarm(self)
         self.sleep = Sleep(self)
         self.timeplan = Timeplan(self)
+        self.weather = Weather(self)
 
         self.scoreboard = Scoreboard(self)
         self.timer = Timer(self)

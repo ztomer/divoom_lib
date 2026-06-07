@@ -40,4 +40,8 @@ test_reports/
 mock_cache_dir/
 .DS_Store
 .divoom_last_working_char.json
+# pip / setuptools build artifacts
+*.egg-info/
+build/
+dist/
 

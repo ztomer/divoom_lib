@@ -126,3 +126,137 @@ is the visual layout of the Settings → Devices card after §3.
 - **Cloud HTTP round** (auth broken).
 - **Pywebview drag fix** (#1820 still open).
 - **GUI §3 visual pass** (after R14 lands).
+
+## Outcome / what shipped (R14 §1-§4)
+
+**Status:** all four R13 follow-up sections complete. **+74 tests**,
+suite now 829 passed / 75 skipped. Ready to commit + push.
+
+### §1 — `Weather` facade — SHIPPED
+
+- New `divoom_lib/system/weather.py` with a clean `Weather` class.
+  Methods: `set(temperature, weather_type)`, `set_temperature(t)`,
+  `set_weather(wt)`, with internal state tracking. Range -127..128,
+  negative encoding via `(256 + c) & 0xFF`.
+- Wired to the Divoom facade as `self.weather = Weather(self)` in
+  `divoom_lib/divoom.py:113`.
+- The old `TempWeatherCommand` in `divoom_lib/system/temp_weather.py`
+  is now a thin shim that delegates to `Weather`. Fixes the latent
+  bug where the old class called `self._divoom_instance.number2HexString()`
+  (a function in `divoom_lib/utils/converters.py`, not a method on
+  Divoom — would have crashed at first call).
+- CLI `set-temperature` subcommand added with `--weather {clear,cloudy,
+  thunderstorm,rain,snow,fog}` choice.
+- Re-added `examples/set_weather.py` (R13 §2 had deferred this).
+- Tests: `tests/test_weather.py` (21 tests — encoding matrix,
+  wire bytes for positive/negative/zero, range validation, hot
+  setters, shim regression, facade wiring). `tests/test_cli.py` +4
+  tests (handler + dispatch + out-of-range + capability gate).
+
+### §2 — Custom routing JSON loader — SHIPPED
+
+- `load_routing_table(path=None)` /
+  `save_routing_table(rules, path=None)` in
+  `gui/macos_notifications.py`. Path resolution: env var
+  `DIVOOM_CONTROL_ROUTING` first, then
+  `~/.config/divoom-control/notification_routing.json` (same
+  XDG-convention dir as `devices.json`).
+- Corrupt-file tolerant: invalid JSON / non-list root / no valid
+  entries → warn + fall back to `DEFAULT_ROUTING`. App_type
+  validation: must be in `NOTIFICATION_APPS` (1-14); bad entries
+  dropped with a warning, not crashed.
+- Atomic save via `.tmp` + `replace()` — partial writes can't
+  corrupt the live config.
+- `MacAppRouter.from_file(path)` classmethod.
+- `MacNotificationMonitor.__init__` gains a `routing_path` arg
+  (default: load from the user's custom file; fall back to
+  defaults silently if it's corrupt or missing).
+- Tests: `tests/test_routing_loader.py` (19 tests — load with
+  valid/missing/corrupt/non-list/empty file, save roundtrip,
+  atomic write, env var override, validation, MacAppRouter
+  integration).
+
+### §3 — GUI Settings → Devices card — SHIPPED
+
+- New "macOS Notifications" card under Settings → Devices in
+  `gui/web_ui/templates.js` (right after the existing manual
+  "Notification" card). Toggle, live status pill (running /
+  stopped / error / unsupported), counters, and a routing JSON
+  editor (textarea + Save / Reset to defaults).
+- `gui_api` adds:
+  - `get_notification_listener_status()` — rich status dict
+    (`platform_supported`, `running`, `db_path`, `routing_path`,
+    `rules`, `counters {seen, routed, dropped}`, `error`).
+  - `save_notification_routing(json_text)` — parses, saves,
+    **hot-reloads** the running monitor's router (no listener
+    restart), returns `{rules, error}`.
+- JS in `gui/web_ui/settings.js`: 5s polling for live counters,
+  dirty-state detection on the textarea, toast on errors.
+- CSS in `gui/web_ui/settings.css`: `.status-pill` with 4 states
+  (running / stopped / error / unsupported), monospace
+  status detail block, details/summary toggle styles. All
+  fonts use `var(--font-mono)` (R14 §5 invariant).
+- **Decision:** chose JSON editor over per-app checkboxes
+  because (a) the rules ARE JSON, (b) a checkbox matrix would
+  be a parallel state to keep in sync, (c) developers can paste
+  rules from a config file, (d) keeps the card under 80 lines.
+- Tests: `tests/test_gui_api.py` +5 tests (status shape,
+  unsupported-off-macos, save roundtrip + hot-reload, bad
+  JSON, all-bad entries silently dropped).
+
+### §4 — `pyproject.toml` — SHIPPED
+
+- First packaging file in the repo. setuptools backend
+  (`>=68`), PEP 621 metadata, version `0.14.0`,
+  `requires-python = ">=3.10"`.
+- Core deps from `requirements.txt`: `bleak`, `aiohttp`,
+  `pillow`, `tomli`/`tomli-w`. `[gui]` extra: `pywebview` +
+  `pyobjc-framework-Cocoa` (darwin-gated). `[test]` and
+  `[dev]` extras for the standard two-bucket setup.
+- `[project.scripts]` registers `divoom-control =
+  divoom_lib.cli:main` — real console script.
+- `tool.setuptools.package-data` ships the
+  `libdivoom_compact.dylib` + `web_ui/*` with the `gui`
+  package so the installed package is self-contained.
+- Verified `pip install -e .` succeeds on Python 3.14,
+  and the resulting `/opt/homebrew/bin/divoom-control`
+  entry point works (`divoom-control --help` lists
+  `set-temperature` correctly).
+- **The legacy shell wrapper `./divoom-control` is kept**
+  for in-tree dev without an editable install.
+- Tests: `tests/test_pyproject.py` (12 tests — TOML valid,
+  metadata sane, entry point declared and callable, deps
+  match `requirements.txt`, GUI extra is darwin-gated,
+  package discovery + package-data, shell wrapper still
+  present and invokes the python module).
+
+### Cross-cutting decisions
+
+- **Errors → warnings, not crashes.** Both the routing loader
+  and `save_routing_table` prefer to log a warning and fall
+  back to a safe default. A bad user config should never take
+  down the listener; a bad user config should never block a
+  save.
+- **Hot-reload over restart.** The routing JSON is editable
+  while the listener runs; save() replaces the monitor's
+  router in place. Restarting the polling thread is more
+  work, more disruptive, and unnecessary.
+- **Atomics for the routing save.** Routed to a `.tmp` sibling
+  + `Path.replace()` (POSIX-atomic). A crash mid-write can't
+  leave a half-written JSON file that the next start would
+  reject.
+- **Latent bug fixed in the process.** The `TempWeatherCommand`
+  → `number2HexString()` call would have crashed at first use
+  (the function is a module-level function, not a method on
+  the Divoom instance). The new `Weather` class doesn't use it
+  at all — encoding is a one-line `(256 + c) & 0xFF` expression.
+
+### Verified
+
+- `python3 -m pytest` → **829 passed, 75 skipped, 0 failed**
+  in ~92s.
+- `pip install -e .` → clean install.
+- `divoom-control --help` → entry point works, lists
+  `set-temperature` correctly.
+- `divoom-control set-temperature --help` → new subcommand
+  help renders with the right `--weather` choices.

@@ -549,6 +549,86 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             return False
         return self._mac_monitor.is_running
 
+    def get_notification_listener_status(self) -> dict:
+        """Rich status snapshot for the Settings → Devices card.
+
+        Returns a dict the JS side can render directly::
+
+            {
+              "platform_supported": bool,    # False on non-darwin
+              "running": bool,
+              "db_path": str | None,         # macOS Notification Center DB
+              "routing_path": str,           # ~/.config/divoom-control/...
+              "rules": [[substr, app_type], ...],
+              "counters": {"seen": int, "routed": int, "dropped": int},
+              "error": str | None,
+            }
+        """
+        from gui.macos_notifications import ROUTING_PATH, load_routing_table
+        if sys.platform != "darwin":
+            return {
+                "platform_supported": False,
+                "running": False,
+                "db_path": None,
+                "routing_path": str(ROUTING_PATH),
+                "rules": [list(r) for r in load_routing_table()],
+                "counters": {"seen": 0, "routed": 0, "dropped": 0},
+                "error": "macOS notifications are only supported on macOS",
+            }
+        monitor = self._notification_monitor()
+        rules = [list(r) for r in monitor._router.rules]
+        return {
+            "platform_supported": True,
+            "running": monitor.is_running,
+            "db_path": str(monitor.db_path) if monitor.db_path else None,
+            "routing_path": str(ROUTING_PATH),
+            "rules": rules,
+            "counters": {
+                "seen":    monitor.records_seen,
+                "routed":  monitor.records_routed,
+                "dropped": monitor.records_dropped,
+            },
+            "error": None,
+        }
+
+    def save_notification_routing(self, json_text: str) -> dict:
+        """Save a user-edited routing table. Persists to disk and
+        hot-reloads the running monitor's router (no listener restart
+        required).
+
+        Returns ``{"rules": [[substr, app_type], ...], "error": str|None}``.
+
+        On parse / validation error, returns the *previous* rule list
+        unchanged and a non-null ``error`` string — the GUI shows the
+        error and keeps the user's draft.
+        """
+        from gui.macos_notifications import (
+            ROUTING_PATH, load_routing_table, save_routing_table,
+        )
+        import json as _json
+        try:
+            parsed = _json.loads(json_text) if json_text.strip() else []
+        except _json.JSONDecodeError as e:
+            return {"rules": [list(r) for r in load_routing_table()], "error": f"Invalid JSON: {e}"}
+        try:
+            path = save_routing_table(
+                [(s, int(t)) for s, t in parsed], path=ROUTING_PATH
+            )
+        except (ValueError, TypeError) as e:
+            return {
+                "rules": [list(r) for r in load_routing_table()],
+                "error": f"Invalid routing entries: {e}",
+            }
+        # Hot-reload the running monitor's router.
+        monitor = self._notification_monitor()
+        from gui.macos_notifications import MacAppRouter
+        monitor._router = MacAppRouter.from_file(path)
+        logger.info(f"save_notification_routing: saved {len(parsed)} rules to {path}")
+        return {
+            "rules": [list(r) for r in load_routing_table(path)],
+            "error": None,
+        }
+
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:
