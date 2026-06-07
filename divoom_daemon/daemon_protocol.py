@@ -105,13 +105,41 @@ class DaemonClient:
             return {"success": False, "error": str(e)}
 
     def device_call(self, method: str, args: list | None = None,
-                    kwargs: dict | None = None) -> dict:
+                    kwargs: dict | None = None, *, target: str = "device") -> dict:
         """Proxy a device method through the daemon (R17 P5): the daemon owns the
-        BLE connection and runs ``divoom.<method>(*args, **kwargs)``. Returns the
-        daemon reply ``{"success", "result"|"error"}``."""
+        BLE connection and runs ``divoom.<method>(*args, **kwargs)``. ``target``
+        selects the single device ("device") or the daemon-owned wall ("wall").
+        Returns the daemon reply ``{"success", "result"|"error"}``."""
         return self.send_command("device_call", {
             "method": method, "args": args or [], "kwargs": kwargs or {},
+            "target": target,
         })
+
+    # ── device ownership / lifecycle (R17 P5 full cutover) ────────────────
+    def connect_device(self, *, mac: str | None = None, lan_ip: str | None = None,
+                       lan_token: int = 0, device_name: str | None = None,
+                       use_ios_le_protocol: bool = True) -> dict:
+        """Ask the daemon to own + connect a device (BLE via ``mac`` or LAN via
+        ``lan_ip``). Returns status fields (connected/mac/lan_ip/wall)."""
+        return self.send_command("connect", {
+            "mac": mac, "lan_ip": lan_ip, "lan_token": lan_token,
+            "device_name": device_name, "use_ios_le_protocol": use_ios_le_protocol,
+        })
+
+    def disconnect_device(self) -> dict:
+        return self.send_command("disconnect")
+
+    def device_status(self) -> dict:
+        return self.send_command("device_status")
+
+    def scan(self, timeout: float = 15, limit: int = 4) -> dict:
+        return self.send_command("scan", {"timeout": timeout, "limit": limit})
+
+    def wall_configure(self, slots: dict, cell_size: int = 16) -> dict:
+        return self.send_command("wall_configure", {"slots": slots, "cell_size": cell_size})
+
+    def probe_lan(self) -> dict:
+        return self.send_command("probe_lan")
 
     def subscribe(
         self,

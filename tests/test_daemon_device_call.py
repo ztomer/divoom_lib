@@ -92,3 +92,26 @@ def test_device_status_and_disconnect(ctx):
     assert c.send_command("device_status")["connected"] is True
     assert c.send_command("disconnect")["success"] is True
     assert dev.is_connected is False
+
+
+def test_device_status_fields(ctx):
+    d, dev, sp = ctx
+    st = DaemonClient(sp).device_status()
+    assert st["success"] is True
+    assert st["connected"] is True
+    assert "mac" in st and "lan_ip" in st and "wall" in st
+
+
+def test_wall_call_without_wall_errors(ctx):
+    d, dev, sp = ctx
+    reply = DaemonClient(sp).device_call("show_image", ["x.png"], target="wall")
+    assert reply["success"] is False
+    assert "wall" in reply["error"].lower()
+
+
+def test_connect_with_injected_device_reports_status(ctx):
+    d, dev, sp = ctx
+    # The injected fake device is honored (no BLE); connect just (re)affirms it.
+    reply = DaemonClient(sp).connect_device(mac="AA:BB:CC:DD:EE:FF")
+    assert reply["success"] is True
+    assert reply["connected"] is True
