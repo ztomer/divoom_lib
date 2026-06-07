@@ -8,14 +8,14 @@ risk, and whether they need real hardware or APK reverse-engineering.
 
 | Area | State |
 |------|-------|
-| 1. Active device → app bar | ✅ done |
-| 2. Control Center (a–g) | ✅ done (on-device validation pending) |
-| 3. Virtual Wall (a–d) | ✅ done |
-| 4. Monthly Best (b–e) | ✅ done (on-device push pending hardware) |
-| 5. Live Widgets (a–f) | ✅ done (on-device display pending hardware) |
-| 6. Settings | ✅ done |
-| 7. Strip-mine + tests | ✅ analysis + system-monitor port + 2 real bug fixes |
-| Instrumentation (REST control server) | ✅ done |
+| 1. Active device → app bar |  done |
+| 2. Control Center (a–g) |  done (on-device validation pending) |
+| 3. Virtual Wall (a–d) |  done |
+| 4. Monthly Best (b–e) |  done (on-device push pending hardware) |
+| 5. Live Widgets (a–f) |  done (on-device display pending hardware) |
+| 6. Settings |  done |
+| 7. Strip-mine + tests |  analysis + system-monitor port + 2 real bug fixes |
+| Instrumentation (REST control server) |  done |
 
 **On-device status (2026-06-03): FULLY VALIDATED.** All four units (Timoo, Tivoo-Max,
 Pixoo, Ditoo) are fully verified using the watchface set-and-readback roundtrip validation
@@ -213,7 +213,7 @@ Implemented:
   wire-level), plus GUI bridge units. Real-hardware suite remains gated by
   `--run-hardware`.
 
-### 🐞 Bugs the mock-device E2E surfaced (both fixed)
+###  Bugs the mock-device E2E surfaced (both fixed)
 
 1. **`show_image` KeyError** — it sent commands `"set image"` / `"set animation
    frame"` which **did not exist in `COMMANDS`**, so *every* on-device image/GIF

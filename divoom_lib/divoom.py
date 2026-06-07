@@ -355,7 +355,7 @@ class Divoom:
         """
         The LAN transport for this device, or None if not configured.
 
-        Transport: 🟢 LAN — configure via ``lan_ip`` kwarg or TOML config.
+        Transport:  LAN — configure via ``lan_ip`` kwarg or TOML config.
         """
         return self._lan
 

@@ -1,6 +1,22 @@
-/* 
+/*
    Divoom Wall Dashboard Stylings
    Designed with premium Glassmorphism, Cyberpunk Slate, and neon highlights.
+
+   ──────────────────────────────────────────────────────────────────────
+   FONT POLICY  (enforced by tests/test_fonts.py)
+   ──────────────────────────────────────────────────────────────────────
+   This file is the SINGLE SOURCE OF TRUTH for all fonts in the GUI.
+   Three families are defined here as CSS variables; every other CSS
+   file (and every JS inline style) MUST reference one of them:
+
+       --font-display  →  Outfit        headings, titles, big numbers
+       --font-sans     →  Inter         body text, buttons, labels
+       --font-mono     →  Inter Mono    MAC addresses, technical strings
+
+   The names below mirror the Google Fonts request in index.html.
+   If you add a font, add it here AND to the index.html <link> AND
+   add a regression test in tests/test_fonts.py.
+   ──────────────────────────────────────────────────────────────────────
 */
 
 @import url('appbar.css');
@@ -19,23 +35,25 @@
     --input-bg: #18191d;
     --input-border: #4e505a;
     --win-appbar-bg: rgba(10, 12, 22, 0.95);
-    
+
     --border-color: #2b2c32;
     --border-hover: #ff5a1f;
-    
+
     --primary: #ff5a1f; /* Braun Tuner Orange Accent */
     --primary-glow: rgba(255, 90, 31, 0.2);
     --secondary: #6e6f76; /* Braun Matte Gray Accent */
     --secondary-glow: rgba(110, 111, 118, 0.2);
     --accent: #00cc66; /* Braun Indicator Green */
-    
+
     --text-main: #e8e9eb;
     --text-muted: #82838a;
     --sidebar-width: 168px;
     --header-height: 80px;
-    
+
+    /* ── FONT FAMILIES — single source of truth (see header comment) ── */
     --font-display: 'Outfit', sans-serif;
-    --font-sans: 'Inter', sans-serif;
+    --font-sans:    'Inter', sans-serif;
+    --font-mono:    'Inter Mono', ui-monospace, monospace;
 }
 
 /* ── Light Mode Redefinitions ── */

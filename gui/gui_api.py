@@ -89,11 +89,15 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         ble_connected = bool(self.current_divoom and self.current_divoom.is_connected)
         lan_ip = self.current_divoom.lan.device_ip if (self.current_divoom and self.current_divoom.lan) else None
         cloud_ok = bool(self.cached_creds and self.cached_creds.is_valid())
+        # Note: the GUI's updateTransportPanel (settings.js) reads only
+        # ``available`` and ``detail`` from this dict. ``badge`` (emoji)
+        # and ``color`` (its hex) were removed in R14 §6; the GUI uses
+        # CSS-driven dots via the `transport-dot active/inactive` class.
         return json.dumps({
-            "ble": {"available": ble_connected, "label": "Bluetooth", "badge": "🔵", "color": "#3b82f6", "description": "Bluetooth — 100% local, never leaves your machine.", "detail": self.current_divoom._conn.mac if ble_connected and self.current_divoom else None},
-            "lan": {"available": bool(lan_ip), "label": "Local Network", "badge": "🟢", "color": "#22c55e", "description": "Local Network — 100% local, WiFi-capable devices only.", "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured"},
-            "cloud": {"available": cloud_ok, "label": "Divoom Cloud", "badge": "🟡", "color": "#f59e0b", "description": "Divoom Cloud — appin.divoom-gz.com, Divoom's servers, requires account.", "detail": "Authenticated" if cloud_ok else "Not authenticated"},
-            "external": {"available": True, "label": "Public Cloud", "badge": "🔴", "color": "#ef4444", "description": "Public Cloud — 3rd-party APIs (weather, stocks), no login required.", "detail": "Available"}
+            "ble": {"available": ble_connected, "label": "Bluetooth", "description": "Bluetooth — 100% local, never leaves your machine.", "detail": self.current_divoom._conn.mac if ble_connected and self.current_divoom else None},
+            "lan": {"available": bool(lan_ip), "label": "Local Network", "description": "Local Network — 100% local, WiFi-capable devices only.", "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured"},
+            "cloud": {"available": cloud_ok, "label": "Divoom Cloud", "description": "Divoom Cloud — appin.divoom-gz.com, Divoom's servers, requires account.", "detail": "Authenticated" if cloud_ok else "Not authenticated"},
+            "external": {"available": True, "label": "Public Cloud", "description": "Public Cloud — 3rd-party APIs (weather, stocks), no login required.", "detail": "Available"}
         })
 
     def save_lan_config(self, device_ip: str, local_token: int) -> bool:
@@ -134,7 +138,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             ip = self.current_divoom.lan.device_ip
             return json.dumps({
                 "reachable": ok,
-                "detail": f"{'✓ Connected' if ok else '✗ Unreachable'} — {ip}:9000",
+                "detail": f"{' Connected' if ok else ' Unreachable'} — {ip}:9000",
             })
         except Exception as e:
             return json.dumps({"reachable": False, "detail": str(e)})

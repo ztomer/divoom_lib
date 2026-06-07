@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!window.requireDevice()) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.switch_channel) {
                 window.pywebview.api.switch_channel(window.DivoomState.activeChannel).then(res => {
-                    if (res) window.showToast("Switched channel", "success", "🔵 BLE");
+                    if (res) window.showToast("Switched channel", "success", " BLE");
                     else window.showToast("Failed to switch channel", "error");
                 });
             }
@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const effect = parseInt(document.getElementById("text-effect-select")?.value);
             if (window.pywebview?.api?.push_text) {
                 window.pywebview.api.push_text(text, color, 1, speed, isNaN(effect) ? 1 : effect).then(res => {
-                    window.showToast(res ? "Text pushed to device" : "Failed to push text", res ? "success" : "error", "🔵 BLE");
+                    window.showToast(res ? "Text pushed to device" : "Failed to push text", res ? "success" : "error", " BLE");
                 });
             }
         });
@@ -99,7 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const blue = parseInt(scoreboardBlueInput?.value) || 0;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_scoreboard) {
             window.pywebview.api.set_scoreboard(1, red, blue).then(res => {
-                window.showToast(res ? `Score: ${red}–${blue}` : "Failed to set scoreboard", res ? "success" : "🔵 BLE");
+                window.showToast(res ? `Score: ${red}–${blue}` : "Failed to set scoreboard", res ? "success" : " BLE");
             });
         }
     }
@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const color = document.getElementById("clock-color-input")?.value || "#ffffff";
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.set_clock(style, color).then(res => {
-                window.showToast(res ? "Clock style applied" : "Failed to apply clock", res ? "success" : "🔵 BLE");
+                window.showToast(res ? "Clock style applied" : "Failed to apply clock", res ? "success" : " BLE");
             });
         }
     }
@@ -264,7 +264,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!window.requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_vj_effect) {
             window.pywebview.api.set_vj_effect(v).then(res => {
-                window.showToast(res ? "VJ effect applied" : "Failed to apply VJ effect", res ? "success" : "🔵 BLE");
+                window.showToast(res ? "VJ effect applied" : "Failed to apply VJ effect", res ? "success" : " BLE");
             });
         }
     }, -1, VJ_PREVIEWS);
@@ -298,7 +298,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!window.requireDevice()) return;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_visualization) {
             window.pywebview.api.set_visualization(v).then(res => {
-                window.showToast(res ? "EQ pattern applied" : "Failed to apply EQ", res ? "success" : "🔵 BLE");
+                window.showToast(res ? "EQ pattern applied" : "Failed to apply EQ", res ? "success" : " BLE");
             });
         }
     }, -1, EQ_PREVIEWS);
@@ -344,7 +344,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const modeType = selectedAmbientMode;
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_solid_light) {
             window.pywebview.api.set_solid_light(color, brightness, modeType).then(res => {
-                window.showToast(res ? "Ambient mode applied" : "Failed to apply ambient", res ? "success" : "🔵 BLE");
+                window.showToast(res ? "Ambient mode applied" : "Failed to apply ambient", res ? "success" : " BLE");
             });
         }
     }

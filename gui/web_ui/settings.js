@@ -177,7 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const tr = document.createElement("tr");
             const dims = window.getDeviceDimensions ? window.getDeviceDimensions(`Wi-Fi Screen: ${d.ip}`) : { size: 16 };
             tr.innerHTML = `
-                <td style="font-weight:600; cursor:pointer;" class="lan-connect-cell">🟢 ${d.ip}</td>
+                <td style="font-weight:600; cursor:pointer;" class="lan-connect-cell"> ${d.ip}</td>
                 <td>${d.token || 0}</td>
                 <td>${dims.size}x${dims.size}</td>
                 <td>—</td>
@@ -295,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 statusBox.style.background = "rgba(34, 197, 94, 0.15)";
                                 statusBox.style.border = "1px solid rgba(34, 197, 94, 0.3)";
                                 statusBox.style.color = "#22c55e";
-                                statusBox.innerHTML = `<span>🟢 Connected as <b>${email}</b></span>`;
+                                statusBox.innerHTML = `<span> Connected as <b>${email}</b></span>`;
                             }
                         } else {
                             window.showToast("Authentication failed. Please verify credentials.", "error");
@@ -305,7 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 statusBox.style.background = "rgba(239, 68, 68, 0.15)";
                                 statusBox.style.border = "1px solid rgba(239, 68, 68, 0.3)";
                                 statusBox.style.color = "#ef4444";
-                                statusBox.innerHTML = `<span>🔴 Not connected. Save your credentials to log in.</span>`;
+                                statusBox.innerHTML = `<span> Not connected. Save your credentials to log in.</span>`;
                             }
                         }
                     });
@@ -412,7 +412,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let week = 0;
             row.querySelectorAll(".alarm-days input:checked").forEach(cb => { week |= (1 << parseInt(cb.dataset.bit)); });
             window.pywebview?.api?.set_alarm?.(idx, enabled, hour, minute, week).then(res =>
-                window.showToast(res ? `Alarm ${idx + 1} saved` : "Failed to save alarm", res ? "success" : "error", "🔵 BLE"));
+                window.showToast(res ? `Alarm ${idx + 1} saved` : "Failed to save alarm", res ? "success" : "error", " BLE"));
         }
     });
     const alarmsRefreshBtn = document.getElementById("alarms-refresh-btn");
@@ -435,10 +435,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const c = document.getElementById("sleep-color")?.value || "#2040ff";
             const v = parseInt(document.getElementById("sleep-volume")?.value) || 10;
             window.pywebview?.api?.start_sleep?.(m, c, v).then(r =>
-                window.showToast(r ? "Sleep started" : "Failed to start sleep", r ? "success" : "error", "🔵 BLE"));
+                window.showToast(r ? "Sleep started" : "Failed to start sleep", r ? "success" : "error", " BLE"));
         } else if (e.target.closest("#sleep-stop-btn")) {
             window.pywebview?.api?.stop_sleep?.().then(r =>
-                window.showToast(r ? "Sleep stopped" : "Failed", r ? "success" : "error", "🔵 BLE"));
+                window.showToast(r ? "Sleep stopped" : "Failed", r ? "success" : "error", " BLE"));
         }
     });
 
@@ -448,7 +448,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (timerBtn) {
             if (window.requireDevice && !window.requireDevice()) return;
             window.pywebview?.api?.set_timer?.(timerBtn.dataset.action).then(r =>
-                window.showToast(r ? `Stopwatch ${timerBtn.dataset.action}` : "Failed", r ? "success" : "error", "🔵 BLE"));
+                window.showToast(r ? `Stopwatch ${timerBtn.dataset.action}` : "Failed", r ? "success" : "error", " BLE"));
             return;
         }
         if (e.target.closest("#countdown-start-btn") || e.target.closest("#countdown-stop-btn")) {
@@ -457,14 +457,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const mm = parseInt(document.getElementById("countdown-min")?.value) || 0;
             const ss = parseInt(document.getElementById("countdown-sec")?.value) || 0;
             window.pywebview?.api?.set_countdown?.(action, mm, ss).then(r =>
-                window.showToast(r ? `Countdown ${action}` : "Failed", r ? "success" : "error", "🔵 BLE"));
+                window.showToast(r ? `Countdown ${action}` : "Failed", r ? "success" : "error", " BLE"));
             return;
         }
         if (e.target.closest("#noise-start-btn") || e.target.closest("#noise-stop-btn")) {
             if (window.requireDevice && !window.requireDevice()) return;
             const action = e.target.closest("#noise-stop-btn") ? "stop" : "start";
             window.pywebview?.api?.set_noise?.(action).then(r =>
-                window.showToast(r ? `Noise meter ${action}` : "Failed", r ? "success" : "error", "🔵 BLE"));
+                window.showToast(r ? `Noise meter ${action}` : "Failed", r ? "success" : "error", " BLE"));
         }
     });
 
@@ -482,7 +482,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ── Round 8: Device settings / weather / memorial / FM ─────────────
     function api() { return window.pywebview && window.pywebview.api; }
     function dev() { return !window.requireDevice || window.requireDevice(); }
-    function toast(r, ok, fail) { window.showToast(r ? ok : (fail || "Failed"), r ? "success" : "error", "🔵 BLE"); }
+    function toast(r, ok, fail) { window.showToast(r ? ok : (fail || "Failed"), r ? "success" : "error", " BLE"); }
 
     const wireToggle = (id, fn) => {
         const el = document.getElementById(id);

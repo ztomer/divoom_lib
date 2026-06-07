@@ -21,7 +21,7 @@ def wall_resolution(panel_resolution: int, grid_cols: int, grid_rows: int) -> tu
     and the grid dimensions. This is the size of the source image you'd push
     to a wall (it gets split into per-panel slices).
 
-    ⚠ `panel_resolution` is the per-panel pixel dimension (16/32/64) — see
+     `panel_resolution` is the per-panel pixel dimension (16/32/64) — see
     `divoom_lib.models.capabilities.Capabilities.panel_resolution`. It is
     NOT the wall canvas size.
 

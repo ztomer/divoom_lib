@@ -73,3 +73,43 @@ The cover-art bug hunt found three independent root causes; all are now invarian
 - macOS BLE is gated per responsible-process (TCC). Agent `Bash` can SIGABRT on
   BLE; drive real hardware by launching via Terminal. The unit suite skips
   hardware tests by default (`--run-hardware` to include).
+
+## GUI: single source of truth for fonts (R14 §5)
+
+`gui/web_ui/style.css` defines three font families as CSS variables — and
+is the **only** file that may declare a raw font name:
+
+| Variable         | Family      | Use                          |
+|------------------|-------------|------------------------------|
+| `--font-display` | Outfit      | headings, titles, big numbers |
+| `--font-sans`    | Inter       | body text, buttons, labels   |
+| `--font-mono`    | Inter Mono  | MAC addresses, technical strings |
+
+Every other CSS file, every JS inline style, and the Google Fonts `<link>`
+in `index.html` MUST reference one of these variables. The regression net
+is `tests/test_fonts.py` — it fails if a new `font-family:` declaration
+shows up with a raw family name, or if the Google Fonts request drifts
+out of sync with `style.css`.
+
+If you need a new font: add it to `style.css` + the index.html `<link>` +
+the allow-list in `tests/test_fonts.py` (in that order). The test will
+catch a missed step.
+
+## No emojis in the repo (R14 §6)
+
+Emoji codepoints (any of the 14 standard blocks: U+2300-23FF, U+2600-27BF,
+U+2B00-2BFF, U+1F1E6-1F1FF, U+1F300-1FAFF) are forbidden everywhere
+except `references/` (third-party code we don't control). The check is
+`tests/test_no_emojis.py` — it scans every `.py`/`.js`/`.css`/`.html`/
+`.md` file in the repo and fails the build if any emoji character is
+present.
+
+For visual indicators use:
+- A CSS-styled element (color + shape — e.g. the `transport-dot
+  active/inactive` class for the sidebar transport panel).
+- An inline SVG (`<svg>...</svg>`) for icons.
+- Plain text (the universal fallback).
+
+The transport status JSON in `gui_api.get_transport_status()` previously
+carried a `badge` (emoji) + `color` (hex) pair. Both were removed in
+R14 §6 — the GUI uses CSS-driven dots via the `transport-dot` class.

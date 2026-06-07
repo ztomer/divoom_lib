@@ -97,7 +97,7 @@
 ### Approach A — All 5 user asks, applied literally, schedule stays
 
 - **Header:** "Sync Targets" (drop "& schedule")
-- **Per-row:** `[☑] [color-dot] DeviceName` (drop address)
+- **Per-row:** `[] [color-dot] DeviceName` (drop address)
 - **Schedule section:** Drop the **body** checkbox text
   "Enable scheduled sync (runs headless)" — keep the
   **header** "Automatic Hot-Channel Schedule" + the toggle
@@ -133,7 +133,7 @@ sections. Halving won't work.
 ### Approach B — All 5 user asks, schedule moves to Settings
 
 - **Header:** "Devices" (no "& schedule" — schedule is gone)
-- **Per-row:** `[☑] [color-dot] DeviceName` (drop address)
+- **Per-row:** `[] [color-dot] DeviceName` (drop address)
 - **Schedule section:** DELETED from Monthly Best. Moved
   to Settings → Connectivity (where the transport legend
   lives) as a new "Automation" sub-card, or as a new
@@ -146,7 +146,7 @@ sections. Halving won't work.
 **Steelman:** each card does one thing (Rams #8 consistent,
 #4 understandable). The narrow devices card fits 4-5 device
 rows + "Sync All" button — 27% of 1024 = 276px, plenty for
-`[☑] [dot] DeviceName` (3 elements, max ~24px each). The
+`[] [dot] DeviceName` (3 elements, max ~24px each). The
 schedule gets its own card with proper room for the
 interval select (4 options × 60px = 240px minimum) and the
 Save button.
@@ -170,7 +170,7 @@ should offer both options and let the user pick.
 
 - **Header:** "Devices" (drop "& schedule" — schedule is
   visually separated below, not in the title)
-- **Per-row:** `[☑] [color-dot] DeviceName` (drop address)
+- **Per-row:** `[] [color-dot] DeviceName` (drop address)
 - **Schedule section:** tight vertical layout in the same
   card. Single column. Stacked: toggle / "Every 1h▼" /
   Save / status.
@@ -201,7 +201,7 @@ recommended.
 ### Approach D — All 5 user asks, schedule moves to Control Panel
 
 - **Header:** "Devices"
-- **Per-row:** `[☑] [color-dot] DeviceName`
+- **Per-row:** `[] [color-dot] DeviceName`
 - **Schedule section:** Moved to a new "Routines" sub-card
   in the Control Panel (where the user spends most of
   their time, next to the channels). The Control Panel
@@ -261,12 +261,12 @@ worse than B's (Settings). **Verdict:** D is rejected.
   schedule is in Settings → Connectivity".
 
 **Kare/Rams verdict on B:**
-- Rams #4 understandable: 1 thing per card. ✓
+- Rams #4 understandable: 1 thing per card. 
 - Rams #8 consistent: same idea looks the same everywhere.
-  The schedule is consistent with other Settings items. ✓
-- Rams #10 as little as possible: no decorative chrome. ✓
+  The schedule is consistent with other Settings items. 
+- Rams #10 as little as possible: no decorative chrome. 
 - Kare: tight visual envelope (devices card is tight;
-  gallery card is wider). ✓
+  gallery card is wider). 
 
 ---
 
@@ -295,10 +295,10 @@ worse than B's (Settings). **Verdict:** D is rejected.
 ┌──────────────────────┐
 │ Devices        [↻]   │
 ├──────────────────────┤
-│ ☑ ● Timoo            │  ← 23% width = 235px
-│ ☐ ● Tivoo Max        │     [☑] 14px + 8px gap + ● 8px + 8px
-│ ☐ ● Ditoo            │     + 6px name → fits ~16 chars
-│ ☐ ● Pixoo            │
+│  ● Timoo            │  ← 23% width = 235px
+│  ● Tivoo Max        │     [] 14px + 8px gap + ● 8px + 8px
+│  ● Ditoo            │     + 6px name → fits ~16 chars
+│  ● Pixoo            │
 │                      │
 │ [  Sync All →  ]     │  ← full-width button
 └──────────────────────┘
@@ -321,7 +321,7 @@ worse than B's (Settings). **Verdict:** D is rejected.
 │                                                                     │
 │ Automatic Hot-Channel Schedule                                      │
 │                                                                     │
-│ ☑ Enable scheduled sync                                              │
+│  Enable scheduled sync                                              │
 │   Sync every [1 hour  ▼]  [Save Schedule]                          │
 │   Status: Saved — scheduled                                          │
 │                                                                     │
@@ -533,20 +533,20 @@ worse than B's (Settings). **Verdict:** D is rejected.
 
 | # | Asks a–f (Monthly Best) | Status |
 |---|--------------------------|--------|
-| a | Header renamed "Sync Targets & Schedule" → "Devices" | ✓ `templates.js:monthly-best-layout` |
-| b | Right card narrowed to 23% (true halve) | ✓ `gallery.css:.monthly-best-layout` now `1.6fr 0.6fr` |
-| c | Sync-target row MAC address removed | ✓ `gallery.js:renderSyncTargets` no longer creates `.target-addr`; CSS rule removed |
-| d | Save Schedule button removed from Monthly Best | ✓ Block deleted, moved to Settings → Routines |
-| e | Interval select → simple interval dropdown (1h/6h/12h/24h) | ✓ `#routines-auto-sync-interval` |
-| f | Settings: new "Routines" sub-tab | ✓ New sub-tab in `templates.js:settings-nav` |
+| a | Header renamed "Sync Targets & Schedule" → "Devices" |  `templates.js:monthly-best-layout` |
+| b | Right card narrowed to 23% (true halve) |  `gallery.css:.monthly-best-layout` now `1.6fr 0.6fr` |
+| c | Sync-target row MAC address removed |  `gallery.js:renderSyncTargets` no longer creates `.target-addr`; CSS rule removed |
+| d | Save Schedule button removed from Monthly Best |  Block deleted, moved to Settings → Routines |
+| e | Interval select → simple interval dropdown (1h/6h/12h/24h) |  `#routines-auto-sync-interval` |
+| f | Settings: new "Routines" sub-tab |  New sub-tab in `templates.js:settings-nav` |
 
 | # | New functionality (Phase 1) | Status |
 |---|-----------------------------|--------|
-| 1 | Volume slider in appbar | ✓ `index.html:appbar-volume-slider` + `app.js:change` handler + `gui_api.set_volume` / `get_volume` |
-| 2 | Settings → Routines sub-tab | ✓ `templates.js:settings-routines` + `settings.js:loadRoutinesAutoSync` |
-| 3 | Schedule moved to Routines as "Auto-Sync Gallery" | ✓ Drop-in from old Monthly Best schedule, "headless" label dropped, "classify" field dropped |
-| 4 | Battery badge in appbar | ✗ **DEFERRED** — no protocol command exists; see "Documented gaps" below |
-| 5 | Scoreboard channel-card | ✓ `index.html:panel-scoreboard` + `channels.js:pushScoreboard` (auto-apply on change) + `gui_api.set_scoreboard` + `divoom_lib.display.show_scoreboard()` |
+| 1 | Volume slider in appbar |  `index.html:appbar-volume-slider` + `app.js:change` handler + `gui_api.set_volume` / `get_volume` |
+| 2 | Settings → Routines sub-tab |  `templates.js:settings-routines` + `settings.js:loadRoutinesAutoSync` |
+| 3 | Schedule moved to Routines as "Auto-Sync Gallery" |  Drop-in from old Monthly Best schedule, "headless" label dropped, "classify" field dropped |
+| 4 | Battery badge in appbar |  **DEFERRED** — no protocol command exists; see "Documented gaps" below |
+| 5 | Scoreboard channel-card |  `index.html:panel-scoreboard` + `channels.js:pushScoreboard` (auto-apply on change) + `gui_api.set_scoreboard` + `divoom_lib.display.show_scoreboard()` |
 
 ### Deviations from the plan
 

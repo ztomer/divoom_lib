@@ -92,7 +92,7 @@ sub-tab style = **segmented pill**; volume slider stays **plain**.
   sliders sit on the right; 4d slider drag-fix (stopPropagation — pywebview's
   drag-region has no no-drag check); 4e brightness thumb tracks value (white→black)
   with contrasting border, volume left plain. +1 UI test. Suite 670/0.
-  **⏳ Visual check:** appbar layout + corner indicators want an eyes-on pass.
+  ** Visual check:** appbar layout + corner indicators want an eyes-on pass.
 - **§A Phase 4 done:** 5b scoreboard restyled — large, centred, stacked BLUE-over-RED
   team rows with 40px numerals.
 - **§A Phase 5 done:** item 6 — one unified Virtual Wall toolbar (icons+labels:

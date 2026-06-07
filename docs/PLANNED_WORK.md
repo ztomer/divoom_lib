@@ -368,17 +368,17 @@ channel. Use 0x46 for "is the device on the animation channel?"
 checks.
 
 ### Status
-- 27 unit tests in `tests/test_divoom_image_encode.py` ✓
-- 4 unit tests in `tests/test_image_processing.py` ✓
-- 40 new parity tests in `tests/test_native_image_encoder.py` ✓
-- 10 new perf tests in `tests/perf_image_encode.py` ✓
-- 9 mock-device tests in `tests/test_e2e_mock_device.py` ✓
+- 27 unit tests in `tests/test_divoom_image_encode.py` 
+- 4 unit tests in `tests/test_image_processing.py` 
+- 40 new parity tests in `tests/test_native_image_encoder.py` 
+- 10 new perf tests in `tests/perf_image_encode.py` 
+- 9 mock-device tests in `tests/test_e2e_mock_device.py` 
   (renamed `test_show_image_emits_0x44_frames` → `_0x49_frames`)
-- 2 live-device verifications (4-quadrant, half-green/red) ✓
-- C encoder shipped in `divoom_lib/native_src/image_encode.c` ✓
-- C encoder byte-identical to Python encoder (40/40 parity tests) ✓
-- `show_image` now uses 0x49 ✓
-- Test count: 448 passed, 73 skipped, 0 failed ✓
+- 2 live-device verifications (4-quadrant, half-green/red) 
+- C encoder shipped in `divoom_lib/native_src/image_encode.c` 
+- C encoder byte-identical to Python encoder (40/40 parity tests) 
+- `show_image` now uses 0x49 
+- Test count: 448 passed, 73 skipped, 0 failed 
 
 ---
 

@@ -1,7 +1,7 @@
 """
 lan_transport.py — Local Wi-Fi HTTP transport for WiFi-capable Divoom devices.
 
-Transport: 🟢 LAN — 100 % local, no internet, no Divoom account required.
+Transport:  LAN — 100 % local, no internet, no Divoom account required.
 
 Reverse-engineered from com.divoom.Divoom_3.8.22 APK (OkHttpUtils.java):
 
@@ -40,7 +40,7 @@ class LanTransport:
     """
     Sends commands to a WiFi-enabled Divoom device via its local HTTP API.
 
-    Transport: 🟢 LAN — POST http://{device_ip}:9000/divoom_api
+    Transport:  LAN — POST http://{device_ip}:9000/divoom_api
 
     No internet connection required. No Divoom account required.
     Faster than BLE for bulk/frequent commands.
@@ -78,7 +78,7 @@ class LanTransport:
         """
         POST a JSON command to the device's local HTTP API.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Args:
             command: The Divoom command string (e.g. "Channel/SetIndex").
@@ -103,7 +103,7 @@ class LanTransport:
         if extra:
             body.update(extra)
 
-        self.logger.debug(f"[LAN 🟢] POST {self._base_url} → {command} {extra or ''}")
+        self.logger.debug(f"[LAN ] POST {self._base_url} → {command} {extra or ''}")
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -115,7 +115,7 @@ class LanTransport:
                 ) as resp:
                     text = await resp.text()
                     result = json.loads(text)
-                    self.logger.debug(f"[LAN 🟢] ← {result}")
+                    self.logger.debug(f"[LAN ] ← {result}")
                     return result
         except aiohttp.ClientConnectorError as e:
             raise LanTransportError(
@@ -135,7 +135,7 @@ class LanTransport:
         """
         Check whether the device is reachable on the LAN.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Returns:
             True if the device responded, False otherwise.
@@ -151,7 +151,7 @@ class LanTransport:
             reachable = isinstance(result, dict)
             if reachable:
                 self.logger.info(
-                    f"[LAN 🟢] Device at {self.device_ip} is reachable."
+                    f"[LAN ] Device at {self.device_ip} is reachable."
                 )
             return reachable
         except LanTransportError:
@@ -164,7 +164,7 @@ class LanTransport:
         """
         Switch the active channel.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Args:
             index: Channel index (0=Clock, 1=Cloud, 2=Visualizer, 3=Custom,
@@ -181,7 +181,7 @@ class LanTransport:
         """
         Get the current active channel index.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Usage::
 
@@ -194,7 +194,7 @@ class LanTransport:
         """
         Set screen brightness.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Args:
             brightness: 0–100.
@@ -210,7 +210,7 @@ class LanTransport:
         """
         Select a clock face by ID.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Args:
             clock_id: The clock face ID (from the Divoom clock store).
@@ -226,7 +226,7 @@ class LanTransport:
         """
         Turn the screen on (1) or off (0).
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Usage::
 
@@ -244,7 +244,7 @@ class LanTransport:
         """
         Configure the ambient light / LED ring.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Args:
             brightness: 0–100.
@@ -266,7 +266,7 @@ class LanTransport:
         """
         Configure the RGB LED strip.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Usage::
 
@@ -285,7 +285,7 @@ class LanTransport:
         """
         Set a countdown timer.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Args:
             minute:  Minutes component.
@@ -307,7 +307,7 @@ class LanTransport:
         """
         Update the scoreboard.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Usage::
 
@@ -323,7 +323,7 @@ class LanTransport:
         """
         Control the stopwatch.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Args:
             status: 1 = start, 0 = stop, 2 = reset.
@@ -339,7 +339,7 @@ class LanTransport:
         """
         Enable or disable the noise meter.
 
-        Transport: 🟢 LAN
+        Transport:  LAN
 
         Args:
             noise_status: 1 = enabled, 0 = disabled.

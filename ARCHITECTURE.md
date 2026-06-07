@@ -84,7 +84,7 @@ To maintain high maintainability, rapid semantic searches, and easy codebase upd
 
 ---
 
-## 👾 Working with this Codebase: AI Agent Self-Reflections
+##  Working with this Codebase: AI Agent Self-Reflections
 
 To make working with the `divoom-control` codebase easier, faster, and more robust, future stages should prioritize the following enhancements:
 

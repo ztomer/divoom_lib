@@ -11,10 +11,14 @@
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Divoom Desktop Controller & Wall Dashboard</title>
-    <!-- Modern Premium Fonts -->
+    <!--
+      Fonts loaded here MUST match the --font-* declarations in
+      gui/web_ui/style.css. See the FONT POLICY header in style.css
+      and the guard test in tests/test_fonts.py.
+    -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -398,7 +402,7 @@
                                     Save
                                 </button>
                                 <select id="presets-select" class="custom-select small" title="Load preset">
-                                    <option value="">📂 Load preset…</option>
+                                    <option value=""> Load preset…</option>
                                 </select>
                             </div>
                         </div>

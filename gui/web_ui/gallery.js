@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (artworks.error) {
                             window.showToast(artworks.error, "error");
                             if (galleryContainer) {
-                                galleryContainer.innerHTML = `<div class="empty-list" style="color:#ef4444; padding:20px; font-weight:600; text-align:center;">⚠️ ${artworks.error}</div>`;
+                                galleryContainer.innerHTML = `<div class="empty-list" style="color:#ef4444; padding:20px; font-weight:600; text-align:center;">️ ${artworks.error}</div>`;
                             }
                             return;
                         }
@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         window.DivoomState.loadedArtworks = artworks;
                         window.DivoomState.selectedArtworkIndex = null;
                         renderGallery(artworks);
-                        window.showToast("Gallery loaded from cache", "success", "🟡 Cloud");
+                        window.showToast("Gallery loaded from cache", "success", " Cloud");
                     });
             }
         });
@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="gallery-item-info">
                     <h5>${art.name}</h5>
-                    <span>❤️ ${art.likes}</span>
+                    <span>️ ${art.likes}</span>
                 </div>
             `;
             
@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.batch_sync_artwork(JSON.stringify(artwork))
                     .then(res => {
-                        if (res) window.showToast(`'${artwork.name}' synced`, "success", "🔵 BLE");
+                        if (res) window.showToast(`'${artwork.name}' synced`, "success", " BLE");
                         else window.showToast("Failed to batch sync artwork", "error");
                     });
             }
@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
             window.pywebview.api.sync_hot_channel(JSON.stringify(fileIds)).then(json => {
                 try {
                     const r = JSON.parse(json);
-                    if (r.ok) window.showToast(`Synced ${r.synced.length} artworks`, "success", "🔵 BLE");
+                    if (r.ok) window.showToast(`Synced ${r.synced.length} artworks`, "success", " BLE");
                     else window.showToast(`Synced ${r.synced.length}, ${r.failed.length} failed`, "error");
                 } catch (e) { window.showToast("Sync failed", "error"); }
             });
@@ -226,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="gallery-item-info">
                     <h5>${art.name}</h5>
-                    <span>❤️ ${art.likes}</span>
+                    <span>️ ${art.likes}</span>
                 </div>
             `;
             
@@ -273,7 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.DivoomState.loadedArtworks = artworks;
                 window.DivoomState.selectedArtworkIndex = null;
                 renderGallery(artworks);
-                window.showToast("Gallery updated with latest monthly best! 🟡", "success");
+                window.showToast("Gallery updated with latest monthly best! ", "success");
                 const loadBtn = document.getElementById("load-gallery-btn");
                 if (loadBtn) loadBtn.textContent = "Fetch Gallery";
             }

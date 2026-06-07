@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (res.success) {
                             const stockCard = document.getElementById("widget-card-stock");
                             if (stockCard) stockCard.classList.add("widget-active");
-                            window.showToast(`Displaying ${symbol} price frame!`, "success", "🔴 Ext");
+                            window.showToast(`Displaying ${symbol} price frame!`, "success", " Ext");
                             const priceMock = document.querySelector(".ticker-price-mock");
                             const arrowMock = document.querySelector(".ticker-arrow-mock");
                             const nameMock = document.querySelector(".ticker-name-mock");
@@ -230,7 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const r = JSON.parse(json);
                     const img = document.getElementById("sysmon-device-preview");
                     if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
-                    window.showToast(r.success ? "System monitor on device" : (r.error || "Failed"), r.success ? "success" : "🔵 BLE");
+                    window.showToast(r.success ? "System monitor on device" : (r.error || "Failed"), r.success ? "success" : " BLE");
                 } catch (e) { window.showToast("Failed", "error"); }
             });
         });

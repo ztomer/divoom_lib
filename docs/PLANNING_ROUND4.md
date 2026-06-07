@@ -4,9 +4,9 @@
 
 | Item | State | Notes |
 |---|---|---|
-| Round 3 close | ✅ 448 passed / 73 skipped / 0 failed | C encoder parity + perf shipped |
-| 3 reference repos cloned | ✅ | `references/divoom-refs/{futpib,hass-divoom,andreas-mausch}` |
-| Reference repos mined | ✅ | see §1 below |
+| Round 3 close |  448 passed / 73 skipped / 0 failed | C encoder parity + perf shipped |
+| 3 reference repos cloned |  | `references/divoom-refs/{futpib,hass-divoom,andreas-mausch}` |
+| Reference repos mined |  | see §1 below |
 | Round 4 plan | 🆕 this document | |
 
 ## 1. Reference Repos (cloned at `references/divoom-refs/`)
@@ -198,86 +198,86 @@ choice — it's about how you wrap a frame in a chunked transfer.
 
 | # | Feature | Command | Source repo:file:line | Status in our code | Priority |
 |---|---|---|---|---|---|
-| 1 | **Multi-frame animation cycling** | `0x8B` 3-phase | `futpib:src/protocol/animation.rs:6-43` | ❌ partial: 0x49 ACK'd but not playing | P0 |
-| 2 | **32×32 PixooMax cover art** | `0x44/0x49` w/ 2 pre-frames | `hass-divoom:devices/divoom.py:300-350,444-450,348-350` | ❌ hardcoded 16×16 | P0 |
-| 3 | **Per-device `screensize`/`chunksize` config** | n/a (config) | `hass-divoom:devices/pixoo.py:7-13`, `pixoomax.py:7-13`, `timeboxmini.py:7-45`, `aurabox.py:7-22` | ❌ hardcoded 16×16 | P0 |
-| 4 | **Static image push (16×16)** | `0x44` | `hass-divoom:devices/divoom.py:669-673,277-281` | ✅ working via 0x49 fallback (Round 3) | P0 |
-| 5 | **Single-frame image push (Timoo firmware quirk)** | `0x49` | our finding 2026-06-05 | ✅ working | P0 |
-| 6 | **EQ / Equalizer (Ditoo-Mic)** | `0xBD 0x1E [3 bytes]` | `hass-divoom:devices/ditooMic.py:15-27` | ❌ id defined, no helper | P1 |
-| 7 | **Scoreboard tool** | `0x72` sub `0x05` | `hass-divoom:devices/divoom.py:755-756` (TODO) | ❌ placeholder only | P1 |
-| 8 | **Lyrics view** | `0x45` channel 2 | `hass-divoom:devices/divoom.py:697-698` (TODO) | ❌ not implemented | P1 |
-| 9 | **Keyboard control (Ditoo)** | `0x23` | `hass-divoom:devices/ditoo.py:18-32` | ❌ id defined, no helper | P1 |
-| 10 | **Memorial tool** | `0x54` | `hass-divoom:devices/divoom.py:700-724` | ❌ id defined, no helper | P1 |
-| 11 | **Sleep scene w/ audio** | `0xa2 0xa3 0xa4` | `futpib:src/protocol/command.rs:34-36` | ❌ id defined, no helper | P1 |
-| 12 | **Alarm listening / vol** | `0x82 0xa5 0xa6` | `futpib:src/protocol/command.rs:31-33` | ❌ id defined, no helper | P1 |
-| 13 | **Auto power off** | `0xAB 0xAC` | `futpib:src/protocol/command.rs:30, 38` | ❌ id defined, no helper | P1 |
-| 14 | **Sleep color / light** | `0xAD 0xAE` | `futpib:src/protocol/command.rs:35-36` | ❌ id defined, no helper | P1 |
-| 15 | **Low power switch** | `0xB2 0xB3` | `futpib:src/protocol/command.rs:30-32` | ❌ id defined, no helper | P1 |
-| 16 | **User GIF / Rhythm** | `0xB1 0xB6 0xB7` | `hass-divoom:devices/divoom.py:65-138` (animation.py) | ❌ constants imported, senders missing | P1 |
-| 17 | **Power-on channel** | `0x8A` | our `commands.py:77` | ❌ id defined, no helper | P1 |
-| 18 | **Boot GIF** | `0x52` | our `commands.py:44` | ❌ id defined, no helper | P1 |
-| 19 | **Sand paint ctrl** | `0x34` sub `0/1` | `divoom.py: drawing.py:331-380` | ✅ helper exists | P1 |
-| 20 | **Picture scan ctrl (multi-screen scroll)** | `0x35` sub `0/1` | `divoom.py: drawing.py:382-437` | ✅ helper exists | P1 |
-| 21 | **Drawing mul pad ctrl (3-screen grid)** | `0x3A` | `divoom.py: drawing.py:61-90` | ✅ helper exists | P1 |
-| 22 | **Drawing big pad ctrl (32+ screens)** | `0x3B` | `divoom.py: drawing.py:92-123` | ✅ helper exists | P1 |
-| 23 | **Drawing pad ctrl** | `0x58` | `divoom.py: drawing.py:125-152` | ✅ helper exists | P1 |
-| 24 | **Drawing pad exit** | `0x5A` | `divoom.py: drawing.py:154-166` | ✅ helper exists | P1 |
-| 25 | **Drawing mul encode single pic** | `0x5B` | `divoom.py: drawing.py:168-191` | ✅ helper exists | P1 |
-| 26 | **Drawing mul encode pic (multi-screen store)** | `0x5C` | `divoom.py: drawing.py:193-218` | ✅ helper exists | P1 |
-| 27 | **Send net temp / disp** | `0x5D 0x5E 0x73` | `hass-divoom:577-592, 845-860` | ❌ id defined, no helper | P2 |
-| 28 | **Set temp** | `0x5F` | `hass-divoom:devices/divoom.py:579-592` | ❌ id defined, no helper | P2 |
-| 29 | **Set radio frequency** | `0x61` | our `commands.py:59` | ❌ id defined, no helper | P2 |
-| 30 | **Drawing mul encode gif play** | `0x6B` | `divoom.py: drawing.py:220-232` | ✅ helper exists | P2 |
-| 31 | **Drawing encode movie play** | `0x6C` | `divoom.py: drawing.py:234-257` | ✅ helper exists | P2 |
-| 32 | **Drawing mul encode movie play** | `0x6D` | `divoom.py: drawing.py:259-284` | ✅ helper exists | P2 |
-| 33 | **Drawing ctrl movie play** | `0x6E` | `divoom.py: drawing.py:286-304` | ✅ helper exists | P2 |
-| 34 | **Drawing mul pad enter (clear)** | `0x6F` | `divoom.py: drawing.py:306-329` | ✅ helper exists | P2 |
-| 35 | **Get/set tool info** | `0x71 0x72` | `hass-divoom:564-575, 818-825` | ❌ id defined, no helper | P2 |
-| 36 | **Get/set device name** | `0x75 0x76` | our `commands.py:69-70` | ❌ id defined, no helper | P2 |
-| 37 | **Get SD music list (count + items)** | `0x07 0x7D` | our `commands.py:71, 106` | ❌ id defined, no helper | P2 |
-| 38 | **Get/set alarm time** | `0x42 0x43` | `hass-divoom:485-522, 577-592` | ❌ id defined, no helper | P2 |
-| 39 | **Get/set memorial time** | `0x53 0x54` | our `commands.py:45-46` | ❌ id defined, no helper | P2 |
-| 40 | **Get device temp** | `0x59` | our `commands.py:51` | ❌ id defined, no helper | P2 |
-| 41 | **Set temp unit** | `0x4C` | our `commands.py:43` | ❌ id defined, no helper | P2 |
-| 42 | **Set temp type** | `0x2B` | our `commands.py:18` | ❌ id defined, no helper | P2 |
-| 43 | **Set time type** | `0x2C` | our `commands.py:19` | ❌ id defined, no helper | P2 |
-| 44 | **Set sleeptime (sleep duration)** | `0x40` | `hass-divoom:758-783` | ❌ id defined, no helper | P2 |
-| 45 | **Set time manage** | `0x56 0x57` | our `commands.py:48-49` | ❌ id defined, no helper | P2 |
-| 46 | **Set hot** | `0x26` | `hass-divoom:558-560` | ❌ id defined, no helper | P2 |
-| 47 | **Set playstate (play/pause)** | `0x0A` | `hass-divoom:735-739` | ❌ id defined, no helper | P2 |
-| 48 | **Get play status** | `0x0B` | our `commands.py:108` | ❌ id defined, no helper | P2 |
-| 49 | **Get/set volume** | `0x08 0x09` | `hass-divoom:836-843` | ❌ id defined, no helper | P2 |
-| 50 | **Set SD play music id** | `0x11` | our `commands.py:109` | ❌ id defined, no helper | P2 |
-| 51 | **Set SD last/next** | `0x12` | our `commands.py:110` | ❌ id defined, no helper | P2 |
-| 52 | **Send SD list over / status** | `0x14 0x15` | our `commands.py:111-112` | ❌ id defined, no helper | P2 |
-| 53 | **Get SD play name** | `0x06` | our `commands.py:113` | ❌ id defined, no helper | P2 |
-| 54 | **Get/set work mode** | `0x05 0x13` | our `commands.py:105, 114` | ✅ partial (get_work_mode helper exists) | P2 |
-| 55 | **Set blue password (BT pairing)** | `0x27` | our `commands.py:13` | ❌ id defined, no helper | P2 |
-| 56 | **Set gif speed** | `0x16` | our `animation.py:46-52` | ✅ helper exists | P2 |
-| 57 | **Set game / game keypress** | `0xA0 0x17 0x21 0x88` | `hass-divoom:619-647, 627-647` | ❌ id defined, no helper | P2 |
-| 58 | **Get/set sound ctrl** | `0xA7 0xA8` | our `commands.py:88-89` | ❌ id defined, no helper | P2 |
-| 59 | **Set poweron voice vol** | `0xBB` | our `commands.py:103` | ❌ id defined, no helper | P2 |
-| 60 | **Set text content / phone word attr** | `0x86 0x87` | our `commands.py:74-75` | ❌ id defined, no helper | P2 |
-| 61 | **Set song dis ctrl** | `0x83` | our `commands.py:73` | ❌ id defined, no helper | P2 |
-| 62 | **Set daylight switch** | `0x32` | our `commands.py:20` | ❌ id defined, no helper | P2 |
-| 63 | **Get/set low power switch** | `0xB2 0xB3` | our `commands.py:95-96` | ❌ id defined, no helper | P2 |
-| 64 | **Get/set SD music info** | `0xB4 0xB5` | our `commands.py:97-98` | ❌ id defined, no helper | P2 |
-| 65 | **Modify user gif items** | `0xB6` | our `commands.py:99` | ❌ id defined, no helper | P2 |
-| 66 | **Set SD music position** | `0xB8` | our `commands.py:101` | ❌ id defined, no helper | P2 |
-| 67 | **Set SD music play mode** | `0xB9` | our `commands.py:102` | ❌ id defined, no helper | P2 |
-| 68 | **App need get music list** | `0x47` | our `commands.py:40` | ❌ id defined, no helper | P2 |
-| 69 | **App send EQ gif** | `0x1B` | our `animation.py:127-138` | ✅ helper exists | P2 |
-| 70 | **App new user define** | `0x8C` | our `commands.py:79` | ❌ id defined, no helper | P2 |
-| 71 | **App big 64 user define** | `0x8D` | our `commands.py:80` | ❌ id defined, no helper | P2 |
-| 72 | **App get user define info** | `0x8E` | our `commands.py:81` | ❌ id defined, no helper | P2 |
-| 73 | **Set design (sub-cmd dispatch)** | `0xBD` | `futpib:src/protocol/extended_command.rs:11-15` | ❌ id defined, no helpers | P2 |
-| 74 | **Set alarm gif / memorial gif** | `0x51 0x55` | our `commands.py:42, 47` | ❌ id defined, no helper | P2 |
-| 75 | **Set brightness** | `0x74` | `hass-divoom:524-531` | ❌ id defined, no helper (cmd exists, no wrapper) | P2 |
-| 76 | **Get/set auto power off** | `0xAB 0xAC` | our `commands.py:90-91` | ❌ id defined, no helper | P2 |
-| 77 | **Set date time** | `0x18` | `hass-divoom:577-592, futpib:src/protocol/datetime.rs:13-30` | ❌ id defined, no helper | P2 |
-| 78 | **LAN/TCP transport (port 7777)** | n/a (transport) | `hass-divoom:devices/divoom.py:86-88, 100-103, 111-113` | ✅ `divoom_lib/lan_transport.py` exists | n/a |
-| 79 | **Divoom file format codec** | n/a (file) | `futpib:src/divoom_file_format/frame.rs`, `frame_header.rs` | ✅ `gui/media_decoder.py` exists | n/a |
-| 80 | **AES-CBC cache .bin decode** | n/a (storage) | reverse-engineered from `~/.config/divoom-control/cache_gallery/*.bin` | ✅ `gui/media_decoder.py` (key=`78hrey23y28ogs89`, IV=`1234567890123456`) | n/a |
+| 1 | **Multi-frame animation cycling** | `0x8B` 3-phase | `futpib:src/protocol/animation.rs:6-43` |  partial: 0x49 ACK'd but not playing | P0 |
+| 2 | **32×32 PixooMax cover art** | `0x44/0x49` w/ 2 pre-frames | `hass-divoom:devices/divoom.py:300-350,444-450,348-350` |  hardcoded 16×16 | P0 |
+| 3 | **Per-device `screensize`/`chunksize` config** | n/a (config) | `hass-divoom:devices/pixoo.py:7-13`, `pixoomax.py:7-13`, `timeboxmini.py:7-45`, `aurabox.py:7-22` |  hardcoded 16×16 | P0 |
+| 4 | **Static image push (16×16)** | `0x44` | `hass-divoom:devices/divoom.py:669-673,277-281` |  working via 0x49 fallback (Round 3) | P0 |
+| 5 | **Single-frame image push (Timoo firmware quirk)** | `0x49` | our finding 2026-06-05 |  working | P0 |
+| 6 | **EQ / Equalizer (Ditoo-Mic)** | `0xBD 0x1E [3 bytes]` | `hass-divoom:devices/ditooMic.py:15-27` |  id defined, no helper | P1 |
+| 7 | **Scoreboard tool** | `0x72` sub `0x05` | `hass-divoom:devices/divoom.py:755-756` (TODO) |  placeholder only | P1 |
+| 8 | **Lyrics view** | `0x45` channel 2 | `hass-divoom:devices/divoom.py:697-698` (TODO) |  not implemented | P1 |
+| 9 | **Keyboard control (Ditoo)** | `0x23` | `hass-divoom:devices/ditoo.py:18-32` |  id defined, no helper | P1 |
+| 10 | **Memorial tool** | `0x54` | `hass-divoom:devices/divoom.py:700-724` |  id defined, no helper | P1 |
+| 11 | **Sleep scene w/ audio** | `0xa2 0xa3 0xa4` | `futpib:src/protocol/command.rs:34-36` |  id defined, no helper | P1 |
+| 12 | **Alarm listening / vol** | `0x82 0xa5 0xa6` | `futpib:src/protocol/command.rs:31-33` |  id defined, no helper | P1 |
+| 13 | **Auto power off** | `0xAB 0xAC` | `futpib:src/protocol/command.rs:30, 38` |  id defined, no helper | P1 |
+| 14 | **Sleep color / light** | `0xAD 0xAE` | `futpib:src/protocol/command.rs:35-36` |  id defined, no helper | P1 |
+| 15 | **Low power switch** | `0xB2 0xB3` | `futpib:src/protocol/command.rs:30-32` |  id defined, no helper | P1 |
+| 16 | **User GIF / Rhythm** | `0xB1 0xB6 0xB7` | `hass-divoom:devices/divoom.py:65-138` (animation.py) |  constants imported, senders missing | P1 |
+| 17 | **Power-on channel** | `0x8A` | our `commands.py:77` |  id defined, no helper | P1 |
+| 18 | **Boot GIF** | `0x52` | our `commands.py:44` |  id defined, no helper | P1 |
+| 19 | **Sand paint ctrl** | `0x34` sub `0/1` | `divoom.py: drawing.py:331-380` |  helper exists | P1 |
+| 20 | **Picture scan ctrl (multi-screen scroll)** | `0x35` sub `0/1` | `divoom.py: drawing.py:382-437` |  helper exists | P1 |
+| 21 | **Drawing mul pad ctrl (3-screen grid)** | `0x3A` | `divoom.py: drawing.py:61-90` |  helper exists | P1 |
+| 22 | **Drawing big pad ctrl (32+ screens)** | `0x3B` | `divoom.py: drawing.py:92-123` |  helper exists | P1 |
+| 23 | **Drawing pad ctrl** | `0x58` | `divoom.py: drawing.py:125-152` |  helper exists | P1 |
+| 24 | **Drawing pad exit** | `0x5A` | `divoom.py: drawing.py:154-166` |  helper exists | P1 |
+| 25 | **Drawing mul encode single pic** | `0x5B` | `divoom.py: drawing.py:168-191` |  helper exists | P1 |
+| 26 | **Drawing mul encode pic (multi-screen store)** | `0x5C` | `divoom.py: drawing.py:193-218` |  helper exists | P1 |
+| 27 | **Send net temp / disp** | `0x5D 0x5E 0x73` | `hass-divoom:577-592, 845-860` |  id defined, no helper | P2 |
+| 28 | **Set temp** | `0x5F` | `hass-divoom:devices/divoom.py:579-592` |  id defined, no helper | P2 |
+| 29 | **Set radio frequency** | `0x61` | our `commands.py:59` |  id defined, no helper | P2 |
+| 30 | **Drawing mul encode gif play** | `0x6B` | `divoom.py: drawing.py:220-232` |  helper exists | P2 |
+| 31 | **Drawing encode movie play** | `0x6C` | `divoom.py: drawing.py:234-257` |  helper exists | P2 |
+| 32 | **Drawing mul encode movie play** | `0x6D` | `divoom.py: drawing.py:259-284` |  helper exists | P2 |
+| 33 | **Drawing ctrl movie play** | `0x6E` | `divoom.py: drawing.py:286-304` |  helper exists | P2 |
+| 34 | **Drawing mul pad enter (clear)** | `0x6F` | `divoom.py: drawing.py:306-329` |  helper exists | P2 |
+| 35 | **Get/set tool info** | `0x71 0x72` | `hass-divoom:564-575, 818-825` |  id defined, no helper | P2 |
+| 36 | **Get/set device name** | `0x75 0x76` | our `commands.py:69-70` |  id defined, no helper | P2 |
+| 37 | **Get SD music list (count + items)** | `0x07 0x7D` | our `commands.py:71, 106` |  id defined, no helper | P2 |
+| 38 | **Get/set alarm time** | `0x42 0x43` | `hass-divoom:485-522, 577-592` |  id defined, no helper | P2 |
+| 39 | **Get/set memorial time** | `0x53 0x54` | our `commands.py:45-46` |  id defined, no helper | P2 |
+| 40 | **Get device temp** | `0x59` | our `commands.py:51` |  id defined, no helper | P2 |
+| 41 | **Set temp unit** | `0x4C` | our `commands.py:43` |  id defined, no helper | P2 |
+| 42 | **Set temp type** | `0x2B` | our `commands.py:18` |  id defined, no helper | P2 |
+| 43 | **Set time type** | `0x2C` | our `commands.py:19` |  id defined, no helper | P2 |
+| 44 | **Set sleeptime (sleep duration)** | `0x40` | `hass-divoom:758-783` |  id defined, no helper | P2 |
+| 45 | **Set time manage** | `0x56 0x57` | our `commands.py:48-49` |  id defined, no helper | P2 |
+| 46 | **Set hot** | `0x26` | `hass-divoom:558-560` |  id defined, no helper | P2 |
+| 47 | **Set playstate (play/pause)** | `0x0A` | `hass-divoom:735-739` |  id defined, no helper | P2 |
+| 48 | **Get play status** | `0x0B` | our `commands.py:108` |  id defined, no helper | P2 |
+| 49 | **Get/set volume** | `0x08 0x09` | `hass-divoom:836-843` |  id defined, no helper | P2 |
+| 50 | **Set SD play music id** | `0x11` | our `commands.py:109` |  id defined, no helper | P2 |
+| 51 | **Set SD last/next** | `0x12` | our `commands.py:110` |  id defined, no helper | P2 |
+| 52 | **Send SD list over / status** | `0x14 0x15` | our `commands.py:111-112` |  id defined, no helper | P2 |
+| 53 | **Get SD play name** | `0x06` | our `commands.py:113` |  id defined, no helper | P2 |
+| 54 | **Get/set work mode** | `0x05 0x13` | our `commands.py:105, 114` |  partial (get_work_mode helper exists) | P2 |
+| 55 | **Set blue password (BT pairing)** | `0x27` | our `commands.py:13` |  id defined, no helper | P2 |
+| 56 | **Set gif speed** | `0x16` | our `animation.py:46-52` |  helper exists | P2 |
+| 57 | **Set game / game keypress** | `0xA0 0x17 0x21 0x88` | `hass-divoom:619-647, 627-647` |  id defined, no helper | P2 |
+| 58 | **Get/set sound ctrl** | `0xA7 0xA8` | our `commands.py:88-89` |  id defined, no helper | P2 |
+| 59 | **Set poweron voice vol** | `0xBB` | our `commands.py:103` |  id defined, no helper | P2 |
+| 60 | **Set text content / phone word attr** | `0x86 0x87` | our `commands.py:74-75` |  id defined, no helper | P2 |
+| 61 | **Set song dis ctrl** | `0x83` | our `commands.py:73` |  id defined, no helper | P2 |
+| 62 | **Set daylight switch** | `0x32` | our `commands.py:20` |  id defined, no helper | P2 |
+| 63 | **Get/set low power switch** | `0xB2 0xB3` | our `commands.py:95-96` |  id defined, no helper | P2 |
+| 64 | **Get/set SD music info** | `0xB4 0xB5` | our `commands.py:97-98` |  id defined, no helper | P2 |
+| 65 | **Modify user gif items** | `0xB6` | our `commands.py:99` |  id defined, no helper | P2 |
+| 66 | **Set SD music position** | `0xB8` | our `commands.py:101` |  id defined, no helper | P2 |
+| 67 | **Set SD music play mode** | `0xB9` | our `commands.py:102` |  id defined, no helper | P2 |
+| 68 | **App need get music list** | `0x47` | our `commands.py:40` |  id defined, no helper | P2 |
+| 69 | **App send EQ gif** | `0x1B` | our `animation.py:127-138` |  helper exists | P2 |
+| 70 | **App new user define** | `0x8C` | our `commands.py:79` |  id defined, no helper | P2 |
+| 71 | **App big 64 user define** | `0x8D` | our `commands.py:80` |  id defined, no helper | P2 |
+| 72 | **App get user define info** | `0x8E` | our `commands.py:81` |  id defined, no helper | P2 |
+| 73 | **Set design (sub-cmd dispatch)** | `0xBD` | `futpib:src/protocol/extended_command.rs:11-15` |  id defined, no helpers | P2 |
+| 74 | **Set alarm gif / memorial gif** | `0x51 0x55` | our `commands.py:42, 47` |  id defined, no helper | P2 |
+| 75 | **Set brightness** | `0x74` | `hass-divoom:524-531` |  id defined, no helper (cmd exists, no wrapper) | P2 |
+| 76 | **Get/set auto power off** | `0xAB 0xAC` | our `commands.py:90-91` |  id defined, no helper | P2 |
+| 77 | **Set date time** | `0x18` | `hass-divoom:577-592, futpib:src/protocol/datetime.rs:13-30` |  id defined, no helper | P2 |
+| 78 | **LAN/TCP transport (port 7777)** | n/a (transport) | `hass-divoom:devices/divoom.py:86-88, 100-103, 111-113` |  `divoom_lib/lan_transport.py` exists | n/a |
+| 79 | **Divoom file format codec** | n/a (file) | `futpib:src/divoom_file_format/frame.rs`, `frame_header.rs` |  `gui/media_decoder.py` exists | n/a |
+| 80 | **AES-CBC cache .bin decode** | n/a (storage) | reverse-engineered from `~/.config/divoom-control/cache_gallery/*.bin` |  `gui/media_decoder.py` (key=`78hrey23y28ogs89`, IV=`1234567890123456`) | n/a |
 
 **Summary:** ~40 features already wired up, ~50 features need helpers (mostly the P2 tier).
 Critical path is P0 (multi-frame + 32×32) + P1 (EQ, scoreboard, lyrics, keyboard, memorial, sleep, alarm, user GIF).
@@ -286,28 +286,28 @@ Critical path is P0 (multi-frame + 32×32) + P1 (EQ, scoreboard, lyrics, keyboar
 
 | # | Feature | Status in our code | Source of truth | Fix |
 |---|---|---|---|---|
-| 1 | **Multi-frame animation cycling on Timoo** | ❌ ACK'd but not playing | `futpib/animation.rs` | Implement 0x8B 3-phase protocol; auto-detect 32×32 |
-| 2 | **32×32 PixooMax cover art** | ❌ Silently falls back to 16×16 | `hass-divoom:300-350` | Add `screensize` + 2 pre-frames + palette flag 0x03 + 2-byte color count |
-| 3 | **Cover art push (single image, Tivoo Max)** | ❌ Renders but might use 0x44 not 0x49 | our `display/__init__.py:show_image` | Audit `media_sync._push_frame` log; force 0x49 path |
-| 4 | **Per-device `screensize`/`chunksize` config** | ❌ Hardcoded 16×16 | `hass-divoom/devices/pixoo.py`, `pixoomax.py`, `timeboxmini.py` | Add to `DivoomConfig` |
+| 1 | **Multi-frame animation cycling on Timoo** |  ACK'd but not playing | `futpib/animation.rs` | Implement 0x8B 3-phase protocol; auto-detect 32×32 |
+| 2 | **32×32 PixooMax cover art** |  Silently falls back to 16×16 | `hass-divoom:300-350` | Add `screensize` + 2 pre-frames + palette flag 0x03 + 2-byte color count |
+| 3 | **Cover art push (single image, Tivoo Max)** |  Renders but might use 0x44 not 0x49 | our `display/__init__.py:show_image` | Audit `media_sync._push_frame` log; force 0x49 path |
+| 4 | **Per-device `screensize`/`chunksize` config** |  Hardcoded 16×16 | `hass-divoom/devices/pixoo.py`, `pixoomax.py`, `timeboxmini.py` | Add to `DivoomConfig` |
 
 ### 3.3 High-value missing features (P1)
 
 | # | Feature | Command | Source of truth | Status |
 |---|---|---|---|---|
-| 5 | EQ / Equalizer (Ditoo-Mic) | `0xbd 0x1E` | `hass-divoom/ditooMic.py:15-27` | ❌ command id defined, no helper |
-| 6 | Scoreboard tool | `0x72` sub `0x05` | `hass-divoom:755-756` (marked TODO) | ❌ placeholder only |
-| 7 | Lyrics view | `0x45` channel 2 | `hass-divoom:697-698` (marked TODO) | ❌ not implemented |
-| 8 | Keyboard control | `0x23` | `hass-divoom/ditoo.py:18-32` | ❌ id defined, no helper |
-| 9 | Memorial tool | `0x54` | `hass-divoom:700-724` | ❌ id defined, no helper |
-| 10 | Sleep scene w/ audio | `0xa2 0xa3 0xa4` | `futpib/command.rs:34-36` | ❌ id defined, no helper |
-| 11 | Alarm listening / vol | `0x82 0xa5 0xa6` | `futpib/command.rs:31-33` | ❌ id defined, no helper |
-| 12 | Auto power off | `0xab 0xac` | `futpib/command.rs:30, 38` | ❌ id defined, no helper |
-| 13 | Sleep color / light | `0xad 0xae` | `futpib/command.rs:35-36` | ❌ id defined, no helper |
-| 14 | Low power switch | `0xb2 0xb3` | `futpib/command.rs:30-32` | ❌ id defined, no helper |
-| 15 | User GIF / Rhythm | `0xb1 0xb6 0xb7` | `divoom.py:65-138` | ❌ constants imported, senders missing |
-| 16 | Power-on channel | `0x8a` | our `commands.py:77` | ❌ id defined, no helper |
-| 17 | Boot GIF | `0x52` | our `commands.py:44` | ❌ id defined, no helper |
+| 5 | EQ / Equalizer (Ditoo-Mic) | `0xbd 0x1E` | `hass-divoom/ditooMic.py:15-27` |  command id defined, no helper |
+| 6 | Scoreboard tool | `0x72` sub `0x05` | `hass-divoom:755-756` (marked TODO) |  placeholder only |
+| 7 | Lyrics view | `0x45` channel 2 | `hass-divoom:697-698` (marked TODO) |  not implemented |
+| 8 | Keyboard control | `0x23` | `hass-divoom/ditoo.py:18-32` |  id defined, no helper |
+| 9 | Memorial tool | `0x54` | `hass-divoom:700-724` |  id defined, no helper |
+| 10 | Sleep scene w/ audio | `0xa2 0xa3 0xa4` | `futpib/command.rs:34-36` |  id defined, no helper |
+| 11 | Alarm listening / vol | `0x82 0xa5 0xa6` | `futpib/command.rs:31-33` |  id defined, no helper |
+| 12 | Auto power off | `0xab 0xac` | `futpib/command.rs:30, 38` |  id defined, no helper |
+| 13 | Sleep color / light | `0xad 0xae` | `futpib/command.rs:35-36` |  id defined, no helper |
+| 14 | Low power switch | `0xb2 0xb3` | `futpib/command.rs:30-32` |  id defined, no helper |
+| 15 | User GIF / Rhythm | `0xb1 0xb6 0xb7` | `divoom.py:65-138` |  constants imported, senders missing |
+| 16 | Power-on channel | `0x8a` | our `commands.py:77` |  id defined, no helper |
+| 17 | Boot GIF | `0x52` | our `commands.py:44` |  id defined, no helper |
 
 ### 3.4 Lower-priority but cheap to add (P2)
 
@@ -328,7 +328,7 @@ following the existing patterns in `divoom_lib/display/*.py` and
 | 5 | `divoom_lib/display/animation.py:_handle_ansgc_sending_data` | `file_size` is unused (only `file_offset_id` + `file_data` are appended). The futpib reference requires `[file_size LE u32]` in the SendingData phase. | medium | Remove unused `file_size` from the SendingData phase, OR include it as a re-confirmation of the total. Confirm with live test. |
 | 6 | `divoom_lib/display/animation.py:app_new_send_gif_cmd` | Implemented but never called. | high (dead feature) | Wire it up to `show_image` and live-test |
 | 7 | `divoom_lib/connection.py:69-73` | Auto-switches to SPP correctly, but the SPP path's `BTSppTransport` 2-second `asyncio.sleep` (line 147-150) is fragile. | medium | Document the cause (macOS Tahoe 26.5.1 SPP reconnection) |
-| 8 | `divoom_lib/framing.py:166` | Checksum range `mv[4:n+7]` is correct for iOS-LE, but the Basic protocol parser at `parse_basic_protocol_frames:226-227` uses `4 + length` which is right. ✓ no bug | n/a | n/a |
+| 8 | `divoom_lib/framing.py:166` | Checksum range `mv[4:n+7]` is correct for iOS-LE, but the Basic protocol parser at `parse_basic_protocol_frames:226-227` uses `4 + length` which is right.  no bug | n/a | n/a |
 | 9 | `divoom_lib/native/image_encoder.py:103-110, 156-157` | `out_size` calculation `7 + 256*3 + (w*h + 7) // 8` may under-allocate for 32×32 (palette can be wider, pixel data is 32×32=1024 pixels = 1024 bytes at 8bpp). | high (silent truncation risk) | Add a `screensize`-aware size; bump worst case to `7 + 65536*3 + 65535` |
 | 10 | `gui/media_sync.py:_push_frame` (line 182-209) | Calls `dev.display.show_image` for cover art — which is correct. The "0x31 in log" is just decimal-for-hex confusion: `0x31` is the same as `0x49` decimal-in-hex-in-response-marker. The device IS ACK'ing our 0x49 push. | low (cosmetic confusion) | Document this in the code comment; add a unit test that asserts the 0x49 response parser handles 0x31. |
 
@@ -473,7 +473,7 @@ Organize by channel (system, alarm, music, etc.) not by command-id-number.
 
 #### Phase E.5 — Drawing (already mostly done, fill gaps)
 
-55. ✅ Sand paint (0x34), Pic scan (0x35), Mul pad (0x3A), Big pad (0x3B), Pad ctrl (0x58), Pad exit (0x5A), Mul encode single pic (0x5B), Mul encode pic (0x5C), Mul encode gif play (0x6B), Encode movie play (0x6C), Mul encode movie play (0x6D), Ctrl movie play (0x6E), Mul pad enter (0x6F) — all in `divoom_lib/display/drawing.py`.
+55.  Sand paint (0x34), Pic scan (0x35), Mul pad (0x3A), Big pad (0x3B), Pad ctrl (0x58), Pad exit (0x5A), Mul encode single pic (0x5B), Mul encode pic (0x5C), Mul encode gif play (0x6B), Encode movie play (0x6C), Mul encode movie play (0x6D), Ctrl movie play (0x6E), Mul pad enter (0x6F) — all in `divoom_lib/display/drawing.py`.
 
 #### Phase E.6 — Design sub-cmd dispatch (`divoom_lib/display/design.py`)
 
@@ -493,7 +493,7 @@ Organize by channel (system, alarm, music, etc.) not by command-id-number.
 
 #### Phase E.8 — Text (partial, mostly done)
 
-66. ✅ `set_text_content` (0x86), `set_light_phone_word_attr` (0x87) — command ids exist, but helpers are in `divoom_lib/display/text.py` already. Verify completeness.
+66.  `set_text_content` (0x86), `set_light_phone_word_attr` (0x87) — command ids exist, but helpers are in `divoom_lib/display/text.py` already. Verify completeness.
 
 #### Phase E.9 — Design sub-cmd dispatch (already covered E.6)
 

@@ -94,7 +94,7 @@ RED, Virtual Wall toolbar icons+labels, font sweep). Lessons consolidated in
 `docs/ENGINEERING_NOTES.md`; stale state pruned; new cross-agent state in
 `docs/SESSION_HANDOFF.md`.
 
-⏳ **§A Phases 2–7 are UI changes — visual pass needed**: run
+ **§A Phases 2–7 are UI changes — visual pass needed**: run
 `python3 gui/gui_main.py` to verify appbar, scoreboard, wall toolbar, font
 sweep, segmented-pill, and tools regroup. Then **§D** (deferred features) →
 **§E** (push the ~34-commit arc to origin).
@@ -562,7 +562,7 @@ a Show button + an Enabled checkbox + a Hide button
 
 ### Live device
 
-- 2 live-device verifications (4-quadrant, half-green/red) ✓.
+- 2 live-device verifications (4-quadrant, half-green/red) .
 - C encoder byte-identical to Python encoder (40/40 parity tests).
 - 0x49 push correctly framed and ACKed by device.
 - Multi-frame cycling on Timoo: deferred (device firmware behavior

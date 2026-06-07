@@ -183,7 +183,7 @@ def main():
     agent.status_item = status_item
     
     # Visual layout: Set a neat Unicode status bar icon
-    status_item.button().setTitle_("👾")
+    status_item.button().setTitle_("")
     status_item.button().setToolTip_("Divoom Coordinator Agent")
     
     # Create the popup menu

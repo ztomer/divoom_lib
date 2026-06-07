@@ -47,7 +47,7 @@ class Capabilities:
     pipeline resizes to `panel_resolution × panel_resolution` BEFORE
     encoding (see `docs/ENGINEERING_NOTES.md` invariant 1).
 
-    ⚠ `panel_resolution` is **NOT** the wall composite size. For a virtual
+     `panel_resolution` is **NOT** the wall composite size. For a virtual
     wall of N columns × M rows, the composite canvas is
     `panel_resolution * N` × `panel_resolution * M` — compute that
     separately (see `wall_resolution` in `divoom_lib/wall.py`).

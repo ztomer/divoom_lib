@@ -58,17 +58,17 @@ async def main():
     response = await comm.send_command_and_wait_for_response(0x46, timeout=2.0)
     if response and len(response) >= 1:
         current_channel = response[0]
-        print(f"   ✓ Current channel: 0x{current_channel:02x} ({'Animation' if current_channel == 5 else 'other'})")
+        print(f"    Current channel: 0x{current_channel:02x} ({'Animation' if current_channel == 5 else 'other'})")
         if current_channel != 0x05:
-            print("   ⚠ Device is NOT on Animation channel. Sending 0x45 0x05...")
+            print("    Device is NOT on Animation channel. Sending 0x45 0x05...")
             await divoom.display.show_design()
             await asyncio.sleep(0.5)
             response = await comm.send_command_and_wait_for_response(0x46, timeout=2.0)
             if response:
                 current_channel = response[0]
-                print(f"   ✓ Channel after switch: 0x{current_channel:02x}")
+                print(f"    Channel after switch: 0x{current_channel:02x}")
     else:
-        print("   ✗ No response to 0x46")
+        print("    No response to 0x46")
         return
 
     # Step 2: encode a test image with the new encoder
@@ -76,7 +76,7 @@ async def main():
     from divoom_lib.utils.divoom_image_encode import encode_static_image
     rgb, w, h = make_test_image("/tmp/verify_quad.png", pattern="quad")
     payload = encode_static_image(rgb, w, h)
-    print(f"   ✓ Encoded {w}x{h} quad image → {len(payload)} bytes")
+    print(f"    Encoded {w}x{h} quad image → {len(payload)} bytes")
     print(f"   Header: {payload[:10].hex()}")
     print(f"   NN (num colors): {payload[9]}")
     print(f"   Palette: {payload[10:10+3*payload[9]].hex() if payload[9] > 0 else 'NN=0 (256 colors)'}")
@@ -86,7 +86,7 @@ async def main():
     t0 = time.time()
     result = await divoom.display.show_image("/tmp/verify_quad.png")
     elapsed = time.time() - t0
-    print(f"   ✓ show_image result: {result} (took {elapsed:.2f}s)")
+    print(f"    show_image result: {result} (took {elapsed:.2f}s)")
 
     # Step 4: wait + poll the device for the response
     print("\n[4/4] Polling device state after push...")

@@ -767,7 +767,7 @@ Evidence:
 appears idempotent (sending `0x45 0x05` while already on mode 0x05
 is expected to be a no-op or a no-visible-effect re-assertion).
 
-### §9.2 ⚠ CRITICAL: the channel switch is *already* being sent
+### §9.2  CRITICAL: the channel switch is *already* being sent
 
 **`gui/media_sync.py:182-209 _push_frame()` calls
 `dev.display.show_image(str(frame_path))` — and

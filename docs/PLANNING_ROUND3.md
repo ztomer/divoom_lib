@@ -418,8 +418,8 @@ regression automatically. Adding it now ensures we never regress again.
 - 27 new encoder tests + 4 updated process_image tests = 31 net new pass.
 - 9 mock-device tests in `tests/test_e2e_mock_device.py` all pass.
 - **Live device verification (Timoo, 2026-06-05, user observed screen):**
-  - 4-color quadrant 16×16 via 0x49 single-frame → **device displays correctly** ✓
-  - Half-green / half-red 16×16 via 0x49 single-frame → **device displays correctly** ✓
+  - 4-color quadrant 16×16 via 0x49 single-frame → **device displays correctly** 
+  - Half-green / half-red 16×16 via 0x49 single-frame → **device displays correctly** 
 - Total test count: 448 passed (was 408; +40 from new `test_native_image_encoder.py` parity tests), 73 skipped, 0 failed.
 
 **Three key learnings from the live-device test:**

@@ -70,7 +70,7 @@
 }
 
 .gallery-item-magic {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     background: rgba(255,255,255,0.05);
     padding: 2px 6px;
@@ -231,7 +231,7 @@
  * moved to Settings → Routines, so the right card is just the device
  * targets list. True halve (1.6fr 0.6fr = 73/27) gives the gallery the
  * dominant real estate (Rams #10). The devices card stays narrow but
- * fits [☑] [color-dot] DeviceName comfortably. */
+ * fits [] [color-dot] DeviceName comfortably. */
 .monthly-best-layout {
     display: grid;
     grid-template-columns: 1.6fr 0.6fr;

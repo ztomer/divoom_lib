@@ -10,15 +10,15 @@ Scraped from: https://docin.divoom-gz.com/web/
 
 ## Categories
 
-✓ **Base**: 1/1 pages successfully scraped
-✓ **System Settings**: 24/24 pages successfully scraped
-✓ **Music Play**: 17/17 pages successfully scraped
-✓ **Alarm Memorial**: 9/9 pages successfully scraped
-✓ **Timeplan**: 2/2 pages successfully scraped
-✓ **Tool**: 2/2 pages successfully scraped
-✓ **Sleep**: 7/7 pages successfully scraped
-✓ **Game**: 4/4 pages successfully scraped
-✓ **Light**: 27/27 pages successfully scraped
+ **Base**: 1/1 pages successfully scraped
+ **System Settings**: 24/24 pages successfully scraped
+ **Music Play**: 17/17 pages successfully scraped
+ **Alarm Memorial**: 9/9 pages successfully scraped
+ **Timeplan**: 2/2 pages successfully scraped
+ **Tool**: 2/2 pages successfully scraped
+ **Sleep**: 7/7 pages successfully scraped
+ **Game**: 4/4 pages successfully scraped
+ **Light**: 27/27 pages successfully scraped
 
 ## Files
 

@@ -64,7 +64,7 @@ window.connectDevice = function(name, address) {
             if (res) {
                 window.DivoomState.appConnected = true;
                 const type = address === "MatrixWall" ? "wall" : (address.startsWith("LAN:") ? "lan" : "ble");
-                const label = type === "wall" ? "🧱 Wall" : (type === "lan" ? "🟢 LAN" : "🔵 BLE");
+                const label = type === "wall" ? " Wall" : (type === "lan" ? " LAN" : " BLE");
                 window.showToast(`Connected to ${name}!`, "success", label);
                 if (statusDot) { statusDot.className = `transport-dot active ${type}`; statusDot.removeAttribute("style"); }
                 
@@ -107,9 +107,9 @@ window.updateDeviceSelectorDropdown = function() {
         sel.appendChild(opt);
     };
     
-    window.DivoomState.discoveredDevices.forEach(d => addOpt(d.address, `🔵 BLE: ${d.name}`));
-    window.DivoomState.registeredLanDevices.forEach(d => addOpt(`LAN:${d.ip}`, `🟢 LAN: ${d.ip}`));
-    if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) addOpt("MatrixWall", "🧱 Matrix Wall Grid");
+    window.DivoomState.discoveredDevices.forEach(d => addOpt(d.address, ` BLE: ${d.name}`));
+    window.DivoomState.registeredLanDevices.forEach(d => addOpt(`LAN:${d.ip}`, ` LAN: ${d.ip}`));
+    if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) addOpt("MatrixWall", " Matrix Wall Grid");
 };
 
 // ── 4. FREE-FORM DISPLAY WALL ARRANGER CANVAS ──
@@ -243,8 +243,8 @@ document.addEventListener("DOMContentLoaded", () => {
         addArrangerBtn.addEventListener("click", () => {
             document.querySelectorAll(".arranger-popup").forEach(p => p.remove());
             
-            const bleOptions = (window.DivoomState.discoveredDevices || []).map(d => `<option value="${d.address}">🔵 BLE: ${d.name}</option>`);
-            const lanOptions = (window.DivoomState.registeredLanDevices || []).map(d => `<option value="LAN:${d.ip}">🟢 LAN: ${d.ip}</option>`);
+            const bleOptions = (window.DivoomState.discoveredDevices || []).map(d => `<option value="${d.address}"> BLE: ${d.name}</option>`);
+            const lanOptions = (window.DivoomState.registeredLanDevices || []).map(d => `<option value="LAN:${d.ip}"> LAN: ${d.ip}</option>`);
             const combinedOptions = bleOptions.concat(lanOptions).join("");
 
             if (!combinedOptions) {
@@ -384,7 +384,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.pywebview && window.pywebview.api && window.pywebview.api.display_custom_art) {
                 window.pywebview.api.display_custom_art(path).then(res => {
                     if (res) {
-                        window.showToast("Custom artwork displayed!", "success", "🔵 BLE");
+                        window.showToast("Custom artwork displayed!", "success", " BLE");
                         const filename = path.split("/").pop();
                         if (window.addCustomArtToHistory) {
                             window.addCustomArtToHistory(filename, path, "file://" + path);
@@ -425,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
             window.showToast("Splitting image and syncing wall...", "success");
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.display_wall_image(path, 16).then(res => {
-                    if (res) window.showToast("Synchronized display wall", "success", "🔵 BLE");
+                    if (res) window.showToast("Synchronized display wall", "success", " BLE");
                 });
             }
         });
@@ -452,7 +452,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!window.DivoomState.appConnected) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.set_brightness) {
                 window.pywebview.api.set_brightness(val).then(res => {
-                    if (res) window.showToast(`Brightness set to ${val}%`, "success", "🔵 BLE");
+                    if (res) window.showToast(`Brightness set to ${val}%`, "success", " BLE");
                 });
             }
         });
@@ -474,7 +474,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!window.DivoomState.appConnected) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.set_volume) {
                 window.pywebview.api.set_volume(val).then(res => {
-                    if (res) window.showToast(`Volume set to ${val}/15`, "success", "🔵 BLE");
+                    if (res) window.showToast(`Volume set to ${val}/15`, "success", " BLE");
                 });
             }
         });
@@ -575,7 +575,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         statusBox.style.background = isConn ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)";
                         statusBox.style.border = isConn ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)";
                         statusBox.style.color = isConn ? "#22c55e" : "#ef4444";
-                        statusBox.innerHTML = `<span>${isConn ? '🟢 Connected as <b>' + (conf.cloud_email || conf.email) + '</b>' : '🔴 Not connected. Save credentials to log in.'}</span>`;
+                        statusBox.innerHTML = `<span>${isConn ? ' Connected as <b>' + (conf.cloud_email || conf.email) + '</b>' : ' Not connected. Save credentials to log in.'}</span>`;
                     }
                 }
             });

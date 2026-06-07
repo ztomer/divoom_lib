@@ -7,10 +7,10 @@ decorator for tagging methods, and the canonical routing map.
 
 Transport Summary
 -----------------
-  BLE    🔵  Bluetooth Low Energy — 100 % local, no internet ever.
-  LAN    🟢  Device HTTP API (:9000) — 100 % local, WiFi-enabled devices.
-  CLOUD  🟡  appin.divoom-gz.com — Divoom's servers, requires account.
-  EXT    🔴  3rd-party APIs (weather, stocks, fonts) — no login needed.
+  BLE      Bluetooth Low Energy — 100 % local, no internet ever.
+  LAN      Device HTTP API (:9000) — 100 % local, WiFi-enabled devices.
+  CLOUD    appin.divoom-gz.com — Divoom's servers, requires account.
+  EXT      3rd-party APIs (weather, stocks, fonts) — no login needed.
 """
 
 from enum import Enum
@@ -22,10 +22,10 @@ from functools import wraps
 class Transport(Enum):
     """The four network paths a command can take."""
 
-    BLE   = "ble"      # 🔵 Bluetooth Low Energy — 100 % local
-    LAN   = "lan"      # 🟢 LAN HTTP :9000       — 100 % local (WiFi devices)
-    CLOUD = "cloud"    # 🟡 appin.divoom-gz.com  — Divoom's servers
-    EXT   = "external" # 🔴 3rd-party internet   — weather / stocks / fonts
+    BLE   = "ble"      #  Bluetooth Low Energy — 100 % local
+    LAN   = "lan"      #  LAN HTTP :9000       — 100 % local (WiFi devices)
+    CLOUD = "cloud"    #  appin.divoom-gz.com  — Divoom's servers
+    EXT   = "external" #  3rd-party internet   — weather / stocks / fonts
 
     # ── Display helpers ───────────────────────────────────────────────────────
 
@@ -56,10 +56,10 @@ class Transport(Enum):
 
 
 _BADGES: dict[Transport, str] = {
-    Transport.BLE:   "🔵",
-    Transport.LAN:   "🟢",
-    Transport.CLOUD: "🟡",
-    Transport.EXT:   "🔴",
+    Transport.BLE:   "",
+    Transport.LAN:   "",
+    Transport.CLOUD: "",
+    Transport.EXT:   "",
 }
 
 _LABELS: dict[Transport, str] = {
@@ -125,7 +125,7 @@ def via(transport: Transport):
 # ── Command routing map ───────────────────────────────────────────────────────
 
 COMMAND_TRANSPORT_MAP: dict[str, Transport] = {
-    # ── 🔵 BLE — always local, Bluetooth only ────────────────────────────────
+    # ──  BLE — always local, Bluetooth only ────────────────────────────────
     "brightness":       Transport.BLE,
     "channel":          Transport.BLE,
     "clock_display":    Transport.BLE,
@@ -151,7 +151,7 @@ COMMAND_TRANSPORT_MAP: dict[str, Transport] = {
     "sound_control":    Transport.BLE,
     "net_temp":         Transport.BLE,   # push weather data over BLE
 
-    # ── 🟢 LAN — local WiFi HTTP :9000 (WiFi-capable devices only) ───────────
+    # ──  LAN — local WiFi HTTP :9000 (WiFi-capable devices only) ───────────
     "lan_brightness":   Transport.LAN,
     "lan_channel":      Transport.LAN,
     "lan_clock":        Transport.LAN,
@@ -164,7 +164,7 @@ COMMAND_TRANSPORT_MAP: dict[str, Transport] = {
     "lan_photo_album":  Transport.LAN,
     "lan_eq":           Transport.LAN,
 
-    # ── 🟡 Divoom Cloud — appin.divoom-gz.com (requires account) ─────────────
+    # ──  Divoom Cloud — appin.divoom-gz.com (requires account) ─────────────
     "gallery_browse":   Transport.CLOUD,
     "clock_face_store": Transport.CLOUD,
     "user_auth":        Transport.CLOUD,
@@ -175,7 +175,7 @@ COMMAND_TRANSPORT_MAP: dict[str, Transport] = {
     "white_noise":      Transport.CLOUD,
     "tts_voice":        Transport.CLOUD,
 
-    # ── 🔴 External — 3rd-party APIs, no account required ────────────────────
+    # ──  External — 3rd-party APIs, no account required ────────────────────
     "weather":          Transport.EXT,
     "stock_ticker":     Transport.EXT,
     "music_metadata":   Transport.EXT,

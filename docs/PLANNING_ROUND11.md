@@ -18,14 +18,14 @@ encoder reimplemented the packing bug independently**.
 
 | Path | Encoder used | Status |
 |---|---|---|
-| Cover art / stocks / sysmon (`media_sync`) | `display.show_image` | ✅ fixed (shared) |
-| Custom art (`gui_api.display_custom_art`) | `display.show_image` | ✅ fixed (shared) |
-| Gallery sync (`gallery_sync`) | resizes → `display.show_image` | ✅ fixed (shared) |
-| Virtual Wall (`wall.show_image`) | per-panel → `display.show_image` | ✅ fixed (shared) |
-| 32px encoder (`divoom_image_encode_32`) | reuses `encode_pixels`/`build_palette` | ✅ fixed (shared) |
-| Monthly-best daemon | own 0x8B streamer | ✅ fixed earlier (256/index) |
-| **Native C** (`image_encode.c` ×2, `image_encode_32.c`) | own C packing loop | ✅ **fixed now** + dylib rebuilt |
-| Native C 0x8B chunker (`divoom_encode_animation_8b`) | byte-offset+256 | ⚠️ **dormant** — no live caller (live 0x8B is Python `stream_animation_8b`); left as-is, flagged |
+| Cover art / stocks / sysmon (`media_sync`) | `display.show_image` |  fixed (shared) |
+| Custom art (`gui_api.display_custom_art`) | `display.show_image` |  fixed (shared) |
+| Gallery sync (`gallery_sync`) | resizes → `display.show_image` |  fixed (shared) |
+| Virtual Wall (`wall.show_image`) | per-panel → `display.show_image` |  fixed (shared) |
+| 32px encoder (`divoom_image_encode_32`) | reuses `encode_pixels`/`build_palette` |  fixed (shared) |
+| Monthly-best daemon | own 0x8B streamer |  fixed earlier (256/index) |
+| **Native C** (`image_encode.c` ×2, `image_encode_32.c`) | own C packing loop |  **fixed now** + dylib rebuilt |
+| Native C 0x8B chunker (`divoom_encode_animation_8b`) | byte-offset+256 | ️ **dormant** — no live caller (live 0x8B is Python `stream_animation_8b`); left as-is, flagged |
 
 **Native C fix:** all three C packing loops had the identical
 "reset accumulator per byte + mask to 8 bits → drop carry for nb_bits∉{1,2,4,8}"
@@ -78,7 +78,7 @@ runs (otherwise it silently skips and only Python is covered).
   fixed/sticky footer container (same CSS class the Monthly Best panel uses).
   Verify in both themes.
 
-### 1b. Push fails: `int too big to convert` 🐞 (root-cause candidate found)
+### 1b. Push fails: `int too big to convert`  (root-cause candidate found)
 - **Trace:** `gui_api.display_custom_art` → `display.show_image` →
   `build_8b_phases(frames)` → `_build_animation_blob` → `encode_animation_frame`.
   The crash happens **before** the "routing N frames via 0x8B" log, i.e. during
@@ -94,7 +94,7 @@ runs (otherwise it silently skips and only Python is covered).
   frame time** to `[1, 65535]` ms and guard/validate length with a clear error;
   (3) confirm against the actual offending gif on hardware.
 
-### 1c. Second push: device shows loading then gets stuck 🐞
+### 1c. Second push: device shows loading then gets stuck 
 - **Trace:** gif 2 DID log "routing 5 frames via 0x8B 3-phase", sent start +
   data + terminate, device ACKs (`8b 55 01 01 00 ee`) repeatedly but never
   finishes — a **transfer-stall**, distinct from 1b.
@@ -109,7 +109,7 @@ runs (otherwise it silently skips and only Python is covered).
 
 ## Item 2 — Live Widgets
 
-### 2a. Cover-art push doesn't work 🐞  +  9. live widgets push broken (same root)
+### 2a. Cover-art push doesn't work   +  9. live widgets push broken (same root)
 - **Trace:** `media_sync._push_frame(out_path, size)` → `display.display_image`
   → same `show_image` path as 1b/1c. Same two ACK lines, no render. Almost
   certainly the **same encoder/transfer bug** as Item 1. Fix 1b/1c → re-test all
@@ -118,7 +118,7 @@ runs (otherwise it silently skips and only Python is covered).
   `show_image`/0x8B path; add a mock-device E2E asserting the full
   start→data→terminate byte sequence for a small animation.
 
-### 2a/2b ✅ SHIPPED — auto cover-art push + button removed
+### 2a/2b  SHIPPED — auto cover-art push + button removed
 
 Cover art now pushes **automatically**: refactored the music watcher into one
 shared path (`_push_cover_for_track` → `_sync_now_playing`), which (a) listens
@@ -157,7 +157,7 @@ tests (`tests/test_music_sync.py`). Suite 562/0.
 ### 4c. Move the sliders to the **right** side of the appbar
 - **Plan:** reorder the appbar flex so both sliders sit right-aligned.
 
-### 4d. 🐞 Dragging a slider drags the whole window (regression-safe fix)
+### 4d.  Dragging a slider drags the whole window (regression-safe fix)
 - **Cause:** the appbar has `-webkit-app-region: drag` (so the frameless window
   is movable), and interactive children inherit it. Sliders need
   `-webkit-app-region: no-drag`.
@@ -193,7 +193,7 @@ tests (`tests/test_music_sync.py`). Suite 562/0.
   `[ Add screen | Clear | …flex… | preset-name (editable) | …flex… | Save | Load ]`
   freeing vertical space for the canvas.
 - **DESIGN QUESTION:** icons vs text? (see clarifying Q). Rams/Kare lean:
-  **icons with tooltips** for the verbs (add ＋, clear 🗑, save 💾, load 📂) —
+  **icons with tooltips** for the verbs (add ＋, clear , save , load ) —
   compact, language-neutral, and Kare's forte — but only if each icon is
   unambiguous; otherwise icon+label. Preset name stays a visible text field.
 
@@ -263,7 +263,7 @@ Target information architecture:
 
 _(filled as phases ship)_
 
-### Phase 1 — push-bug cluster ✅ code-complete (awaiting hardware confirm)
+### Phase 1 — push-bug cluster  code-complete (awaiting hardware confirm)
 
 Two distinct root causes found + fixed:
 
@@ -290,7 +290,7 @@ Note: the **native** C chunker (`divoom_encode_animation_8b`) still uses
 byte-offset ids + 256 chunks, but it's not on the live `show_image` path; left
 as-is (would need a dylib rebuild) — flagged for a future cleanup.
 
-**⏳ Needs:** user to confirm custom-art + live-cover push on the real device.
+** Needs:** user to confirm custom-art + live-cover push on the real device.
 
 #### Reference cross-check (after user flagged the monthly-best path as suspect)
 
@@ -303,7 +303,7 @@ andreas-mausch):
 | our 0x8B framing | 0x8B 3-phase | (was 200) | chunk index (u16) |
 | hass-divoom / node-divoom | 0x49 | 200 | chunk index (u8) |
 | APK `SPP_DRAWING_ENCODE_PLAY` (Q) | own | 200 | chunk index (u8) |
-| monthly-best daemon (ours) | 0x8B | **200 ❌** | chunk index |
+| monthly-best daemon (ours) | 0x8B | **200 ** | chunk index |
 
 Findings:
 - Our **wire framing matches futpib exactly** (`file_size` u32 + `offset_id` u16
@@ -330,7 +330,7 @@ and N frames) through `stream_animation_8b`; 0x49 remains only as a fallback.
 (32px still uses its dedicated 0x49 encoder.) e2e test updated to assert the
 single-still push emits the 0x8B Start/Data/Terminate phases. Suite 546/0.
 
-**⏳ Still needs hardware confirm** that cover art now renders via 0x8B.
+** Still needs hardware confirm** that cover art now renders via 0x8B.
 
 #### Cover art rendered but DISTORTED → 3rd root cause (the real one)
 
@@ -348,4 +348,4 @@ hand-verified 3- and 6-bit cases. Also fixed an unrelated `Path` scoping
 `UnboundLocalError` in `scanner_mixin` connection-persist seen in the same log.
 Suite 556 passed / 0 failed.
 
-**⏳ Hardware:** confirm the album cover now renders un-distorted.
+** Hardware:** confirm the album cover now renders un-distorted.

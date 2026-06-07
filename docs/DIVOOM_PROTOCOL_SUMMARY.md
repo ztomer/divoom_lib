@@ -63,10 +63,10 @@ Unlike BLE, this protocol is stateless, doesn't require packet escaping or check
 
 The library segments all commands and queries into one of four transports (defined in [`divoom_lib/transport.py`](../divoom_lib/transport.py)):
 
-1.  **🔵 BLE (Bluetooth Low Energy)**: 100% local. Used for commands written directly to the device via GATT characteristics.
-2.  **🟢 LAN (Local Wi-Fi)**: 100% local. Talks directly to the device's HTTP server (`:9000/divoom_api`).
-3.  **🟡 Divoom Cloud**: Remote. Interacts with `appin.divoom-gz.com` for community gallery browsing, store items, and remote configurations. Requires a Divoom account.
-4.  **🔴 External**: Remote. Pulls from third-party services (e.g., Yahoo Finance stock ticker, iTunes album art lookup, OpenWeatherMap) to fetch metadata or render local frames.
+1.  ** BLE (Bluetooth Low Energy)**: 100% local. Used for commands written directly to the device via GATT characteristics.
+2.  ** LAN (Local Wi-Fi)**: 100% local. Talks directly to the device's HTTP server (`:9000/divoom_api`).
+3.  ** Divoom Cloud**: Remote. Interacts with `appin.divoom-gz.com` for community gallery browsing, store items, and remote configurations. Requires a Divoom account.
+4.  ** External**: Remote. Pulls from third-party services (e.g., Yahoo Finance stock ticker, iTunes album art lookup, OpenWeatherMap) to fetch metadata or render local frames.
 
 ## Commands
 

@@ -4,13 +4,13 @@ Dual-persona review (Linus Torvalds / "Uncle Bob" Martin) of the refactored
 `divoom_lib` package, with verification against the current source and a
 concrete remediation plan.
 
-> Status legend: ✅ confirmed in code · ⚠️ partially true · ❌ not reproduced
+> Status legend:  confirmed in code · ️ partially true ·  not reproduced
 
 ---
 
-## 🐧 Linus Torvalds — performance & I/O pragmatism
+##  Linus Torvalds — performance & I/O pragmatism
 
-### L1. Allocation debt: `list`-backed receive buffer ✅
+### L1. Allocation debt: `list`-backed receive buffer 
 `Divoom.__init__` sets `self.message_buf = []` ([divoom.py:114](divoom_lib/divoom.py:114)).
 The basic-protocol parser then does `self.message_buf.extend(new_data)`
 ([divoom.py:307](divoom_lib/divoom.py:307)), promoting every received byte into
@@ -28,7 +28,7 @@ no realloc of the tail beyond the memmove), and parse via `int.from_bytes` on
 slices of `bytes` only where needed. A `collections.deque`/ring buffer is
 overkill here — a `bytearray` with `del buf[:n]` is the idiomatic fast path.
 
-### L2. Hex-string round-tripping on the send path ✅
+### L2. Hex-string round-tripping on the send path 
 `_make_message` / `_make_message_ios_le` build the frame as a **hex string**
 (`"".join(f"{b:02x}" ...)`, [divoom.py:618](divoom_lib/divoom.py:618),
 [divoom.py:639](divoom_lib/divoom.py:639)), and the senders immediately do
@@ -41,7 +41,7 @@ string twice the size of the payload only to parse it back to bytes.
 (`mv = memoryview(buf); mv[i:i+n]`). Keep hex strictly for log lines, guarded by
 `logger.isEnabledFor(logging.DEBUG)` so the formatting is skipped when DEBUG is off.
 
-### L3. Logging cost in the hot path ⚠️
+### L3. Logging cost in the hot path ️
 `_notification_handler` and `_handle_basic_protocol_notification` call
 `data.hex()` / `bytes(message).hex()` unconditionally across ~6 log lines per
 notification ([divoom.py:254-261](divoom_lib/divoom.py:254)). Even at INFO level
@@ -50,7 +50,7 @@ the `.hex()` allocations run. This compounds L1/L2.
 **Fix:** wrap hex formatting in `isEnabledFor` guards or pass lazy `%`-style args
 to the logger; drop the duplicate "THIS IS MY NOTIFICATION HANDLER" debug noise.
 
-### L4. Connection robustness / retry ⚠️
+### L4. Connection robustness / retry ️
 `connect()` re-instantiates `BleakClient(self.mac)` when the address changes
 ([divoom.py:212-213](divoom_lib/divoom.py:212)) and wraps failures into a plain
 `ConnectionError` ([divoom.py:221](divoom_lib/divoom.py:221)). `_send_payload`
@@ -63,7 +63,7 @@ has a retry loop ([divoom.py:479-512](divoom_lib/divoom.py:477)) but with a
 `await asyncio.sleep(1.0)` after connect ([divoom.py:229](divoom_lib/divoom.py:229))
 should be a documented constant, ideally replaced by a readiness check.
 
-### L5. Sync disk I/O on the event loop ✅
+### L5. Sync disk I/O on the event loop 
 `utils/cache.py` uses blocking `open()` + `json.load`/`json.dump`
 ([cache.py:16-30](divoom_lib/utils/cache.py:16)). These are called from
 `async` methods — `_send_diagnostic_payload`, `_handle_cached_payload`,
@@ -75,7 +75,7 @@ loop and can drop incoming BLE notifications.
 cache module async (`aiofiles`). Keep the `except OSError: pass` swallowing
 behavior but log at debug.
 
-### L6. `_wait_for_response` busy-polls ⚠️
+### L6. `_wait_for_response` busy-polls ️
 It loops `get_nowait()` + `asyncio.sleep(0.1)`
 ([divoom.py:377-394](divoom_lib/divoom.py:373)) instead of awaiting the queue
 with a timeout. Functionally fine, but a `asyncio.wait_for(queue.get(), ...)`
@@ -83,9 +83,9 @@ loop is cleaner and lower-latency.
 
 ---
 
-## 🛠️ Uncle Bob — SOLID & clean code
+## ️ Uncle Bob — SOLID & clean code
 
-### B1. `Divoom` God Object + circular coupling ✅
+### B1. `Divoom` God Object + circular coupling 
 `__init__` constructs ~20 sub-modules and passes `self` to each
 ([divoom.py:130-154](divoom_lib/divoom.py:130)); each module stores it back
 (`self._divoom = divoom`, e.g. [light.py:42](divoom_lib/display/light.py:42))
@@ -98,7 +98,7 @@ exposing only `send_command`, `send_command_and_wait_for_response`,
 dedicated transport object) implements it. Inverts the dependency, makes modules
 testable with a tiny fake.
 
-### B2. Dual-mode constructor (SRP) ✅
+### B2. Dual-mode constructor (SRP) 
 `__init__(config=None, mac=None, logger=None, **kwargs)` branches on type and
 even treats a `str` `config` as a MAC ([divoom.py:73-101](divoom_lib/divoom.py:73)).
 Two construction contracts in one signature.
@@ -107,7 +107,7 @@ Two construction contracts in one signature.
 classmethods `Divoom.from_config(cfg)` / `Divoom.from_mac(mac, **opts)`. The
 legacy kwarg path becomes a thin shim in `from_mac`.
 
-### B3. Stringly-typed exceptions ✅
+### B3. Stringly-typed exceptions 
 `raise ValueError("No MAC address...")` / `raise ConnectionError(...)`
 ([divoom.py:202](divoom_lib/divoom.py:202),
 [divoom.py:206](divoom_lib/divoom.py:206),
@@ -118,7 +118,7 @@ legacy kwarg path becomes a thin shim in `from_mac`.
 `DeviceConnectionError`, `CharacteristicDiscoveryError`. Raise those (subclassing
 the current built-ins for one release keeps `except ValueError` working).
 
-### B4. Protocol concerns live in the orchestrator ⚠️
+### B4. Protocol concerns live in the orchestrator ️
 Framing, escaping, checksum, chunking, and notification parsing all sit on the
 `Divoom` class ([divoom.py:574-639](divoom_lib/divoom.py:574)) alongside
 connection management and the module registry. A `protocol.py` already exists in
@@ -126,7 +126,7 @@ the tree — the framing/parse logic should move there as pure functions
 (`encode_basic(payload) -> bytes`, `decode_basic(buf) -> list[Frame]`), leaving
 `Divoom` to orchestrate transport only.
 
-### B5. Untracked duplicate/legacy modules in the tree ⚠️
+### B5. Untracked duplicate/legacy modules in the tree ️
 `git status` shows untracked `divoom_lib/alarm.py`, `base.py`, `game.py`,
 `light.py`, `music.py`, `sleep.py`, `tool.py`, `timeplan.py`,
 `divoom_protocol.py`, plus `channels/`, `commands/`, `drawing/` — many of which
@@ -136,7 +136,7 @@ and delete the rest before doing anything else.
 
 ---
 
-## 📊 Tradeoff summary
+##  Tradeoff summary
 
 | Aspect | Current | Pragmatic target | Clean target |
 |---|---|---|---|
@@ -149,7 +149,7 @@ and delete the rest before doing anything else.
 
 ---
 
-## ⚠️ Constraints discovered during verification
+## ️ Constraints discovered during verification
 
 Before executing the plan I traced imports and ran the suite. Two assumptions in
 the original review turned out to be wrong — recorded here so the plan stays honest:
@@ -168,10 +168,10 @@ the original review turned out to be wrong — recorded here so the plan stays h
    Bluetooth/TCC privacy violation (they construct a real `BleakClient`/scanner
    at import/setup — an environment + test-design problem, not a perf bug).
 
-3. **Green island that covers the perf targets:** `test_protocol.py` (21✓),
-   `test_base.py` (35✓), `test_divoom_protocol.py` (17✓), `test_divoom.py` (7✓),
-   plus `test_divoom_protocol_extended.py` (8✓), `test_drawing.py`,
-   `test_text.py`, `test_drawing_functions.py`, `test_text_functions.py` (19✓).
+3. **Green island that covers the perf targets:** `test_protocol.py` (21),
+   `test_base.py` (35), `test_divoom_protocol.py` (17), `test_divoom.py` (7),
+   plus `test_divoom_protocol_extended.py` (8), `test_drawing.py`,
+   `test_text.py`, `test_drawing_functions.py`, `test_text_functions.py` (19).
    **But** these pin current representations as contracts:
    - `_make_message(...) == "010a00...02"` — asserts a **hex string** return.
    - `message_buf == []` — asserts a **list**.
@@ -181,7 +181,7 @@ the original review turned out to be wrong — recorded here so the plan stays h
    tests, rewriting green-test contracts is a decision to make explicitly, not a
    silent refactor. L3 has no such conflict.
 
-## 🔧 Remediation plan (ordered)
+##  Remediation plan (ordered)
 
 Each phase is independently shippable and keeps the public API working.
 
@@ -372,13 +372,13 @@ equivalent `BTSppTransport` connect test. Result:
 
 | Step | Expected | Actual |
 |---|---|---|
-| `sudo pkill bluetoothd` | bluetoothd re-spawns via launchd | ✓ PID 13377 started 22:23 |
-| Timoo forget + re-pair in System Settings | `/dev/cu.Timoo-audio-4` reappears with new timestamp | ✓ remapped 22:33 |
-| `IOBluetoothDevice.pairedDevices()` shows Timoo | paired + connected | ✓ `connected=True` |
+| `sudo pkill bluetoothd` | bluetoothd re-spawns via launchd |  PID 13377 started 22:23 |
+| Timoo forget + re-pair in System Settings | `/dev/cu.Timoo-audio-4` reappears with new timestamp |  remapped 22:33 |
+| `IOBluetoothDevice.pairedDevices()` shows Timoo | paired + connected |  `connected=True` |
 | `system_profiler SPBluetoothDataType` | Timoo services mask | `0x800019` = HFP+AVRCP+A2DP+ACL, **no SerialPort** |
-| pyserial open `/dev/cu.Timoo-audio-4` @ 115200 | basic SPP `get_volume` (cmd 0x09) round-trips | ✗ **0 bytes back** |
-| pyserial open `/dev/cu.Timoo-audio-4` @ 9600 | n/a (sanity) | ✗ 0 bytes back |
-| `BTSppTransport.connect()` (IOBluetooth, channel 2) | `rfcommChannelOpenComplete_status_` fires within 8s | ✗ timeout, callback never fires |
+| pyserial open `/dev/cu.Timoo-audio-4` @ 115200 | basic SPP `get_volume` (cmd 0x09) round-trips |  **0 bytes back** |
+| pyserial open `/dev/cu.Timoo-audio-4` @ 9600 | n/a (sanity) |  0 bytes back |
+| `BTSppTransport.connect()` (IOBluetooth, channel 2) | `rfcommChannelOpenComplete_status_` fires within 8s |  timeout, callback never fires |
 
 **Diagnosis:** the bug is deeper than a stale SDP cache. macOS is negotiating
 Timoo as an **audio-only device** on a fresh pairing — the `SerialPort` bit is
@@ -409,12 +409,12 @@ never fires; `writeSync` on the "open" channel returns
 
 | # | Workaround | Tested? | Result |
 |---|---|---|---|
-| 1 | IOBluetooth async + dedicated run-loop thread ([SO Feb 2020](https://stackoverflow.com/questions/60205505)) | ✓ | `rc=0`, no open callback. |
-| 2 | IOBluetooth + `runUntilDate:` 1 s intervals in thread | ✓ | `rc=0`, no open callback. |
-| 3 | IOBluetooth + `NSRunLoopCommonModes` | ✓ | `rc=0`, no open callback. |
-| 4 | IOBluetooth + `dispatch_async(main_queue, ^{})` per [Chromium `bluetooth_rfcomm_channel_mac.mm`](https://chromium.googlesource.com/chromium/src/+/lkgr/device/bluetooth/bluetooth_rfcomm_channel_mac.mm) (FB13705522) | ✓ | `rc=0`, no open callback. |
-| 5 | IOBluetooth + `cb.retain()` (delegate self-strong-ref) | ✓ | `rc=0`, no open callback. |
-| 6 | `killall bluetoothuserd` (user-level daemon, no sudo) | ✓ | launchd auto-respawns it; SPP still silent. |
+| 1 | IOBluetooth async + dedicated run-loop thread ([SO Feb 2020](https://stackoverflow.com/questions/60205505)) |  | `rc=0`, no open callback. |
+| 2 | IOBluetooth + `runUntilDate:` 1 s intervals in thread |  | `rc=0`, no open callback. |
+| 3 | IOBluetooth + `NSRunLoopCommonModes` |  | `rc=0`, no open callback. |
+| 4 | IOBluetooth + `dispatch_async(main_queue, ^{})` per [Chromium `bluetooth_rfcomm_channel_mac.mm`](https://chromium.googlesource.com/chromium/src/+/lkgr/device/bluetooth/bluetooth_rfcomm_channel_mac.mm) (FB13705522) |  | `rc=0`, no open callback. |
+| 5 | IOBluetooth + `cb.retain()` (delegate self-strong-ref) |  | `rc=0`, no open callback. |
+| 6 | `killall bluetoothuserd` (user-level daemon, no sudo) |  | launchd auto-respawns it; SPP still silent. |
 | 7 | Forget + re-pair device in System Settings | not run | Would require sudo-equivalent TCC reset. |
 | 8 | Shift+Option-click Bluetooth menu bar icon | n/a | Removed in macOS Monterey, not in Tahoe 26.5.1. |
 | 9 | Delete `~/Library/Preferences/com.apple.Bluetooth*.plist` + reboot | not run | Requires re-pair of all BT devices. |
@@ -543,7 +543,7 @@ approve any specific design; user is the design *owner*.
 
 ---
 
-## 📒 Execution log (per step)
+##  Execution log (per step)
 
 Chronological record of what was changed and the verification result after each
 step. "Green island" early on = `test_protocol.py` + `test_base.py` +
@@ -572,7 +572,7 @@ skipped**; settled at **36 failed / 182 passed / 72 skipped** after Phase 5
   `_handle_basic_protocol_notification`, both send paths; same in `protocol.py`.
 - Change: wrapped every `.hex()` log call in `logger.isEnabledFor(...)`, switched
   to lazy `%`-args, deleted `"THIS IS MY NOTIFICATION HANDLER"` + duplicate lines.
-- Verify: green island 80/15. ✅
+- Verify: green island 80/15. 
 
 ### Step 4 — L1: bytearray receive buffer
 - **Edited** `divoom.py` + `protocol.py`: `self.message_buf = bytearray()`;
@@ -581,7 +581,7 @@ skipped**; settled at **36 failed / 182 passed / 72 skipped** after Phase 5
   `== []` → `== bytearray()`; `test_base.py:356` `== list(...)` → `== <bytearray>`.
 - Gotcha found: `test_protocol.py` exercises a **separate** `DivoomProtocol`
   class in `protocol.py` — had to apply the change there too.
-- Verify: green island 80/15. ✅
+- Verify: green island 80/15. 
 
 ### Step 5 — L2: byte-native frame builders + senders
 - **Edited** `divoom.py` + `protocol.py`: `_make_message` / `_make_message_ios_le`
@@ -590,7 +590,7 @@ skipped**; settled at **36 failed / 182 passed / 72 skipped** after Phase 5
   `_int2hexlittle`/`_getCRC` (used by `drawing/`, `channels/`).
 - **Edited tests:** `test_protocol.py:42,52,61` and `test_base.py:557,567,575`
   `== "<hex>"` → `.hex() == "<hex>"`.
-- Verify: green island 80/15; full suite 39/179 (no regressions). ✅
+- Verify: green island 80/15; full suite 39/179 (no regressions). 
 
 ### Step 6 — Phase 3: domain exceptions (B3)
 - **Added** [divoom_lib/exceptions.py](../divoom_lib/exceptions.py):
@@ -598,30 +598,30 @@ skipped**; settled at **36 failed / 182 passed / 72 skipped** after Phase 5
   `CharacteristicConfigError(ValueError)`, `DeviceConnectionError(ConnectionError)`.
 - **Edited** `connect()` in `divoom.py` + `protocol.py` to raise them (messages
   unchanged, so `match=`-based tests pass); exported from `__init__.py`.
-- Verify: green island 80/15 (incl. `test_base.py` connect-error tests). ✅
+- Verify: green island 80/15 (incl. `test_base.py` connect-error tests). 
 
 ### Step 7 — L6: await the queue instead of polling
 - **Edited** `_wait_for_response` (`divoom.py`) / `wait_for_response`
   (`protocol.py`): replaced `get_nowait()` + `sleep(0.1)` loop with
   `asyncio.wait_for(queue.get(), remaining)`; preserved discard + generic-ACK
-  semantics. `test_wait_for_response_timeout` (timeout=0.1) still fast. ✅
+  semantics. `test_wait_for_response_timeout` (timeout=0.1) still fast. 
 
 ### Step 8 — L5: async cache I/O
 - **Edited** `divoom.py` (7 call sites): `cache_mod.save/load_device_cache(...)`
   → `await asyncio.to_thread(cache_mod.<fn>, ...)`.
 - Verify: full suite 39/179 (the red `test_divoom_protocol_utils` failures are a
-  pre-existing positional-vs-kwarg mismatch, unaffected). ✅
+  pre-existing positional-vs-kwarg mismatch, unaffected). 
 
 ### Step 9 — L4: exponential backoff
 - **Edited** `_send_payload` (`divoom.py`) / `send_payload` (`protocol.py`):
   `backoff = retry_delay * (2 ** attempt)`; all inter-attempt sleeps use it.
 - Note: `max_reconnect_attempts` / `reconnect_delay` still unused (follow-up).
-- Verify: full suite 39/179. ✅
+- Verify: full suite 39/179. 
 
 ### Step 10 — B2: construction factories
 - **Added** `Divoom.from_config(config)` and `Divoom.from_mac(mac, **opts)`
   classmethods (`__init__` left intact for backward compatibility).
-- Verify: smoke-constructed both; green island 63/15 on the subset run. ✅
+- Verify: smoke-constructed both; green island 63/15 on the subset run. 
 
 ### Step 11 — B4: extract framing to shared pure functions
 - Created `divoom_lib/framing.py` with `int2hexlittle`, `escape_payload`,
@@ -663,14 +663,14 @@ skipped**; settled at **36 failed / 182 passed / 72 skipped** after Phase 5
   updated to numeric command IDs.
 - **Verify:** green island 109/15 (expanded), full suite **36/182/72**
   (3 more tests collected but pre-existing failures — expected from
-  extended test module being importable again). ✅
+  extended test module being importable again). 
 
 ### Step 15 — Remaining failures fixed; suite fully green (Phase 6)
 - The 36 remaining pre-existing failures (channel tests, `test_converters`,
   `test_divoom_protocol_utils`) have since been resolved.
 - **Verify:** full suite **218 passed / 0 failed / 72 skipped** (290 collected).
   All review items (L1–L6, B1–B4, dedup, housecleaning) are complete and the
-  entire non-hardware suite is green. ✅
+  entire non-hardware suite is green. 
 
 ---
 

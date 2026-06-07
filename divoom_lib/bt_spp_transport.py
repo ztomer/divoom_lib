@@ -238,7 +238,7 @@ class BTSppTransport(DeviceTransport):
                     self._serial_port.flush()
 
             await asyncio.to_thread(_do_serial_write)
-            self.logger.debug(f"[BT-SPP-Serial 🔵] sent ({framing}): {frame.hex()}")
+            self.logger.debug(f"[BT-SPP-Serial ] sent ({framing}): {frame.hex()}")
             return
 
         def _do_write():
@@ -250,7 +250,7 @@ class BTSppTransport(DeviceTransport):
                     raise BtSppTransportError(f"writeSync_length_ returned {rc}")
 
         await asyncio.to_thread(_do_write)
-        self.logger.debug(f"[BT-SPP 🔵] sent ({framing}): {frame.hex()}")
+        self.logger.debug(f"[BT-SPP ] sent ({framing}): {frame.hex()}")
 
     async def read_notification(
         self, timeout: float = DEFAULT_READ_TIMEOUT_S

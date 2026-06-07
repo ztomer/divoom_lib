@@ -41,7 +41,7 @@ Run in this order, dwelling ~2.5s on visual steps:
    path the two just-fixed bugs were on).
 8. **Disconnect**.
 
-## ✅ STATUS — FULLY RESOLVED & VALIDATED (2026-06-03)
+##  STATUS — FULLY RESOLVED & VALIDATED (2026-06-03)
 
 As of June 3, 2026, the on-device communication verification is fully resolved and automated. We no longer rely on unverified fire-and-forget writes; we now perform true two-way verification (or write completion verification where readbacks are unsupported):
 - **Dynamic Parser**: The connection layer dynamically handles mixed protocol responses (iOS LE writes paired with Basic notifications).
@@ -59,7 +59,7 @@ As of June 3, 2026, the on-device communication verification is fully resolved a
       `01 0900 04 33 55 00000000 9500 02` → a Basic-protocol frame whose command
       id is `0x33` (GENERIC_ACK). So the device acknowledges commands.
 
-### 🟢 What is now fully confirmed and resolved (as of 2026-06-03)
+###  What is now fully confirmed and resolved (as of 2026-06-03)
 - **Protocol-Agnostic Response Parsing**: Implemented dynamic notification parsing inside `DivoomConnection._notification_handler()`. This resolves the issue where queries written in **iOS LE** framing are responded to by the device using **Basic Protocol** framing.
 - **Stateful Clock Dial Roundtrip Verification**: Created a robust verification harness in `scripts/test_watchface_roundtrip.py` that cycles through multiple protocol options (iOS LE, Basic Escaped, Basic Non-Escaped). It sets the clock dial (e.g. dial 3) and reads it back or verifies write success.
 - **Successful Real Hardware Verification**: Ran the validation harness on all 4 physical devices (Timoo, Pixoo, Ditoo, Tivoo Max), successfully connecting, writing clock dial settings, and confirming full two-way communication. All query timeouts and notification issues are fully resolved.

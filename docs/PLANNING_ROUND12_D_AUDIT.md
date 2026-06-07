@@ -33,7 +33,7 @@ For each feature:
 
 ### Protocol truth (decompiled APK)
 - `SppProc$CMD_TYPE.java:62-63` — `SPP_SET_TIME_MANAGE_INFO(86) = 0x56`,
-  `SPP_GET_TIME_MANAGE_CTRL(87) = 0x57`. ✓
+  `SPP_GET_TIME_MANAGE_CTRL(87) = 0x57`. 
 - `CmdManager.java:664-714` — pack a 10-byte header then optional animation
   data, sent via `s.c(SPP_SET_TIME_MANAGE_INFO, bArr4)`. Header fields are
   obfuscated ints in `W1.p`: `f3179a` (status), `f3180b` (hour), `f3181c`
@@ -180,7 +180,7 @@ For each feature:
 
 ### Protocol truth (decompiled APK)
 - `SppProc$CMD_TYPE.java:42,43,44,64-67,80-84` — all 12+ command IDs match
-  exactly. ✓
+  exactly. 
 
 ### GUI surface
 - **No UI card, no gui_api wrapper.** Dead code on the JS side.
@@ -238,11 +238,11 @@ For each feature:
 
 | Feature        | Lib exists | Wire-correct | Semantics verified | UX feasible | **Decision**  |
 |----------------|------------|--------------|--------------------|-------------|---------------|
-| Timeplan       | ✅         | ✅           | ❌ (mode/type unverified) | ⚠️ requires task #20 | **DEFER**     |
-| SD card player | ✅         | ✅           | ✅                 | ❌ blocked on task #20 + device SD | **DEFER**     |
-| Game           | ✅         | ✅           | ✅ (commands)      | ❌ no host UX; device-specific buttons | **DEFER**     |
-| Drawing / sand | ✅         | ⚠️ (0x35 unconfirmed) | ✅           | ❌ non-trivial UI per mode | **DEFER**     |
-| Cloud HTTP     | ❌         | n/a          | n/a                | ❌ auth broken; new transport | **DEFER (own round)** |
+| Timeplan       |          |            |  (mode/type unverified) | ️ requires task #20 | **DEFER**     |
+| SD card player |          |            |                  |  blocked on task #20 + device SD | **DEFER**     |
+| Game           |          |            |  (commands)      |  no host UX; device-specific buttons | **DEFER**     |
+| Drawing / sand |          | ️ (0x35 unconfirmed) |            |  non-trivial UI per mode | **DEFER**     |
+| Cloud HTTP     |          | n/a          | n/a                |  auth broken; new transport | **DEFER (own round)** |
 
 **Net result:** 0 features exposed this round, 0 features dropped. All 5 stay
 in the lib (no code deletion). The GUI surface stays at its R8-R12 level.

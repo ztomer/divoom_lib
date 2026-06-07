@@ -4,7 +4,7 @@ This document captures the next phase requirements for the Divoom Control Center
 
 ---
 
-## 📋 The Next Phase Requirements
+##  The Next Phase Requirements
 
 ### 1. Custom Art Channel
 *   **Switching Channel Fix**: Investigate and repair why switching to the "Custom Art / Design" channel does not change the active channel correctly on the physical device.
@@ -50,7 +50,7 @@ This document captures the next phase requirements for the Divoom Control Center
 
 ---
 
-## 👥 The Design Council Review
+##  The Design Council Review
 
 ### 1. Steve Jobs (Focus, Simplicity, & Clarity)
 > *"We must design with absolute focus. The Apply button on the Ambient tab was a crutch for slow engineering; removing it and applying changes immediately is the only right way. The same goes for the Music Sync toggle—why make the user click a switch after they've already navigated to the Music tab? Of course they want it synced!*
@@ -69,7 +69,7 @@ This document captures the next phase requirements for the Divoom Control Center
 
 ---
 
-## ⚖️ Implementation Strategy & Technical Analysis
+## ️ Implementation Strategy & Technical Analysis
 
 ### A. Line Count Constraints (Strict < 500 LOC per file)
 Before writing any code, we must ensure we stay well below the 500-line limit for files like [widgets.js](file:///Users/ztomer/Projects/divoom-control/gui/web_ui/widgets.js) (currently 409 lines) and [widgets.css](file:///Users/ztomer/Projects/divoom-control/gui/web_ui/widgets.css) (currently 451 lines).

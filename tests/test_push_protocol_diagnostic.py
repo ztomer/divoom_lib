@@ -187,13 +187,13 @@ class TestPushProtocolDiagnostic(unittest.IsolatedAsyncioTestCase):
         logger.info("  image_data_seen:     %s", image_data_seen)
         if initial_mode is not None and final_mode is not None:
             if initial_mode == final_mode:
-                logger.warning("  ⚠ Work mode did NOT change after push. Device stayed on 0x%02x.", initial_mode)
+                logger.warning("   Work mode did NOT change after push. Device stayed on 0x%02x.", initial_mode)
             else:
-                logger.info("  ✓ Work mode changed: 0x%02x -> 0x%02x", initial_mode, final_mode)
+                logger.info("   Work mode changed: 0x%02x -> 0x%02x", initial_mode, final_mode)
         if not channel_switch_seen:
-            logger.error("  ✗ Channel switch (0x45 0x05) was NOT in the byte stream.")
+            logger.error("   Channel switch (0x45 0x05) was NOT in the byte stream.")
         if not image_data_seen:
-            logger.error("  ✗ Image data (0x44 or 0x49) was NOT in the byte stream.")
+            logger.error("   Image data (0x44 or 0x49) was NOT in the byte stream.")
         logger.info("=" * 70)
 
         # The diagnostic doesn't assert success — it just records. Mark

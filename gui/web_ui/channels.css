@@ -272,7 +272,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-weight: 700;
     font-size: 22px;
     color: #e8e9eb;
