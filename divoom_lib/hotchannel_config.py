@@ -32,6 +32,12 @@ DEFAULTS = {
 
 # Guardrails.
 MIN_INTERVAL = 60  # never hammer the cloud/device faster than once a minute
+# R15 §4: cap the auto-sync interval at 30 days so a typo (e.g. an
+# extra zero) doesn't disable syncing for years. The UI only offers
+# values up to 30d; the clamp is a defensive belt for the JSON file
+# (the user can still set anything manually in the file, but the
+# daemon will read-back the clamped value).
+MAX_INTERVAL = 2592000  # 30 days
 
 
 def _config_path() -> Path:
@@ -84,7 +90,7 @@ def _normalize(cfg: dict) -> dict:
     out.update(cfg)
     out["enabled"] = bool(out.get("enabled", False))
     try:
-        out["interval"] = max(MIN_INTERVAL, int(out.get("interval", 3600)))
+        out["interval"] = max(MIN_INTERVAL, min(MAX_INTERVAL, int(out.get("interval", 3600))))
     except (TypeError, ValueError):
         out["interval"] = DEFAULTS["interval"]
     try:

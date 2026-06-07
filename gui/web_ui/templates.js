@@ -445,11 +445,17 @@ window.DivoomTemplates = {
                                 </div>
                                 <label class="hc-toggle"><input type="checkbox" id="screen-mirror-toggle"> Mirror / flip display</label>
                                 <p class="panel-hint" style="margin:0;">Orientation support is device-dependent; the exact angle mapping may vary by model.</p>
-                                <div class="danger-zone">
-                                    <span class="form-label" style="font-size:11px; color:var(--transport-ext); text-transform:uppercase; letter-spacing:0.06em;">Danger zone</span>
-                                    <p class="panel-hint" style="margin:6px 0;">Factory reset wipes the device's stored configuration. This cannot be undone.</p>
-                                    <button id="factory-reset-btn" class="glow-btn danger">Factory reset device…</button>
-                                </div>
+                            </div>
+                        </div>
+                        <!-- R15 §4: Danger zone is its own card so destructive
+                             actions aren't buried at the bottom of an unrelated
+                             card. Visual treatment (red border, warning text)
+                             unchanged from when it lived inside Display. -->
+                        <div class="card glass-card danger-card">
+                            <div class="card-header"><h3>Danger zone</h3></div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+                                <p class="panel-hint" style="margin:0;">Factory reset wipes the device's stored configuration. This cannot be undone.</p>
+                                <button id="factory-reset-btn" class="glow-btn danger">Factory reset device…</button>
                             </div>
                         </div>
                         <!-- Notification (moved from Tools → Settings, R11 item 8e) -->
@@ -567,6 +573,11 @@ window.DivoomTemplates = {
                                         <option value="21600">6 hours</option>
                                         <option value="43200">12 hours</option>
                                         <option value="86400">24 hours</option>
+                                        <!-- R15 §4: long-interval options for users who
+                                             only want a weekly / monthly refresh of the
+                                             Monthly Best gallery. -->
+                                        <option value="604800">7 days</option>
+                                        <option value="2592000">30 days</option>
                                     </select>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:10px; margin-top: 14px;">

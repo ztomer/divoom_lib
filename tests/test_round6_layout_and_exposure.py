@@ -430,12 +430,19 @@ def test_no_battery_badge_intentionally_not_implemented():
 
 def test_r9_display_card_exists():
     """The Display card (orientation/mirror/factory-reset) exists — it now lives
-    in Settings → Devices (moved there in R12 Phase 7)."""
+    in Settings → Devices (moved there in R12 Phase 7). R15 §4: factory reset
+    moved to its own Danger zone card."""
     src = TEMPLATES_JS.read_text()
     assert 'id="screen-dir-select"' in src, "Display card missing orientation <select>."
     assert 'id="screen-mirror-toggle"' in src, "Display card missing mirror toggle."
-    assert 'id="factory-reset-btn"' in src, "Display card missing factory-reset button."
-    assert "danger-zone" in src, "Factory reset should sit in a .danger-zone."
+    # R15 §4: factory reset moved out of the Display card into its own
+    # Danger zone card — both must still be present, just not nested.
+    assert 'id="factory-reset-btn"' in src, "factory-reset-btn is missing from the DOM."
+    # The Danger zone card exists with a red border treatment.
+    assert re.search(
+        r'<div class="card glass-card danger-card">[\s\S]*?id="factory-reset-btn"[\s\S]*?</div>',
+        src,
+    ), "factory-reset-btn is not inside the new Danger zone card."
 
 
 def test_r9_settings_js_wires_display_and_guards_reset():

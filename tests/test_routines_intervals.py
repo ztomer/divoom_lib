@@ -1,0 +1,179 @@
+"""
+R15 §4 — tests for the Settings refactor.
+
+The §4 contract is three-fold:
+1. The Display card no longer contains the danger zone — it is its
+   own card.
+2. The Routines auto-sync interval select has 6 options (1h, 6h, 12h,
+   24h, 7d, 30d) and the long-interval values round-trip through
+   the config.
+3. The config has a MAX_INTERVAL guardrail (30 days) so a typo in
+   the JSON file doesn't disable syncing for years.
+"""
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).parent.parent
+TEMPLATES_JS = REPO_ROOT / "gui" / "web_ui" / "templates.js"
+SETTINGS_CSS = REPO_ROOT / "gui" / "web_ui" / "settings.css"
+
+from divoom_lib.hotchannel_config import (
+    DEFAULTS,
+    MAX_INTERVAL,
+    MIN_INTERVAL,
+    save_config,
+    load_config,
+)
+
+
+# ── 1. Danger zone is its own card ────────────────────────────────────
+
+
+def test_display_card_no_longer_contains_danger_zone() -> None:
+    """The `.danger-zone` div must be GONE from inside the Display
+    card. The Display card is between the `<!-- Display -->` and
+    `<!-- R15 §4: Danger zone -->` markers — we check that the div
+    isn't between those two markers."""
+    src = TEMPLATES_JS.read_text()
+    display_start = src.find("<!-- Display (moved from Tools")
+    danger_start = src.find("<!-- R15 §4: Danger zone is its own card")
+    assert display_start > 0, "Display card marker not found"
+    assert danger_start > display_start, "Danger zone card must come after Display"
+    between = src[display_start:danger_start]
+    assert 'class="danger-zone"' not in between, (
+        ".danger-zone div is still inside the Display card — should be its own card."
+    )
+
+
+def test_danger_zone_card_exists() -> None:
+    src = TEMPLATES_JS.read_text()
+    assert re.search(
+        r'<div class="card glass-card danger-card">\s*'
+        r'<div class="card-header"><h3>Danger zone</h3></div>',
+        src,
+    ), (
+        "The new Danger zone card is missing — should be a "
+        "card.glass-card.danger-card with header 'Danger zone'."
+    )
+
+
+def test_danger_card_visual_marker() -> None:
+    """The danger-card class must have a red border treatment."""
+    css = SETTINGS_CSS.read_text()
+    assert re.search(
+        r"\.card\.glass-card\.danger-card\s*\{[^}]*border:\s*1px solid rgba\(239,\s*68,\s*68",
+        css,
+        re.DOTALL,
+    ), (
+        ".card.glass-card.danger-card is missing a red border treatment "
+        "in settings.css."
+    )
+
+
+def test_factory_reset_btn_still_present() -> None:
+    """The factory reset button must still be in the DOM (just moved
+    to its own card)."""
+    src = TEMPLATES_JS.read_text()
+    assert re.search(
+        r'<button\s+id="factory-reset-btn"[^>]*class="glow-btn danger"[^>]*>'
+        r'\s*Factory reset device…\s*</button>',
+        src,
+    ), "factory-reset-btn is missing — should be in the new Danger zone card."
+
+
+# ── 2. Routines interval options ──────────────────────────────────────
+
+
+def test_routines_select_has_six_options() -> None:
+    src = TEMPLATES_JS.read_text()
+    select_match = re.search(
+        r'<select\s+id="routines-auto-sync-interval"[^>]*>(.+?)</select>',
+        src,
+        re.DOTALL,
+    )
+    assert select_match, "routines-auto-sync-interval select is missing"
+    body = select_match.group(1)
+    # Extract the option values.
+    values = re.findall(r'<option\s+value="(\d+)"', body)
+    expected = ["3600", "21600", "43200", "86400", "604800", "2592000"]
+    assert values == expected, (
+        f"Expected interval options {expected}, got {values}."
+    )
+
+
+def test_routines_interval_labels_are_human_readable() -> None:
+    """Spot-check that 7d and 30d have human labels (not raw seconds)."""
+    src = TEMPLATES_JS.read_text()
+    select_match = re.search(
+        r'<select\s+id="routines-auto-sync-interval"[^>]*>(.+?)</select>',
+        src,
+        re.DOTALL,
+    )
+    body = select_match.group(1)
+    assert re.search(r'<option\s+value="604800">7 days</option>', body), (
+        "7d option should have the human label '7 days'."
+    )
+    assert re.search(r'<option\s+value="2592000">30 days</option>', body), (
+        "30d option should have the human label '30 days'."
+    )
+
+
+# ── 3. Config round-trip + MAX_INTERVAL guardrail ─────────────────────
+
+
+def test_long_interval_round_trips(tmp_path: Path, monkeypatch) -> None:
+    """Saving 7d (604800) and 30d (2592000) round-trips through the
+    config file."""
+    cfg_file = tmp_path / "hotchannel.json"
+    monkeypatch.setenv("DIVOOM_HOTCHANNEL_CONFIG", str(cfg_file))
+
+    for value in (604800, 2592000):
+        cfg = dict(DEFAULTS)
+        cfg["enabled"] = True
+        cfg["interval"] = value
+        cfg["targets"] = ["11-75-58-3f-fd-aa"]
+        save_config(cfg)
+        loaded = load_config()
+        assert loaded["interval"] == value, (
+            f"Interval {value}s did not round-trip; got {loaded['interval']}."
+        )
+        assert loaded["enabled"] is True
+        assert loaded["targets"] == ["11-75-58-3f-fd-aa"]
+
+
+def test_max_interval_clamps_typos(tmp_path: Path, monkeypatch) -> None:
+    """A typo (e.g. 6048000 instead of 604800) is clamped to MAX_INTERVAL
+    on read, so the daemon doesn't end up waiting 70 days."""
+    cfg_file = tmp_path / "hotchannel.json"
+    monkeypatch.setenv("DIVOOM_HOTCHANNEL_CONFIG", str(cfg_file))
+    cfg_file.write_text(json.dumps({"enabled": True, "interval": 6048000}))
+
+    loaded = load_config()
+    assert loaded["interval"] == MAX_INTERVAL, (
+        f"interval=6048000 should be clamped to MAX_INTERVAL ({MAX_INTERVAL}); "
+        f"got {loaded['interval']}."
+    )
+
+
+def test_min_interval_unchanged(tmp_path: Path, monkeypatch) -> None:
+    """Belt-and-braces: MIN_INTERVAL still clamps the floor."""
+    cfg_file = tmp_path / "hotchannel.json"
+    monkeypatch.setenv("DIVOOM_HOTCHANNEL_CONFIG", str(cfg_file))
+    cfg_file.write_text(json.dumps({"enabled": True, "interval": 5}))
+
+    loaded = load_config()
+    assert loaded["interval"] == MIN_INTERVAL, (
+        f"interval=5 should be clamped to MIN_INTERVAL ({MIN_INTERVAL}); "
+        f"got {loaded['interval']}."
+    )
+
+
+def test_max_interval_constant_value() -> None:
+    """The constant is exactly 30 days in seconds — guards against
+    typos in the constant itself."""
+    assert MAX_INTERVAL == 30 * 24 * 60 * 60, (
+        f"MAX_INTERVAL should be 30 days = 2592000, got {MAX_INTERVAL}."
+    )

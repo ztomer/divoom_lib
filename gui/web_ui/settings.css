@@ -305,7 +305,20 @@ body.theme-light .theme-mode-btn.active {
    shared segmented-pill rules above. */
 .settings-tabs-nav { /* alias kept for backward compat with markup */ }
 
-/* Round 9 — Display card: destructive "danger zone" (factory reset) */
+/* R15 §4: The "Danger zone" card uses a red border so the user knows
+   it contains destructive actions. The old `.danger-zone` sub-block
+   inside the Display card was extracted; the styling now lives on
+   the card itself via a marker class. */
+.card.glass-card.danger-card {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.03);
+}
+.card.glass-card.danger-card > .card-header h3 {
+  color: var(--transport-ext);
+}
+
+/* Legacy .danger-zone (sub-block inside a card). Kept for any callers
+   that still reference it from elsewhere. */
 .danger-zone {
   margin-top: 6px;
   padding: 12px;
