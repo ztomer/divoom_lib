@@ -10,6 +10,7 @@ from .transport import Transport, COMMAND_TRANSPORT_MAP
 
 from . import models
 from .connection import DivoomConnection
+from .models.capabilities import capabilities_for
 from .display.light import Light
 from .display.animation import Animation
 from .display.drawing import Drawing
@@ -61,6 +62,7 @@ class Divoom:
                 device_name=kwargs.get('device_name'),
                 client=kwargs.get('client'),
                 screensize=kwargs.get('screensize'),
+                device_type=kwargs.get('device_type'),
             )
 
         # Optional LAN transport (WiFi-capable devices only)
@@ -73,6 +75,8 @@ class Divoom:
 
         self._mac = cfg.mac
         self._device_name = cfg.device_name
+        self._device_type = kwargs.get('device_type')  # R13 §1 — explicit override; else registry/manufacturer_data
+        self._advertisement_data = kwargs.get('advertisement_data')  # bleak AdvertisementData or None
 
         if cfg.logger is None:
             log = logging.getLogger(self.mac or "divoom")
@@ -302,6 +306,49 @@ class Divoom:
             "cloud":    False,   # set True after successful cloud auth
             "external": True,    # assume internet unless proven otherwise
         }
+
+    @property
+    def capabilities(self):
+        """R13 §1 — return the Capabilities for the connected device.
+
+        Lookup order (R13 review — name heuristic removed, hardware-derived
+        paths preferred):
+          1. ``device_type`` kwarg passed to the constructor (explicit
+             override; requires the caller to know the model)
+          2. ``DeviceRegistry`` lookup by MAC (per-install
+             ``~/.config/divoom-control/devices.json``)
+          3. ``capabilities_from_manufacturer_data`` — if the caller
+             has passed an ``AdvertisementData`` via the
+             ``advertisement_data`` kwarg
+          4. Baseline (most-limited Pixoo defaults)
+
+        Source: ``divoom_lib.models.capabilities.DEVICE_CAPABILITIES``
+        (filled from the decompiled APK's ``DeviceTypeEnum`` + reference repos).
+        """
+        # 1. Explicit override.
+        if self._device_type:
+            return capabilities_for(self._device_type)
+        # 2. MAC registry.
+        if self._mac:
+            from .models.capabilities import DeviceRegistry
+            caps = DeviceRegistry().lookup(self._mac)
+            if caps is not None:
+                return caps
+        # 3. Manufacturer-data fingerprint (if the caller provided it).
+        if self._advertisement_data is not None:
+            from .models.capabilities import capabilities_from_manufacturer_data
+            caps = capabilities_from_manufacturer_data(self._advertisement_data)
+            if caps is not None:
+                return caps
+        # 4. Baseline.
+        return capabilities_for(None)
+
+    @property
+    def device_type(self) -> str | None:
+        return self._device_type
+    @device_type.setter
+    def device_type(self, val: str | None) -> None:
+        self._device_type = val
 
     @property
     def lan(self):

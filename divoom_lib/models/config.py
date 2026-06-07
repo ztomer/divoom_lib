@@ -14,6 +14,7 @@ class DivoomConfig:
         device_name: str | None = None,
         client: object | None = None,
         screensize: int | None = None,
+        device_type: str | None = None,
     ):
         self.mac = mac
         self.logger = logger
@@ -26,3 +27,4 @@ class DivoomConfig:
         self.device_name = device_name
         self.client = client
         self.screensize = screensize
+        self.device_type = device_type

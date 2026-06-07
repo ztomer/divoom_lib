@@ -7,6 +7,11 @@ This is a diagnostic tool, not a strict assertion. It always passes
 (prints what it found). Run it interactively:
 
     /opt/homebrew/bin/python3.14 tests/test_live_widgets_diagnostic.py -v
+
+R13: the test SKIPS (not errors) when playwright is missing, so CI on a
+host without a Chromium can still run the rest of the suite. Previously
+this file did `sys.exit(2)` at import time, which crashed the entire
+pytest run before any test could collect.
 """
 import sys
 import time
@@ -15,13 +20,11 @@ import http.server
 import socket
 import socketserver
 import threading
+import pytest
 from pathlib import Path
 
-try:
-    from playwright.sync_api import sync_playwright
-except ImportError:
-    print("playwright not installed", file=sys.stderr)
-    sys.exit(2)
+playwright = pytest.importorskip("playwright.sync_api", reason="playwright not installed")
+sync_playwright = playwright.sync_playwright
 
 WEB_UI_DIR = Path(__file__).resolve().parents[1] / "gui" / "web_ui"
 

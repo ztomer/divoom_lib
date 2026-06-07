@@ -15,6 +15,30 @@ from divoom_lib.divoom import Divoom
 
 logger = logging.getLogger(__name__)
 
+
+def wall_resolution(panel_resolution: int, grid_cols: int, grid_rows: int) -> tuple[int, int]:
+    """Compute the **composite** wall canvas size from the per-panel resolution
+    and the grid dimensions. This is the size of the source image you'd push
+    to a wall (it gets split into per-panel slices).
+
+    ⚠ `panel_resolution` is the per-panel pixel dimension (16/32/64) — see
+    `divoom_lib.models.capabilities.Capabilities.panel_resolution`. It is
+    NOT the wall canvas size.
+
+    Examples:
+        # 2x2 wall of 16×16 panels (e.g. four Pixoos):
+        wall_resolution(16, 2, 2)  # → (32, 32)
+        # 2x1 wall of 32×32 panels (e.g. two TivooMax side-by-side):
+        wall_resolution(32, 2, 1)  # → (64, 32)
+        # 4x2 wall of 32×32 panels (e.g. eight Timoos):
+        wall_resolution(32, 4, 2)  # → (128, 64)
+    """
+    if panel_resolution not in (16, 32, 64):
+        raise ValueError(f"panel_resolution must be 16, 32, or 64; got {panel_resolution}")
+    if grid_cols < 1 or grid_rows < 1:
+        raise ValueError(f"grid must be at least 1×1; got {grid_cols}×{grid_rows}")
+    return (panel_resolution * grid_cols, panel_resolution * grid_rows)
+
 class DivoomWall:
     """
     Coordinates multiple Divoom screens arranged in a 2D grid to act as a single unified display.

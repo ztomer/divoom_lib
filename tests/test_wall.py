@@ -7,7 +7,7 @@ from PIL import Image
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from divoom_lib.wall import DivoomWall
+from divoom_lib.wall import DivoomWall, wall_resolution
 
 class TestDivoomWall(unittest.IsolatedAsyncioTestCase):
 
@@ -118,6 +118,50 @@ class TestDivoomWall(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res_clock)
         for mc in mock_clients:
             mc.display.show_clock.assert_called_once_with(clock=2)
+
+
+class TestWallResolution(unittest.TestCase):
+    """R13 §1 — the wall_resolution() helper. It must be derived from
+    panel_resolution (per-panel pixels), not the wall canvas size."""
+
+    def test_2x2_wall_of_16px_panels(self):
+        """Four Pixoos (16×16) in a 2×2 grid = 32×32 composite."""
+        self.assertEqual(wall_resolution(16, 2, 2), (32, 32))
+
+    def test_2x1_wall_of_32px_panels(self):
+        """Two Tivoo Maxes (32×32) side-by-side = 64×32 composite."""
+        self.assertEqual(wall_resolution(32, 2, 1), (64, 32))
+
+    def test_4x2_wall_of_32px_panels(self):
+        """Eight Timoos (32×32) in a 4×2 grid = 128×64 composite."""
+        self.assertEqual(wall_resolution(32, 4, 2), (128, 64))
+
+    def test_single_panel_returns_panel_resolution(self):
+        """A 1×1 wall is just one panel — the canvas is panel_resolution square."""
+        self.assertEqual(wall_resolution(16, 1, 1), (16, 16))
+        self.assertEqual(wall_resolution(32, 1, 1), (32, 32))
+
+    def test_64px_panels(self):
+        """A Pixoo 64 (64×64) in a 1×1 wall = 64×64; in 2×1 = 128×64."""
+        self.assertEqual(wall_resolution(64, 1, 1), (64, 64))
+        self.assertEqual(wall_resolution(64, 2, 1), (128, 64))
+
+    def test_invalid_panel_resolution_rejected(self):
+        """panel_resolution must be 16, 32, or 64. Other values raise."""
+        with self.assertRaises(ValueError):
+            wall_resolution(8, 1, 1)
+        with self.assertRaises(ValueError):
+            wall_resolution(128, 1, 1)
+        with self.assertRaises(ValueError):
+            wall_resolution(0, 1, 1)
+
+    def test_invalid_grid_rejected(self):
+        """Grid must be at least 1×1."""
+        with self.assertRaises(ValueError):
+            wall_resolution(32, 0, 1)
+        with self.assertRaises(ValueError):
+            wall_resolution(32, 1, 0)
+
 
 if __name__ == '__main__':
     unittest.main()

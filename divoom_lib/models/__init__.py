@@ -3,6 +3,16 @@
 from .commands import COMMANDS
 from .config import DivoomConfig
 from .constants import *
+from .capabilities import (
+    Capabilities,
+    DEVICE_CAPABILITIES,
+    BASELINE,
+    capabilities_for,
+    DeviceRegistry,
+    REGISTRY_PATH,
+    capabilities_from_manufacturer_data,
+    ADVERTISED_FINGERPRINTS,
+)
 
 __all__ = [
     "COMMANDS",
@@ -288,6 +298,14 @@ __all__ = [
     "DIVOOM_DISP_NOISE_MODE",
     "DIVOOM_DISP_COUNT_TIME_DOWN",
     "TimeDisplayType",
+    "Capabilities",
+    "DEVICE_CAPABILITIES",
+    "BASELINE",
+    "capabilities_for",
+    "DeviceRegistry",
+    "REGISTRY_PATH",
+    "capabilities_from_manufacturer_data",
+    "ADVERTISED_FINGERPRINTS",
     "LightningType",
     "WeatherType",
     "VJEffectType",
