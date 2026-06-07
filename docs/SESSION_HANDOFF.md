@@ -15,6 +15,21 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R18 — live-widgets + tabs fixes SHIPPED** (user feedback). Weather card
+  auto-populates on load; weather location now IP-geolocated via wttr.in (no more
+  hardcoded "Berlin"); weather 10-min poll re-pushes to the device; sysmon lost
+  its grey gauge-track box; stock ticker got a smaller arrow + small font so the
+  acronym fits; Tools/Settings sub-tabs got `.tab-icon` SVGs; the pill row +
+  theme selector size to content. Suite **963 / 0 / 75**. *(item: weather
+  device-sync still needs hardware verification.)*
+- **Credentials-erased bug FIXED:** the settings form never re-populated the
+  password field, so a plain re-save wrote `password=""`; the 23h token-cache
+  expiry then degraded the account to a guest token. `save_credentials` now keeps
+  a stored password on blank re-saves. +3 regression tests.
+- **R17 (3-way split) P1-P3 SHIPPED; P4 (rename gui/→divoom_gui/) NOT started.**
+  Daemon package + macos_notifications/menubar moved; dylib relocated to
+  divoom_lib. See `docs/PLANNING_ROUND17.md` §outcome.
+
 - **In flight — R16 daemon (P1+P2 shipped) → folding into R17 (3-way split).**
   Architecture correction from the user: the macOS notification monitor + ALL
   background device-driving must live in a **headless daemon**, not the GUI
