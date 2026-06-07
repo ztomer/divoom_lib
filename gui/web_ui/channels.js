@@ -29,8 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
     
-    // ── 2. CHANNEL CARDS NAVIGATION ──
-    const channelCards = document.querySelectorAll(".channel-card");
+    // ── 2. CHANNEL CARDS NAVIGATION (R15 §1+§7: `.channel-card` → `.tab-btn`) ──
+    const channelCards = document.querySelectorAll(".tab-btn[data-channel]");
     const channelPanels = document.querySelectorAll(".channel-panel");
 
     function showChannelPanel(channel) {
@@ -447,11 +447,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ── 7. DYNAMIC VJ EFFECTS TOGGLE & GALLERY CACHE SELECTOR ──
+    // ── 7. DYNAMIC VJ EFFECTS TOGGLE & GALLERY CACHE SELECTOR (R15 §1+§7: `.channel-card` → `.tab-btn`) ──
     window.updateChannelButtonsVisibility = function(name) {
-        const vjCard = document.querySelector('.channel-card[data-channel="vj"]');
+        const vjCard = document.querySelector('.tab-btn[data-channel="vj"]');
         if (!vjCard) return;
-        
+
         const n = (name || "").toLowerCase();
         // Timebox Evo supports VJ effects
         const supportsVJ = n.includes("timebox") || n.includes("evo");
@@ -461,7 +461,7 @@ document.addEventListener("DOMContentLoaded", () => {
             vjCard.style.display = "none";
             // Auto-switch to clock mode if active channel was VJ
             if (window.DivoomState.activeChannel === "vj") {
-                const clockCard = document.querySelector('.channel-card[data-channel="clock"]');
+                const clockCard = document.querySelector('.tab-btn[data-channel="clock"]');
                 if (clockCard) clockCard.click();
             }
         }

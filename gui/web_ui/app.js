@@ -514,8 +514,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const channel = modeToChannel[mode];
             if (!channel) return;
             // Deactivate all cards, then activate the matching one.
-            document.querySelectorAll(".channel-card").forEach(c => c.classList.remove("active"));
-            const card = document.querySelector(`.channel-card[data-channel="${channel}"]`);
+            // (R15 §1+§7: `.channel-card` → `.tab-btn`.)
+            document.querySelectorAll(".tab-btn[data-channel]").forEach(c => c.classList.remove("active"));
+            const card = document.querySelector(`.tab-btn[data-channel="${channel}"]`);
             if (card) card.classList.add("active");
         });
     }

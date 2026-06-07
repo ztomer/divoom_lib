@@ -20,6 +20,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- R15 §1+§7: shared tab chrome (Channels / Tools / Settings sub-tabs). -->
+    <link rel="stylesheet" href="tabs.css">
 </head>
 <body>
     <div class="glass-bg"></div>
@@ -152,81 +154,68 @@
                 <div class="grid-layout">
                     <div class="card glass-card">
                         <div class="card-header" style="display:flex; flex-direction:row; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:16px;">
-                            <div class="channel-tabs">
-                                <button class="channel-card active" data-channel="clock">
-                                    <span class="channel-icon">
-                                        <svg class="kare-icon" viewBox="0 0 16 16">
-                                            <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
-                                            <path d="M8,4 L8,8 L11,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                        </svg>
-                                    </span>
-                                    <h4>Clock</h4>
+                            <!-- R15 §1+§7: tab chrome is now `.tabs-row` + `.tab-btn`
+                                 (defined in tabs.css) — same active state as Tools and
+                                 Settings. Kare icons remain as a prefix. -->
+                            <div class="tabs-row" role="tablist" aria-label="Channel">
+                                <button class="tab-btn active" data-tab="clock" data-channel="clock" role="tab" aria-selected="true">
+                                    <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M8,4 L8,8 L11,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    <span>Clock</span>
                                 </button>
-                                <button class="channel-card" data-channel="visualizer">
-                                    <span class="channel-icon">
-                                        <svg class="kare-icon" viewBox="0 0 16 16">
-                                            <rect x="2" y="10" width="2" height="6"/>
-                                            <rect x="6" y="4" width="2" height="12"/>
-                                            <rect x="10" y="7" width="2" height="9"/>
-                                            <rect x="14" y="2" width="2" height="14"/>
-                                        </svg>
-                                    </span>
-                                    <h4>EQ Visualizer</h4>
+                                <button class="tab-btn" data-tab="visualizer" data-channel="visualizer" role="tab" aria-selected="false">
+                                    <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <rect x="2" y="10" width="2" height="6"/>
+                                        <rect x="6" y="4" width="2" height="12"/>
+                                        <rect x="10" y="7" width="2" height="9"/>
+                                        <rect x="14" y="2" width="2" height="14"/>
+                                    </svg>
+                                    <span>EQ Visualizer</span>
                                 </button>
-                                <button class="channel-card" data-channel="vj">
-                                    <span class="channel-icon">
-                                        <svg class="kare-icon" viewBox="0 0 16 16">
-                                            <rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-                                            <rect x="4" y="4" width="8" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
-                                            <rect x="7" y="7" width="2" height="2" fill="currentColor"/>
-                                        </svg>
-                                    </span>
-                                    <h4>VJ Effects</h4>
+                                <button class="tab-btn" data-tab="vj" data-channel="vj" role="tab" aria-selected="false">
+                                    <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="4" y="4" width="8" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="7" y="7" width="2" height="2" fill="currentColor"/>
+                                    </svg>
+                                    <span>VJ Effects</span>
                                 </button>
-                                <button class="channel-card" data-channel="design">
-                                    <span class="channel-icon">
-                                        <svg class="kare-icon" viewBox="0 0 16 16">
-                                            <path d="M2,4 C2,2 5,1 8,1 C12,1 15,3 15,7 C15,11 11,14 7,14 C5.5,14 4.5,13.5 3.5,13.5 C2.5,13.5 1,15 1,13 C1,11.5 1,9.5 2,7 C2,5.5 2,5 2,4 Z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                            <circle cx="5" cy="4" r="1"/>
-                                            <circle cx="9" cy="4" r="1"/>
-                                            <circle cx="11" cy="7" r="1"/>
-                                            <circle cx="8" cy="10" r="1"/>
-                                        </svg>
-                                    </span>
-                                    <h4>Custom Art</h4>
+                                <button class="tab-btn" data-tab="design" data-channel="design" role="tab" aria-selected="false">
+                                    <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M2,4 C2,2 5,1 8,1 C12,1 15,3 15,7 C15,11 11,14 7,14 C5.5,14 4.5,13.5 3.5,13.5 C2.5,13.5 1,15 1,13 C1,11.5 1,9.5 2,7 C2,5.5 2,5 2,4 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <circle cx="5" cy="4" r="1"/>
+                                        <circle cx="9" cy="4" r="1"/>
+                                        <circle cx="11" cy="7" r="1"/>
+                                        <circle cx="8" cy="10" r="1"/>
+                                    </svg>
+                                    <span>Custom Art</span>
                                 </button>
-                                <button class="channel-card" data-channel="ambient">
-                                    <span class="channel-icon">
-                                        <svg class="kare-icon" viewBox="0 0 16 16">
-                                            <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
-                                            <circle cx="8" cy="8" r="2" fill="currentColor"/>
-                                        </svg>
-                                    </span>
-                                    <h4>Ambient</h4>
+                                <button class="tab-btn" data-tab="ambient" data-channel="ambient" role="tab" aria-selected="false">
+                                    <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <circle cx="8" cy="8" r="2" fill="currentColor"/>
+                                    </svg>
+                                    <span>Ambient</span>
                                 </button>
-                                <!-- Round 6 — new functionality exposure: Scoreboard channel.
-                                     Kare: same shape as the existing channel cards. Rams #4
-                                     understandable — picker + 2 numbers + push button. -->
-                                <button class="channel-card" data-channel="scoreboard">
-                                    <span class="channel-icon">
-                                        <svg class="kare-icon" viewBox="0 0 16 16">
-                                            <rect x="1" y="3" width="14" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
-                                            <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" stroke-width="1"/>
-                                            <text x="5" y="12" font-size="6" font-weight="700" fill="currentColor">10</text>
-                                            <text x="10" y="12" font-size="6" font-weight="700" fill="currentColor">20</text>
-                                        </svg>
-                                    </span>
-                                    <h4>Scoreboard</h4>
+                                <!-- Round 6 — Scoreboard channel. -->
+                                <button class="tab-btn" data-tab="scoreboard" data-channel="scoreboard" role="tab" aria-selected="false">
+                                    <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <rect x="1" y="3" width="14" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" stroke-width="1"/>
+                                        <text x="5" y="12" font-size="6" font-weight="700" fill="currentColor">10</text>
+                                        <text x="10" y="12" font-size="6" font-weight="700" fill="currentColor">20</text>
+                                    </svg>
+                                    <span>Scoreboard</span>
                                 </button>
-                                <button class="channel-card" data-channel="text">
-                                    <span class="channel-icon">
-                                        <svg class="kare-icon" viewBox="0 0 16 16">
-                                            <path d="M2,3 L14,3" stroke="currentColor" stroke-width="2" fill="none"/>
-                                            <path d="M8,3 L8,13" stroke="currentColor" stroke-width="2" fill="none"/>
-                                            <path d="M5,13 L11,13" stroke="currentColor" stroke-width="2" fill="none"/>
-                                        </svg>
-                                    </span>
-                                    <h4>Text</h4>
+                                <button class="tab-btn" data-tab="text" data-channel="text" role="tab" aria-selected="false">
+                                    <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M2,3 L14,3" stroke="currentColor" stroke-width="2" fill="none"/>
+                                        <path d="M8,3 L8,13" stroke="currentColor" stroke-width="2" fill="none"/>
+                                        <path d="M5,13 L11,13" stroke="currentColor" stroke-width="2" fill="none"/>
+                                    </svg>
+                                    <span>Text</span>
                                 </button>
                             </div>
                         </div>
@@ -321,7 +310,7 @@
                                 </div>
                                 <!-- Round 6 — Scoreboard panel. Same shape as the other
                                      channels: 2 number inputs, no Apply/Hide/Enabled buttons.
-                                     Clicking the channel-card switches the device to the
+                                     Clicking the scoreboard tab switches the device to the
                                      scoreboard channel (0x06). Editing a number auto-pushes
                                      the new score via the 0x72 set tool. Kare: matches the
                                      ambient / clock-face / VJ-cell pattern (auto-apply on

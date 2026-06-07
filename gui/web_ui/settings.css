@@ -236,8 +236,12 @@ body.theme-light .theme-mode-btn.active {
   max-width: 480px;
 }
 
+/* R15 §1+§7: tab chrome is now in tabs.css (single source of truth).
+   The legacy class names are aliased to .tab-btn / .tabs-row so
+   older markup that still references them keeps rendering. */
 .settings-tab-btn,
-.tools-subtab-btn {
+.tools-subtab-btn,
+.theme-mode-btn {
   flex: 1;
   background: transparent;
   border: none;
@@ -253,19 +257,22 @@ body.theme-light .theme-mode-btn.active {
 }
 
 .settings-tab-btn:hover,
-.tools-subtab-btn:hover {
+.tools-subtab-btn:hover,
+.theme-mode-btn:hover {
   color: var(--text-main);
   background: rgba(255, 255, 255, 0.04);
 }
 
 .settings-tab-btn.active,
-.tools-subtab-btn.active {
+.tools-subtab-btn.active,
+.theme-mode-btn.active {
   background: var(--primary);
   color: #ffffff;
 }
 
 body.theme-light .settings-tab-btn.active,
-body.theme-light .tools-subtab-btn.active {
+body.theme-light .tools-subtab-btn.active,
+body.theme-light .theme-mode-btn.active {
   color: #ffffff;
 }
 

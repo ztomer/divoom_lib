@@ -148,10 +148,11 @@ def test_target_addr_css_class_removed():
 
 
 def test_settings_has_routines_subtab():
-    """The Settings tab nav must include a 'Routines' sub-tab."""
+    """The Settings tab nav must include a 'Routines' sub-tab.
+    (R15 §1+§7: `.settings-tab-btn` is now `.tab-btn`.)"""
     src = TEMPLATES_JS.read_text()
     assert re.search(
-        r'<button class="settings-tab-btn"\s+data-settings-tab="settings-routines">\s*Routines\s*</button>',
+        r'<button class="tab-btn"[^>]*data-settings-tab="settings-routines"[^>]*>\s*Routines\s*</button>',
         src,
     ), "Settings tab nav is missing the Routines sub-tab button."
 
@@ -284,13 +285,13 @@ def test_gui_api_exposes_set_volume_and_get_volume():
 
 
 def test_scoreboard_channel_card_exists():
-    """The Control Panel must have a Scoreboard channel-card with
-    data-channel='scoreboard'."""
+    """The Control Panel must have a Scoreboard tab-btn with
+    data-channel='scoreboard'. (R15 §1+§7: `.channel-card` → `.tab-btn`.)"""
     html = INDEX_HTML.read_text()
     assert re.search(
-        r'<button class="channel-card"\s+data-channel="scoreboard">',
+        r'<button class="tab-btn"[^>]*data-channel="scoreboard"',
         html,
-    ), "Scoreboard channel-card not found in index.html"
+    ), "Scoreboard tab-btn not found in index.html"
 
 
 def test_scoreboard_panel_has_number_inputs_and_no_buttons():
@@ -635,12 +636,13 @@ async def test_monthly_best_layout_renders_cleanly():
         assert await page.locator("#appbar-volume-slider").count() == 1, (
             "appbar-volume-slider not found in the rendered DOM"
         )
-        # And the Control Panel must have the Scoreboard channel-card.
+        # And the Control Panel must have the Scoreboard tab.
+        # (R15 §1+§7: `.channel-card` → `.tab-btn`.)
         await page.click('[data-tab="control-panel"]', timeout=2000)
         await page.wait_for_selector("#control-panel.active", timeout=2000)
         assert await page.locator(
-            '.channel-card[data-channel="scoreboard"]'
-        ).count() == 1, "Scoreboard channel-card not found in Control Panel"
+            '.tab-btn[data-channel="scoreboard"]'
+        ).count() == 1, "Scoreboard tab-btn not found in Control Panel"
 
         await browser.close()
 
@@ -659,10 +661,13 @@ def test_r12_tools_subtab_uses_sessions_not_tools_inner_collision():
     multi-timer/noise/sleep bundle."""
     src = TEMPLATES_JS.read_text()
     # The inner sub-tab button is now 'Sessions' with data-tools-tab=tools-sessions.
-    assert 'data-tools-tab="tools-sessions">Sessions' in src, (
-        "Tools inner sub-tab is not 'Sessions' — it should be renamed to "
-        "avoid the parent-tab / sub-tab 'Tools' collision."
-    )
+    # (R15 §1+§7: button class is now `.tab-btn` and has additional `data-tab` /
+    # `role` / `aria-selected` attrs — the assertion uses a regex that matches
+    # the new shape without locking in attribute order.)
+    assert re.search(
+        r'<button[^>]*data-tools-tab="tools-sessions"[^>]*>\s*Sessions\s*</button>',
+        src,
+    ), "Tools inner sub-tab is not 'Sessions' — it should be renamed to avoid the parent-tab / sub-tab 'Tools' collision."
     # The id of the inner sub-tab content block must match.
     assert 'id="tools-sessions"' in src, (
         "inner sub-tab content id should be 'tools-sessions'."
@@ -672,40 +677,51 @@ def test_r12_tools_subtab_uses_sessions_not_tools_inner_collision():
         "id 'tools-tools' is still present — it should be renamed to 'tools-sessions'."
     )
     # The 'Time' sub-tab is still present (alarms + anniversary).
-    assert 'data-tools-tab="tools-time">Time' in src, (
-        "Tools Time sub-tab is missing — it should contain Alarms + Anniversary."
-    )
-
-
-def test_r12_unified_segmented_pill_css():
-    """R12 §A Phase 7 (unified segmented-pill): the Tools sub-tab nav
-    uses the same .settings-tabs-nav / .settings-tab-btn segmented-pill
-    style as Settings, via grouped CSS rules (no duplicate styles)."""
-    css = SETTINGS_CSS.read_text()
-    # Grouped selector: shared button styles apply to both settings-tab-btn
-    # and tools-subtab-btn.
+    # (R15 §1+§7: button class is now `.tab-btn` and has additional `data-tab` /
+    # `role` / `aria-selected` attrs — the assertion uses a regex that
+    # doesn't lock in attribute order.)
     assert re.search(
-        r"\.settings-tab-btn\s*,\s*\n\s*\.tools-subtab-btn\s*\{",
-        css,
-    ), (
-        "settings.css should group .settings-tab-btn and .tools-subtab-btn "
-        "in a single shared rule (segmented-pill unification)."
+        r'<button[^>]*data-tools-tab="tools-time"[^>]*>\s*Time\s*</button>',
+        src,
+    ), "Tools Time sub-tab is missing — it should contain Alarms + Anniversary."
+
+
+def test_r15_unified_segmented_pill_css():
+    """R15 §1+§7: tab chrome lives in `tabs.css` as the single source of
+    truth (`.tabs-row` + `.tab-btn`), shared across Channels / Tools /
+    Settings / Theme. `settings.css` keeps the legacy class names as
+    aliases so older markup (or external themes) still render."""
+    repo_root = Path(__file__).parent.parent
+    tabs_css = (repo_root / "gui" / "web_ui" / "tabs.css").read_text()
+    settings_css = SETTINGS_CSS.read_text()
+
+    # tabs.css defines the unified `.tabs-row` and `.tab-btn` rules.
+    assert re.search(r"\.tabs-row\s*\{", tabs_css), (
+        "tabs.css is missing the .tabs-row wrapper rule."
     )
-    # The shared content visibility rule too.
+    assert re.search(r"\.tabs-row\s+\.tab-btn\s*\{", tabs_css), (
+        "tabs.css is missing the .tabs-row .tab-btn rule."
+    )
+    assert re.search(r"\.tabs-row\s+\.tab-btn\.active\s*\{", tabs_css), (
+        "tabs.css is missing the .tabs-row .tab-btn.active rule."
+    )
+
+    # settings.css still aliases the legacy class names so old markup
+    # (theme buttons, etc.) keeps rendering — no functional regression.
+    assert re.search(
+        r"\.settings-tab-btn\s*,\s*\n\s*\.tools-subtab-btn\s*,\s*\n\s*\.theme-mode-btn\s*\{",
+        settings_css,
+    ), (
+        "settings.css should still group the legacy class names "
+        "(.settings-tab-btn, .tools-subtab-btn, .theme-mode-btn) so "
+        "older markup keeps rendering."
+    )
     assert re.search(
         r"\.settings-tab-content\s*,\s*\n\s*\.tools-subtab-content\s*\{",
-        css,
+        settings_css,
     ), (
-        "settings.css should group .settings-tab-content and .tools-subtab-content "
-        "in a single shared visibility rule."
-    )
-    # Pill-wrapper class also aliased.
-    assert re.search(
-        r"\.settings-tabs-nav\s*,\s*\n\s*\.tools-tabs-nav\s*\{",
-        css,
-    ), (
-        "settings.css should group .settings-tabs-nav and .tools-tabs-nav "
-        "as a single pill-wrapper class."
+        "settings.css should group .settings-tab-content and "
+        ".tools-subtab-content in a single shared visibility rule."
     )
 
 

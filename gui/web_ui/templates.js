@@ -3,9 +3,13 @@
 window.DivoomTemplates = {
     tools: `
         <div class="header-section"><h1>Tools</h1></div>
-        <div class="settings-tabs-nav">
-            <button class="tools-subtab-btn active" data-tools-tab="tools-time">Time</button>
-            <button class="tools-subtab-btn" data-tools-tab="tools-sessions">Sessions</button>
+        <!-- R15 §1+§7: tab chrome is now .tabs-row + .tab-btn
+             (defined in tabs.css) — same active state as Channels and
+             Settings. The legacy class names are aliased in settings.css
+             for backward compat with the JS selectors. -->
+        <div class="tabs-row" role="tablist" aria-label="Tools">
+            <button class="tab-btn active" data-tools-tab="tools-time" data-tab="tools-time" role="tab" aria-selected="true">Time</button>
+            <button class="tab-btn" data-tools-tab="tools-sessions" data-tab="tools-sessions" role="tab" aria-selected="false">Sessions</button>
         </div>
         <!-- R11 item 8: TIME sub-tab — alarms + anniversary. -->
         <div class="tools-subtab-content active" id="tools-time">
@@ -301,13 +305,16 @@ window.DivoomTemplates = {
                     </div>
     `,
     settings: `
-                <!-- Settings Sub-Tabs Navigation -->
-                <div class="settings-tabs-nav">
-                    <button class="settings-tab-btn active" data-settings-tab="settings-devices">Devices</button>
-                    <button class="settings-tab-btn" data-settings-tab="settings-divoom">Divoom</button>
-                    <button class="settings-tab-btn" data-settings-tab="settings-routines">Routines</button>
-                    <button class="settings-tab-btn" data-settings-tab="settings-connectivity">Connectivity</button>
-                    <button class="settings-tab-btn" data-settings-tab="settings-appearance">Appearance</button>
+                <!-- R15 §1+§7: tab chrome is now .tabs-row + .tab-btn
+                     (defined in tabs.css) — same active state as Channels and
+                     Tools. The legacy class names are aliased in settings.css
+                     for backward compat with the JS selectors. -->
+                <div class="tabs-row" role="tablist" aria-label="Settings">
+                    <button class="tab-btn active" data-settings-tab="settings-devices" data-tab="settings-devices" role="tab" aria-selected="true">Devices</button>
+                    <button class="tab-btn" data-settings-tab="settings-divoom" data-tab="settings-divoom" role="tab" aria-selected="false">Divoom</button>
+                    <button class="tab-btn" data-settings-tab="settings-routines" data-tab="settings-routines" role="tab" aria-selected="false">Routines</button>
+                    <button class="tab-btn" data-settings-tab="settings-connectivity" data-tab="settings-connectivity" role="tab" aria-selected="false">Connectivity</button>
+                    <button class="tab-btn" data-settings-tab="settings-appearance" data-tab="settings-appearance" role="tab" aria-selected="false">Appearance</button>
                 </div>
 
                 <!-- 1. DEVICES TAB -->
@@ -620,22 +627,22 @@ window.DivoomTemplates = {
                                 <h3>Theme</h3>
                             </div>
                             <div class="card-body">
-                                <div class="theme-buttons">
-                                    <button class="theme-mode-btn active" data-theme="dark" title="Dark Mode">
-                                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                                <div class="tabs-row theme-buttons" role="tablist" aria-label="Theme">
+                                    <button class="tab-btn theme-mode-btn active" data-theme="dark" role="tab" aria-selected="true" title="Dark Mode">
+                                        <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
                                             <path d="M12,2 C10,2 6,4 6,9 C6,13 9,14 12,14 C6,16 2,12 2,8 C2,4 6,2 12,2 Z" fill="currentColor"/>
                                         </svg>
                                         Dark
                                     </button>
-                                    <button class="theme-mode-btn" data-theme="light" title="Light Mode">
-                                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                                    <button class="tab-btn theme-mode-btn" data-theme="light" role="tab" aria-selected="false" title="Light Mode">
+                                        <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
                                             <circle cx="8" cy="8" r="3" fill="currentColor"/>
                                             <path d="M8,1 L8,3 M8,13 L8,15 M1,8 L3,8 M13,8 L15,8 M3,3 L4.5,4.5 M11.5,11.5 L13,13 M3,13 L4.5,11.5 M11.5,4.5 L13,3" stroke="currentColor" stroke-width="2"/>
                                         </svg>
                                         Light
                                     </button>
-                                    <button class="theme-mode-btn" data-theme="system" title="System Auto">
-                                        <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px;">
+                                    <button class="tab-btn theme-mode-btn" data-theme="system" role="tab" aria-selected="false" title="System Auto">
+                                        <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
                                             <rect x="1" y="2" width="14" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
                                             <rect x="6" y="12" width="4" height="2"/>
                                             <rect x="4" y="14" width="8" height="1"/>

@@ -20,13 +20,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Sub-settings tabs navigation click handler
+    // Sub-settings tabs navigation click handler (R15 §1+§7: `.settings-tab-btn` → `.tab-btn`)
     document.addEventListener("click", (e) => {
-        const btn = e.target.closest(".settings-tab-btn");
+        const btn = e.target.closest(".tab-btn[data-settings-tab]");
         if (btn) {
-            const settingsTabButtons = document.querySelectorAll(".settings-tab-btn");
+            const settingsTabButtons = document.querySelectorAll(".tab-btn[data-settings-tab]");
             const settingsTabContents = document.querySelectorAll(".settings-tab-content");
-            
+
             settingsTabButtons.forEach(b => b.classList.remove("active"));
             settingsTabContents.forEach(t => t.classList.remove("active"));
 
@@ -39,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // ── 2. THEME SELECTOR WIRING ──
+    // ── 2. THEME SELECTOR WIRING (R15 §1+§7: `.theme-mode-btn` keeps its name but is also a `.tab-btn`) ──
     const themeButtons = document.querySelectorAll(".theme-mode-btn");
     
     function applyTheme(theme) {
@@ -360,7 +360,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
     document.addEventListener("click", (e) => {
-        const btn = e.target.closest(".settings-tab-btn");
+        // R15 §1+§7: `.settings-tab-btn` → `.tab-btn[data-settings-tab]`
+        const btn = e.target.closest(".tab-btn[data-settings-tab]");
         if (btn && btn.getAttribute("data-settings-tab") === "settings-routines") {
             setTimeout(window.loadRoutinesAutoSync, 0);
         }
@@ -468,11 +469,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // ── Round 8: Tools sub-tab nav (Utilities / Device / Radio) ────────
+    // ── Round 8: Tools sub-tab nav (R15 §1+§7: `.tools-subtab-btn` → `.tab-btn[data-tools-tab]`) ──
     document.addEventListener("click", (e) => {
-        const btn = e.target.closest(".tools-subtab-btn");
+        const btn = e.target.closest(".tab-btn[data-tools-tab]");
         if (!btn) return;
-        document.querySelectorAll(".tools-subtab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tab-btn[data-tools-tab]").forEach(b => b.classList.remove("active"));
         document.querySelectorAll(".tools-subtab-content").forEach(c => c.classList.remove("active"));
         btn.classList.add("active");
         const target = document.getElementById(btn.getAttribute("data-tools-tab"));

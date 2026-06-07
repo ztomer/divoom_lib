@@ -1,0 +1,85 @@
+/* tabs.css — single source of truth for the tab chrome used in
+   Channels, Tools, Settings, and any future sub-tab row. (R15 §1+§7.)
+
+   Design rationale (Rams + Kare):
+   - Rams: "less but better" — one chrome, one state model, no
+     competing visual treatments across panels.
+   - Kare: icons earn their place when they carry identity (the
+     7 channel icons). Tools/Settings sub-tabs are text-only; the
+     channel row is `[icon] Label`. The optional icon prefix slot
+     keeps the row's visual rhythm identical across panels.
+   - Active state is `--primary` bg + `#ffffff` text, everywhere.
+     The focus indicator is the fill, not a border — no border
+     competes with the fill.
+
+   Selector contract:
+   - The row wrapper is `.tabs-row`.
+   - Each tab is `.tab-btn` with `data-tab="<id>"`.
+   - Active state is `.tab-btn.active`.
+   - Optional icon prefix: `<svg class="tab-icon">` or `<img class="tab-icon">`.
+   - Tooltips: `title` attribute.
+*/
+.tabs-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  /* No outer border — the active pill's bg is the focus indicator. */
+}
+
+.tabs-row .tab-btn {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 14px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tabs-row .tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tabs-row .tab-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.tabs-row .tab-btn.active .tab-icon {
+  /* Slight lift so the icon stays visible against the primary fill. */
+  opacity: 1;
+}
+
+.tabs-row .tab-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: currentColor;
+  opacity: 0.85;
+}
+
+/* Theme overrides — the segmented-pill must read in both dark and light. */
+body.theme-light .tabs-row {
+  background: rgba(0, 0, 0, 0.04);
+}
+body.theme-light .tabs-row .tab-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+body.theme-system .tabs-row {
+  background: rgba(0, 0, 0, 0.04);
+}
+body.theme-system .tabs-row .tab-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
