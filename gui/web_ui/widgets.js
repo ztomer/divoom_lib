@@ -286,8 +286,15 @@ document.addEventListener("DOMContentLoaded", () => {
     function startWeatherPolling() {
         if (weatherTimer) return;
         refreshWeatherPreview();
-        // R15 §3: weather changes slowly — 10 min is plenty.
-        weatherTimer = setInterval(refreshWeatherPreview, 10 * 60 * 1000);
+        // R18 item 3: keep the DEVICE in sync over time, not just the preview —
+        // each poll re-pushes the current weather to the device. Weather changes
+        // slowly, so 10 min is plenty.
+        weatherTimer = setInterval(() => {
+            refreshWeatherPreview();
+            if (window.pywebview?.api?.push_weather) {
+                window.pywebview.api.push_weather();
+            }
+        }, 10 * 60 * 1000);
     }
 
     function stopWeatherPolling() {
@@ -405,6 +412,11 @@ document.addEventListener("DOMContentLoaded", () => {
     bindCardSelection("widget-card-weather", "weather");
     bindCardSelection("widget-card-notif-manual", "notif-manual");
     bindCardSelection("widget-card-notif-mirror", "notif-mirror");
+
+    // R18 item 1: populate the weather card on load — no click required.
+    // (Preview only; pushing to the device still happens when weather is the
+    // selected widget, per the one-active-widget model.)
+    refreshWeatherPreview();
 
     const sysmonLive = document.getElementById("sysmon-live");
     if (sysmonLive) {

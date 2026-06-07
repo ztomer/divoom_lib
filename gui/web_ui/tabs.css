@@ -27,6 +27,10 @@
   background: rgba(255, 255, 255, 0.04);
   border-radius: 6px;
   /* No outer border — the active pill's bg is the focus indicator. */
+  /* R18 item b: the pill bar hugs its tabs instead of stretching to the
+     window's right edge. */
+  width: fit-content;
+  max-width: 100%;
 }
 
 .tabs-row .tab-btn {

@@ -161,6 +161,16 @@ def fetch_stock_ticker(symbol: str) -> dict | None:
     return None
 
 
+def _tiny_font(px: int = 8):
+    """A small bitmap font so short tickers fit a 16px row. Pillow >= 10.1
+    supports a size on the built-in font; older Pillow falls back to the
+    (larger) fixed default."""
+    try:
+        return ImageFont.load_default(size=px)
+    except TypeError:
+        return ImageFont.load_default()
+
+
 def render_stock_ticker_frame(symbol: str, data: dict, size: int = 16) -> Path:
     """
     Renders a neat visual stock ticker to fit Divoom grid dimensions (16x16 or 32x32).
@@ -178,30 +188,25 @@ def render_stock_ticker_frame(symbol: str, data: dict, size: int = 16) -> Path:
     text_color = (0, 255, 180) if is_up else (255, 60, 60) # Green vs Red
     
     if size == 16:
-        # Mini 16x16 layout
-        # Render a simple colored arrow and mini price
+        # Mini 16x16 layout (R18 item 4): small arrow at top so the ticker
+        # acronym gets a full-width row in a small font and isn't clipped.
         if is_up:
-            # Draw green up arrow
-            draw.polygon([(8, 2), (4, 7), (12, 7)], fill=text_color)
-            draw.rectangle([(6, 7), (10, 10)], fill=text_color)
+            draw.polygon([(8, 0), (5, 4), (11, 4)], fill=text_color)  # small up triangle
         else:
-            # Draw red down arrow
-            draw.polygon([(8, 10), (4, 5), (12, 5)], fill=text_color)
-            draw.rectangle([(6, 2), (10, 5)], fill=text_color)
-            
-        # Draw symbol/text in 1px outline
-        draw.text((1, 11), symbol[:3].upper(), fill=(255,255,255))
+            draw.polygon([(8, 4), (5, 0), (11, 0)], fill=text_color)  # small down triangle
+        # Ticker acronym across the lower rows in a small font.
+        draw.text((0, 6), symbol[:4].upper(), fill=(255, 255, 255), font=_tiny_font(8))
     else:
         # 32x32 layout allows typography
-        # Draw symbol name
-        draw.text((2, 2), symbol.upper()[:4], fill=(255, 255, 255))
-        # Draw arrow
+        # Draw symbol name (small font fits the full ticker)
+        draw.text((2, 2), symbol.upper()[:6], fill=(255, 255, 255), font=_tiny_font(10))
+        # Draw arrow (smaller than before)
         if is_up:
-            draw.polygon([(24, 6), (20, 12), (28, 12)], fill=text_color)
+            draw.polygon([(25, 4), (21, 10), (29, 10)], fill=text_color)
         else:
-            draw.polygon([(24, 12), (20, 6), (28, 6)], fill=text_color)
+            draw.polygon([(25, 10), (21, 4), (29, 4)], fill=text_color)
         # Draw price
-        draw.text((2, 14), f"${data['price']}", fill=text_color)
+        draw.text((2, 16), f"${data['price']}", fill=text_color, font=_tiny_font(10))
         
     img.save(out_path)
     return out_path
@@ -237,11 +242,12 @@ def render_system_stats_frame(stats: dict, size: int = 16) -> Path:
     draw = ImageDraw.Draw(img)
 
     def draw_gauge(x, y, w_max, h, value, color):
-        draw.rectangle([(x, y), (x + w_max - 1, y + h - 1)], outline=(40, 42, 54))
+        # R18 item 4: no gray track box behind the bar — just the coloured fill
+        # on the dark background (the empty grey rectangle read as unwanted
+        # "white/gray background" on the device).
         frac = max(0.0, min(1.0, value / 100.0))
-        w_fill = max(1, int(round((w_max - 2) * frac)))
-        if w_fill > 0:
-            draw.rectangle([(x + 1, y + 1), (x + w_fill, y + h - 2)], fill=color)
+        w_fill = max(1, int(round(w_max * frac)))
+        draw.rectangle([(x, y), (x + w_fill - 1, y + h - 1)], fill=color)
 
     cpu = stats.get("cpu", 0)
     mem = stats.get("mem", 0)

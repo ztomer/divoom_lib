@@ -184,7 +184,8 @@
 }
 
 .theme-buttons {
-  display: flex;
+  /* R18 item b: hug the three options instead of stretching full width. */
+  display: inline-flex;
   background: var(--input-bg);
   border: 1px solid var(--input-border);
   border-radius: 4px;
@@ -193,7 +194,7 @@
 }
 
 .theme-mode-btn {
-  flex: 1;
+  flex: 0 0 auto;
   background: transparent;
   border: none;
   color: var(--text-muted);

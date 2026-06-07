@@ -122,7 +122,16 @@ class WeatherInfo:
 
 
 def _resolve_location(explicit: Optional[str]) -> str:
-    """Pick the location string, applying env overrides."""
+    """Pick the location string, applying overrides in priority order:
+
+      1. explicit argument
+      2. DIVOOM_CONTROL_WEATHER_LAT / _LON
+      3. DIVOOM_CONTROL_WEATHER_LOCATION
+
+    With none set, returns "" — an empty location makes wttr.in **geolocate by
+    the caller's IP** (``https://wttr.in/?format=j1``), and the real city is read
+    back from the response's ``nearest_area``. This replaces the old hardcoded
+    "Berlin" default (which was wrong for everyone not in Berlin)."""
     if explicit:
         return explicit
     lat = os.environ.get("DIVOOM_CONTROL_WEATHER_LAT")
@@ -132,7 +141,7 @@ def _resolve_location(explicit: Optional[str]) -> str:
     env_loc = os.environ.get("DIVOOM_CONTROL_WEATHER_LOCATION")
     if env_loc:
         return env_loc
-    return DEFAULT_LOCATION
+    return ""  # let wttr.in geolocate by IP
 
 
 def _map_weather_code(code: int) -> int:

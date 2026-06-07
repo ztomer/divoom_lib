@@ -8,8 +8,8 @@ window.DivoomTemplates = {
              Settings. The legacy class names are aliased in settings.css
              for backward compat with the JS selectors. -->
         <div class="tabs-row" role="tablist" aria-label="Tools">
-            <button class="tab-btn active" data-tools-tab="tools-time" data-tab="tools-time" role="tab" aria-selected="true">Time</button>
-            <button class="tab-btn" data-tools-tab="tools-sessions" data-tab="tools-sessions" role="tab" aria-selected="false">Sessions</button>
+            <button class="tab-btn active" data-tools-tab="tools-time" data-tab="tools-time" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Time</button>
+            <button class="tab-btn" data-tools-tab="tools-sessions" data-tab="tools-sessions" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 9V6M6.5 2.5h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Sessions</button>
         </div>
         <!-- R11 item 8: TIME sub-tab — alarms + anniversary. -->
         <div class="tools-subtab-content active" id="tools-time">
@@ -392,11 +392,11 @@ window.DivoomTemplates = {
                      Tools. The legacy class names are aliased in settings.css
                      for backward compat with the JS selectors. -->
                 <div class="tabs-row" role="tablist" aria-label="Settings">
-                    <button class="tab-btn active" data-settings-tab="settings-devices" data-tab="settings-devices" role="tab" aria-selected="true">Devices</button>
-                    <button class="tab-btn" data-settings-tab="settings-divoom" data-tab="settings-divoom" role="tab" aria-selected="false">Divoom</button>
-                    <button class="tab-btn" data-settings-tab="settings-routines" data-tab="settings-routines" role="tab" aria-selected="false">Routines</button>
-                    <button class="tab-btn" data-settings-tab="settings-connectivity" data-tab="settings-connectivity" role="tab" aria-selected="false">Connectivity</button>
-                    <button class="tab-btn" data-settings-tab="settings-appearance" data-tab="settings-appearance" role="tab" aria-selected="false">Appearance</button>
+                    <button class="tab-btn active" data-settings-tab="settings-devices" data-tab="settings-devices" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Devices</button>
+                    <button class="tab-btn" data-settings-tab="settings-divoom" data-tab="settings-divoom" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 12h6a3 3 0 0 0 .4-6A4 4 0 0 0 4 7a3 3 0 0 0 1 5z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>Divoom</button>
+                    <button class="tab-btn" data-settings-tab="settings-routines" data-tab="settings-routines" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8a4.5 4.5 0 0 1 7.5-3.3M12.5 8a4.5 4.5 0 0 1-7.5 3.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 3v2H9M5 13v-2h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Routines</button>
+                    <button class="tab-btn" data-settings-tab="settings-connectivity" data-tab="settings-connectivity" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5a7 7 0 0 1 10 0M5.5 11a3.5 3.5 0 0 1 5 0" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="13" r="1" fill="currentColor"/></svg>Connectivity</button>
+                    <button class="tab-btn" data-settings-tab="settings-appearance" data-tab="settings-appearance" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>Appearance</button>
                 </div>
 
                 <!-- 1. DEVICES TAB -->

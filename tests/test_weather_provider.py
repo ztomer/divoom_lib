@@ -270,11 +270,12 @@ def test_resolve_location_uses_location_env_when_no_lat_lon() -> None:
 
 
 def test_resolve_location_default() -> None:
-    """No env, no argument → DEFAULT_LOCATION (Berlin)."""
+    """No env, no argument -> "" so wttr.in geolocates by the caller's IP
+    (replaces the old hardcoded Berlin default)."""
     import os
     for k in ("DIVOOM_CONTROL_WEATHER_LAT", "DIVOOM_CONTROL_WEATHER_LON", "DIVOOM_CONTROL_WEATHER_LOCATION"):
         os.environ.pop(k, None)
-    assert _resolve_location(None) == DEFAULT_LOCATION
+    assert _resolve_location(None) == ""
 
 
 # ── Sanity: WeatherProviderKind enum ──────────────────────────────────

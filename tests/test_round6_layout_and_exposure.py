@@ -152,8 +152,9 @@ def test_settings_has_routines_subtab():
     (R15 §1+§7: `.settings-tab-btn` is now `.tab-btn`.)"""
     src = TEMPLATES_JS.read_text()
     assert re.search(
-        r'<button class="tab-btn"[^>]*data-settings-tab="settings-routines"[^>]*>\s*Routines\s*</button>',
-        src,
+        r'<button class="tab-btn"[^>]*data-settings-tab="settings-routines"[^>]*>'
+        r'(?:\s*<svg.*?</svg>)?\s*Routines\s*</button>',
+        src, re.DOTALL,
     ), "Settings tab nav is missing the Routines sub-tab button."
 
 
@@ -593,6 +594,23 @@ def test_r11_wall_toolbar_unified():
     assert "save-preset-btn" in APP_JS.read_text()
 
 
+def test_r18_subtabs_have_icons_and_fit_content():
+    """R18 a/b: Tools + Settings sub-tab buttons carry a .tab-icon (consistency
+    with the channel row), and the pill row sizes to its content rather than the
+    full window width."""
+    src = TEMPLATES_JS.read_text()
+    for did in ("tools-time", "tools-sessions", "settings-devices",
+                "settings-divoom", "settings-routines", "settings-connectivity",
+                "settings-appearance"):
+        m = re.search(rf'data-(?:tools|settings)-tab="{did}"[^>]*>(.*?)</button>', src, re.DOTALL)
+        assert m and "tab-icon" in m.group(1), f"{did} tab button is missing a .tab-icon"
+    tabs_css = (REPO_ROOT / "gui" / "web_ui" / "tabs.css").read_text()
+    assert "fit-content" in tabs_css, ".tabs-row should size to content (item b)"
+    settings_css = (REPO_ROOT / "gui" / "web_ui" / "settings.css").read_text()
+    assert re.search(r"\.theme-buttons\s*\{[^}]*inline-flex", settings_css), \
+        "theme selector should size to content (item b)"
+
+
 # ──────────────────────────────────────────────────────────────────
 # 6. Playwright integration smoke (sanity check, optional)
 # ──────────────────────────────────────────────────────────────────
@@ -672,8 +690,9 @@ def test_r12_tools_subtab_uses_sessions_not_tools_inner_collision():
     # `role` / `aria-selected` attrs — the assertion uses a regex that matches
     # the new shape without locking in attribute order.)
     assert re.search(
-        r'<button[^>]*data-tools-tab="tools-sessions"[^>]*>\s*Sessions\s*</button>',
-        src,
+        r'<button[^>]*data-tools-tab="tools-sessions"[^>]*>'
+        r'(?:\s*<svg.*?</svg>)?\s*Sessions\s*</button>',
+        src, re.DOTALL,
     ), "Tools inner sub-tab is not 'Sessions' — it should be renamed to avoid the parent-tab / sub-tab 'Tools' collision."
     # The id of the inner sub-tab content block must match.
     assert 'id="tools-sessions"' in src, (
@@ -688,8 +707,9 @@ def test_r12_tools_subtab_uses_sessions_not_tools_inner_collision():
     # `role` / `aria-selected` attrs — the assertion uses a regex that
     # doesn't lock in attribute order.)
     assert re.search(
-        r'<button[^>]*data-tools-tab="tools-time"[^>]*>\s*Time\s*</button>',
-        src,
+        r'<button[^>]*data-tools-tab="tools-time"[^>]*>'
+        r'(?:\s*<svg.*?</svg>)?\s*Time\s*</button>',
+        src, re.DOTALL,
     ), "Tools Time sub-tab is missing — it should contain Alarms + Anniversary."
 
 
