@@ -68,9 +68,12 @@ core rule in `AGENTS.md`).
    Gates every "read from device". See `docs/DEVICE_VALIDATION_PLAN.md`.
 4. **Channel-switch hardware bug (Divoom Max):** first switch works, rest don't;
    not root-caused. All switches are `set light mode` (0x45) fire-and-forget.
-5. **Deferred features** (§D): Timeplan UI (semantics unverified); SD player /
-   game / drawing (lib→GUI exposure); auto-source real macOS notifications; the
-   200+ cloud HTTP endpoints (own round).
+5. **Deferred features** (§D): see `docs/PLANNING_ROUND12_D_AUDIT.md` — the
+   full audit. Verdict: 0 exposed, 0 dropped; all 5 stay in the lib with
+   rationale per feature. Timeplan UI blocked on unverified `mode`/`type`
+   semantics; SD player blocked on task #20; Game has no host UX; Drawing
+   needs a non-trivial UI per mode; Cloud HTTP is its own round (auth
+   broken).
 
 ## Hardware note
 

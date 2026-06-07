@@ -6,6 +6,33 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 12 §D — 2026-06-06 (deferred features audit)
+
+Full audit in **`docs/PLANNING_ROUND12_D_AUDIT.md`**. Verdict: 0 features
+exposed, 0 dropped. All 5 stay in the lib with rationale per feature:
+
+- **Timeplan** (0x56/0x57) — DEFER. Field semantics for `mode`/`trigger_mode`/
+  `type` are obfuscated ints in the decompiled APK with no third-party
+  documentation. `gui_api.set_timeplan` exists but is a guess; no UI card.
+  Lib stays wire-correct.
+- **SD card player** (0x06/0x07/0x0B/0x11/etc.) — DEFER. Requires `get_sd_music_list`
+  (0x07) response, which is a `get_*` read-back blocked by task #20.
+  Plus device-specific (only Tivoo Max / Ditoo / Timoo have SD slots).
+- **Game** (0xA0/0x88/0x17/0x21) — DEFER. No useful host UX on a single
+  device; the device has its own buttons. Control sets are device-specific.
+- **Drawing / sand / picture scan** (0x3A/0x3B/0x58/0x5A-0x5C/0x6B-0x6F/0x34/0x35)
+  — DEFER. Non-trivial UI per mode (freehand canvas, sand generator, scroll
+  preview). **`pic_scan_ctrl` (0x35) flagged UNVERIFIED** — no entry in
+  `SppProc$CMD_TYPE.java` (decompiled APK); single-line comment added in
+  `divoom_lib/display/drawing.py`.
+- **Cloud HTTP (200+ endpoints)** — DEFER (own round). Out of BLE scope;
+  auth broken (`UserNewGuest RC=10`); large surface (clock-face store,
+  weather city search, pomodoro, white-noise, TTS, …).
+
+No code changes this round beyond the audit doc + 1 comment.
+
+---
+
 ## Round 12 — 2026-06-06 (§A Phase 7 closeout: tools regroup + segmented-pill)
 
 Inner Tools sub-tab renamed to **Sessions** (resolves the Tools/Tools

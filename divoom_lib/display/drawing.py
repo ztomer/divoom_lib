@@ -421,6 +421,10 @@ class Drawing:
             await divoom.drawing.pic_scan_ctrl(0, mode=1, speed=100)
         """
         self.logger.info(f"Picture scan control: control={control} (0x35)...")
+        # R12 §D audit: 0x35 has NO entry in `SppProc$CMD_TYPE.java` (decompiled
+        # APK). The method claims to send command id 0x35 but the device's
+        # command table doesn't list it. Treat as UNVERIFIED until a real
+        # device acknowledges the call. See docs/PLANNING_ROUND12_D_AUDIT.md.
         args = [control]
 
         handler = self._psc_handlers.get(control)
