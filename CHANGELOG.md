@@ -23,20 +23,23 @@ and gained a headless daemon with a Unix-socket NDJSON protocol. See
   `gui/` → `divoom_gui/` (+ 19 test path-hacks); rewrote `pyproject.toml` to find
   all three packages with per-package data. Browser-verified via the Playwright
   DOM tests. Suite held 959 → 963 / 0.
-- **R17 P5 — single-owner cutover mechanism (device_call RPC)**: BLE is
-  single-owner, so the daemon becomes the sole device owner and the GUI proxies
-  device methods. **Daemon side**: generic `device_call` (dotted-method dispatch
-  + await + JSON-coerce), `connect`/`disconnect`/`device_status`, a dedicated
-  device asyncio loop surviving across calls. **GUI side** (`daemon_bridge.py`):
-  `ensure_daemon()` auto-spawns a detached daemon; `DaemonDeviceProxy` makes
-  `proxy.x.y(...)` issue a `device_call` so existing `_run_async(target.X.Y(...))`
-  call-sites work unchanged. +12 tests, suite → 975 / 0 / 75.
-- **R17 P5 — known blocker**: flipping `gui_api` itself is gated on migrating the
-  remaining BLE-owning subsystems (wall/multi-device, scanning+connect,
-  LAN/status internals) into the daemon — a partial flip would make two
-  processes contend for the connection. Plus runtime verification against the
-  live app + hardware. Mechanism is in place; the flip is scoped in
-  `PLANNING_ROUND17.md §outcome P5`.
+- **R17 P5 — full single-owner cutover**: BLE is single-owner, so the daemon is
+  now the sole device owner and the GUI is a thin client — **no BLE connection is
+  held in the GUI anywhere**. **Daemon**: `device_call` (dotted dispatch, target
+  device|wall), enriched `connect` (BLE+LAN+auto), `device_status`, `scan`,
+  `wall_configure` (idempotent), `probe_lan`, `sync_artwork` (download+decode+
+  resize+stream daemon-side, binary off the socket); a dedicated device asyncio
+  loop surviving across calls. **GUI**: `ensure_daemon()` auto-spawns a detached
+  daemon; `DaemonDeviceProxy` routes `proxy.x.y(...)` through `device_call` and
+  answers is_connected/lan/_conn from `device_status`, so `current_divoom`/
+  `wall_instance` become proxies and media_sync (live widgets) routes through the
+  daemon with no rewrite; scanner_mixin + gallery sync delegate to the daemon.
+  **Library**: `DivoomWall` gained switch_channel/push_text/set_brightness/
+  set_volume; `media_decoder` moved divoom_gui→divoom_lib. **After P5 the daemon
+  must run for the GUI to control the device** (auto-spawned). +14 tests; the 5
+  gui_api tests that mocked direct BLE were rewritten to the daemon-client model.
+  Suite → 980 / 0 / 75. **Not yet hardware-verified** — runtime drive + the
+  menubar→daemon-subscription cleanup are scoped in `PLANNING_ROUND17.md`.
 - **R18 — product fixes** (landed alongside): weather auto-fetch + device re-push
   + IP geolocation (no more hard-coded "Berlin"); system-monitor frame grey-box
   removal; smaller stock arrow + tiny stock-name font; Tools/Settings tab icons;

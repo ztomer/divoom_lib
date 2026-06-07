@@ -97,8 +97,43 @@ here. R16 P3/P4/P5 are folded into Phase 5/7 of this round.
   (`divoom_lib`/`divoom_daemon`/`divoom_gui`), ships the dylib with divoom_lib +
   web_ui with divoom_gui; `divoom-control` + `divoom-control daemon` entry points
   verified; all three packages import.
-- **P5 — IN PROGRESS. Mechanism shipped + tested; gui_api flip blocked on a
-  discovered constraint (decision pending).**
+- **P5 — SHIPPED (full cutover; user chose "do the full flip now").** The GUI
+  no longer holds a BLE connection anywhere; the daemon is the sole owner.
+  - `feat(R17-P5): daemon owns connect/scan/wall/LAN — full-cutover protocol`:
+    enriched `connect` (BLE+LAN+auto), `device_status` {connected,mac,lan_ip,wall},
+    `scan`, `wall_configure` + `device_call target="wall"`, `probe_lan`,
+    idempotent wall; matching `DaemonClient` methods.
+  - `feat(R17-P5): full GUI cutover — daemon is the sole BLE owner`:
+    * scanner_mixin → thin client (scan/connect(BLE+LAN)/wall-build via daemon;
+      `current_divoom`/`wall_instance` are `DaemonDeviceProxy` handles).
+    * gui_api → `_client()`/`ensure_daemon` (auto-spawn) + `_device_status()`;
+      transport-status / save_lan_config / probe_lan read daemon state, not
+      device internals; wall branches call single wall methods via the
+      target="wall" proxy (no `wall_instance.devices` iteration in the GUI).
+    * gallery `batch_sync_artwork` → daemon `sync_artwork` (download+decode+
+      resize+stream run daemon-side; binary never crosses the socket).
+    * `DaemonDeviceProxy` carries a target + answers `is_connected`/`lan`/`_conn`
+      from `device_status` so introspection call-sites work unchanged.
+    * `DivoomWall` gained `switch_channel`/`push_text`/`set_brightness`/
+      `set_volume`; `media_decoder` moved divoom_gui→divoom_lib (shared util).
+  - Tests: rewrote the 5 gui_api tests that mocked direct BLE → daemon-client
+    model; +4 daemon, +8 bridge, +2 wall tests. **Suite 980 / 0 / 75.**
+  - **media_sync (live widgets/cover-art) needs NO rewrite** — it drives the
+    device only through `current_divoom`/`wall_instance` (now proxies) with
+    path-based `show_image`, so it routes through the daemon automatically.
+  - **Remaining (post-cutover, needs the live app + hardware):**
+    1. **Runtime verification** — drive the real pywebview GUI against a live
+       daemon + a real device for every channel/tool/wall/gallery path. None of
+       the cutover is hardware-verified; it is unit-green only.
+    2. **Menubar still uses `gui_api._push_menubar_status`** (R15 §6) to push
+       notification status to the menubar's own socket. The daemon already owns
+       the notification monitor + broadcasts status events; the menubar should
+       *subscribe* to the daemon instead, and `_push_menubar_status` be removed.
+       Left working rather than ripped out blind.
+    3. **save_lan_config** no longer hot-attaches LAN to a live device; the saved
+       config applies on the next `connect_device(lan_ip=...)`. Verify acceptable.
+
+- (superseded) **P5 — mechanism only (pre-flip notes):**
   - **Daemon side SHIPPED** (`feat(R17-P5): daemon device_call RPC`): generic
     `device_call` ({method,args,kwargs} → dotted-method dispatch on the daemon's
     owned `Divoom`, awaited, JSON-coerced), `connect`/`disconnect`/`device_status`,

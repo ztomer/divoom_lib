@@ -15,27 +15,29 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **R17 P5 — cutover MECHANISM shipped + tested; gui_api flip blocked on a
-  discovered constraint (decision pending). Suite 975 / 0 / 75.**
-  - Daemon side (`feat(R17-P5): daemon device_call RPC`, commit `9cd76a73`):
-    generic `device_call` (dotted-method dispatch + await + JSON-coerce),
-    `connect`/`disconnect`/`device_status`, a dedicated device asyncio loop that
-    survives across calls. +4 tests (`tests/test_daemon_device_call.py`).
-  - GUI side (`feat(R17-P5): GUI daemon bridge`): `divoom_gui/daemon_bridge.py` —
-    `ensure_daemon()` auto-spawns a detached daemon if none is live;
-    `DaemonDeviceProxy` makes `proxy.x.y(...)` issue a `device_call` so existing
-    `_run_async(target.X.Y(...))` call-sites work unchanged once `target` is a
-    proxy. +8 tests (`tests/test_daemon_bridge.py`).
-  - **BLOCKER (why the flip isn't done):** BLE is single-owner — a *partial*
-    flip is unsafe (GUI + daemon would contend for the connection). Flipping
-    gui_api requires also moving its other BLE-owning subsystems into the daemon:
-    (1) **wall/multi-device** (`wall_instance` = a `DivoomWall` of several live
-    `Divoom`s; needs a daemon-owned wall + multi-device call protocol),
-    (2) **scanning+connect** (`scanner_mixin` → `client.connect(mac)` + a scan
-    RPC), (3) **LAN/status internals** (`current_divoom._conn.mac`/`.lan.device_ip`
-    /`._lan` in transport-status/lan-config → served by `device_status` fields).
-    Plus **runtime verification against the live pywebview app + real hardware**
-    (can't be unit-tested). Full scope in `PLANNING_ROUND17.md §outcome P5`.
+- **R17 P5 — FULL CUTOVER SHIPPED. The daemon is the sole BLE owner; the GUI is
+  a thin client. Suite 980 / 0 / 75.** (User chose "do the full flip now.")
+  - Daemon (`9cd76a73`, `abc83a20`, `8cb8e10e`): `device_call` (dotted dispatch,
+    target device|wall), enriched `connect` (BLE+LAN+auto), `device_status`
+    {connected,mac,lan_ip,wall}, `scan`, `wall_configure` (idempotent),
+    `probe_lan`, `sync_artwork` (download+decode+resize+stream daemon-side); a
+    dedicated device asyncio loop that survives across calls.
+  - GUI (`divoom_gui/daemon_bridge.py` + scanner_mixin + gui_api + gallery_sync):
+    `ensure_daemon()` auto-spawns a detached daemon; `DaemonDeviceProxy` routes
+    `proxy.x.y(...)` through `device_call` and answers is_connected/lan/_conn from
+    `device_status`. `current_divoom`/`wall_instance` are proxies — so media_sync
+    (live widgets) routes through the daemon with NO rewrite. No `Divoom(`/
+    `DivoomWall(` construction left in the GUI.
+  - Library: `DivoomWall` gained switch_channel/push_text/set_brightness/
+    set_volume; `media_decoder` moved divoom_gui→divoom_lib.
+  - **AFTER P5 the daemon MUST be running for the GUI to control the device**
+    (the GUI auto-spawns it via `divoom-control daemon`).
+  - **Remaining (needs the live app + hardware — NOT verified, unit-green only):**
+    (1) runtime-drive every GUI path against a real device; (2) menubar still
+    uses `gui_api._push_menubar_status` → should subscribe to the daemon's status
+    stream instead (the daemon already owns the monitor + broadcasts); (3)
+    save_lan_config no longer hot-attaches LAN to a live device (applies on next
+    connect). See `PLANNING_ROUND17.md §outcome P5`.
 
 - **R18 — live-widgets + tabs fixes SHIPPED** (user feedback). Weather card
   auto-populates on load; weather location now IP-geolocated via wttr.in (no more
