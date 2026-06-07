@@ -418,9 +418,63 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         return self._tool_call(lambda d: DeviceSettings(d).set_low_power_switch(1 if self._as_bool(on) else 0), "low power")
 
     def push_weather(self) -> bool:
-        """Push current weather to the device's weather widget."""
-        from divoom_lib.system.temp_weather import TempWeatherCommand
-        return self._tool_call(lambda d: TempWeatherCommand(d).update_temp_weather(), "weather")
+        """Push current weather to the device's weather widget.
+
+        R15 §3: pulls live weather from the configured provider, then
+        writes the resulting temperature + icon to the device via
+        ``divoom.weather.set``. The legacy TempWeatherCommand shim is
+        no longer used in this path — the new Weather class is the
+        canonical source of truth (R14 §1)."""
+        from divoom_lib.system.weather import Weather
+        from divoom_lib.weather_provider import get_weather
+
+        async def _push(d):
+            info = await get_weather()
+            return await Weather(d).set(info.temperature_c, info.weather_type)
+
+        return self._tool_call(_push, "weather")
+
+    def get_weather(self) -> dict:
+        """Return the current weather as a dict for the Live Widgets
+        card to render. Shape::
+
+            {
+                "temperature_c": int,
+                "weather_type": int,    # divoom WeatherType enum value
+                "location": str,
+                "provider": str,        # "wttr_in" | "stub"
+                "fetched_at": float,    # unix epoch seconds
+            }
+
+        Never raises — falls back to StubProvider on any error.
+        Uses a private event loop because the GUI's loop thread is
+        for device-bound work; weather fetches don't need a device."""
+        from divoom_lib.weather_provider import get_weather
+        from divoom_lib.models import WeatherType
+        import asyncio
+
+        async def _gather():
+            info = await get_weather()
+            return {
+                "temperature_c": info.temperature_c,
+                "weather_type": info.weather_type,
+                "location": info.location,
+                "provider": info.provider,
+                "fetched_at": info.fetched_at,
+            }
+
+        try:
+            return asyncio.run(_gather())
+        except Exception as exc:  # last-ditch: never break the UI
+            logger.warning("get_weather failed: %s", exc)
+            return {
+                "temperature_c": 0,
+                "weather_type": int(WeatherType.Clear),
+                "location": "error",
+                "provider": "stub",
+                "fetched_at": 0.0,
+                "error": str(exc),
+            }
 
     def set_fm_frequency(self, freq_x10: int) -> bool:
         """Tune the FM radio. freq_x10 = MHz×10 (e.g. 875 = 87.5 MHz)."""

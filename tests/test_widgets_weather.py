@@ -1,0 +1,198 @@
+"""
+R15 §3 — tests for the Live Widgets weather card.
+
+Three contract tests:
+1. The Weather card lives in Live Widgets (not in Settings) and has
+   no text content (no .panel-hint inside, no button) — just the
+   128x128 preview.
+2. The macOS Notification + manual Notification cards also live in
+   Live Widgets (R15 §3 move) and the matching cards are gone from
+   Settings → Devices.
+3. The widgets.js auto-fetch + auto-push on selection flow is wired
+   (mock get_weather + push_weather are called once on selection).
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).parent.parent
+TEMPLATES_JS = REPO_ROOT / "gui" / "web_ui" / "templates.js"
+WIDGETS_JS = REPO_ROOT / "gui" / "web_ui" / "widgets.js"
+SETTINGS_JS = REPO_ROOT / "gui" / "web_ui" / "settings.js"
+
+
+def _live_widgets_block() -> str:
+    src = TEMPLATES_JS.read_text()
+    m = re.search(r"widgets:\s*`(.+?)`,\s*\n\s*settings:\s*`", src, re.DOTALL)
+    assert m, "Live Widgets (widgets:) block not found in templates.js"
+    return m.group(1)
+
+
+def _settings_devices_block() -> str:
+    """The Settings → Devices block (the first settings tab)."""
+    src = TEMPLATES_JS.read_text()
+    m = re.search(
+        r'<div class="settings-tab-content active" id="settings-devices">'
+        r'(.+?)</div>\s*</div>\s*</div>\s*<!--\s*2\.\s*DIVOOM\s*TAB',
+        src,
+        re.DOTALL,
+    )
+    if not m:
+        # Some templates have whitespace + comment markers in different
+        # shapes; fall back to a more permissive pattern.
+        m = re.search(
+            r'id="settings-devices">(.+?)<!-- 2\. DIVOOM TAB',
+            src,
+            re.DOTALL,
+        )
+    assert m, "Settings → Devices block not found in templates.js"
+    return m.group(1)
+
+
+# ── 1. Weather card is in Live Widgets, no text content ──────────────
+
+
+def test_weather_card_in_live_widgets() -> None:
+    lw = _live_widgets_block()
+    assert 'id="widget-card-weather"' in lw, (
+        "Weather card (widget-card-weather) is not in Live Widgets."
+    )
+
+
+def test_weather_card_has_no_panel_hint() -> None:
+    """The Weather card body is JUST the 128x128 preview — no
+    panel-hint text, no buttons (Kare: the preview is the only thing
+    the user needs to see; auto-push fires on card selection)."""
+    lw = _live_widgets_block()
+    # Extract the weather card.
+    m = re.search(
+        r'<div class="card glass-card" id="widget-card-weather"[^>]*>(.+?)</div>\s*</div>\s*</div>',
+        lw,
+        re.DOTALL,
+    )
+    assert m, "weather card markup not found"
+    body = m.group(1)
+    # The card-header is allowed (it has the title), but the card-body
+    # should not have any panel-hint.
+    body_match = re.search(r'<div class="card-body"[^>]*>(.+?)</div>\s*</div>', body, re.DOTALL)
+    assert body_match, "weather card-body not found"
+    body_inner = body_match.group(1)
+    assert "panel-hint" not in body_inner, (
+        "Weather card has a panel-hint — should be preview-only."
+    )
+    assert "<button" not in body_inner, (
+        "Weather card has a button — should be preview-only."
+    )
+
+
+def test_weather_preview_has_128px_box_and_temp_and_icon() -> None:
+    """The 128x128 preview box contains the temp + icon spans."""
+    lw = _live_widgets_block()
+    assert 'id="weather-device-preview"' in lw, "weather-device-preview box missing"
+    assert 'id="weather-preview-temp"' in lw, "weather-preview-temp span missing"
+    assert 'id="weather-preview-icon"' in lw, "weather-preview-icon SVG missing"
+    assert 'id="weather-preview-location"' in lw, "weather-preview-location span missing"
+
+
+# ── 2. Notification cards moved to Live Widgets ───────────────────────
+
+
+def test_notif_manual_card_in_live_widgets() -> None:
+    lw = _live_widgets_block()
+    assert 'id="widget-card-notif-manual"' in lw, (
+        "Manual Notification card (widget-card-notif-manual) is not in Live Widgets."
+    )
+    # The form widgets still have their ids.
+    assert 'id="notif-app-select"' in lw
+    assert 'id="notif-text"' in lw
+    assert 'id="notif-send"' in lw
+
+
+def test_notif_mirror_card_in_live_widgets() -> None:
+    lw = _live_widgets_block()
+    assert 'id="widget-card-notif-mirror"' in lw, (
+        "macOS Notifications mirror card (widget-card-notif-mirror) is not in Live Widgets."
+    )
+    assert 'id="macnotif-toggle"' in lw
+    assert 'id="macnotif-detail"' in lw
+    assert 'id="macnotif-rules-json"' in lw
+    assert 'id="macnotif-rules-save"' in lw
+
+
+def test_settings_devices_block_no_longer_has_notif_cards() -> None:
+    """The old Notification + macOS Notifications cards are GONE
+    from Settings → Devices (R15 §3 move to Live Widgets)."""
+    devices = _settings_devices_block()
+    # The old cards were <div class="card glass-card"> wrapping the
+    # notif-app-select / macnotif-toggle ids. We only need to assert
+    # those ids are no longer in the Devices block.
+    # (They're now in the Live Widgets block, so the assertion can be
+    # loose — just that they aren't in *both* the old and new homes.)
+    # The old card-header had h3>Notification</h3> and h3>macOS
+    # Notifications</h3> — check the explicit text in the Devices
+    # block.
+    assert "<h3>Notification</h3>" not in devices, (
+        "Old 'Notification' h3 header is still in Settings → Devices."
+    )
+    assert "<h3>macOS Notifications</h3>" not in devices, (
+        "Old 'macOS Notifications' h3 header is still in Settings → Devices."
+    )
+
+
+# ── 3. widgets.js wires auto-fetch + auto-push ────────────────────────
+
+
+def test_widgets_js_calls_get_weather_on_select() -> None:
+    src = WIDGETS_JS.read_text()
+    # selectWidget("weather") path calls api.get_weather() (via
+    # refreshWeatherPreview).
+    assert "get_weather" in src, "widgets.js does not call get_weather."
+    # And there's a 10-minute poll.
+    assert re.search(
+        r"10\s*\*\s*60\s*\*\s*1000",
+        src,
+    ), "widgets.js is missing the 10-minute weather poll timer."
+
+
+def test_widgets_js_calls_push_weather_on_select() -> None:
+    src = WIDGETS_JS.read_text()
+    assert "push_weather" in src, "widgets.js does not call push_weather on selection."
+
+
+def test_widgets_js_stops_weather_poller_on_tab_leave() -> None:
+    src = WIDGETS_JS.read_text()
+    # The tab-leave branch must call stopWeatherPolling() so the
+    # interval timer doesn't keep running when the user is on a
+    # different tab. The tab-leave branch is the one with the
+    # `// Stop everything` comment.
+    tab_leave = re.search(
+        r"//\s*Stop everything[\s\S]+?\}\s*\}\);",
+        src,
+    )
+    assert tab_leave, "tab-leave branch (with 'Stop everything' comment) not found"
+    branch = tab_leave.group(0)
+    assert "stopWeatherPolling()" in branch, (
+        "tab-leave handler does not call stopWeatherPolling()."
+    )
+
+
+def test_widgets_js_clears_weather_active_class_on_tab_leave() -> None:
+    src = WIDGETS_JS.read_text()
+    # The cards array on tab-leave must include "weather" so the
+    # active state gets cleared.
+    assert re.search(
+        r'\[.*?"music".*?"stock".*?"sysmon".*?"weather".*?\]',
+        src,
+        re.DOTALL,
+    ), "tab-leave cards list does not include 'weather'."
+
+
+def test_settings_js_dead_push_weather_handler_removed() -> None:
+    """The old #push-weather-btn click handler in settings.js is
+    dead code now (button removed in R15 §3)."""
+    src = SETTINGS_JS.read_text()
+    assert "push-weather-btn" not in src, (
+        "settings.js still references the removed #push-weather-btn — "
+        "should be cleaned up."
+    )

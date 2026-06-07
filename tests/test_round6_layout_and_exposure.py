@@ -758,15 +758,24 @@ def test_r12_anniversary_moved_into_time_subtab():
 
 
 def test_r12_weather_moved_into_live_widgets():
-    """The Weather card now lives in Live Widgets, not in the Tools tab."""
+    """The Weather card now lives in Live Widgets, not in the Tools tab.
+    R15 §3: the card uses the 128x128 preview (#weather-device-preview)
+    — the old push-weather-btn was removed and replaced with an
+    auto-push on card selection."""
     src = TEMPLATES_JS.read_text()
     # Live Widgets template block: between widgets: ` and settings: `.
     lw = re.search(r"widgets:\s*`(.+?)`,\s*\n\s*settings:\s*`", src, re.DOTALL)
     assert lw is not None, "Live Widgets (widgets:) block not found in templates.js"
     lw_block = lw.group(1)
-    assert 'id="push-weather-btn"' in lw_block, (
-        "Weather card (push-weather-btn) is missing from Live Widgets — "
-        "should be there after the R12 regroup."
+    assert 'id="widget-card-weather"' in lw_block, (
+        "Weather card (widget-card-weather) is missing from Live Widgets."
+    )
+    assert 'id="weather-device-preview"' in lw_block, (
+        "Weather preview box (#weather-device-preview) is missing from Live Widgets."
+    )
+    # The old push-weather-btn is GONE.
+    assert 'id="push-weather-btn"' not in lw_block, (
+        "Old push-weather-btn is still in Live Widgets — should be removed in R15 §3."
     )
     # Weather MUST NOT still be in the Tools tab.
     tools = re.search(r"tools:\s*`(.+?)`,\s*\n\s*widgets:\s*`", src, re.DOTALL)

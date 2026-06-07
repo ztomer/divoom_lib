@@ -511,8 +511,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (e.target.closest("#auto-off-save")) {
             const m = parseInt(document.getElementById("auto-off-min")?.value) || 0;
             if (dev()) api()?.set_auto_power_off?.(m).then(r => toast(r, m ? `Auto-off ${m}min` : "Auto-off disabled"));
-        } else if (e.target.closest("#push-weather-btn")) {
-            if (dev()) api()?.push_weather?.().then(r => toast(r, "Weather pushed"));
         } else if (e.target.closest("#memorial-save")) {
             if (!dev()) return;
             const enabled = document.getElementById("memorial-enabled")?.checked;

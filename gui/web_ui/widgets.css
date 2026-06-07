@@ -496,3 +496,29 @@ input:checked + .slider-round:before {
     border: none;
     border-radius: 6px;
 }
+
+/* ── R15 §3: Weather preview (icon + temperature) ──
+ *
+ * The .device-preview-wrap is the 128×128 dark box. We layer:
+ *   - the SVG icon (32×32, centered) for the weather type
+ *   - the temperature (pixel-art 7-segment style, top-right corner)
+ * Both are absolutely positioned inside the box; the box itself is
+ * flex-centered so the icon stays put if the temperature is long.
+ */
+.weather-preview-icon {
+    width: 64px;
+    height: 64px;
+    color: var(--text-main);
+    flex-shrink: 0;
+}
+.weather-preview-temp {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
+    pointer-events: none;
+}

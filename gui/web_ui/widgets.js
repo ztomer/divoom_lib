@@ -244,19 +244,71 @@ document.addEventListener("DOMContentLoaded", () => {
     //  declaration at line ~284 already attaches the handler.)
 
     let selectedWidget = "music"; // Default selected widget is cover art
+    let weatherTimer = null;  // R15 §3: 10-minute poll for the weather card
+
+    // R15 §3: weather card icon SVGs (one per WeatherType). Inline so the
+    // preview doesn't depend on an external sprite.
+    const WEATHER_ICON_SVG = {
+        1: '<circle cx="8" cy="8" r="3" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="8" y1="1" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="15"/><line x1="1" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="15" y2="8"/><line x1="3" y1="3" x2="4.5" y2="4.5"/><line x1="11.5" y1="11.5" x2="13" y2="13"/><line x1="3" y1="13" x2="4.5" y2="11.5"/><line x1="11.5" y1="4.5" x2="13" y2="3"/></g>', // Clear (sun)
+        3: '<path d="M3,12 C1.5,12 0.5,10.5 0.5,9 C0.5,7.5 1.5,6 3,6 C3.5,4 5.5,3 8,3 C11,3 13.5,5.5 13.5,8.5 C13.5,10.5 12,12 10,12 Z" fill="none" stroke="currentColor" stroke-width="1.5"/>', // CloudySky
+        5: '<path d="M3,11 C1.5,11 0.5,9.5 0.5,8 C0.5,6.5 1.5,5 3,5 C3.5,3 5.5,2 8,2 C11,2 13.5,4.5 13.5,7.5 C13.5,9.5 12,11 10,11 Z" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="4" y1="13" x2="6" y2="15" stroke="currentColor" stroke-width="1.2"/><line x1="12" y1="13" x2="10" y2="15" stroke="currentColor" stroke-width="1.2"/>', // Thunderstorm
+        6: '<path d="M3,9 C1.5,9 0.5,7.5 0.5,6 C0.5,4.5 1.5,3 3,3 C3.5,1 5.5,0 8,0 C11,0 13.5,2.5 13.5,5.5 C13.5,7.5 12,9 10,9 Z" fill="none" stroke="currentColor" stroke-width="1.2"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="4" y1="11" x2="3" y2="13"/><line x1="8" y1="11" x2="7" y2="13"/><line x1="12" y1="11" x2="11" y2="13"/></g>', // Rain (drops)
+        8: '<g fill="currentColor"><circle cx="5" cy="3" r="0.8"/><circle cx="9" cy="3" r="0.8"/><circle cx="13" cy="3" r="0.8"/><circle cx="3" cy="6" r="0.8"/><circle cx="7" cy="6" r="0.8"/><circle cx="11" cy="6" r="0.8"/><circle cx="15" cy="6" r="0.8"/><circle cx="5" cy="9" r="0.8"/><circle cx="9" cy="9" r="0.8"/><circle cx="13" cy="9" r="0.8"/></g>', // Snow (dots)
+        9: '<g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="2" y1="6" x2="14" y2="6"/><line x1="2" y1="9" x2="14" y2="9"/><line x1="2" y1="12" x2="14" y2="12"/></g>', // Fog (lines)
+    };
+
+    function renderWeatherPreview(info) {
+        const tempEl = document.getElementById("weather-preview-temp");
+        const iconEl = document.getElementById("weather-preview-icon");
+        const locEl = document.getElementById("weather-preview-location");
+        if (tempEl) tempEl.textContent = `${info.temperature_c}°`;
+        if (iconEl) {
+            const svg = WEATHER_ICON_SVG[info.weather_type] || WEATHER_ICON_SVG[1];
+            iconEl.innerHTML = svg;
+        }
+        if (locEl) {
+            // Truncate long location strings to keep the card tidy.
+            const loc = info.location || "--";
+            const short = loc.length > 28 ? `${loc.slice(0, 25)}…` : loc;
+            locEl.textContent = short;
+        }
+    }
+
+    function refreshWeatherPreview() {
+        if (!window.pywebview || !window.pywebview.api) return;
+        const api = window.pywebview.api;
+        if (typeof api.get_weather !== "function") return;
+        Promise.resolve(api.get_weather()).then(info => {
+            if (info && typeof info === "object") renderWeatherPreview(info);
+        });
+    }
+
+    function startWeatherPolling() {
+        if (weatherTimer) return;
+        refreshWeatherPreview();
+        // R15 §3: weather changes slowly — 10 min is plenty.
+        weatherTimer = setInterval(refreshWeatherPreview, 10 * 60 * 1000);
+    }
+
+    function stopWeatherPolling() {
+        if (weatherTimer) {
+            clearInterval(weatherTimer);
+            weatherTimer = null;
+        }
+    }
 
     function selectWidget(widgetId) {
         selectedWidget = widgetId;
-        
+
         // Update visual card states
-        const cards = ["music", "stock", "sysmon"];
+        const cards = ["music", "stock", "sysmon", "weather", "notif-manual", "notif-mirror"];
         cards.forEach(id => {
             const cardEl = document.getElementById(`widget-card-${id}`);
             if (cardEl) {
                 cardEl.classList.toggle("widget-active", id === widgetId);
             }
         });
-        
+
         // Trigger background sync toggles
         syncActiveWidget();
     }
@@ -309,6 +361,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 sysmonTimer = null;
             }
         }
+
+        // 4. Weather (R15 §3): auto-fetch + auto-push on selection; 10-min
+        // poll for slow-changing weather. push_weather writes the live
+        // temperature + icon to the device's built-in weather channel.
+        const startWeather = isTabActive && (selectedWidget === "weather");
+        if (startWeather) {
+            startWeatherPolling();
+            if (typeof window.pywebview.api.push_weather === "function") {
+                window.pywebview.api.push_weather();
+            }
+        } else {
+            stopWeatherPolling();
+        }
+
+        // 5. Notification cards (R15 §3): pure visual selection — no
+        // auto-push, no poller. The form widgets retain their existing
+        // click handlers (Send button, toggle, JSON Save).
+        // Nothing to do here — the active class is already toggled in
+        // selectWidget().
     }
 
     function bindCardSelection(cardId, widgetName) {
@@ -330,6 +401,10 @@ document.addEventListener("DOMContentLoaded", () => {
     bindCardSelection("widget-card-music", "music");
     bindCardSelection("widget-card-stock", "stock");
     bindCardSelection("widget-card-sysmon", "sysmon");
+    // R15 §3: new cards in the Live Widgets grid.
+    bindCardSelection("widget-card-weather", "weather");
+    bindCardSelection("widget-card-notif-manual", "notif-manual");
+    bindCardSelection("widget-card-notif-mirror", "notif-mirror");
 
     const sysmonLive = document.getElementById("sysmon-live");
     if (sysmonLive) {
@@ -367,7 +442,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 clearInterval(stockTimer);
                 stockTimer = null;
             }
-            ["music", "stock", "sysmon"].forEach(id => {
+            // R15 §3: weather poller also stops on tab-leave.
+            stopWeatherPolling();
+            ["music", "stock", "sysmon", "weather", "notif-manual", "notif-mirror"].forEach(id => {
                 const cardEl = document.getElementById(`widget-card-${id}`);
                 if (cardEl) cardEl.classList.remove("widget-active");
             });
