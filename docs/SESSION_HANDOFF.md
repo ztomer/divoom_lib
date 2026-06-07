@@ -31,9 +31,13 @@ core rule in `AGENTS.md`).
   `docs/ENGINEERING_NOTES.md` (linked from AGENTS.md); stale state pruned; **§C**
   shipped — framing dual-impl correctness test, which caught + fixed two real
   Python-fallback crashes (list→memoryview in `encode_basic_payload` escape +
-  `encode_ios_le_payload`). Suite **666 passed / 0 failed**. Next: §A Phase 2
-  (quick GUI wins) — sticky push footer, ambient color visibility + drop
-  "Custom", scoreboard reset.
+  `encode_ios_le_payload`). **§A Phase 2** shipped (sticky custom-art push footer,
+  ambient color gating + drop "Custom", scoreboard Reset). **§A Phase 3** shipped
+  (appbar: corner transports, right-aligned sliders, slider drag-fix, unified
+  value font, brightness-mapped thumb). Suite **670 passed / 0 failed**.
+  **⏳ Phase 2 + 3 UI want a visual pass (run `python3 gui/gui_main.py`).**
+  Next: §A Phases 4–7 (scoreboard restyle, wall toolbar icons+labels, font sweep,
+  tools regroup + unified segmented-pill tabs) → §D → §E (handoff + push arc).
 - **Earlier:** R10 ANCS notifications; R9 screen orientation + factory reset
   (0xBD EXT); R8 device settings/FM/weather/memorial + Tools sub-tabs; R7 surfaced
   text/alarms/sleep/tools. See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
