@@ -6,6 +6,41 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 13 — 2026-06-06 (capability detection + examples/CLI + macOS notifications)
+
+Three deliverables, all on the kill-criterion-aware path. See
+`docs/PLANNING_ROUND13.md` for the full plan.
+
+- **§1 — Capability detection** (`167a1019`): hardware-derived identifier
+  hierarchy. `Divoom.capabilities` property consults explicit
+  `device_type` → MAC `DeviceRegistry` (`~/.config/divoom-control/devices.json`)
+  → `manufacturer_data` fingerprint → baseline. **`screensize` renamed to
+  `panel_resolution`** (per-panel pixels, not wall composite — the new
+  `wall_resolution()` helper in `divoom_lib/wall.py` makes the distinction
+  explicit). `ADVERTISED_FINGERPRINTS` table starts empty; populate as the
+  user identifies new devices. **CI fix**: `tests/test_live_widgets_diagnostic.py`
+  now `pytest.importorskip`s playwright instead of `sys.exit(2)` at import
+  time (which was crashing the entire pytest run). +33 tests.
+- **§2 — `examples/` + `divoom-control` CLI** (`16cb8b8`): 6 example
+  scripts (`discover_and_connect`, `push_static_image`, `push_animated_gif`,
+  `set_radio`, `set_alarm`, `auto_connect`) + 10-subcommand CLI with shared
+  parent-parser options (`--mac`, `--type`, `--timeout`, `--json`, `-v`).
+  Shell wrapper at `./divoom-control` (symlink into `$PATH`). **Weather
+  example deferred** — `TempWeatherCommand` (0x5F) isn't wired to the
+  Divoom facade. **`pyproject.toml` deferred** — repo has no packaging
+  file today; adding one is a separate kind of change. +22 tests.
+- **§3 — macOS notification mirroring** (pending commit): polls the
+  macOS Notification Center SQLite DB (the same approach used by
+  `mac-notification-forwarder`, Hammerspoon, etc. — Apple's public
+  notification API only fires for *our own* app's notifications; DB-poll
+  bypasses TCC). `MacAppRouter` with 14 default rules. `gui_api` integration
+  uses fire-and-forget `_schedule_async` so the polling thread never blocks
+  on BLE. **GUI Settings card deferred to R14**. Setup guide in
+  `docs/NOTIFICATIONS_SETUP.md`. +23 tests.
+
+**Suite:** 755 passed / 0 failed / 74 skipped (up from R12's 677).
+Zero regressions across R8→R13.
+
 ## Round 12 §D — 2026-06-06 (deferred features audit)
 
 Full audit in **`docs/PLANNING_ROUND12_D_AUDIT.md`**. Verdict: 0 features

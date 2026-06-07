@@ -103,6 +103,12 @@ own switch.
   verifies the help text is sensible; mock the device layer for any
   command that hits a device.
 
+### Status
+
+- [x] **`examples/`** shipped — 6 working scripts (weather deferred, see below).
+- [x] **`divoom_lib/cli.py`** shipped — 10 subcommands, 22 tests, all green.
+- [x] **Shell wrapper** shipped — `./divoom-control` calls `python -m divoom_lib.cli`.
+
 ## §3 — macOS auto-source notifications (FEATURE)
 
 **Why last:** highest risk (TCC permission model), highest reward (real
@@ -147,6 +153,31 @@ user-visible feature; closes R10/R12 §D deferral).
   manual end-to-end check). The class should expose
   `_map_app_name(name) -> int` as a testable static.
 - Mock the `pyobjc`/`pync` boundary so tests don't need macOS notifications.
+
+### Status
+
+- [x] **`gui/macos_notifications.py`** shipped — `MacNotificationMonitor`
+  (1Hz polling), `MacAppRouter` (substring routing, 14 default rules),
+  `parse_notification_record`, `find_notification_db_path`. Tradeoffs
+  documented in `docs/NOTIFICATIONS_SETUP.md`.
+- [x] **`gui_api` integration** shipped — `_notification_sink`,
+  `_send_notification_async`, `start_notification_listener`,
+  `stop_notification_listener`, `is_notification_listener_running`.
+  Uses fire-and-forget `_schedule_async` so the polling thread never
+  blocks on BLE.
+- [x] **Tests** shipped — `tests/test_macos_notifications.py` (18 tests
+  with mocked SQLite + injectable time source) + 5 R13 tests in
+  `tests/test_gui_api.py` (mocked `MacNotificationMonitor`).
+- [x] **Docs** shipped — `docs/NOTIFICATIONS_SETUP.md` (setup,
+  permissions, custom routing JSON, manual test checklist).
+- [ ] **GUI Settings card** — "Mirror macOS notifications" toggle +
+  per-app checkboxes in Settings → Devices. **DEFERRED to R14** —
+  the lib + tests are the high-value part of §3; the GUI toggle is a
+  30-line `templates.js` + `settings.js` follow-up that depends on
+  visual layout decisions (where in the Devices card, what colour the
+  on/off pill uses, etc.). Until then, the listener can be started
+  via `api.start_notification_listener()` from a devtools console or
+  scheduled via `launchd`.
 
 ## Order of execution
 

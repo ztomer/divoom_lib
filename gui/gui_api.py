@@ -3,6 +3,7 @@
 import json
 import logging
 import asyncio
+import sys
 import webview
 import threading
 import time
@@ -76,6 +77,12 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def _run_async(self, coro):
         future = asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
         return future.result()
+
+    def _schedule_async(self, coro) -> None:
+        """Fire-and-forget: schedule ``coro`` on the main asyncio loop
+        without blocking the caller. Used by the macOS notification
+        monitor's polling thread (which must not block on BLE)."""
+        asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
 
     def get_transport_status(self) -> str:
         """Return live status of all four transport layers as JSON."""
@@ -470,6 +477,73 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
                 "notification")
         return self._tool_call(
             lambda d: d.notification.show_notification(t), "notification")
+
+    # ── Round 13 §3: macOS notification mirroring ────────────────────────
+    # The monitor runs in a daemon thread that polls the macOS Notification
+    # Center SQLite DB. The sink callback (called on the polling thread)
+    # schedules the BLE send on the main asyncio loop via _schedule_async
+    # so the polling thread never blocks on BLE roundtrips.
+
+    def _notification_monitor(self):
+        """Lazy accessor for the macOS monitor singleton. Imports
+        ``gui.macos_notifications`` lazily so non-macOS hosts don't
+        fail to import this module."""
+        if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:
+            from gui.macos_notifications import MacAppRouter, MacNotificationMonitor
+            router = MacAppRouter()
+            self._mac_monitor = MacNotificationMonitor(router=router, poll_interval=1.0)
+        return self._mac_monitor
+
+    def _notification_sink(self, app_type: int, title: str, body: str) -> None:
+        """Sink for the monitor. Truncates to a single line of text and
+        schedules a fire-and-forget BLE send."""
+        text = (title or body or "").strip().splitlines()[0] if (title or body) else ""
+        self._schedule_async(self._send_notification_async(app_type, text))
+
+    async def _send_notification_async(self, app_type: int, text: str) -> None:
+        """Coroutines run on the main loop. Logs + sends; ignores failures
+        (we'd rather drop a notification than back up the polling thread)."""
+        d = self.current_divoom
+        if d is None or not d.is_connected:
+            return
+        try:
+            if text:
+                await d.notification.show_notification_text(int(app_type), text)
+            else:
+                await d.notification.show_notification(int(app_type))
+        except Exception as e:
+            logger.debug(f"_send_notification_async: {e}")
+
+    def start_notification_listener(self) -> dict:
+        """Start polling the macOS Notification Center DB. Returns a
+        status dict for the JS side (``{running, db_path, error?}``).
+        Safe to call multiple times; no-op if already running."""
+        if sys.platform != "darwin":
+            return {"running": False, "error": "macOS only"}
+        try:
+            monitor = self._notification_monitor()
+            if monitor.is_running:
+                return {"running": True, "db_path": str(monitor.db_path)}
+            monitor.start(sink=self._notification_sink)
+            return {"running": True, "db_path": str(monitor.db_path)}
+        except FileNotFoundError as e:
+            logger.warning(f"start_notification_listener: {e}")
+            return {"running": False, "error": str(e)}
+        except Exception as e:
+            logger.exception(f"start_notification_listener: {e}")
+            return {"running": False, "error": str(e)}
+
+    def stop_notification_listener(self) -> dict:
+        """Stop the polling thread. No-op if not running."""
+        if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:
+            return {"running": False}
+        self._mac_monitor.stop()
+        return {"running": False}
+
+    def is_notification_listener_running(self) -> bool:
+        if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:
+            return False
+        return self._mac_monitor.is_running
 
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")

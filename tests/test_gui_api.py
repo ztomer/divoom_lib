@@ -201,6 +201,73 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.api.current_divoom = None
         self.assertFalse(self.api.send_notification(6))
 
+    # ── R13 §3: macOS notification mirroring ────────────────────────────
+
+    def test_r13_notification_listener_initial_state(self):
+        """is_running returns False before start; stop is a no-op."""
+        self.assertFalse(self.api.is_notification_listener_running())
+        # stop_notification_listener with no monitor must not raise.
+        result = self.api.stop_notification_listener()
+        self.assertFalse(result["running"])
+
+    @patch("gui.macos_notifications.MacNotificationMonitor")
+    def test_r13_start_notification_listener_wires_sink(self, mock_monitor_cls):
+        """start_notification_listener constructs a monitor with a sink
+        that schedules a coroutine on the main loop, then calls .start()."""
+        mock_monitor = mock_monitor_cls.return_value
+        mock_monitor.is_running = False
+        mock_monitor.db_path = "/fake/db.sqlite"
+
+        with patch.object(self.api, "_schedule_async") as mock_sched:
+            result = self.api.start_notification_listener()
+            self.assertTrue(result["running"])
+            self.assertEqual(result["db_path"], "/fake/db.sqlite")
+            mock_monitor_cls.assert_called_once()
+            mock_monitor.start.assert_called_once()
+            # The sink is passed as a keyword arg to monitor.start.
+            sink = mock_monitor.start.call_args.kwargs.get("sink")
+            self.assertTrue(callable(sink))
+            # Verify the sink calls _schedule_async with the right shape.
+            sink(6, "Alice", "Hello")
+            mock_sched.assert_called_once()
+            # The sink truncates to first line.
+            mock_sched.reset_mock()
+            sink(6, "Alice", "Hello world\nsecond line")
+            mock_sched.assert_called_once()
+
+    @patch("gui.macos_notifications.MacNotificationMonitor")
+    def test_r13_start_notification_listener_idempotent(self, mock_monitor_cls):
+        """If the monitor is already running, start() is a no-op."""
+        mock_monitor = mock_monitor_cls.return_value
+        mock_monitor.is_running = True
+        mock_monitor.db_path = "/fake/db.sqlite"
+        result = self.api.start_notification_listener()
+        self.assertTrue(result["running"])
+        mock_monitor.start.assert_not_called()
+
+    @patch("gui.macos_notifications.MacNotificationMonitor")
+    def test_r13_start_notification_listener_filenotfound(self, mock_monitor_cls):
+        """If start() raises FileNotFoundError, return error dict."""
+        mock_monitor = mock_monitor_cls.return_value
+        mock_monitor.is_running = False
+        mock_monitor.start.side_effect = FileNotFoundError("db not found")
+        result = self.api.start_notification_listener()
+        self.assertFalse(result["running"])
+        self.assertIn("db not found", result["error"])
+
+    def test_r13_stop_notification_listener_calls_monitor_stop(self):
+        """Stop calls monitor.stop() on the existing monitor."""
+        # Create a monitor first via start (mocked).
+        with patch("gui.macos_notifications.MacNotificationMonitor") as mock_cls:
+            mock_monitor = mock_cls.return_value
+            mock_monitor.is_running = False
+            mock_monitor.db_path = "/fake/db.sqlite"
+            self.api.start_notification_listener()
+            mock_monitor.is_running = True
+            result = self.api.stop_notification_listener()
+            self.assertFalse(result["running"])
+            mock_monitor.stop.assert_called_once()
+
     @patch("gui_main.BleakScanner")
     def test_scan_devices(self, mock_scanner_cls):
         """Test BLE scanning executes cleanly under thread-safe asyncio loops."""

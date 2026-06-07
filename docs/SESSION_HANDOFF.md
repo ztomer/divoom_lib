@@ -15,65 +15,80 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **Last round shipped:** Round 11 (push-path bug fixes) + docs. Fixed the live
-  image push end-to-end (cover art / custom art / gallery / wall) — three root
-  causes, all now aligned to the futpib reference: (1) resize-to-device-grid
-  before encoding (the "int too big to convert" crash); (2) 0x8B = 256-byte
-  chunks + chunk-index offset id (the transfer stall); (3) continuous LSB-first
-  pixel packing (the distortion). Also: cover art auto-pushes on track change +
-  immediately on enable (manual button removed); native C encoder had the same
-  packing bug → fixed + dylib rebuilt; **both C and Python encoders are now held
-  to one correctness suite** (`tests/test_encoder_both_impls.py`); `conftest.py`
-  auto-rebuilds a stale dylib; added `Makefile` + GitHub Actions; README rewritten.
-  See `docs/PLANNING_ROUND11.md`. Suite: **614 passed / 0 failed / 73 skipped**.
-- **In progress:** Round 12 (consolidation + continuation), order C→A→D→E→B.
-  See `docs/PLANNING_ROUND12.md`. Done so far: lessons consolidated in
-  `docs/ENGINEERING_NOTES.md` (linked from AGENTS.md); stale state pruned; **§C**
-  shipped — framing dual-impl correctness test, which caught + fixed two real
-  Python-fallback crashes (list→memoryview in `encode_basic_payload` escape +
-  `encode_ios_le_payload`). **§A Phases 2–6** shipped (sticky custom-art push
-  footer, ambient color gating + drop "Custom", scoreboard Reset, appbar
-  corner transports + right-aligned sliders + slider drag-fix + unified value
-  font + brightness-mapped thumb, scoreboard restyle BLUE-over-RED, unified
-  Virtual Wall toolbar icons+labels, font sweep). **§A Phase 7** shipped
-  (`697f1d51`): inner Tools sub-tab renamed to **Sessions** (resolves the
-  Tools/Tools parent-sub-tab naming collision; "Sessions" is the device-manual
-  term for the multi-timer/noise/sleep bundle); tools regroup: Device Settings
-  + Display + Notification → Settings → Devices; Weather → Live Widgets;
-  Anniversary → Time (with Alarms); settings.css unified segmented-pill
-  (`.settings-tab-btn` + `.tools-subtab-btn` grouped; `.settings-tabs-nav` +
-  `.tools-tabs-nav` pill-wrapper alias). 5 new regression tests
-  (sub-tab id+label, segmented-pill grouped selectors, Anniversary location,
-  Weather location, Device Settings location). Suite **677 passed / 0 failed
-  / 73 skipped** (up from 672). ⏳ **§A Phases 2–7 are UI changes — run
-  `python3 gui/gui_main.py` for a visual pass** (appbar corner transports,
-  scoreboard restyle, wall toolbar, font sweep, segmented-pill, tools regroup).
-  Next: **§D** (deferred features verification) → **§E** (push the ~34-commit
-  arc to origin, needs user OK).
-- **Earlier:** R10 ANCS notifications; R9 screen orientation + factory reset
-  (0xBD EXT); R8 device settings/FM/weather/memorial + Tools sub-tabs; R7 surfaced
-  text/alarms/sleep/tools. See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
-- **Git:** R8→R12 arc (~30 commits) **PUSHED to origin** (`2041d6c3`). Branch
-  is in sync with `origin/main` as of 2026-06-06.
+- **Last round shipped:** Round 13 (capability detection + examples/CLI + macOS
+  notifications). Three deliverables, all on the kill-criterion-aware path:
 
-## Open threads / next up (see docs/PLANNING_ROUND12.md for the full plan)
+  - **§1 — Capability detection** (`167a1019`): hardware-derived identifier
+    hierarchy (explicit `device_type` → MAC registry → `manufacturer_data`
+    fingerprint → baseline). New `divoom_lib/models/capabilities.py` (RENAMED
+    `screensize` → `panel_resolution` per user — disambiguates per-panel
+    pixels from wall composite). `Divoom.capabilities` property.
+    `DeviceRegistry` saves to `~/.config/divoom-control/devices.json`.
+    `divoom_lib/wall.py:wall_resolution()` helper. **CI fix**:
+    `tests/test_live_widgets_diagnostic.py` now `pytest.importorskip`s
+    playwright instead of `sys.exit(2)`. +33 tests (26 capabilities + 7
+    wall helper).
+  - **§2 — `examples/` + `divoom-control` CLI** (`16cb8b8`): 6 example
+    scripts + 10-subcommand CLI + shell wrapper. **Weather example
+    deferred** — `TempWeatherCommand` (0x5F) is not wired to the Divoom
+    facade; small R14 follow-up. **CLI entry point is a shell wrapper,
+    not `pyproject.toml`** — that repo has no `setup.py`/`pyproject.toml`
+    today; adding it is a packaging change, deferred to R14. +22 CLI tests.
+  - **§3 — macOS notification mirroring** (uncommitted, ready to commit):
+    `gui/macos_notifications.py` — `MacNotificationMonitor` polls the
+    macOS Notification Center SQLite DB (the same approach used by
+    `mac-notification-forwarder`, Hammerspoon, etc. — Apple's public
+    notification API only fires for *our own* app's notifications;
+    DB-poll bypasses TCC). `MacAppRouter` (14 default rules,
+    substring-matched, case-insensitive). `gui_api` integration with
+    fire-and-forget `_schedule_async` so the polling thread never
+    blocks on BLE. **GUI Settings card DEFERRED to R14** — the lib + tests
+    are the high-value part of §3; the Settings toggle is a 30-line
+    `templates.js`/`settings.js` follow-up that needs visual layout
+    decisions. Setup guide in `docs/NOTIFICATIONS_SETUP.md`. +23 tests
+    (18 macOS notifications + 5 gui_api).
 
-1. **§A visual pass pending** (user-run `python3 gui/gui_main.py`): verify
-   appbar corner transports, scoreboard restyle, wall toolbar, font sweep,
-   segmented-pill, tools regroup, sub-tab rename to "Sessions".
-2. **Hardware verification pending** (§B, user-run): album cover renders
+  Suite: **755 passed / 0 failed / 74 skipped** (up from R12's 677;
+  the +1 skip is the macOS-only test that's now actually skipped at
+  collection time). Zero regressions across R8→R13.
+
+- **Earlier rounds:** R12 §A P7 (Tools sub-tab rename to **Sessions**),
+  §D audit (5 features deferred with rationale), §E pushed; R11 push-path
+  bug fixes; R10 ANCS notifications; R9 screen orientation + factory reset
+  (0xBD EXT); R8 device settings/FM/weather/memorial + Tools sub-tabs;
+  R7 surfaced text/alarms/sleep/tools. See `CHANGELOG.md` +
+  `docs/PLANNING_ROUND*.md`.
+- **Git:** R8→R13 arc **PUSHED to origin** through R13 §2
+  (`16cb8b8c`). R13 §3 is in the working tree, ready to commit.
+  Branch is in sync with `origin/main` as of 2026-06-06 except for
+  the uncommitted R13 §3 work.
+
+## Open threads / next up (see docs/PLANNING_ROUND13.md for the full plan)
+
+1. **R13 §3 — commit + push** (current working tree): macOS notification
+   monitor + gui_api integration + tests + `docs/NOTIFICATIONS_SETUP.md`.
+   GUI Settings card UI is deferred to R14.
+2. **R12 §A visual pass pending** (user-run `python3 gui/gui_main.py`):
+   verify appbar corner transports, scoreboard restyle, wall toolbar,
+   font sweep, segmented-pill, tools regroup, sub-tab rename to "Sessions".
+3. **R12 §B hardware verification pending** (user-run): album cover renders
    un-distorted; custom-art/live push end-to-end.
-3. **get_* read-back times out on real devices** (task #20): get queries
+4. **get_* read-back times out on real devices** (task #20): get queries
    0x42/0x46/0x13 get no parseable response (likely query-framing mismatch).
    Gates every "read from device". See `docs/DEVICE_VALIDATION_PLAN.md`.
-4. **Channel-switch hardware bug (Divoom Max):** first switch works, rest don't;
+5. **Channel-switch hardware bug (Divoom Max):** first switch works, rest don't;
    not root-caused. All switches are `set light mode` (0x45) fire-and-forget.
-5. **Deferred features** (§D): see `docs/PLANNING_ROUND12_D_AUDIT.md` — the
-   full audit. Verdict: 0 exposed, 0 dropped; all 5 stay in the lib with
-   rationale per feature. Timeplan UI blocked on unverified `mode`/`type`
-   semantics; SD player blocked on task #20; Game has no host UX; Drawing
-   needs a non-trivial UI per mode; Cloud HTTP is its own round (auth
-   broken).
+6. **R13 follow-ups for R14:** (a) wire `TempWeatherCommand` to the Divoom
+   facade (`divoom.weather.send()`), (b) add `pyproject.toml` with
+   `[project.scripts]` for a real installable `divoom-control` entry
+   point, (c) add the GUI Settings → Devices card for the notification
+   mirror toggle + per-app checkboxes, (d) load custom routing JSON
+   (`~/.config/divoom-control/notification_routing.json`) — currently
+   the defaults are used; the JSON loader is a 10-line follow-up.
+7. **Deferred features** (R12 §D): see `docs/PLANNING_ROUND12_D_AUDIT.md` —
+   Timeplan UI blocked on unverified `mode`/`type` semantics; SD player
+   blocked on task #20; Game has no host UX; Drawing needs a non-trivial
+   UI per mode; Cloud HTTP is its own round (auth broken).
 
 ## Hardware note
 
