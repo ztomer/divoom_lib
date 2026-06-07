@@ -74,4 +74,14 @@ sub-tab style = **segmented pill**; volume slider stays **plain**.
 
 ## §outcome
 
-_(filled as phases ship)_
+- **§0 done:** lessons → `docs/ENGINEERING_NOTES.md` (linked from AGENTS.md);
+  AGENTS.md APK-path fixed; SESSION_HANDOFF refreshed to R11/R12; 35 stale
+  completed tasks pruned.
+- **§C done:** `tests/test_framing_both_impls.py` (correctness on both C +
+  Python framing encoders). It caught **two real Python-fallback bugs**
+  (list→memoryview TypeError in `encode_basic_payload` escape branch and
+  `encode_ios_le_payload` header) that would crash framing on any platform
+  without the dylib — both fixed. Suite 666 passed / 0 failed.
+- **§A / §D / §E:** not started — staged below. §A Phase 2 (quick GUI wins) is
+  the next unit; it touches dynamic `channels.js` + templates, best done as its
+  own reviewable pass.

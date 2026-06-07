@@ -27,8 +27,13 @@ core rule in `AGENTS.md`).
   auto-rebuilds a stale dylib; added `Makefile` + GitHub Actions; README rewritten.
   See `docs/PLANNING_ROUND11.md`. Suite: **614 passed / 0 failed / 73 skipped**.
 - **In progress:** Round 12 (consolidation + continuation), order C→A→D→E→B.
-  See `docs/PLANNING_ROUND12.md`. New: `docs/ENGINEERING_NOTES.md` (invariants,
-  linked from AGENTS.md).
+  See `docs/PLANNING_ROUND12.md`. Done so far: lessons consolidated in
+  `docs/ENGINEERING_NOTES.md` (linked from AGENTS.md); stale state pruned; **§C**
+  shipped — framing dual-impl correctness test, which caught + fixed two real
+  Python-fallback crashes (list→memoryview in `encode_basic_payload` escape +
+  `encode_ios_le_payload`). Suite **666 passed / 0 failed**. Next: §A Phase 2
+  (quick GUI wins) — sticky push footer, ambient color visibility + drop
+  "Custom", scoreboard reset.
 - **Earlier:** R10 ANCS notifications; R9 screen orientation + factory reset
   (0xBD EXT); R8 device settings/FM/weather/memorial + Tools sub-tabs; R7 surfaced
   text/alarms/sleep/tools. See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
