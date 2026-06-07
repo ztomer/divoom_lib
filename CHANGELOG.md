@@ -6,6 +6,74 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 15 — 2026-06-07 (UI unification, monthly best, weather widget, settings refactor, MCP server)
+
+Six user-driven changes plus a new MCP server feature. The unifying
+theme is **making the GUI more honest**: removing buttons that should
+be automatic, moving things to where users expect them, and giving
+the menubar + an MCP server a real role in the workflow. **+103 tests**,
+suite 829 → 932 passed. See `docs/PLANNING_ROUND15.md` for the
+full plan + outcome.
+
+- **§1+§7 — Tab style unification** (`2c819325`): single source of
+  truth `gui/web_ui/tabs.css` for `.tabs-row` / `.tab-btn` / `.tab-icon`.
+  Segmented-pill (Kare: clear silhouettes; Rams: less but better, one
+  form for "sub-tab" across the app). Active state = `--primary` bg +
+  white text. Channel/Tools/Settings/Theme rows migrated; panel CSS
+  files (`channels.css`, `settings.css`) alias legacy class names.
+  Optional 16×16 SVG icon prefix. **Lesson**: backticks inside template
+  literal comments break JS parsing. Use plain text in inline comments
+  inside template strings. `tests/test_tabs_chrome.py` (16 tests).
+  Suite 829 → 846.
+- **§2 — Monthly Best auto-fetch + box cap** (`0e23253f`): Gallery
+  card now auto-fetches on tab activation; changing the classify
+  dropdown auto-reloads via `window.loadGallery()`. "Fetch Gallery"
+  button hidden. Renamed "Push Selected to Device" → "Update Device"
+  and "Sync All → Devices" → "Update Devices". Dropped "Refresh"
+  button. Box cap `minmax(110px, 1fr)` → `minmax(110px, 168px)`.
+  `tests/test_gallery_auto_fetch.py` (10 tests). Suite 846 → 856.
+- **§4 — Settings refactor** (`24f95690`): `.danger-zone` extracted to
+  its own `card.glass-card.danger-card` (red border via a single
+  `settings.css` rule). Added 7d (`604800`) and 30d (`2592000`) to
+  `#routines-auto-sync-interval`; `MAX_INTERVAL = 2592000` clamp in
+  `divoom_lib/hotchannel_config._normalize()` is the belt-and-braces
+  for bad JSON files. `tests/test_routines_intervals.py` (10 tests).
+  Suite 856 → 866.
+- **§3 — Live Widgets weather card + Notifications move** (`b7c1e4d7`):
+  new `divoom_lib/weather_provider.py` (WTTrIn + Stub + auto-fallback,
+  env: `DIVOOM_CONTROL_WEATHER_{PROVIDER,LAT,LON,LOCATION}`, default
+  Berlin). `gui/gui_api.get_weather()` sync wrapper, `push_weather()`
+  uses live weather + `divoom.weather.set()`. Weather card moved to
+  top-level Live Widgets grid with 128×128 preview + 16×16 SVG icon +
+  7-segment temp. 10-min poller + auto-push on selection. Notification
+  manual + notification mirror cards moved from Settings → Devices to
+  Live Widgets. `tests/test_weather_provider.py` (30 tests) +
+  `tests/test_widgets_weather.py` (11 tests). Suite 866 → 907.
+- **§5 — MCP server + GUI toggle** (`121d0b5`): new
+  `divoom_lib/mcp_server.py` (`MCPServer`, `Tool` dataclass, JSON-RPC
+  dispatcher per spec 2024-11-05; methods: `initialize`, `tools/list`,
+  `tools/call`, `ping`; std codes: `-32700` parse, `-32600` invalid
+  request, `-32601` method not found, `-32602` invalid params,
+  `-32603` internal error; notifications get no reply). 12 tools in
+  `divoom_lib/mcp_tools.py`: `set_volume`, `set_brightness`,
+  `set_light_mode`, `set_weather`, `set_alarm`, `set_radio`,
+  `set_low_power`, `set_screen_orientation`, `show_image`, `play_sound`
+  (best-effort), `get_capabilities`, `get_device_state`. CLI
+  `divoom-control mcp-server --mac <MAC>` runs the stdio loop.
+  `gui/mcp_control.py` (`MCPController` subprocess, new process group
+  for clean SIGTERM, log to `~/.config/divoom-control/mcp-server.log`).
+  Settings → Connectivity card with Start/Stop buttons + status pill
+  + log tail. **No background polling** — the status card refreshes
+  on initial mount, on tab activation, and after Start/Stop click.
+  `docs/MCP_SERVER.md` ships with config snippets for Claude Desktop,
+  Cursor, Cline, Continue. `tests/test_mcp_server.py` (25 tests).
+  Suite 907 → 932.
+
+**Test count:** 829 → 932 (+103). **Suite:** 932 passed, 75 skipped,
+0 failed. Zero regressions across R8→R15.
+
+---
+
 ## Round 14 — 2026-06-07 (R13 follow-ups: weather, routing JSON, GUI card, packaging)
 
 Four deliverables closing out the R13 follow-up list. **+74 tests**,

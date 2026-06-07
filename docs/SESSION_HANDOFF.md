@@ -15,8 +15,114 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **Last round shipped:** Round 14 (R13 follow-ups §1-§4). Four
-  deliverables, all on the kill-criterion-aware path:
+- **Last round shipped:** Round 15 (§1+§7, §2, §3, §4, §5 SHIPPED;
+  §6 not started). Five commits, 829 → 932 passed, +103 tests,
+  zero regressions. **MCP server live** — `divoom-control mcp-server
+  --mac <MAC>` exposes 12 tools over stdio JSON-RPC. GUI toggle in
+  Settings → Connectivity with **no background polling** (initial
+  fetch + tab-activation + click-driven refresh only — user
+  explicitly rejected 5s polling as "notifications every 5s").
+
+  - **§1+§7 — Tab style unification** (`2c819325`): single source
+    of truth `gui/web_ui/tabs.css` (`.tabs-row` / `.tab-btn` /
+    `.tab-icon`); segmented-pill across Channel/Tools/Settings/Theme
+    rows; Kare 16×16 SVG icon prefix optional. +16 tests. **Lesson
+    learned:** backticks in template-literal comments break JS
+    parsing — use plain text in inline comments inside template
+    strings.
+  - **§2 — Monthly Best auto-fetch** (`0e23253f`): `window.loadGallery()`
+    auto-fires on tab activation + classify change. Renamed "Push
+    Selected to Device" → "Update Device"; dropped "Refresh" button.
+    Box cap `minmax(110px, 168px)`. +10 tests.
+  - **§4 — Settings refactor** (`24f95690`): `.danger-zone` extracted
+    to own `card.glass-card.danger-card` (red border via `settings.css`).
+    Added 7d (`604800`) and 30d (`2592000`) to routines; `MAX_INTERVAL
+    = 2592000` clamp in `hotchannel_config._normalize()`. +10 tests.
+  - **§3 — Live Widgets weather card + Notifications move**
+    (`b7c1e4d7`): new `divoom_lib/weather_provider.py` (WTTrIn +
+    Stub + auto-fallback; env `DIVOOM_CONTROL_WEATHER_{PROVIDER,
+    LAT, LON, LOCATION}`; default Berlin). Weather card has 128×128
+    preview + 16×16 SVG icon + 7-segment temp; auto-push on select +
+    10-min poller. Notification manual + mirror cards moved from
+    Settings → Devices to Live Widgets. +41 tests (30 + 11).
+  - **§5 — MCP server + GUI toggle** (`121d0b5`): new
+    `divoom_lib/mcp_server.py` (MCPServer, Tool dataclass, JSON-RPC
+    per spec 2024-11-05; methods: `initialize`, `tools/list`,
+    `tools/call`, `ping`; std codes: `-32700`/`-32600`/`-32601`/
+    `-32602`/`-32603`; notifications get no reply). 12 tools in
+    `divoom_lib/mcp_tools.py`: `set_volume` (0-15),
+    `set_brightness` (0-100), `set_light_mode` (named→channel),
+    `set_weather` (-127..128, named→WeatherType), `set_alarm`
+    (10 slots, weekday_mask 0-127), `set_radio` (875-1080),
+    `set_low_power` (bool), `set_screen_orientation` (0/90/180/270 +
+    mirror), `show_image` (local path), `play_sound` (100-3000ms
+    best-effort via set_hot), `get_capabilities` (read-only),
+    `get_device_state` (read-only with safe fallback). CLI
+    `divoom-control mcp-server --mac <MAC>` runs the stdio loop.
+    `gui/mcp_control.py` spawns `python -m divoom_lib.cli mcp-server`
+    as a subprocess (new process group for clean SIGTERM); logs to
+    `~/.config/divoom-control/mcp-server.log`. Settings → Connectivity
+    card with Start/Stop buttons + status pill + log tail (20 lines /
+    16 KB). **No 5s polling** — initial fetch + tab-activation + click
+    refresh only. `docs/MCP_SERVER.md` ships with config snippets
+    for Claude Desktop, Cursor, Cline, Continue. +25 tests. **The
+    AsyncMock lesson:** auto-spy on `MagicMock` does NOT return
+    AsyncMocks for sub-attributes; you must explicitly set
+    `d.music.set_volume = AsyncMock(return_value=...)` to get
+    `assert_awaited_*_with` assertions working.
+
+  Suite: **932 passed / 0 failed / 75 skipped** (up from R15 start
+  at 829). **+103 tests across R15 §1+§2+§3+§4+§5**. Zero regressions
+  across R8→R15.
+
+- **Earlier rounds:** R14 (weather facade, routing JSON, GUI card,
+  pyproject.toml); R13 (capability detection + examples/CLI +
+  macOS notifications); R12 §A P7 (Tools→Sessions sub-tab rename),
+  §D audit, §E pushed; R11 push-path bug fixes; R10 ANCS; R9 screen
+  orientation + factory reset (0xBD EXT); R8 device settings/FM/weather
+  /memorial + Tools sub-tabs; R7 surfaced text/alarms/sleep/tools.
+  See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
+- **Git:** R8→R15 arc is in the working tree, ready to push.
+
+## Open threads / next up
+
+1. **R15 §6 — Menubar (not started).** Plan: poll
+   `get_notification_status` less aggressively (or event-driven);
+   status-item title suffix `(active)/(idle)/(error)` with color
+   tints. "Open Notifications..." menu item. ~4 tests. **Carry the
+   "no background polling" lesson from §5** — the user has explicitly
+   flagged this twice.
+2. **Push R15 to origin.** Local is 5 commits ahead (`git log --oneline`
+   for the last 5 shows R15 §1+§7, §2, §4, §3, §5 in that order).
+3. **R12 §A visual pass pending** (user-run `python3 gui/gui_main.py`):
+   verify appbar corner transports, scoreboard restyle, wall toolbar,
+   font sweep, segmented-pill, tools regroup, sub-tab rename to
+   "Sessions", **and the new macOS Notifications card under
+   Settings → Devices** (R14 §3) and the **new MCP Server card under
+   Settings → Connectivity** (R15 §5).
+4. **R12 §B hardware verification pending** (user-run): album cover
+   renders un-distorted; custom-art/live push end-to-end; weather
+   push via `divoom-control set-temperature 18 --weather clear`.
+5. **get_* read-back times out on real devices** (task #20): get
+   queries 0x42/0x46/0x13 get no parseable response (likely
+   query-framing mismatch). Gates every "read from device". See
+   `docs/DEVICE_VALIDATION_PLAN.md`.
+6. **Channel-switch hardware bug (Divoom Max):** first switch works,
+   rest don't; not root-caused. All switches are `set light mode`
+   (0x45) fire-and-forget.
+7. **Deferred features** (R12 §D): see
+   `docs/PLANNING_ROUND12_D_AUDIT.md` — Timeplan UI blocked on
+   unverified `mode`/`type` semantics; SD player blocked on task
+   #20; Game has no host UX; Drawing needs a non-trivial UI per mode;
+   Cloud HTTP is its own round (auth broken).
+8. **MCP enhancements (post-R15):** HTTP+SSE transport, `subscribe_*`
+   tools, auth (none now; macOS-only + per-user-uid is the default
+   trust boundary).
+
+## Hardware note
+
+macOS Bluetooth TCC is per responsible-process; drive real BLE by launching via
+Terminal (`open *.command`). Device UUIDs + method in `docs/DEVICE_VALIDATION_PLAN.md`.
 
   - **§1 — `Weather` facade** (`<commit>`): new
     `divoom_lib/system/weather.py` with `Weather.set()`,
