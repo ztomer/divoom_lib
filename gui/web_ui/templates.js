@@ -5,7 +5,7 @@ window.DivoomTemplates = {
         <div class="header-section"><h1>Tools</h1></div>
         <div class="settings-tabs-nav">
             <button class="tools-subtab-btn active" data-tools-tab="tools-time">Time</button>
-            <button class="tools-subtab-btn" data-tools-tab="tools-tools">Tools</button>
+            <button class="tools-subtab-btn" data-tools-tab="tools-sessions">Sessions</button>
         </div>
         <!-- R11 item 8: TIME sub-tab — alarms + anniversary. -->
         <div class="tools-subtab-content active" id="tools-time">
@@ -45,8 +45,9 @@ window.DivoomTemplates = {
         </div>
         </div>
 
-        <!-- R11 item 8: TOOLS sub-tab — sleep aid, FM radio, timer/countdown/noise. -->
-        <div class="tools-subtab-content" id="tools-tools">
+        <!-- R11 item 8: SESSIONS sub-tab — sleep aid, FM radio, timer/countdown/noise.
+             "Sessions" is the device-manual term for the multi-timer/noise/sleep bundle. -->
+        <div class="tools-subtab-content" id="tools-sessions">
         <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
                         <!-- Round 7: Sleep Aid -->
                         <div class="card glass-card">

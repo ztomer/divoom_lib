@@ -643,3 +643,139 @@ async def test_monthly_best_layout_renders_cleanly():
         ).count() == 1, "Scoreboard channel-card not found in Control Panel"
 
         await browser.close()
+
+
+# ──────────────────────────────────────────────────────────────────
+# 5e. Round 12 §A Phase 7 — tools regroup + unified segmented-pill
+# ──────────────────────────────────────────────────────────────────
+
+SETTINGS_CSS = REPO_ROOT / "gui" / "web_ui" / "settings.css"
+
+
+def test_r12_tools_subtab_uses_sessions_not_tools_inner_collision():
+    """R12 §A Phase 7 (tools regroup): the inner Tools sub-tab is renamed
+    to 'Sessions' to avoid the parent-tab / sub-tab 'Tools' naming
+    collision. Sessions is the device-manual term for the
+    multi-timer/noise/sleep bundle."""
+    src = TEMPLATES_JS.read_text()
+    # The inner sub-tab button is now 'Sessions' with data-tools-tab=tools-sessions.
+    assert 'data-tools-tab="tools-sessions">Sessions' in src, (
+        "Tools inner sub-tab is not 'Sessions' — it should be renamed to "
+        "avoid the parent-tab / sub-tab 'Tools' collision."
+    )
+    # The id of the inner sub-tab content block must match.
+    assert 'id="tools-sessions"' in src, (
+        "inner sub-tab content id should be 'tools-sessions'."
+    )
+    # The OLD 'tools-tools' collision id must be GONE.
+    assert 'id="tools-tools"' not in src, (
+        "id 'tools-tools' is still present — it should be renamed to 'tools-sessions'."
+    )
+    # The 'Time' sub-tab is still present (alarms + anniversary).
+    assert 'data-tools-tab="tools-time">Time' in src, (
+        "Tools Time sub-tab is missing — it should contain Alarms + Anniversary."
+    )
+
+
+def test_r12_unified_segmented_pill_css():
+    """R12 §A Phase 7 (unified segmented-pill): the Tools sub-tab nav
+    uses the same .settings-tabs-nav / .settings-tab-btn segmented-pill
+    style as Settings, via grouped CSS rules (no duplicate styles)."""
+    css = SETTINGS_CSS.read_text()
+    # Grouped selector: shared button styles apply to both settings-tab-btn
+    # and tools-subtab-btn.
+    assert re.search(
+        r"\.settings-tab-btn\s*,\s*\n\s*\.tools-subtab-btn\s*\{",
+        css,
+    ), (
+        "settings.css should group .settings-tab-btn and .tools-subtab-btn "
+        "in a single shared rule (segmented-pill unification)."
+    )
+    # The shared content visibility rule too.
+    assert re.search(
+        r"\.settings-tab-content\s*,\s*\n\s*\.tools-subtab-content\s*\{",
+        css,
+    ), (
+        "settings.css should group .settings-tab-content and .tools-subtab-content "
+        "in a single shared visibility rule."
+    )
+    # Pill-wrapper class also aliased.
+    assert re.search(
+        r"\.settings-tabs-nav\s*,\s*\n\s*\.tools-tabs-nav\s*\{",
+        css,
+    ), (
+        "settings.css should group .settings-tabs-nav and .tools-tabs-nav "
+        "as a single pill-wrapper class."
+    )
+
+
+def test_r12_anniversary_moved_into_time_subtab():
+    """The Anniversary/Memorial card lives in the Time sub-tab (not the
+    Sessions or Device sub-tab), per the regroup."""
+    src = TEMPLATES_JS.read_text()
+    # Find the Time sub-tab content block.
+    m = re.search(
+        r'id="tools-time">(.+?)<!-- R11 item 8: SESSIONS',
+        src, re.DOTALL,
+    )
+    assert m is not None, "Time sub-tab block not found"
+    block = m.group(1)
+    assert 'id="memorial-save"' in block, (
+        "Anniversary/Memorial card (memorial-save button) is missing from the Time sub-tab."
+    )
+    # Anniversary MUST NOT be in the Sessions sub-tab.
+    sm = re.search(
+        r'id="tools-sessions">(.+?)</div>\s*</div>\s*</div>',
+        src, re.DOTALL,
+    )
+    if sm:
+        assert 'id="memorial-save"' not in sm.group(1), (
+            "Anniversary/Memorial is in the Sessions sub-tab — should be in Time."
+        )
+
+
+def test_r12_weather_moved_into_live_widgets():
+    """The Weather card now lives in Live Widgets, not in the Tools tab."""
+    src = TEMPLATES_JS.read_text()
+    # Live Widgets template block: between widgets: ` and settings: `.
+    lw = re.search(r"widgets:\s*`(.+?)`,\s*\n\s*settings:\s*`", src, re.DOTALL)
+    assert lw is not None, "Live Widgets (widgets:) block not found in templates.js"
+    lw_block = lw.group(1)
+    assert 'id="push-weather-btn"' in lw_block, (
+        "Weather card (push-weather-btn) is missing from Live Widgets — "
+        "should be there after the R12 regroup."
+    )
+    # Weather MUST NOT still be in the Tools tab.
+    tools = re.search(r"tools:\s*`(.+?)`,\s*\n\s*widgets:\s*`", src, re.DOTALL)
+    assert tools is not None, "Tools tab block not found in templates.js"
+    tools_block = tools.group(1)
+    assert 'id="push-weather-btn"' not in tools_block, (
+        "Weather card is still in the Tools tab — should have moved to Live Widgets."
+    )
+
+
+def test_r12_device_settings_moved_to_settings_devices():
+    """The Device Settings card (24h, °F, low-power, device name, etc.)
+    now lives in Settings → Devices, not in the Tools tab."""
+    src = TEMPLATES_JS.read_text()
+    # Settings → Devices sub-tab block: between id="settings-devices" and the
+    # next sub-tab id="settings-divoom" (or end of the Settings block).
+    m = re.search(
+        r'id="settings-devices">(.+?)<div class="settings-tab-content" id="settings-divoom">',
+        src, re.DOTALL,
+    )
+    assert m is not None, "settings-devices sub-tab block not found"
+    block = m.group(1)
+    for _id in ["hour24-toggle", "tempf-toggle", "lowpower-toggle", "device-name-input", "sync-time-btn"]:
+        assert f'id="{_id}"' in block, (
+            f"Device Settings id={_id} not found in Settings → Devices — "
+            f"should have moved there in R12."
+        )
+    # And those ids MUST NOT be in the Tools tab.
+    tools = re.search(r"tools:\s*`(.+?)`,\s*\n\s*widgets:\s*`", src, re.DOTALL)
+    assert tools is not None
+    tools_block = tools.group(1)
+    for _id in ["hour24-toggle", "tempf-toggle", "lowpower-toggle", "device-name-input", "sync-time-btn"]:
+        assert f'id="{_id}"' not in tools_block, (
+            f"Device Settings id={_id} is still in the Tools tab — should be in Settings."
+        )
