@@ -1,7 +1,7 @@
 """
 Divoom device image encoder — native dylib with pure-Python fallback.
 
-The dylib (`gui/libdivoom_compact.dylib`) implements the palette
+The dylib (`divoom_lib/libdivoom_compact.dylib`) implements the palette
 encoder in C for ~10-50× faster animation push. The C output is
 byte-identical to the pure-Python encoder in
 `divoom_lib/utils/divoom_image_encode.py` — `tests/test_native_image_encoder.py`
@@ -45,12 +45,10 @@ from ..utils.divoom_image_encode_32 import (  # noqa: F401
 _lib = None
 _lib_load_error: str | None = None
 
-# The dylib lives in gui/ because it bundles gui/compact.c (tile-compacting)
-# with divoom_lib/native_src/{downsample,image_encode}.c into a single
-# shared library. The wrapper here loads from gui/ by walking up to the
-# project root.
-_PROJECT_ROOT = Path(__file__).parent.parent.parent
-_DYLIB_PATH = _PROJECT_ROOT / "gui" / "libdivoom_compact.dylib"
+# The dylib lives in divoom_lib/ (R17): it bundles native_src/compact.c
+# (tile-compacting + framing) with native_src/{downsample,image_encode}.c into
+# one shared library. native/ -> parent.parent == divoom_lib/.
+_DYLIB_PATH = Path(__file__).parent.parent / "libdivoom_compact.dylib"
 
 # Animation packet chunk size (must match C DIVOOM_ANIMATION_CHUNK_SIZE)
 ANIMATION_CHUNK_SIZE = 200

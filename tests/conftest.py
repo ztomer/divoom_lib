@@ -20,10 +20,10 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_DYLIB = _REPO_ROOT / "gui" / "libdivoom_compact.dylib"
+_DYLIB = _REPO_ROOT / "divoom_lib" / "libdivoom_compact.dylib"
 _BUILD_SCRIPT = _REPO_ROOT / "scripts" / "build_libdivoom.sh"
 _C_SOURCES = [
-    _REPO_ROOT / "gui" / "compact.c",
+    _REPO_ROOT / "divoom_lib" / "native_src" / "compact.c",
     _REPO_ROOT / "divoom_lib" / "native_src" / "downsample.c",
     _REPO_ROOT / "divoom_lib" / "native_src" / "image_encode.c",
     _REPO_ROOT / "divoom_lib" / "native_src" / "image_encode_32.c",

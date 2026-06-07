@@ -3,7 +3,7 @@ divoom_lib.native — performance-sensitive native code exposed to Python.
 
 The three C sources that make up libdivoom_compact.dylib:
 
-  - `gui/compact.c`              — tile-compacting and protocol-framing
+  - `divoom_lib/native_src/compact.c`              — tile-compacting and protocol-framing
                                    (encode_basic_payload, encode_ios_le_payload,
                                     compact_tiles). Used by `divoom_lib.framing`
                                    and the GUI's media decoder.
@@ -18,7 +18,7 @@ The three C sources that make up libdivoom_compact.dylib:
                                               `divoom_lib.utils.divoom_image_encode`.
 
 The dylib is built by `scripts/build_libdivoom.sh` and lives at
-`gui/libdivoom_compact.dylib`.
+`divoom_lib/libdivoom_compact.dylib`.
 
 Public API
 ----------

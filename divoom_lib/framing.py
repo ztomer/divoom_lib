@@ -7,7 +7,7 @@ from . import models
 # Dynamically load native C shared library for fast payload escaping/framing if available
 lib = None
 try:
-    lib_path = Path(__file__).parent.parent / "gui" / "libdivoom_compact.dylib"
+    lib_path = Path(__file__).parent / "libdivoom_compact.dylib"
     if lib_path.exists():
         lib = ctypes.CDLL(str(lib_path))
         lib.encode_basic_payload.argtypes = [

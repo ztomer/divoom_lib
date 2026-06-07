@@ -1,7 +1,7 @@
 """
 LANCZOS3 image downscaler — native dylib with PIL fallback.
 
-The dylib (`gui/libdivoom_compact.dylib`) implements the full PIL-equivalent
+The dylib (`divoom_lib/libdivoom_compact.dylib`) implements the full PIL-equivalent
 pipeline in C:
     - For RGB:    per-channel LANCZOS3 resample
     - For RGBA:   convert('RGBa')  →  resize()  →  convert('RGBA')
@@ -34,11 +34,10 @@ CHANNELS_RGBA = 4
 _lib = None
 _lib_load_error: str | None = None
 
-# The dylib lives in gui/ because it bundles gui/compact.c (tile-compacting)
-# with divoom_lib/native_src/downsample.c (LANCZOS3) into a single shared
-# library. The wrapper here loads from gui/ by walking up to the project root.
-_PROJECT_ROOT = Path(__file__).parent.parent.parent
-_DYLIB_PATH = _PROJECT_ROOT / "gui" / "libdivoom_compact.dylib"
+# The dylib lives in divoom_lib/ (R17): it bundles native_src/compact.c with
+# native_src/downsample.c (LANCZOS3) into one shared library.
+# native/ -> parent.parent == divoom_lib/.
+_DYLIB_PATH = Path(__file__).parent.parent / "libdivoom_compact.dylib"
 
 
 def _load_lib():

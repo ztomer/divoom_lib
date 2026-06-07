@@ -2,7 +2,7 @@
 native C implementation and the pure-Python fallback.
 
 `encode_basic_payload` / `encode_ios_le_payload` have C + Python twins (the C one
-lives in gui/compact.c, loaded by framing.py). Like the image encoders, a
+lives in divoom_lib/native_src/compact.c, loaded by framing.py). Like the image encoders, a
 `C == Python` parity test would miss a bug present in both. So these assert
 **correctness**: an encoded frame decodes back to the original command + payload
 (and escaping round-trips through a reference un-escaper).

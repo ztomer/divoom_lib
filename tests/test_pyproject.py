@@ -139,9 +139,9 @@ def test_pyproject_package_data_includes_dylib_and_web_ui() -> None:
     p = REPO_ROOT / "pyproject.toml"
     data = tomllib.loads(p.read_text())
     pd = data.get("tool", {}).get("setuptools", {}).get("package-data", {})
-    gui_pd = pd.get("gui", [])
-    assert "*.dylib" in gui_pd
-    assert "web_ui/*" in gui_pd
+    # R17: the dylib ships with divoom_lib (its true home); web_ui with gui.
+    assert "*.dylib" in pd.get("divoom_lib", [])
+    assert "web_ui/*" in pd.get("gui", [])
 
 
 # ── legacy shell wrapper ──────────────────────────────────────────────
