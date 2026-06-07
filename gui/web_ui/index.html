@@ -28,6 +28,9 @@
             <button id="win-max" class="win-btn max" title="ToggleFullscreen">▢</button>
         </div>
 
+        <!-- R11 4c: spacer first, so the sliders are pushed to the right side. -->
+        <div class="appbar-drag-spacer"></div>
+
         <!-- Global Brightness + Volume in Appbar (Round 6) -->
         <div class="appbar-brightness">
             <svg class="kare-icon" viewBox="0 0 16 16" title="Brightness">
@@ -53,16 +56,15 @@
             <span id="appbar-volume-value">7/15</span>
         </div>
 
-        <div class="appbar-drag-spacer"></div>
-
-        <!-- Connection Transports in Appbar -->
-        <div class="appbar-transports">
-            <span class="transport-dot inactive" id="tr-ble-dot" style="background:#3b82f6; color:#3b82f6;" title="Bluetooth - Disconnected"></span>
-            <span class="transport-dot inactive" id="tr-lan-dot" style="background:#22c55e; color:#22c55e;" title="Local Network - No IP set"></span>
-            <span class="transport-dot inactive" id="tr-cloud-dot" style="background:#f59e0b; color:#f59e0b;" title="Divoom Cloud - Not signed in"></span>
-            <span class="transport-dot active" id="tr-ext-dot" style="background:#ef4444; color:#ef4444;" title="Public Cloud - Available"></span>
-        </div>
     </header>
+
+    <!-- R11 4b: connection indicators live in the bottom-right corner, not the appbar. -->
+    <div class="appbar-transports corner-transports">
+        <span class="transport-dot inactive" id="tr-ble-dot" style="background:#3b82f6; color:#3b82f6;" title="Bluetooth - Disconnected"></span>
+        <span class="transport-dot inactive" id="tr-lan-dot" style="background:#22c55e; color:#22c55e;" title="Local Network - No IP set"></span>
+        <span class="transport-dot inactive" id="tr-cloud-dot" style="background:#f59e0b; color:#f59e0b;" title="Divoom Cloud - Not signed in"></span>
+        <span class="transport-dot active" id="tr-ext-dot" style="background:#ef4444; color:#ef4444;" title="Public Cloud - Available"></span>
+    </div>
 
     <div class="app-container">
         

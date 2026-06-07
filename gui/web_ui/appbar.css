@@ -202,10 +202,39 @@
     transform: scale(1.2);
 }
 
-#global-brightness-value {
+/* R11 4a: the volume value uses the exact same type as the brightness value. */
+#global-brightness-value,
+#appbar-volume-value {
     font-size: 10px;
     font-family: var(--font-sans);
     color: var(--text-muted);
     min-width: 28px;
     text-align: right;
+}
+
+/* R11 4e: the brightness slider thumb tracks the value it controls — white at
+   full brightness, darkening toward black as it drops — with a contrasting
+   border so it stays visible. (--thumb-color is set per-value from app.js.)
+   The volume slider stays plain per Rams: volume has no honest colour mapping. */
+#global-brightness-slider::-webkit-slider-thumb {
+    background: var(--thumb-color, #ffffff);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+}
+body.theme-light #global-brightness-slider::-webkit-slider-thumb {
+    border-color: rgba(0, 0, 0, 0.85);
+}
+
+/* R11 4b: connection indicators pinned to the bottom-right corner. */
+.corner-transports {
+    position: fixed;
+    bottom: 10px;
+    right: 12px;
+    display: flex;
+    gap: 7px;
+    padding: 5px 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    z-index: 50;
 }

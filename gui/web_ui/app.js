@@ -213,6 +213,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // `webview.create_window` that drops the `self.screen.origin.x`
     // term from BrowserView.move. The patch is a no-op on
     // single-monitor setups.
+    //
+    // R11 4d: pywebview's drag handler (customize.js) starts a window move on
+    // ANY mousedown whose ancestor is the .pywebview-drag-region (the appbar) —
+    // it has no no-drag exclusion, so dragging an appbar slider moved the whole
+    // window. Stop the mousedown from bubbling to body for the interactive
+    // appbar controls so they work as controls, not drag handles.
+    document.querySelectorAll(
+        ".integrated-appbar .appbar-slider, .integrated-appbar .win-btn"
+    ).forEach((el) => el.addEventListener("mousedown", (e) => e.stopPropagation()));
 
     // Inject HTML Templates
     if (document.getElementById('monthly-best') && window.DivoomTemplates?.monthlyBest) {
@@ -419,10 +428,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const globalBrightnessSlider = document.getElementById("global-brightness-slider");
     const globalBrightnessValue = document.getElementById("global-brightness-value");
     
+    // R11 4e: thumb tracks brightness — white at 100%, darkening toward black.
+    function updateBrightnessThumb(v) {
+        const g = Math.round(255 * (parseInt(v) || 0) / 100);
+        globalBrightnessSlider.style.setProperty("--thumb-color", `rgb(${g},${g},${g})`);
+    }
     if (globalBrightnessSlider) {
+        updateBrightnessThumb(globalBrightnessSlider.value);
         globalBrightnessSlider.addEventListener("input", (e) => {
             const val = e.target.value;
             if (globalBrightnessValue) globalBrightnessValue.textContent = val + "%";
+            updateBrightnessThumb(val);
         });
         globalBrightnessSlider.addEventListener("change", (e) => {
             const val = parseInt(e.target.value);

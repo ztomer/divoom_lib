@@ -87,4 +87,10 @@ sub-tab style = **segmented pill**; volume slider stays **plain**.
   controls (+favorites) hidden unless mode = Plain Color
   (`updateAmbientColorVisibility`); 3b "Custom" label removed; 5a scoreboard
   Reset button. +3 UI-presence tests. Suite 669 passed / 0 failed.
-- **§A Phases 3–7 / §D / §E:** not started — staged below.
+- **§A Phase 3 done (appbar):** 4a unified volume/brightness value font; 4b
+  connection indicators moved to a fixed bottom-right corner; 4c spacer-first so
+  sliders sit on the right; 4d slider drag-fix (stopPropagation — pywebview's
+  drag-region has no no-drag check); 4e brightness thumb tracks value (white→black)
+  with contrasting border, volume left plain. +1 UI test. Suite 670/0.
+  **⏳ Visual check:** appbar layout + corner indicators want an eyes-on pass.
+- **§A Phases 4–7 / §D / §E:** not started — staged below.
