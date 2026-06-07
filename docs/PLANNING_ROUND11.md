@@ -61,6 +61,16 @@ honest; unobtrusive) + **Susan Kare** (clear, friendly, iconic, pixel-precise).
   `show_image`/0x8B path; add a mock-device E2E asserting the full
   start→data→terminate byte sequence for a small animation.
 
+### 2a/2b ✅ SHIPPED — auto cover-art push + button removed
+
+Cover art now pushes **automatically**: refactored the music watcher into one
+shared path (`_push_cover_for_track` → `_sync_now_playing`), which (a) listens
+for album change via a tighter 1.5s now-playing poll, (b) pushes **immediately**
+on change **and** immediately on enable (`force=True`, off the main thread), and
+(c) the manual "Push Cover Art to Device" button + handler + were removed
+(`push_music_cover_now` bridge left as an unused programmatic helper). +6 unit
+tests (`tests/test_music_sync.py`). Suite 562/0.
+
 ### 2b. "Push cover art to device" button is redundant → remove, do it automatically
 - **Finding:** music-sync already auto-pushes on track change (`_push_frame` in
   the sync loop). The manual button is redundant.

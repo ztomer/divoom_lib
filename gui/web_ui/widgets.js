@@ -52,34 +52,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Manual push button — gives the user a recovery path when the auto-push
-    // doesn't reach the device (channel-switch, BLE sleep, etc.).
-    const pushCoverBtn = document.getElementById("music-push-cover-btn");
-    if (pushCoverBtn) {
-        pushCoverBtn.addEventListener("click", () => {
-            if (window.pywebview?.api?.push_music_cover_now) {
-                pushCoverBtn.disabled = true;
-                pushCoverBtn.textContent = "Pushing...";
-                window.pywebview.api.push_music_cover_now().then(resJson => {
-                    try {
-                        const res = typeof resJson === "string" ? JSON.parse(resJson) : resJson;
-                        if (res && res.success) {
-                            window.showToast("Cover art pushed to device", "success");
-                        } else {
-                            window.showToast(res?.error || "Push failed — no track or no device", "error");
-                        }
-                    } catch {
-                        window.showToast("Push failed (parse error)", "error");
-                    } finally {
-                        pushCoverBtn.disabled = false;
-                        pushCoverBtn.textContent = "Push Cover Art to Device";
-                    }
-                });
-            } else {
-                window.showToast("Push API not available", "error");
-            }
-        });
-    }
+    // R11: the manual "Push Cover Art" button is obsolete — cover art is pushed
+    // automatically when sync is on and the track changes (and immediately on
+    // enable). The button + its handler were removed.
 
     // ── 3. YAHOO STOCKS TICKER WIDGET ──
     const applyStockBtn = document.getElementById("apply-stock-btn");

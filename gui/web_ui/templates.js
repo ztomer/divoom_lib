@@ -284,7 +284,8 @@ window.DivoomTemplates = {
                                     <h4 id="music-track-name">No Music Playing</h4>
                                     <p id="music-artist-name">Spotify / Apple Music</p>
                                 </div>
-                                <button id="music-push-cover-btn" class="glow-btn compact" style="margin:0;">Push Cover Art to Device</button>
+                                <!-- Cover art is pushed automatically on track change while sync is on
+                                     (R11) — the manual push button is obsolete and was removed. -->
                             </div>
                         </div>
                     </div>
