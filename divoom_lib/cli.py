@@ -110,6 +110,15 @@ def build_parser() -> argparse.ArgumentParser:
         "mcp-server", parents=[shared],
         help="Start the MCP stdio JSON-RPC server (use --mac to pick a device).",
     )
+
+    # Headless daemon (R16): owns the device + macOS notification routing and
+    # serves status/notification events over a Unix socket. The GUI and menubar
+    # are thin clients of it.
+    p_daemon = sub.add_parser(
+        "daemon", parents=[shared],
+        help="Run the headless daemon (device + macOS notification routing + event socket).",
+    )
+    p_daemon.add_argument("--socket", default="/tmp/divoom.sock", help="Unix socket path.")
     return p
 
 
@@ -416,6 +425,18 @@ async def cmd_mcp_server(args: argparse.Namespace) -> int:
         await d.disconnect()
 
 
+async def cmd_daemon(args: argparse.Namespace) -> int:
+    """Run the headless daemon (R16). Owns the device + the macOS notification
+    monitor and serves events over a Unix socket. Does NOT pre-connect a device
+    (the daemon manages its own lazy connection), so it starts on any host."""
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from gui.daemon import run as run_daemon
+    return run_daemon(mac=getattr(args, "mac", None),
+                      socket_path=getattr(args, "socket", "/tmp/divoom.sock"))
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────
 
 
@@ -432,6 +453,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace], Awaitable[int]]] = {
     "pair":          cmd_pair,
     "identify":      cmd_identify,
     "mcp-server":    cmd_mcp_server,
+    "daemon":        cmd_daemon,
 }
 
 

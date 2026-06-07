@@ -67,4 +67,18 @@ listen to the daemon.**
 
 ## §outcome
 
-_(filled as phases ship)_
+- **P1 SHIPPED** (`gui/daemon_protocol.py`): NDJSON framing, command/event
+  shapes, `DaemonClient` (send_command + subscribe). 8 tests.
+- **P2 SHIPPED** (`gui/daemon.py` + `divoom-control daemon` CLI): `DivoomDaemon`
+  owns device + macOS monitor + routing; Unix-socket server with request/response
+  + subscribe/stream + event broadcast; sink routes to device (preserving the
+  GUI's title-first behavior) + counts + broadcasts. Monitor + device-sender are
+  injectable → 5 tests with a fake monitor over a temp socket (no AppKit/BLE).
+  Suite 946 → 959.
+- **P3 / P4 / P5 — not started.** P3 migrates the menubar to a daemon *client*
+  (subscribe → title; commands → daemon; spawn daemon if absent) and **removes
+  R15 §6's `gui_api._push_menubar_status`**. P4 migrates the GUI (`gui_api`
+  notification methods proxy to the daemon; remove `_mac_monitor`; card
+  subscribes). These touch the live menubar + GUI processes — own focused pass,
+  user should visually verify. Until P3 lands, don't run the daemon and the old
+  menubar simultaneously (both bind `/tmp/divoom.sock`).
