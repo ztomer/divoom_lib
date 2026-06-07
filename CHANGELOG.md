@@ -6,6 +6,39 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 12 — 2026-06-06 (§A Phase 7 closeout: tools regroup + segmented-pill)
+
+Inner Tools sub-tab renamed to **Sessions** (resolves the Tools/Tools
+parent-sub-tab naming collision; "Sessions" is the device-manual term for the
+multi-timer/noise/sleep bundle). Tools regroup: Device Settings + Display +
+Notification moved to Settings → Devices; Weather moved to Live Widgets;
+Anniversary moved to Time (with Alarms). `settings.css` unified segmented-pill
+(`.settings-tab-btn` + `.tools-subtab-btn` grouped; `.settings-tabs-nav` +
+`.tools-tabs-nav` pill-wrapper alias). 5 regression tests
+(`test_r12_tools_subtab_uses_sessions_not_tools_inner_collision`,
+`test_r12_unified_segmented_pill_css`,
+`test_r12_anniversary_moved_into_time_subtab`,
+`test_r12_weather_moved_into_live_widgets`,
+`test_r12_device_settings_moved_to_settings_devices`).
+
+Suite: **677 passed / 73 skipped / 0 failed** (up from 672).
+
+Earlier R12: **§C** framing dual-impl correctness test caught + fixed two
+Python-fallback crashes (list→memoryview in `encode_basic_payload` escape +
+`encode_ios_le_payload`). **§A Phases 2–6** shipped (sticky custom-art push
+footer, ambient color gating, scoreboard Reset, appbar corner transports +
+right-aligned sliders + brightness-mapped thumb, scoreboard restyle BLUE-over-
+RED, Virtual Wall toolbar icons+labels, font sweep). Lessons consolidated in
+`docs/ENGINEERING_NOTES.md`; stale state pruned; new cross-agent state in
+`docs/SESSION_HANDOFF.md`.
+
+⏳ **§A Phases 2–7 are UI changes — visual pass needed**: run
+`python3 gui/gui_main.py` to verify appbar, scoreboard, wall toolbar, font
+sweep, segmented-pill, and tools regroup. Then **§D** (deferred features) →
+**§E** (push the ~34-commit arc to origin).
+
+---
+
 ## Round 10 — 2026-06-06 (APK-only frontier: notification mirroring / ANCS)
 
 The headline APK feature (report §3): `SPP_SET_ANDROID_ANCS`. Shipped as a

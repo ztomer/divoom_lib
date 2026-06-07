@@ -31,18 +31,25 @@ core rule in `AGENTS.md`).
   `docs/ENGINEERING_NOTES.md` (linked from AGENTS.md); stale state pruned; **§C**
   shipped — framing dual-impl correctness test, which caught + fixed two real
   Python-fallback crashes (list→memoryview in `encode_basic_payload` escape +
-  `encode_ios_le_payload`). **§A Phase 2** shipped (sticky custom-art push footer,
-  ambient color gating + drop "Custom", scoreboard Reset). **§A Phase 3** shipped
-  (appbar: corner transports, right-aligned sliders, slider drag-fix, unified
-  value font, brightness-mapped thumb). Suite **670 passed / 0 failed**.
-  **§A Phases 4–6** shipped: scoreboard restyle (stacked BLUE-over-RED), unified
-  Virtual Wall toolbar (icons+labels, editable preset name, "Canvas" heading
-  dropped), font sweep (controls inherit `--font-sans`). Suite **672 passed / 0
-  failed**. **⏳ Phases 2–6 are UI changes — run `python3 gui/gui_main.py` for a
-  visual pass.** Next: **§A Phase 7** (item 8 tools regroup: Tools→Time/Sleep/FM,
-  Weather→Live Widgets, Device settings→Settings→Devices, unified segmented-pill
-  tabs — relocates cards across tabs + rewrites location tests, own pass) → §D →
-  §E (push the ~33-commit arc to origin, needs user OK).
+  `encode_ios_le_payload`). **§A Phases 2–6** shipped (sticky custom-art push
+  footer, ambient color gating + drop "Custom", scoreboard Reset, appbar
+  corner transports + right-aligned sliders + slider drag-fix + unified value
+  font + brightness-mapped thumb, scoreboard restyle BLUE-over-RED, unified
+  Virtual Wall toolbar icons+labels, font sweep). **§A Phase 7** shipped
+  (`697f1d51`): inner Tools sub-tab renamed to **Sessions** (resolves the
+  Tools/Tools parent-sub-tab naming collision; "Sessions" is the device-manual
+  term for the multi-timer/noise/sleep bundle); tools regroup: Device Settings
+  + Display + Notification → Settings → Devices; Weather → Live Widgets;
+  Anniversary → Time (with Alarms); settings.css unified segmented-pill
+  (`.settings-tab-btn` + `.tools-subtab-btn` grouped; `.settings-tabs-nav` +
+  `.tools-tabs-nav` pill-wrapper alias). 5 new regression tests
+  (sub-tab id+label, segmented-pill grouped selectors, Anniversary location,
+  Weather location, Device Settings location). Suite **677 passed / 0 failed
+  / 73 skipped** (up from 672). ⏳ **§A Phases 2–7 are UI changes — run
+  `python3 gui/gui_main.py` for a visual pass** (appbar corner transports,
+  scoreboard restyle, wall toolbar, font sweep, segmented-pill, tools regroup).
+  Next: **§D** (deferred features verification) → **§E** (push the ~34-commit
+  arc to origin, needs user OK).
 - **Earlier:** R10 ANCS notifications; R9 screen orientation + factory reset
   (0xBD EXT); R8 device settings/FM/weather/memorial + Tools sub-tabs; R7 surfaced
   text/alarms/sleep/tools. See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
@@ -51,10 +58,9 @@ core rule in `AGENTS.md`).
 
 ## Open threads / next up (see docs/PLANNING_ROUND12.md for the full plan)
 
-1. **R11 GUI overhaul Phases 2–7 not done** (§A): sticky push footer, ambient
-   color visibility + drop "Custom", scoreboard reset+restyle, appbar tweaks,
-   virtual-wall toolbar (icons+labels), font sweep, tools regroup + unified
-   segmented-pill tabs.
+1. **§A visual pass pending** (user-run `python3 gui/gui_main.py`): verify
+   appbar corner transports, scoreboard restyle, wall toolbar, font sweep,
+   segmented-pill, tools regroup, sub-tab rename to "Sessions".
 2. **Hardware verification pending** (§B, user-run): album cover renders
    un-distorted; custom-art/live push end-to-end.
 3. **get_* read-back times out on real devices** (task #20): get queries
