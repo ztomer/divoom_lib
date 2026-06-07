@@ -11,7 +11,7 @@ socket. Two interaction modes share one connection grammar:
 
 All messages are newline-delimited JSON ("NDJSON"): one compact JSON object per
 line. This module has the framing, the message/event shapes, and a thin client.
-The server lives in ``gui/daemon.py``; clients are the menubar + the GUI.
+The server lives in ``divoom_daemon/daemon.py``; clients are the menubar + the GUI.
 """
 from __future__ import annotations
 

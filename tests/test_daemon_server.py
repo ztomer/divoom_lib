@@ -1,4 +1,4 @@
-"""R16 Phase 2 — daemon server (gui/daemon.py).
+"""R16 Phase 2 — daemon server (divoom_daemon/daemon.py).
 
 Drives a real DivoomDaemon over a temp Unix socket with a FAKE monitor and an
 injected device-sender, so no AppKit/BLE is needed. Covers command dispatch,
@@ -16,8 +16,8 @@ import pytest
 sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent.parent / "gui"))
 
-from gui.daemon import DivoomDaemon, STATE_ACTIVE, STATE_IDLE
-from gui.daemon_protocol import DaemonClient, EVENT_STATUS, EVENT_NOTIFICATION
+from divoom_daemon.daemon import DivoomDaemon, STATE_ACTIVE, STATE_IDLE
+from divoom_daemon.daemon_protocol import DaemonClient, EVENT_STATUS, EVENT_NOTIFICATION
 
 
 class FakeMonitor:

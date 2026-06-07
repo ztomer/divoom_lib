@@ -432,7 +432,7 @@ async def cmd_daemon(args: argparse.Namespace) -> int:
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from gui.daemon import run as run_daemon
+    from divoom_daemon.daemon import run as run_daemon
     return run_daemon(mac=getattr(args, "mac", None),
                       socket_path=getattr(args, "socket", "/tmp/divoom.sock"))
 

@@ -21,7 +21,7 @@ import threading
 from pathlib import Path
 from typing import Callable, Optional
 
-from gui.daemon_protocol import (
+from divoom_daemon.daemon_protocol import (
     DEFAULT_SOCKET_PATH,
     SUBSCRIBE_COMMAND,
     encode_message,
