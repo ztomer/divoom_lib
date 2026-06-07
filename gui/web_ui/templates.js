@@ -4,11 +4,11 @@ window.DivoomTemplates = {
     tools: `
         <div class="header-section"><h1>Tools</h1></div>
         <div class="settings-tabs-nav">
-            <button class="tools-subtab-btn active" data-tools-tab="tools-utilities">Utilities</button>
-            <button class="tools-subtab-btn" data-tools-tab="tools-device">Device</button>
-            <button class="tools-subtab-btn" data-tools-tab="tools-radio">Radio</button>
+            <button class="tools-subtab-btn active" data-tools-tab="tools-time">Time</button>
+            <button class="tools-subtab-btn" data-tools-tab="tools-tools">Tools</button>
         </div>
-        <div class="tools-subtab-content active" id="tools-utilities">
+        <!-- R11 item 8: TIME sub-tab — alarms + anniversary. -->
+        <div class="tools-subtab-content active" id="tools-time">
         <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
                         <!-- Round 7: Alarms editor (10 slots) -->
                         <div class="card glass-card">
@@ -21,6 +21,33 @@ window.DivoomTemplates = {
                                 <div id="alarms-list" class="alarms-list" style="display:flex; flex-direction:column; gap:8px;"></div>
                             </div>
                         </div>
+                        <!-- Anniversary / Memorial (moved into Time, R11 item 8a) -->
+                        <div class="card glass-card">
+                            <div class="card-header"><h3>Anniversary / Memorial</h3></div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <label class="hc-toggle"><input type="checkbox" id="memorial-enabled" checked> Enabled</label>
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <input type="text" id="memorial-title" class="text-input" maxlength="16" style="flex:1; min-width:120px;" placeholder="Title (e.g. Birthday)">
+                                </div>
+                                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                    <span class="form-label" style="font-size:12px;">Date</span>
+                                    <input type="number" id="memorial-month" class="text-input" min="1" max="12" value="1" style="width:60px;" title="month">
+                                    <span>/</span>
+                                    <input type="number" id="memorial-day" class="text-input" min="1" max="31" value="1" style="width:60px;" title="day">
+                                    <span class="form-label" style="font-size:12px; margin-left:8px;">at</span>
+                                    <input type="number" id="memorial-hour" class="text-input" min="0" max="23" value="9" style="width:60px;" title="hour">
+                                    <span>:</span>
+                                    <input type="number" id="memorial-min" class="text-input" min="0" max="59" value="0" style="width:60px;" title="minute">
+                                    <button id="memorial-save" class="glow-btn compact" style="margin-left:auto;">Save</button>
+                                </div>
+                            </div>
+                        </div>
+        </div>
+        </div>
+
+        <!-- R11 item 8: TOOLS sub-tab — sleep aid, FM radio, timer/countdown/noise. -->
+        <div class="tools-subtab-content" id="tools-tools">
+        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
                         <!-- Round 7: Sleep Aid -->
                         <div class="card glass-card">
                             <div class="card-header"><h3>Sleep Aid</h3></div>
@@ -71,119 +98,9 @@ window.DivoomTemplates = {
                                 </div>
                             </div>
                         </div>
-        </div>
-        </div>
-
-        <!-- DEVICE sub-tab -->
-        <div class="tools-subtab-content" id="tools-device">
-        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
-            <div class="card glass-card">
-                <div class="card-header"><h3>Device Settings</h3></div>
-                <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-                    <label class="hc-toggle"><input type="checkbox" id="hour24-toggle"> 24-hour clock</label>
-                    <label class="hc-toggle"><input type="checkbox" id="tempf-toggle"> Fahrenheit (°F)</label>
-                    <label class="hc-toggle"><input type="checkbox" id="lowpower-toggle"> Low-power mode</label>
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <span class="form-label" style="font-size:12px; min-width:96px;">Device name</span>
-                        <input type="text" id="device-name-input" class="text-input" maxlength="24" style="flex:1; min-width:140px;" placeholder="Name">
-                        <button id="device-name-save" class="glow-btn compact">Save</button>
-                    </div>
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <span class="form-label" style="font-size:12px; min-width:96px;">Auto power-off</span>
-                        <input type="number" id="auto-off-min" class="text-input" min="0" max="240" value="0" style="width:80px;" title="minutes (0 = off)">
-                        <span style="font-size:12px; color:var(--text-muted);">min</span>
-                        <button id="auto-off-save" class="glow-btn compact">Save</button>
-                    </div>
-                    <div style="display:flex; gap:10px;">
-                        <button id="sync-time-btn" class="glow-btn" style="flex:1;">Sync time from this Mac</button>
-                    </div>
-                </div>
-            </div>
-            <div class="card glass-card">
-                <div class="card-header"><h3>Weather</h3></div>
-                <div class="card-body">
-                    <p class="panel-hint" style="margin-top:0;">Push the current weather to the device's weather widget (pairs with the °C/°F toggle).</p>
-                    <button id="push-weather-btn" class="glow-btn">Push weather to device</button>
-                </div>
-            </div>
-            <div class="card glass-card">
-                <div class="card-header"><h3>Anniversary / Memorial</h3></div>
-                <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
-                    <label class="hc-toggle"><input type="checkbox" id="memorial-enabled" checked> Enabled</label>
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <input type="text" id="memorial-title" class="text-input" maxlength="16" style="flex:1; min-width:120px;" placeholder="Title (e.g. Birthday)">
-                    </div>
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                        <span class="form-label" style="font-size:12px;">Date</span>
-                        <input type="number" id="memorial-month" class="text-input" min="1" max="12" value="1" style="width:60px;" title="month">
-                        <span>/</span>
-                        <input type="number" id="memorial-day" class="text-input" min="1" max="31" value="1" style="width:60px;" title="day">
-                        <span class="form-label" style="font-size:12px; margin-left:8px;">at</span>
-                        <input type="number" id="memorial-hour" class="text-input" min="0" max="23" value="9" style="width:60px;" title="hour">
-                        <span>:</span>
-                        <input type="number" id="memorial-min" class="text-input" min="0" max="59" value="0" style="width:60px;" title="minute">
-                        <button id="memorial-save" class="glow-btn compact" style="margin-left:auto;">Save</button>
-                    </div>
-                </div>
-            </div>
-            <div class="card glass-card">
-                <div class="card-header"><h3>Display</h3></div>
-                <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <span class="form-label" style="font-size:12px; min-width:96px;">Orientation</span>
-                        <select id="screen-dir-select" class="text-input" style="flex:1; min-width:120px;">
-                            <option value="0">0° (normal)</option>
-                            <option value="1">90°</option>
-                            <option value="2">180°</option>
-                            <option value="3">270°</option>
-                        </select>
-                    </div>
-                    <label class="hc-toggle"><input type="checkbox" id="screen-mirror-toggle"> Mirror / flip display</label>
-                    <p class="panel-hint" style="margin:0;">Orientation support is device-dependent; the exact angle mapping may vary by model.</p>
-                    <div class="danger-zone">
-                        <span class="form-label" style="font-size:11px; color:var(--transport-ext); text-transform:uppercase; letter-spacing:0.06em;">Danger zone</span>
-                        <p class="panel-hint" style="margin:6px 0;">Factory reset wipes the device's stored configuration. This cannot be undone.</p>
-                        <button id="factory-reset-btn" class="glow-btn danger">Factory reset device…</button>
-                    </div>
-                </div>
-            </div>
-            <div class="card glass-card">
-                <div class="card-header"><h3>Notification</h3></div>
-                <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
-                    <p class="panel-hint" style="margin-top:0;">Trigger the device's notification display for an app. (Manual — does not mirror your Mac's real notifications.)</p>
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <span class="form-label" style="font-size:12px; min-width:60px;">App</span>
-                        <select id="notif-app-select" class="text-input" style="flex:1; min-width:140px;">
-                            <option value="6">WhatsApp</option>
-                            <option value="7">Text message</option>
-                            <option value="2">Instagram</option>
-                            <option value="4">Facebook</option>
-                            <option value="5">Twitter</option>
-                            <option value="13">Messenger</option>
-                            <option value="3">Snapchat</option>
-                            <option value="8">Skype</option>
-                            <option value="9">LINE</option>
-                            <option value="10">WeChat</option>
-                            <option value="11">QQ</option>
-                            <option value="12">Viber</option>
-                            <option value="1">KakaoTalk</option>
-                            <option value="14">Other</option>
-                        </select>
-                    </div>
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <input type="text" id="notif-text" class="text-input" maxlength="128" style="flex:1; min-width:140px;" placeholder="Optional text">
-                        <button id="notif-send" class="glow-btn compact">Send</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        </div>
-
-        <!-- RADIO sub-tab -->
-        <div class="tools-subtab-content" id="tools-radio">
-        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
-            <div class="card glass-card">
-                <div class="card-header"><h3>FM Radio</h3></div>
+                        <!-- FM Radio (moved into Tools, R11 item 8c) -->
+                        <div class="card glass-card">
+                            <div class="card-header"><h3>FM Radio</h3></div>
                 <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
                     <p class="panel-hint" style="margin-top:0;">Tune the device's FM radio (FM-capable models only — Tivoo / Ditoo).</p>
                     <div style="display:flex; gap:10px; align-items:center;">
@@ -372,6 +289,14 @@ window.DivoomTemplates = {
                                 <label class="hc-toggle" style="margin:0;"><input type="checkbox" id="sysmon-live" checked> Live (5s)</label>
                             </div>
                         </div>
+                        <!-- Weather (moved from Tools to Live Widgets, R11 item 8d) -->
+                        <div class="card glass-card" id="widget-card-weather">
+                            <div class="card-header flex-header"><h3>Weather</h3></div>
+                            <div class="card-body">
+                                <p class="panel-hint" style="margin-top:0;">Push the current weather to the device's built-in weather widget (pairs with the °C/°F toggle in Settings → Devices).</p>
+                                <button id="push-weather-btn" class="glow-btn">Push weather to device</button>
+                            </div>
+                        </div>
                     </div>
     `,
     settings: `
@@ -464,6 +389,81 @@ window.DivoomTemplates = {
                                             <tr><td colspan="5" class="empty-list">No Wi-Fi screens registered.</td></tr>
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Device Settings (moved from Tools → Settings, R11 item 8e) -->
+                        <div class="card glass-card">
+                            <div class="card-header"><h3>Device Settings</h3></div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+                                <label class="hc-toggle"><input type="checkbox" id="hour24-toggle"> 24-hour clock</label>
+                                <label class="hc-toggle"><input type="checkbox" id="tempf-toggle"> Fahrenheit (°F)</label>
+                                <label class="hc-toggle"><input type="checkbox" id="lowpower-toggle"> Low-power mode</label>
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <span class="form-label" style="font-size:12px; min-width:96px;">Device name</span>
+                                    <input type="text" id="device-name-input" class="text-input" maxlength="24" style="flex:1; min-width:140px;" placeholder="Name">
+                                    <button id="device-name-save" class="glow-btn compact">Save</button>
+                                </div>
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <span class="form-label" style="font-size:12px; min-width:96px;">Auto power-off</span>
+                                    <input type="number" id="auto-off-min" class="text-input" min="0" max="240" value="0" style="width:80px;" title="minutes (0 = off)">
+                                    <span style="font-size:12px; color:var(--text-muted);">min</span>
+                                    <button id="auto-off-save" class="glow-btn compact">Save</button>
+                                </div>
+                                <div style="display:flex; gap:10px;">
+                                    <button id="sync-time-btn" class="glow-btn" style="flex:1;">Sync time from this Mac</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Display (moved from Tools → Settings, R11 item 8e) -->
+                        <div class="card glass-card">
+                            <div class="card-header"><h3>Display</h3></div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <span class="form-label" style="font-size:12px; min-width:96px;">Orientation</span>
+                                    <select id="screen-dir-select" class="text-input" style="flex:1; min-width:120px;">
+                                        <option value="0">0° (normal)</option>
+                                        <option value="1">90°</option>
+                                        <option value="2">180°</option>
+                                        <option value="3">270°</option>
+                                    </select>
+                                </div>
+                                <label class="hc-toggle"><input type="checkbox" id="screen-mirror-toggle"> Mirror / flip display</label>
+                                <p class="panel-hint" style="margin:0;">Orientation support is device-dependent; the exact angle mapping may vary by model.</p>
+                                <div class="danger-zone">
+                                    <span class="form-label" style="font-size:11px; color:var(--transport-ext); text-transform:uppercase; letter-spacing:0.06em;">Danger zone</span>
+                                    <p class="panel-hint" style="margin:6px 0;">Factory reset wipes the device's stored configuration. This cannot be undone.</p>
+                                    <button id="factory-reset-btn" class="glow-btn danger">Factory reset device…</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Notification (moved from Tools → Settings, R11 item 8e) -->
+                        <div class="card glass-card">
+                            <div class="card-header"><h3>Notification</h3></div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="panel-hint" style="margin-top:0;">Trigger the device's notification display for an app. (Manual — does not mirror your Mac's real notifications.)</p>
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <span class="form-label" style="font-size:12px; min-width:60px;">App</span>
+                                    <select id="notif-app-select" class="text-input" style="flex:1; min-width:140px;">
+                                        <option value="6">WhatsApp</option>
+                                        <option value="7">Text message</option>
+                                        <option value="2">Instagram</option>
+                                        <option value="4">Facebook</option>
+                                        <option value="5">Twitter</option>
+                                        <option value="13">Messenger</option>
+                                        <option value="3">Snapchat</option>
+                                        <option value="8">Skype</option>
+                                        <option value="9">LINE</option>
+                                        <option value="10">WeChat</option>
+                                        <option value="11">QQ</option>
+                                        <option value="12">Viber</option>
+                                        <option value="1">KakaoTalk</option>
+                                        <option value="14">Other</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <input type="text" id="notif-text" class="text-input" maxlength="128" style="flex:1; min-width:140px;" placeholder="Optional text">
+                                    <button id="notif-send" class="glow-btn compact">Send</button>
                                 </div>
                             </div>
                         </div>

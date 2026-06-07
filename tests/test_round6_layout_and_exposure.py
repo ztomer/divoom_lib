@@ -427,9 +427,9 @@ def test_no_battery_badge_intentionally_not_implemented():
 # ──────────────────────────────────────────────────────────────────
 
 
-def test_r9_display_card_in_tools_device():
-    """The Tools→Device sub-tab has a Display card with orientation select,
-    mirror toggle, and a gated factory-reset button."""
+def test_r9_display_card_exists():
+    """The Display card (orientation/mirror/factory-reset) exists — it now lives
+    in Settings → Devices (moved there in R12 Phase 7)."""
     src = TEMPLATES_JS.read_text()
     assert 'id="screen-dir-select"' in src, "Display card missing orientation <select>."
     assert 'id="screen-mirror-toggle"' in src, "Display card missing mirror toggle."
