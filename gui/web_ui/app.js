@@ -325,8 +325,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const savePresetBtn = document.getElementById("save-preset-btn");
     if (savePresetBtn) {
         savePresetBtn.addEventListener("click", () => {
-            if (Object.keys(window.DivoomState.assignedSlots).length === 0) return;
-            const name = prompt("Enter a unique preset name:", "My Layout Preset");
+            if (Object.keys(window.DivoomState.assignedSlots).length === 0) {
+                window.showToast("Add at least one screen before saving", "error");
+                return;
+            }
+            // R11 item 6: name comes from the toolbar's editable field (falls back
+            // to a prompt if the field is empty).
+            const nameInput = document.getElementById("preset-name-input");
+            let name = (nameInput?.value || "").trim();
+            if (!name) name = (prompt("Enter a unique preset name:", "My Layout Preset") || "").trim();
             if (!name) return;
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.save_preset(name, JSON.stringify(window.DivoomState.assignedSlots)).then(res => {

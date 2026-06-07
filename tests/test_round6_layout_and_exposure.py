@@ -557,6 +557,34 @@ def test_r11_appbar_phase3():
     assert "stopPropagation" in app_js and "appbar-slider" in app_js, "4d slider drag-fix"
 
 
+def test_r11_scoreboard_restyle_blue_over_red():
+    """Phase 4 (5b): scoreboard is a stacked display with BLUE above RED."""
+    html = INDEX_HTML.read_text()
+    m = re.search(r'<div class="scoreboard-display">(.+?)</div>\s*<button', html, re.DOTALL)
+    assert m is not None, "scoreboard-display wrapper missing"
+    block = m.group(1)
+    assert block.index("scoreboard-row blue") < block.index("scoreboard-row red"), \
+        "BLUE row must come before RED"
+    assert 'id="scoreboard-blue"' in block and 'id="scoreboard-red"' in block
+    css = CHANNELS_CSS.read_text()
+    assert ".scoreboard-score" in css and ".scoreboard-row" in css
+
+
+def test_r11_wall_toolbar_unified():
+    """Phase 5 (item 6): single wall toolbar, icons+labels, editable preset name,
+    no 'Canvas'/'Layout & Presets' headings."""
+    html = INDEX_HTML.read_text()
+    wall = re.search(r'id="display-wall".+?id="arranger-canvas"', html, re.DOTALL).group(0)
+    assert "wall-toolbar" in wall
+    assert 'id="preset-name-input"' in wall, "editable preset name field missing"
+    for ctrl in ('id="add-arranger-screen-btn"', 'id="clear-arranger-btn"',
+                 'id="save-preset-btn"', 'id="presets-select"'):
+        assert ctrl in wall, f"{ctrl} missing from unified toolbar"
+    assert ">Canvas<" not in wall, "'Canvas' heading should be gone"
+    assert "Layout &amp; Presets" not in wall, "'Layout & Presets' heading should be gone"
+    assert "save-preset-btn" in APP_JS.read_text()
+
+
 # ──────────────────────────────────────────────────────────────────
 # 6. Playwright integration smoke (sanity check, optional)
 # ──────────────────────────────────────────────────────────────────

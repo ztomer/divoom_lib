@@ -324,17 +324,19 @@
                                      change, no separate Show button). -->
                                 <div class="channel-panel" id="panel-scoreboard">
                                     <p class="panel-hint" style="margin-top: 0;">Display a two-team score counter on the device's Scoreboard tool. Click the card to switch the device to the scoreboard channel; edit a number to update the score.</p>
-                                    <div class="selector-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 360px;">
-                                        <div class="form-group" style="margin: 0;">
-                                            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom: 4px; display:block;">Red</label>
-                                            <input type="number" id="scoreboard-red" min="0" max="999" value="0" class="text-input" style="text-align:center; font-weight:600; font-size:18px;">
+                                    <!-- R11 5b: stacked, centred, large — mirrors the device's
+                                         two-row scoreboard display (blue above red). -->
+                                    <div class="scoreboard-display">
+                                        <div class="scoreboard-row blue">
+                                            <span class="scoreboard-team">BLUE</span>
+                                            <input type="number" id="scoreboard-blue" min="0" max="999" value="0" class="scoreboard-score">
                                         </div>
-                                        <div class="form-group" style="margin: 0;">
-                                            <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom: 4px; display:block;">Blue</label>
-                                            <input type="number" id="scoreboard-blue" min="0" max="999" value="0" class="text-input" style="text-align:center; font-weight:600; font-size:18px;">
+                                        <div class="scoreboard-row red">
+                                            <span class="scoreboard-team">RED</span>
+                                            <input type="number" id="scoreboard-red" min="0" max="999" value="0" class="scoreboard-score">
                                         </div>
                                     </div>
-                                    <button id="scoreboard-reset-btn" class="glow-btn compact" style="margin-top:14px;">Reset to 0 – 0</button>
+                                    <button id="scoreboard-reset-btn" class="glow-btn compact" style="margin-top:16px;">Reset to 0 – 0</button>
                                 </div>
                                 <!-- Text channel (type & push scrolling text) -->
                                 <div class="channel-panel" id="panel-text">
@@ -374,34 +376,30 @@
             <section id="display-wall" class="tab-content">
                 
                 <div class="grid-layout vertical">
-                    <!-- Layout Config -->
-                    <div class="card glass-card">
-                        <div class="card-header flex-header">
-                            <h3>Layout &amp; Presets</h3>
-                            <div class="header-actions">
-                                <button id="save-preset-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none; display:inline-flex; align-items:center;">
-                                    <svg class="kare-icon" viewBox="0 0 16 16" style="margin-right: 4px; width:12px; height:12px;">
-                                        <path d="M2,2 L11,2 L14,5 L14,14 L2,14 Z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                        <rect x="5" y="2" width="5" height="4" fill="none" stroke="currentColor" stroke-width="1"/>
-                                        <rect x="7" y="3" width="1" height="2"/>
-                                        <rect x="4" y="9" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
-                                    </svg>
-                                    Save Preset
-                                </button>
-                                <select id="presets-select" class="custom-select small">
-                                    <option value="">Load Preset...</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Free-form Arranger Canvas -->
+                    <!-- R11 item 6: one unified Virtual Wall toolbar (icons + labels);
+                         "Canvas"/"Layout & Presets" headings dropped, presets merged in.
+                         [ + Add screen | Clear | …flex… | preset name | …flex… | Save | Load ] -->
                     <div class="card glass-card arranger-card">
-                        <div class="card-header flex-header">
-                            <h3>Canvas</h3>
-                            <div class="header-actions">
-                                <button id="add-arranger-screen-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Add Screen</button>
-                                <button id="clear-arranger-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Clear Canvas</button>
+                        <div class="card-header wall-toolbar">
+                            <div class="wall-toolbar-group">
+                                <button id="add-arranger-screen-btn" class="glow-btn compact wall-tool-btn" title="Add a screen">
+                                    <svg class="kare-icon" viewBox="0 0 16 16"><path d="M8,2 L8,14 M2,8 L14,8" stroke="currentColor" stroke-width="2"/></svg>
+                                    Add screen
+                                </button>
+                                <button id="clear-arranger-btn" class="glow-btn compact wall-tool-btn" title="Clear all screens">
+                                    <svg class="kare-icon" viewBox="0 0 16 16"><path d="M3,4 L13,4 M6,4 L6,2 L10,2 L10,4 M4,4 L5,14 L11,14 L12,4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                    Clear
+                                </button>
+                            </div>
+                            <input type="text" id="preset-name-input" class="text-input wall-preset-name" maxlength="40" placeholder="Preset name…" title="Name this layout to save it">
+                            <div class="wall-toolbar-group">
+                                <button id="save-preset-btn" class="glow-btn compact wall-tool-btn" title="Save preset">
+                                    <svg class="kare-icon" viewBox="0 0 16 16"><path d="M2,2 L11,2 L14,5 L14,14 L2,14 Z" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="5" y="2" width="5" height="4" fill="none" stroke="currentColor" stroke-width="1"/><rect x="4" y="9" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                    Save
+                                </button>
+                                <select id="presets-select" class="custom-select small" title="Load preset">
+                                    <option value="">📂 Load preset…</option>
+                                </select>
                             </div>
                         </div>
                         <div class="card-body container-body" style="padding: 0;">

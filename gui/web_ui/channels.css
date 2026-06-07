@@ -126,6 +126,69 @@
     bottom: 0;
 }
 
+/* R11 5b: scoreboard — large, centred, two stacked team rows (blue over red),
+   styled to read like the device's own scoreboard panel. */
+.scoreboard-display {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 360px;
+    margin: 4px auto 0;
+}
+.scoreboard-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+.scoreboard-row.blue { background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.45); }
+.scoreboard-row.red  { background: rgba(239, 68, 68, 0.12);  border-color: rgba(239, 68, 68, 0.45); }
+.scoreboard-team {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+.scoreboard-row.blue .scoreboard-team { color: #3b82f6; }
+.scoreboard-row.red  .scoreboard-team { color: #ef4444; }
+.scoreboard-score {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 110px;
+    background: transparent;
+    border: none;
+    outline: none;
+    text-align: right;
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+/* R11 item 6: unified Virtual Wall toolbar (icons + labels). */
+.wall-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    flex-wrap: wrap;
+}
+.wall-toolbar-group { display: flex; gap: 8px; }
+.wall-preset-name { flex: 1; min-width: 100px; }
+.wall-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: 1px solid var(--secondary);
+    color: var(--text-main);
+    box-shadow: none;
+}
+.wall-tool-btn .kare-icon { width: 12px; height: 12px; }
+
 .panel-title {
     font-family: var(--font-display);
     font-size: 13px;
