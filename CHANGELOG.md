@@ -6,6 +6,30 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 20 — 2026-06-07 (Linux compatibility: daemon + libraries)
+
+`divoom_lib` + `divoom_daemon` now run on Linux, not just macOS (BLE via
+bleak/BlueZ; the R19 network server is platform-neutral). See
+`docs/PLANNING_ROUND20.md`.
+
+- **Per-platform native lib**: `divoom_lib/native_lib.py` resolves
+  `libdivoom_compact.{dylib|so|dll}`; all four ctypes loaders (framing,
+  media_decoder, native.image_encoder, native.downscaler) go through it.
+- **Cross-platform build**: `scripts/build_libdivoom.sh` produces a `.dylib` on
+  macOS (clang) and a `.so` on Linux (`cc -shared -fPIC -lm`); ARM→NEON,
+  x86_64→SSE2.
+- **Portable C**: `compact.c` guarded `<arm_neon.h>` + its NEON tile-row copy
+  behind `DIVOOM_HAVE_NEON`; x86_64 uses a byte-identical `memcpy`. Both paths
+  verified to compile (arm64 NEON build + an x86_64 cross-compile).
+- **Platform-aware tooling**: conftest auto-rebuild + pyproject package-data ship
+  `*.dylib`/`*.so`/`*.dll`.
+- **Daemon on Linux**: notification monitoring is macOS-only; off macOS
+  `_cmd_start` reports a clean `unsupported`/idle state (never builds the Mac
+  monitor). `media_source` now-playing returns None off macOS.
+- +12 tests; suite → 991 / 0 / 75. **Not yet run on real Linux hardware**
+  (cross-compile + platform-guard unit tests). Gaps by design: no Linux
+  notification monitor / now-playing / menu-bar.
+
 ## Round 19 — 2026-06-07 (daemon as a headless network server: TCP + token + binary blobs)
 
 The daemon can now run as a headless LAN server, not just a local Unix socket.

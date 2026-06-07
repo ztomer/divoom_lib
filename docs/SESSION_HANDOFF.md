@@ -15,6 +15,20 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R20 — Linux compatibility (daemon + libraries) SHIPPED. Suite 991 / 0 / 75.**
+  `divoom_lib` + `divoom_daemon` run on Linux; BLE via bleak/BlueZ; the R19
+  network server is platform-neutral. See `docs/PLANNING_ROUND20.md`.
+  - `divoom_lib/native_lib.py` resolves `libdivoom_compact.{dylib|so|dll}`; all 4
+    ctypes loaders use it. `build_libdivoom.sh` is cross-platform (clang/.dylib on
+    macOS, cc/.so on Linux). `compact.c` NEON now guarded (`DIVOOM_HAVE_NEON`),
+    x86_64 uses byte-identical memcpy — both paths verified to compile.
+  - Daemon notification monitoring is macOS-only; off macOS `_cmd_start` returns
+    a clean `unsupported`/idle state (no Mac monitor built). `media_source`
+    now-playing returns None off macOS.
+  - **Not run on real Linux hardware yet** (cross-compile + platform-guard unit
+    tests only). Gaps by design: no Linux notification monitor / now-playing /
+    menu-bar (macOS-only); a D-Bus/MPRIS backend would be future work.
+
 - **R19 — daemon as a headless NETWORK server SHIPPED. Suite 986 / 0 / 75.**
   (User: "why JSON for on-device RPC? + I want the daemon to run headless over
   the network." Decisions: TCP alongside Unix · LAN + token · ship image bytes.)
