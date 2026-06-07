@@ -78,4 +78,20 @@ here. R16 P3/P4/P5 are folded into Phase 5/7 of this round.
 
 ## §outcome
 
-_(filled as phases ship)_
+- **P1 SHIPPED** (`refactor(R17-P1)`): created `divoom_daemon/` package; moved
+  `daemon.py` + `daemon_protocol.py` out of `gui/`; fixed `cli.py` + 2 tests.
+- **P2 SHIPPED** (`refactor(R17-P2)`): moved `macos_notifications.py` +
+  `menubar.py` + `menubar_status.py` into `divoom_daemon/`; repathed every
+  importer consistently (no shim — `@patch` needs one module path); fixed the
+  menubar's `gui_main` launch path.
+- **P3 SHIPPED** (`refactor(R17-P3)`): moved the native dylib + `compact.c` into
+  `divoom_lib/` (its true home); fixed all 9+ refs (framing, image_encoder,
+  downscaler, build script, conftest, pyproject + its test); rebuilt + verified.
+  (Also swept in 9 pre-existing `verify_*.py` root→`scripts/` pure renames.)
+- Suite after each: **959 passed / 0 failed / 75 skipped.**
+- **P4 — NOT started** (the big ripple): rename `gui/` → `divoom_gui/`; move
+  `gui_main`/`gui_api`/`presets_manager`/`web_ui` (the background modules
+  media_sync/gallery_sync/scanner_mixin/media_decoder/control_server/mcp_control
+  ride along until P5). Fix the **10 test path-hacks** + menubar's
+  `../gui/gui_main` path + pyproject `gui`→`divoom_gui`. Own focused pass.
+- **P5/P6/P7 — NOT started** (behavior migration, pyproject finalize, close).

@@ -23,14 +23,17 @@ core rule in `AGENTS.md`).
   owns device + monitor + routing + event socket; `divoom-control daemon` CLI;
   monitor/device-sender injectable) are SHIPPED + tested (13 daemon tests).
   Suite **959 passed / 0 failed**.
-  - **Next = R17, a 3-way package split** (`divoom_lib` / `divoom_daemon` /
-    `divoom_gui`), decided with the user: daemon absorbs ALL background work
-    (notifications + live widgets + gallery/monthly-best); **physical split
-    first**, then behavior migration; **three top-level packages**. R16 P3/P4
-    (menubar + GUI → daemon clients) are folded into R17 Phase 5. See
-    **`docs/PLANNING_ROUND17.md`** for the dependency-safe, incremental,
-    shim-based phase plan + the measured hazards (10 test path-hacks, 9 dylib
-    refs → dylib moves to `divoom_lib/`, pyproject rewrite). **Not started.**
+  - **R17 — 3-way package split IN PROGRESS** (`divoom_lib`/`divoom_daemon`/
+    `divoom_gui`). **P1–P3 SHIPPED**: `divoom_daemon/` package created; daemon
+    core + `macos_notifications` + `menubar*` moved there; the native dylib +
+    `compact.c` moved into `divoom_lib/` (all 9+ refs fixed, rebuilt, green).
+    Suite **959 / 0 / 75**. **Next = P4**: rename `gui/` → `divoom_gui/` (move
+    gui_main/gui_api/presets_manager/web_ui; the background modules ride along
+    until P5), fix the **10 test `sys.path` hacks** + menubar's `../gui/gui_main`
+    path + pyproject `gui`→`divoom_gui`. Then **P5** behavior migration (media_sync
+    /gallery/scanner → daemon; gui_api+menubar become DaemonClients; removes R15
+    §6 GUI-push), **P6** pyproject finalize, **P7** close. See
+    `docs/PLANNING_ROUND17.md` §outcome. R16 P3/P4 are folded into P5.
 
 - **Last round shipped:** Round 15 (§1+§7, §2, §3, §4, §5, §6 SHIPPED —
   round complete). 829 → 946 passed, +117 tests, zero regressions.
