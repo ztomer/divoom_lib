@@ -48,6 +48,24 @@ wasn't loading on this arch, so the live path was the Python fallback.)
 6. **Don't fork the encoder.** The C/Python split already drifted once; if perf
    needs C, keep the parity test as the contract and run it in CI.
 
+### Decision: keep BOTH impls (C + Python fallback), anti-drift via shared tests
+
+Rather than collapse to one implementation, we keep the native C encoder **and**
+the pure-Python encoder (a real fallback when the dylib isn't built). Drift is
+prevented by `tests/test_encoder_both_impls.py`, which runs the **same
+correctness suite against each implementation independently**:
+
+- Parametrized `impl` fixture → {python, c} (c skips if dylib absent).
+- Tests assert **correctness** (encode → decode round-trips to the original
+  image; LLLL/NN/TTTT fields correct), **not** mutual `C == Python` agreement.
+  This is the key fix: the old parity test passed when a bug was present in
+  *both* impls; a correctness test fails on either.
+- Covers every bit-width via colour counts {1,2,4,5,16,17,43,100,200,256}
+  (nb_bits 1–8), single-frame, static, and 3-frame animation.
+
+**CI requirement:** build the dylib in CI so the `c` parametrization actually
+runs (otherwise it silently skips and only Python is covered).
+
 ---
 
 ## Item 1 — Channels / Custom art
