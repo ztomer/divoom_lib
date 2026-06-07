@@ -82,6 +82,9 @@ sub-tab style = **segmented pill**; volume slider stays **plain**.
   (list→memoryview TypeError in `encode_basic_payload` escape branch and
   `encode_ios_le_payload` header) that would crash framing on any platform
   without the dylib — both fixed. Suite 666 passed / 0 failed.
-- **§A / §D / §E:** not started — staged below. §A Phase 2 (quick GUI wins) is
-  the next unit; it touches dynamic `channels.js` + templates, best done as its
-  own reviewable pass.
+- **§A Phase 2 done:** 1a custom-art "Push to Device" is now a pinned footer
+  (`#panel-design.active` flex column + sticky button); 3a ambient color
+  controls (+favorites) hidden unless mode = Plain Color
+  (`updateAmbientColorVisibility`); 3b "Custom" label removed; 5a scoreboard
+  Reset button. +3 UI-presence tests. Suite 669 passed / 0 failed.
+- **§A Phases 3–7 / §D / §E:** not started — staged below.

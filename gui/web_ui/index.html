@@ -286,8 +286,9 @@
                                                 <div class="selector-grid" id="ambient-mode-grid" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; width: 100%;"></div>
                                             </div>
 
-                                            <!-- Color Picker and Swatches Grid -->
-                                            <div class="ambient-swatches-grid" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                                            <!-- Color Picker and Swatches Grid — only relevant to the
+                                                 "Plain Color" mode; hidden for the fixed-palette effects (R11 item 3a). -->
+                                            <div class="ambient-swatches-grid" id="ambient-color-controls" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px;">
                                                 <label class="color-picker-wrapper" style="position:relative; width:36px; height:36px; border-radius:50%; overflow:hidden; border:2px dashed rgba(255,255,255,0.35); cursor:pointer; flex-shrink:0; display:inline-block; background:repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 4px, transparent 4px 8px);" title="Pick a custom color">
                                                     <input type="color" id="ambient-color-input" value="#00ffcc" style="position:absolute; top:-4px; left:-4px; width:44px; height:44px; border:none; background:none; cursor:pointer; padding:0; opacity:0;">
                                                     <svg viewBox="0 0 16 16" width="14" height="14" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none;">
@@ -303,7 +304,6 @@
                                                 <button class="ambient-swatch" style="background:#00ffcc;" data-color="#00ffcc" title="Cyan"></button>
                                                 <button class="ambient-swatch" style="background:#ff00ff;" data-color="#ff00ff" title="Magenta"></button>
                                                 <button class="ambient-swatch" style="background:#ffffff;" data-color="#ffffff" title="White"></button>
-                                                <span style="font-size:11px; color:var(--text-muted); margin-left:4px;">Custom</span>
                                             </div>
 
                                             <!-- 10 last-selected favorites (user override of Rams #10) -->
@@ -332,6 +332,7 @@
                                             <input type="number" id="scoreboard-blue" min="0" max="999" value="0" class="text-input" style="text-align:center; font-weight:600; font-size:18px;">
                                         </div>
                                     </div>
+                                    <button id="scoreboard-reset-btn" class="glow-btn compact" style="margin-top:14px;">Reset to 0 – 0</button>
                                 </div>
                                 <!-- Text channel (type & push scrolling text) -->
                                 <div class="channel-panel" id="panel-text">

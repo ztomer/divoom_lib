@@ -106,6 +106,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (scoreboardRedInput) scoreboardRedInput.addEventListener("change", pushScoreboard);
     if (scoreboardBlueInput) scoreboardBlueInput.addEventListener("change", pushScoreboard);
 
+    // R11 item 5a: Reset both scores to 0 and push.
+    const scoreboardResetBtn = document.getElementById("scoreboard-reset-btn");
+    if (scoreboardResetBtn) scoreboardResetBtn.addEventListener("click", () => {
+        if (scoreboardRedInput) scoreboardRedInput.value = 0;
+        if (scoreboardBlueInput) scoreboardBlueInput.value = 0;
+        pushScoreboard();
+    });
+
     // Selector-grid builder helper
     function buildSelectorGrid(containerId, items, onSelect, activeIndex = 0, previewMap = null) {
         const grid = document.getElementById(containerId);
@@ -341,16 +349,29 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // R11 item 3a: the color picker/swatches/favorites only affect "Plain Color"
+    // (mode 0); the other ambient effects use fixed palettes, so hide the color
+    // controls for them.
+    function updateAmbientColorVisibility() {
+        const show = parseInt(selectedAmbientMode) === 0;
+        const controls = document.getElementById("ambient-color-controls");
+        const favorites = document.getElementById("ambient-favorites-grid");
+        if (controls) controls.style.display = show ? "flex" : "none";
+        if (favorites) favorites.style.display = show ? "flex" : "none";
+    }
+
     buildSelectorGrid("ambient-mode-grid", AMBIENT_EFFECTS, (v) => {
         selectedAmbientMode = parseInt(v);
         const color = ambientColorInput?.value || "#00ffcc";
         window.applyAmbientColor(color);
+        updateAmbientColorVisibility();
     }, 0, AMBIENT_PREVIEWS);
 
     // Call it initially after grid builds
     setTimeout(() => {
         const initialColor = ambientColorInput?.value || "#00ffcc";
         updateAmbientPreviewsColor(initialColor);
+        updateAmbientColorVisibility();
     }, 500);
 
     // ── 10-favorites (last-selected colors) — Kare-style bitmap clarity, Rams #10 overridden per user ──

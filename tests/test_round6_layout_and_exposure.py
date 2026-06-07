@@ -494,6 +494,45 @@ def test_r10_gui_api_and_lib_expose_notification():
 
 
 # ──────────────────────────────────────────────────────────────────
+# 5d. Round 11 Phase 2 — quick GUI wins
+# ──────────────────────────────────────────────────────────────────
+
+CHANNELS_CSS = REPO_ROOT / "gui" / "web_ui" / "channels.css"
+
+
+def test_r11_ambient_color_controls_gated_and_no_custom_label():
+    """Ambient color controls have an id to gate (3a) and the bare 'Custom'
+    label is gone (3b)."""
+    html = INDEX_HTML.read_text()
+    amb = re.search(r'id="panel-ambient">(.+?)<!-- Round 6 — Scoreboard', html, re.DOTALL)
+    assert amb is not None, "ambient panel not found"
+    block = amb.group(1)
+    assert 'id="ambient-color-controls"' in block, "color controls need an id to gate by mode"
+    assert "Custom</span>" not in block, "the 'Custom' label should be removed"
+    js = CHANNELS_JS.read_text()
+    assert "updateAmbientColorVisibility" in js, "channels.js must gate color controls by mode"
+
+
+def test_r11_scoreboard_reset_button():
+    html = INDEX_HTML.read_text()
+    assert 'id="scoreboard-reset-btn"' in html, "scoreboard Reset button missing"
+    js = CHANNELS_JS.read_text()
+    assert "scoreboard-reset-btn" in js, "Reset button not wired in channels.js"
+
+
+def test_r11_custom_art_push_is_pinned_footer():
+    """The Custom Art panel is a flex column so the Push button stays pinned
+    (1a) — mirrors the Monthly Best sticky footer."""
+    css = CHANNELS_CSS.read_text()
+    assert re.search(r"#panel-design\.active\s*\{[^}]*flex-direction:\s*column", css), (
+        "#panel-design.active must be a flex column so the push button pins"
+    )
+    assert re.search(r"#apply-custom-art-btn\s*\{[^}]*sticky", css), (
+        "#apply-custom-art-btn should be a sticky footer"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────
 # 6. Playwright integration smoke (sanity check, optional)
 # ──────────────────────────────────────────────────────────────────
 
