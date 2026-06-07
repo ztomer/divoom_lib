@@ -6,13 +6,13 @@ shipped milestone (per the project planning docs).
 
 ---
 
-## Round 15 — 2026-06-07 (UI unification, monthly best, weather widget, settings refactor, MCP server)
+## Round 15 — 2026-06-07 (UI unification, monthly best, weather widget, settings refactor, MCP server, menubar)
 
 Six user-driven changes plus a new MCP server feature. The unifying
 theme is **making the GUI more honest**: removing buttons that should
 be automatic, moving things to where users expect them, and giving
-the menubar + an MCP server a real role in the workflow. **+103 tests**,
-suite 829 → 932 passed. See `docs/PLANNING_ROUND15.md` for the
+the menubar + an MCP server a real role in the workflow. **+117 tests**,
+suite 829 → 946 passed. See `docs/PLANNING_ROUND15.md` for the
 full plan + outcome.
 
 - **§1+§7 — Tab style unification** (`2c819325`): single source of
@@ -68,8 +68,20 @@ full plan + outcome.
   `docs/MCP_SERVER.md` ships with config snippets for Claude Desktop,
   Cursor, Cline, Continue. `tests/test_mcp_server.py` (25 tests).
   Suite 907 → 932.
+- **§6 — Menubar notification status** (event-driven): the menubar
+  status item now shows the macOS notification-listener state —
+  `Divoom (active|idle|error)` with a green/grey/amber tint — plus an
+  "Open Notifications..." menu item that launches the GUI to Live
+  Widgets → Notifications. **No polling** (user rejected it twice): the
+  GUI *pushes* status to the menubar's Unix socket only on
+  start/stop/error via `gui_api._push_menubar_status`. AppKit-free logic
+  in new `gui/menubar_status.py`; `menubar.py` handles the
+  `notification_status` IPC without a BLE auto-connect; `gui_main`
+  gained `--tab`/`--card` (URL params honored by `settings.js`).
+  `tests/test_menubar_ipc.py` (14 tests incl. a Unix-socket round-trip).
+  Suite 932 → 946.
 
-**Test count:** 829 → 932 (+103). **Suite:** 932 passed, 75 skipped,
+**Test count:** 829 → 946 (+117). **Suite:** 946 passed, 75 skipped,
 0 failed. Zero regressions across R8→R15.
 
 ---

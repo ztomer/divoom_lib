@@ -67,6 +67,14 @@ def _pywebview_1820_bug_present() -> bool:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Divoom Control Center")
+    # R15 §6: the menubar "Open Notifications..." item launches with these so the
+    # GUI opens straight to a given tab/card.
+    parser.add_argument("--tab", default=None, help="nav tab to pre-select (e.g. data-sources)")
+    parser.add_argument("--card", default=None, help="card to focus within the tab (e.g. notifications)")
+    cli_args, _ = parser.parse_known_args()
+
     api = DivoomGuiAPI()
     web_ui_dir = Path(__file__).parent / "web_ui"
     index_html = web_ui_dir / "index.html"
@@ -128,7 +136,13 @@ def main():
             logger.warning("Could not check pywebview #1820 patch (AppKit not available)")
 
     import time
-    url_str = f"{index_html.as_uri()}?t={int(time.time())}"
+    from urllib.parse import urlencode
+    query = {"t": int(time.time())}
+    if cli_args.tab:
+        query["tab"] = cli_args.tab
+    if cli_args.card:
+        query["card"] = cli_args.card
+    url_str = f"{index_html.as_uri()}?{urlencode(query)}"
     window = webview.create_window(
         title="Divoom Control Center",
         url=url_str,

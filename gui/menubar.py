@@ -15,14 +15,25 @@ import asyncio
 import subprocess
 import logging
 from pathlib import Path
-from AppKit import NSApplication, NSStatusBar, NSVariableStatusItemLength, NSMenu, NSMenuItem
-from Foundation import NSObject
+from AppKit import (
+    NSApplication, NSStatusBar, NSVariableStatusItemLength, NSMenu, NSMenuItem,
+    NSColor, NSForegroundColorAttributeName,
+)
+from Foundation import NSObject, NSAttributedString
 
 sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent.parent / "api_scraper"))
 
 from divoom_lib.divoom import Divoom
 from divoom_lib.utils import discovery
+from gui.menubar_status import (
+    SOCKET_PATH as _STATUS_SOCKET_PATH,
+    STATE_IDLE,
+    format_status_title,
+    status_color,
+    hex_to_rgb01,
+    open_notifications_command,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("divoom_menubar")
@@ -38,6 +49,9 @@ class DivoomMenuBarAgent(NSObject):
             self.socket_running = False
             self.current_divoom = None
             self.active_device_mac = None
+            # R15 §6: notification-listener status, pushed by the GUI on change
+            # (no polling). {state, counters}.
+            self.notification_status = {"state": STATE_IDLE, "counters": {}}
             
             # Start UNIX socket server by default
             self.start_socket_server()
@@ -82,8 +96,24 @@ class DivoomMenuBarAgent(NSObject):
                     args = req.get("args", {})
                     
                     logger.info(f"UNIX Socket Received Command: {cmd} (args={args})")
-                    res = self.execute_ipc_command(cmd, args)
-                    conn.sendall(json.dumps({"success": res}).encode("utf-8"))
+                    # R15 §6: notification-status messages are handled here and
+                    # do NOT trigger a BLE scan/connect (unlike device commands).
+                    if cmd == "notification_status":
+                        self.notification_status = {
+                            "state": args.get("state", STATE_IDLE),
+                            "counters": args.get("counters", {}) or {},
+                        }
+                        self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                            "updateStatusTitle:", None, False
+                        )
+                        conn.sendall(json.dumps({"success": True}).encode("utf-8"))
+                    elif cmd == "get_notification_status":
+                        conn.sendall(json.dumps(
+                            {"success": True, "status": self.notification_status}
+                        ).encode("utf-8"))
+                    else:
+                        res = self.execute_ipc_command(cmd, args)
+                        conn.sendall(json.dumps({"success": res}).encode("utf-8"))
                 except Exception as parse_err:
                     conn.sendall(json.dumps({"success": False, "error": str(parse_err)}).encode("utf-8"))
                 finally:
@@ -145,6 +175,29 @@ class DivoomMenuBarAgent(NSObject):
         return False
 
     # Cocoa status item actions
+    def updateStatusTitle_(self, sender):
+        """Render the status-item title from self.notification_status. MUST run
+        on the main thread (Cocoa UI) — call via performSelectorOnMainThread_."""
+        if self.status_item is None:
+            return
+        state = self.notification_status.get("state", STATE_IDLE)
+        title = format_status_title(state)
+        try:
+            r, g, b = hex_to_rgb01(status_color(state))
+            color = NSColor.colorWithCalibratedRed_green_blue_alpha_(r, g, b, 1.0)
+            attrs = {NSForegroundColorAttributeName: color}
+            attributed = NSAttributedString.alloc().initWithString_attributes_(title, attrs)
+            self.status_item.button().setAttributedTitle_(attributed)
+        except Exception as e:
+            logger.warning(f"updateStatusTitle: falling back to plain title ({e})")
+            self.status_item.button().setTitle_(title)
+
+    def openNotifications_(self, sender):
+        """Open the GUI focused on Live Widgets -> Notifications (R15 §6)."""
+        logger.info("Cocoa Action: Opening Notifications view...")
+        gui_path = Path(__file__).parent / "gui_main.py"
+        subprocess.Popen(open_notifications_command(sys.executable, str(gui_path)))
+
     def launchDashboard_(self, sender):
         logger.info("Cocoa Action: Launching pywebview Dashboard...")
         gui_path = Path(__file__).parent / "gui_main.py"
@@ -182,20 +235,27 @@ def main():
     status_item = status_bar.statusItemWithLength_(NSVariableStatusItemLength)
     agent.status_item = status_item
     
-    # Visual layout: Set a neat Unicode status bar icon
-    status_item.button().setTitle_("")
+    # Visual layout: title reflects the notification-listener state (R15 §6).
     status_item.button().setToolTip_("Divoom Coordinator Agent")
-    
+    agent.updateStatusTitle_(None)  # initial "Divoom (idle)"
+
     # Create the popup menu
     menu = NSMenu.alloc().init()
-    
+
     # 1. Launch Dashboard option
     launch_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
         "Launch Dashboard", "launchDashboard:", "d"
     )
     launch_item.setTarget_(agent)
     menu.addItem_(launch_item)
-    
+
+    # 1b. Open Notifications view (R15 §6)
+    notif_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+        "Open Notifications...", "openNotifications:", "n"
+    )
+    notif_item.setTarget_(agent)
+    menu.addItem_(notif_item)
+
     menu.addItem_(NSMenuItem.separatorItem())
     
     # 2. Start/Stop socket server indicator

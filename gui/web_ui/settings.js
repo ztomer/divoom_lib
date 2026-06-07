@@ -20,6 +20,27 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // R15 §6: honor ?tab=&card= (the menubar "Open Notifications..." item opens
+    // the GUI focused on a tab/card). Best-effort; unknown values are ignored.
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const wantTab = params.get("tab");
+        if (wantTab) {
+            const navBtn = document.querySelector(`.nav-btn[data-tab="${wantTab}"]`);
+            if (navBtn) navBtn.click();
+        }
+        const wantCard = params.get("card");
+        if (wantCard) {
+            // Templates are injected async; give them a tick to mount.
+            setTimeout(() => {
+                const card = document.getElementById(`widget-card-${wantCard}`)
+                    || document.getElementById(`${wantCard}-card`)
+                    || document.getElementById(wantCard);
+                if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 400);
+        }
+    } catch (e) { /* no-op */ }
+
     // Sub-settings tabs navigation click handler (R15 §1+§7: `.settings-tab-btn` → `.tab-btn`)
     document.addEventListener("click", (e) => {
         const btn = e.target.closest(".tab-btn[data-settings-tab]");

@@ -498,6 +498,21 @@ existing menu items still work.
 - "Open Notifications..." handler builds the right subprocess
   command.
 
+**Outcome (SHIPPED):** Implemented **event-driven, NOT polled** — the user
+rejected background polling twice, so the plan's "poll every 5s" was dropped.
+Instead the GUI pushes the listener status to the menubar's Unix socket only when
+it changes (`gui_api._push_menubar_status` → `start/stop_notification_listener`).
+AppKit-free logic lives in new `gui/menubar_status.py` (derive_state /
+format_status_title / status_color / hex_to_rgb01 / open_notifications_command /
+push_notification_status) so it's testable on any platform. `menubar.py`:
+`notification_status` + `get_notification_status` IPC handled WITHOUT a BLE
+auto-connect; status-item title shows `Divoom (active|idle|error)` with a
+green/grey/amber `NSAttributedString` tint updated on the main thread;
+"Open Notifications..." menu item launches the GUI via
+`gui_main --tab data-sources --card notifications`; `gui_main` parses those into
+URL query params honored by `settings.js`. Tests: `tests/test_menubar_ipc.py`
+(14, incl. a real Unix-socket push round-trip). Suite **946 passed / 0 failed**.
+
 ---
 
 ## §7 — Cross-cutting: shared design tokens

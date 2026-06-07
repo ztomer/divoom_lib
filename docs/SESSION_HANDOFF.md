@@ -15,9 +15,15 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **Last round shipped:** Round 15 (§1+§7, §2, §3, §4, §5 SHIPPED;
-  §6 not started). Five commits, 829 → 932 passed, +103 tests,
-  zero regressions. **MCP server live** — `divoom-control mcp-server
+- **Last round shipped:** Round 15 (§1+§7, §2, §3, §4, §5, §6 SHIPPED —
+  round complete). 829 → 946 passed, +117 tests, zero regressions.
+  **§6 menubar (event-driven, no polling):** the menubar status item shows
+  `Divoom (active|idle|error)` with a green/grey/amber tint + an "Open
+  Notifications..." item; the GUI pushes status to the menubar's Unix socket on
+  start/stop/error (`gui_api._push_menubar_status`); AppKit-free logic in new
+  `gui/menubar_status.py`; `gui_main --tab/--card` URL params honored by
+  `settings.js`. `tests/test_menubar_ipc.py` (14). The plan's "poll every 5s"
+  was dropped — user rejected polling twice. **MCP server live** — `divoom-control mcp-server
   --mac <MAC>` exposes 12 tools over stdio JSON-RPC. GUI toggle in
   Settings → Connectivity with **no background polling** (initial
   fetch + tab-activation + click-driven refresh only — user
@@ -71,8 +77,8 @@ core rule in `AGENTS.md`).
     `d.music.set_volume = AsyncMock(return_value=...)` to get
     `assert_awaited_*_with` assertions working.
 
-  Suite: **932 passed / 0 failed / 75 skipped** (up from R15 start
-  at 829). **+103 tests across R15 §1+§2+§3+§4+§5**. Zero regressions
+  Suite: **946 passed / 0 failed / 75 skipped** (up from R15 start
+  at 829). **+117 tests across R15 §1-§6**. Zero regressions
   across R8→R15.
 
 - **Earlier rounds:** R14 (weather facade, routing JSON, GUI card,
@@ -86,14 +92,8 @@ core rule in `AGENTS.md`).
 
 ## Open threads / next up
 
-1. **R15 §6 — Menubar (not started).** Plan: poll
-   `get_notification_status` less aggressively (or event-driven);
-   status-item title suffix `(active)/(idle)/(error)` with color
-   tints. "Open Notifications..." menu item. ~4 tests. **Carry the
-   "no background polling" lesson from §5** — the user has explicitly
-   flagged this twice.
-2. **Push R15 to origin.** Local is 5 commits ahead (`git log --oneline`
-   for the last 5 shows R15 §1+§7, §2, §4, §3, §5 in that order).
+1. **Push R15 to origin.** Local is ~6 commits ahead (R15 §1+§7, §2, §4,
+   §3, §5, §6). Round 15 is complete.
 3. **R12 §A visual pass pending** (user-run `python3 gui/gui_main.py`):
    verify appbar corner transports, scoreboard restyle, wall toolbar,
    font sweep, segmented-pill, tools regroup, sub-tab rename to
