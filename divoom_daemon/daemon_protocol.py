@@ -184,14 +184,20 @@ class DaemonClient:
                        lan_token: int = 0, device_name: str | None = None,
                        use_ios_le_protocol: bool = True) -> dict:
         """Ask the daemon to own + connect a device (BLE via ``mac`` or LAN via
-        ``lan_ip``). Returns status fields (connected/mac/lan_ip/wall)."""
+        ``lan_ip``). Returns status fields (connected/mac/lan_ip/wall).
+
+        Uses the longer ``connect_timeout`` (BLE setup is slow — the 2s default
+        read timeout would give up mid-handshake and surface as "timed out")."""
+        from divoom_daemon.daemon_config import load_daemon_config
         return self.send_command("connect", {
             "mac": mac, "lan_ip": lan_ip, "lan_token": lan_token,
             "device_name": device_name, "use_ios_le_protocol": use_ios_le_protocol,
-        })
+        }, read_timeout=load_daemon_config().connect_timeout)
 
     def disconnect_device(self) -> dict:
-        return self.send_command("disconnect")
+        from divoom_daemon.daemon_config import load_daemon_config
+        return self.send_command("disconnect",
+                                 read_timeout=load_daemon_config().connect_timeout)
 
     def shutdown(self) -> dict:
         """Ask the daemon to stop its process (clean kill switch). Best-effort:

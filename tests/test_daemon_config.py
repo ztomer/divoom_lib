@@ -22,6 +22,14 @@ def test_defaults_match_named_constants():
     assert cfg.scan_read_slack == dc.DEFAULT_SCAN_READ_SLACK
     assert cfg.client_timeout == dc.DEFAULT_CLIENT_TIMEOUT
     assert cfg.reconnect_scan_timeout == dc.DEFAULT_RECONNECT_SCAN_TIMEOUT
+    assert cfg.connect_timeout == dc.DEFAULT_CONNECT_TIMEOUT
+
+
+def test_connect_timeout_is_longer_than_quick_timeout():
+    # BLE connect is slow — the connect read timeout must comfortably exceed the
+    # quick-command timeout, else the GUI gives up mid-handshake ("timed out").
+    cfg = dc.DaemonConfig()
+    assert cfg.connect_timeout > cfg.client_timeout
 
 
 def test_scan_read_timeout_adds_slack_to_per_scan_timeout():

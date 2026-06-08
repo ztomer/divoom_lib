@@ -30,6 +30,7 @@ DEFAULT_SCAN_LIMIT = 4               # stop after N devices (0 = no limit)
 DEFAULT_SCAN_READ_SLACK = 10.0       # client waits scan_timeout + this for the reply
 DEFAULT_CLIENT_TIMEOUT = 2.0         # socket read timeout for quick, non-scan commands
 DEFAULT_RECONNECT_SCAN_TIMEOUT = 3.0  # short scan used during auto-reconnect
+DEFAULT_CONNECT_TIMEOUT = 20.0       # client read timeout for connect/disconnect (BLE is slow)
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,7 @@ class DaemonConfig:
     scan_read_slack: float = DEFAULT_SCAN_READ_SLACK
     client_timeout: float = DEFAULT_CLIENT_TIMEOUT
     reconnect_scan_timeout: float = DEFAULT_RECONNECT_SCAN_TIMEOUT
+    connect_timeout: float = DEFAULT_CONNECT_TIMEOUT
 
     def scan_read_timeout(self, scan_timeout: float) -> float:
         """How long a client should wait for a scan reply: the daemon only
@@ -68,11 +70,15 @@ scan_limit = {scan_limit}
 # (the daemon only answers once the scan finishes). Covers connect + serialize.
 scan_read_slack = {scan_read_slack}
 
-# Socket read timeout for quick, non-scan commands (status, connect, etc.).
+# Socket read timeout for quick commands (status, brightness, etc.).
 client_timeout = {client_timeout}
 
 # Short scan used internally when auto-reconnecting to a known device.
 reconnect_scan_timeout = {reconnect_scan_timeout}
+
+# Client read timeout for connect/disconnect. BLE connection setup is slow, so
+# this is much larger than client_timeout — otherwise the GUI gives up mid-handshake.
+connect_timeout = {connect_timeout}
 """
 
 _cache: DaemonConfig | None = None
