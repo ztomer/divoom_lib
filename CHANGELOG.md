@@ -31,6 +31,21 @@ shipped milestone (per the project planning docs).
 - Daemon `scan()` logs `pid / sys.executable / CBCentralManager.authorization()`
   before scanning so the attribution state is visible in the daemon log.
 
+### Added — daemon configuration file (`daemon.ini`)
+
+- **`divoom_daemon/daemon_config.py`** — `DaemonConfig` loaded from
+  `~/.config/divoom-control/daemon.ini`, alongside the GUI's `config.ini`. A
+  commented default file is written on first load so the knobs are discoverable.
+  Knobs: `scan_timeout`, `scan_limit` (0 = no cap), `scan_read_slack`,
+  `client_timeout`, `reconnect_scan_timeout`.
+- **Removed scan magic numbers.** The hardcoded `+10s` client read padding, the
+  `DaemonClient` `2.0s` timeout, the `15`/`4` scan defaults (in three places),
+  and the `3.0s` reconnect scans now all resolve from this config — one source of
+  truth. The GUI's per-scan `timeout` still wins; the config is the fallback
+  (Divoom discovery is slow, so the defaults are deliberately large).
+- Tests: `tests/test_daemon_config.py` (defaults, file-write, override parse,
+  0-limit edge, bad-value + missing-section fallback, slack helper).
+
 ---
 
 ## Round 23 — 2026-06-07 (REVIEW §1.2 + §1.3 + §1.4 + §1.5)

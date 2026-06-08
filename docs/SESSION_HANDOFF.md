@@ -37,6 +37,17 @@ core rule in `AGENTS.md`).
   Verified end-to-end with the exact GUI startup sequence (eager detached
   `ensure_daemon` → fresh-client `scan`) → all 4 Divoom screens.
 
+- **R24 — daemon config + scan magic-number cleanup. Suite 1016 / 0 / 75.**
+  (commit `4be1144c`) New `divoom_daemon/daemon_config.py` → `DaemonConfig` from
+  `~/.config/divoom-control/daemon.ini` (sits beside the GUI's `config.ini`; a
+  commented default file is written on first load). Knobs: `scan_timeout`,
+  `scan_limit` (0 = no cap, honored), `scan_read_slack` (replaces the hardcoded
+  `+10s` client read padding), `client_timeout` (replaces `DaemonClient`'s 2.0s),
+  `reconnect_scan_timeout` (replaces 3.0s). Wired through `DaemonClient`,
+  `DeviceOwner.scan` + both reconnect scans, and `ScannerMixin.scan_devices`. The
+  user-sent per-scan timeout still wins; the config is just the fallback. No more
+  15/4/2.0/3.0/10.0 literals scattered around. Tests: `test_daemon_config.py`.
+
 - **NEXT (deferred round-2 UI polish, per user "polish UI afterwards"):**
   (a) tabs consistency — make all three panels share the SAME structure (tabs
   OUTSIDE the box; drop Channels' glass-panel-around-tabs so it matches
