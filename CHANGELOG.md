@@ -6,6 +6,25 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 21 — 2026-06-07 (review + documentation overhaul)
+
+- **`docs/REVIEW_2026-06.md`**: code/architecture review (Linus + Uncle Bob),
+  UI/UX review (Rams + Kare), and a "rewrite the lib + daemon in Rust?" analysis
+  (verdict: don't rewrite the library; the daemon is the only defensible Rust
+  candidate, and only with an embedded/footprint driver).
+- **500-LOC rule enforced**: `tests/test_file_size.py` fails on any unlisted
+  source file over 500 LOC, with a shrink-only allow-list of the 11 current
+  offenders (so the rule can't silently re-drift).
+- **Docs rewritten to current reality**: `README.md` + `ARCHITECTURE.md`
+  (3-package + daemon-owns-device + Unix/TCP network + macOS/Linux); new
+  `docs/README.md` index separating canonical from historical docs.
+- **Removed 10 stale docs** (CODE_REVIEW, APP_IMPROVEMENT_PLAN, PLANNED_WORK,
+  next_phase_requirements, DESKTOP_GUI, ENGINEERING_NOTES, brightness_investigation,
+  DRAG_FIX_HISTORY, DEVICE_VALIDATION_PLAN, PLANNING_ROUND2_CONTINUATION) —
+  recoverable from git history.
+- Suite → 993 / 0 / 75. The recommended >500-LOC refactors + a live UI pass +
+  an optional Rust daemon spike are staged (see REVIEW §1.7), not yet done.
+
 ## Round 20 — 2026-06-07 (Linux compatibility: daemon + libraries)
 
 `divoom_lib` + `divoom_daemon` now run on Linux, not just macOS (BLE via

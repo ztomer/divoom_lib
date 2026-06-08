@@ -1,10 +1,59 @@
 # Divoom Control Architecture
 
-This document provides a high-level overview of the `divoom-control` library, designed to help AI agents (and humans) quickly understand the system structure and communication protocols.
+High-level map of `divoom-control` for humans and AI agents. The lower half
+(protocols, transports, framing) describes the **library**; this top half
+describes the **three-package system** the library now lives inside.
 
-## System Overview
+## Three packages (R17)
 
-The library is structured as a facade architecture supporting multi-transport (BLE, Bluetooth Classic SPP, and local LAN Wi-Fi HTTP) connection routing.
+```
+divoom_lib/      pure protocol + transports + encoders + CLI + MCP + weather.
+                 The native accelerator (libdivoom_compact.{dylib|so|dll}) lives
+                 here. No host/OS/GUI deps beyond bleak. Runs on macOS + Linux.
+divoom_daemon/   headless, always-on agent: the SINGLE owner of the device
+                 connection, a Unix + optional TCP event/command server, and
+                 (macOS only) notification monitoring/routing + the menu-bar app.
+divoom_gui/      pywebview desktop "Control Center" — presentation only. A thin
+                 client of the daemon (it owns no BLE connection). macOS today.
+```
+
+### Single-owner model (R17 "full cutover")
+
+A BLE connection can be held by exactly **one** process, so the **daemon owns the
+device** and the GUI is a thin RPC client:
+
+```mermaid
+graph LR
+    GUI[divoom_gui pywebview] -- NDJSON over Unix/TCP --> Daemon[divoom_daemon]
+    CLI[divoom-control CLI] --> Lib[divoom_lib]
+    Daemon -- owns --> Lib
+    Lib --> Conn[DivoomConnection]
+    Conn --> Dev[Divoom device  BLE / BT-SPP / LAN]
+```
+
+- The GUI proxies every device call through the daemon's generic `device_call`
+  RPC (`DaemonDeviceProxy`); `current_divoom`/`wall_instance` are proxies, not
+  real `Divoom` objects. The GUI auto-spawns the daemon if none is running.
+- **Daemon protocol:** newline-delimited JSON (control plane) over a Unix socket
+  (local, trusted) and, optionally, TCP (`--host`/`--port`/`--token`, R19).
+  Binary device data (images/GIFs) is shipped via base64 `blobs` only when the
+  client is remote; locally, file paths are passed (shared filesystem).
+- See `docs/PLANNING_ROUND16.md`/`17`/`19`/`20` for the daemon, cutover, network
+  server, and Linux-compat rounds.
+
+### Platform support (R20)
+
+`divoom_lib` + `divoom_daemon` run on **macOS and Linux** (BLE via bleak/BlueZ;
+the network server is platform-neutral). The native lib builds per-platform via
+`scripts/build_libdivoom.sh` (`.dylib`/`.so`), resolved by
+`divoom_lib/native_lib.py`. macOS-only features degrade cleanly on Linux:
+notification monitoring → idle/"unsupported", now-playing/cover-art → no-op, the
+menu-bar agent is macOS-only.
+
+## Library system overview
+
+The library is a facade supporting multi-transport (BLE, Bluetooth Classic SPP,
+and local LAN Wi-Fi HTTP) connection routing.
 
 ```mermaid
 graph TD
@@ -75,8 +124,12 @@ The system architecture is governed by strict technical guidelines established d
 
 ## Strict Architectural Standards
 
-To maintain high maintainability, rapid semantic searches, and easy codebase updates for both human developers and AI agents, the project enforces a strict limit:
-*   **No File Above 500 Lines of Code (LOC)**: No single Python, JS, or CSS source file in the library must exceed 500 lines of code.
+To maintain high maintainability, rapid semantic searches, and easy codebase updates for both human developers and AI agents, the project targets a strict limit:
+*   **No File Above 500 Lines of Code (LOC)**: No single Python, JS, or CSS source file should exceed 500 lines of code.
+*   **Status (2026-06): regressed — 11 files currently exceed 500 LOC** (notably
+    `divoom_gui/gui_api.py` 921, `divoom_daemon/daemon.py` 730, and four
+    `web_ui/*.js/css`). A guardrail test + the refactor plan are in
+    `docs/REVIEW_2026-06.md` §1. Treat the rule as enforced going forward.
 *   **Agent/Developer Rationale**:
     *   **LLM Context Optimization**: Under 500 LOC ensures an AI assistant can read and reason about the *entire* file without truncation or loss of precision.
     *   **Strict Modularity**: A 500 LOC ceiling forces developers to apply the Single Responsibility Principle, separating framing logic, networking, and data processing.

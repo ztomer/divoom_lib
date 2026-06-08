@@ -15,6 +15,27 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R21 — review + doc overhaul. Suite 993 / 0 / 75.**
+  - `docs/REVIEW_2026-06.md`: full code/architecture review (Linus + Uncle Bob),
+    UI/UX review (Rams + Kare), and the "rewrite lib+daemon in Rust?" analysis.
+    Key findings: 11 files >500 LOC (rule regressed); `gui_api.py` (921) is a God
+    Object with ~150 LOC of duplicated wall/single branching; `daemon.py` (730) is
+    an if-ladder dispatch + 4 responsibilities; wall 6-tuple should be a dataclass.
+    Rust verdict: don't rewrite the lib; the *daemon* is the only defensible Rust
+    candidate, and only with an embedded/footprint driver.
+  - **Executed now:** `tests/test_file_size.py` (500-LOC guardrail with a
+    shrink-only allow-list of the 11 current offenders); README + ARCHITECTURE
+    rewritten to current reality (3-package + daemon + network + Linux); new
+    `docs/README.md` index; removed 10 stale docs (CODE_REVIEW, APP_IMPROVEMENT_
+    PLAN, PLANNED_WORK, next_phase_requirements, DESKTOP_GUI, ENGINEERING_NOTES,
+    brightness_investigation, DRAG_FIX_HISTORY, DEVICE_VALIDATION_PLAN,
+    PLANNING_ROUND2_CONTINUATION — recoverable from git).
+  - **Staged (NOT done — need approval / are large):** the >500-LOC refactors
+    (gui_api split + dispatcher, daemon command-registry + DeviceOwner/
+    NotificationService/SocketServer extraction, DeviceSlot dataclass, web_ui
+    splits); a live screenshot-based UI/UX pass; an optional Rust daemon spike.
+    Priority order in REVIEW §1.7.
+
 - **R20 — Linux compatibility (daemon + libraries) SHIPPED. Suite 991 / 0 / 75.**
   `divoom_lib` + `divoom_daemon` run on Linux; BLE via bleak/BlueZ; the R19
   network server is platform-neutral. See `docs/PLANNING_ROUND20.md`.
