@@ -14,17 +14,14 @@ testable without AppKit or a real BLE device.
 """
 from __future__ import annotations
 
-import base64
 import logging
 import os
-import tempfile
-import threading
-from pathlib import Path
 from typing import Callable, Optional
 
 from divoom_daemon.daemon_protocol import DEFAULT_SOCKET_PATH
 from divoom_daemon.socket_server import SocketServer
 from divoom_daemon.notification_service import NotificationService
+from divoom_daemon.device_owner import DeviceOwner
 
 logger = logging.getLogger("divoom_daemon")
 
@@ -47,26 +44,16 @@ class DivoomDaemon:
         port: Optional[int] = None,
         token: Optional[str] = None,
     ):
-        self.mac = mac
         self.socket_path = socket_path
-        # Optional TCP listener (R19): the daemon can be a headless network
-        # server alongside the local Unix socket. `token` (env-overridable)
-        # authenticates every TCP request; Unix connections are trusted (local
-        # filesystem perms already gate them).
         self.host = host
         self.port = port
         self.token = token if token is not None else (os.environ.get("DIVOOM_DAEMON_TOKEN") or None)
-        self._device_sender = device_sender     # injectable notification sender; default = real BLE
-        # R17 P5: the daemon is the SINGLE owner of the BLE device. The GUI is a
-        # thin client that proxies device methods through the `device_call` RPC.
-        self._device = device                   # injectable (tests); else lazy BLE
-        self._device_lock = threading.Lock()
-        self._loop = None                       # dedicated asyncio loop for device ops
-        self._loop_thread = None
-        self._lan_ip: Optional[str] = None      # set when the device is LAN-attached
-        self._wall = None                       # DivoomWall (multi-device), daemon-owned
-        self._wall_slots: dict = {}
         self._registry: dict[str, Callable[[dict], dict]] = {}
+        self._device_owner = DeviceOwner(
+            mac=mac,
+            device=device,
+            device_sender=device_sender,
+        )
         self._socket_server = SocketServer(
             socket_path=socket_path,
             host=host, port=port,
@@ -76,7 +63,7 @@ class DivoomDaemon:
         )
         self._notifier = NotificationService(
             broadcast=self._socket_server.broadcast,
-            send_notification=self._send_to_device,
+            send_notification=self._device_owner.send_notification,
             monitor=monitor,
         )
 
@@ -89,14 +76,14 @@ class DivoomDaemon:
         r["start_notifications"] = lambda _: self._notifier.start()
         r["stop_notifications"] = lambda _: self._notifier.stop()
         r["set_routing"] = self._notifier.set_routing
-        r["device_call"] = self._cmd_device_call
-        r["connect"] = self._cmd_connect
-        r["disconnect"] = lambda _: self._cmd_disconnect()
-        r["device_status"] = lambda _: self._cmd_device_status()
-        r["scan"] = self._cmd_scan
-        r["wall_configure"] = self._cmd_wall_configure
-        r["probe_lan"] = lambda _: self._cmd_probe_lan()
-        r["sync_artwork"] = self._cmd_sync_artwork
+        r["device_call"] = self._device_owner.device_call
+        r["connect"] = self._device_owner.connect
+        r["disconnect"] = lambda _: self._device_owner.disconnect()
+        r["device_status"] = lambda _: self._device_owner.device_status()
+        r["scan"] = self._device_owner.scan
+        r["wall_configure"] = self._device_owner.wall_configure
+        r["probe_lan"] = lambda _: self._device_owner.probe_lan()
+        r["sync_artwork"] = self._device_owner.sync_artwork
         self._registry = r
 
     def handle_command(self, command: str, args: dict) -> dict:
@@ -107,372 +94,12 @@ class DivoomDaemon:
             return {"success": False, "error": f"unknown command: {command}"}
         return handler(args)
 
-    # ── device ownership (R17 P5: the daemon is the single BLE owner) ─────
-    def _device_loop(self):
-        """A dedicated asyncio loop so the BLE connection persists across calls."""
-        with self._device_lock:
-            if self._loop is not None:
-                return self._loop
-            import asyncio
-            loop = asyncio.new_event_loop()
-            ready = threading.Event()
-
-            def _run():
-                asyncio.set_event_loop(loop)
-                ready.set()
-                loop.run_forever()
-
-            self._loop_thread = threading.Thread(target=_run, daemon=True, name="daemon-device-loop")
-            self._loop_thread.start()
-            ready.wait(2.0)
-            self._loop = loop
-            return self._loop
-
-    def _run_device(self, coro):
-        """Run a device coroutine on the persistent device loop, blocking for the result."""
-        import asyncio
-        loop = self._device_loop()
-        return asyncio.run_coroutine_threadsafe(coro, loop).result()
-
-    def _device_connected(self) -> bool:
-        d = self._device
-        return bool(d is not None and getattr(d, "is_connected", False))
-
-    async def _ensure_device_async(self, mac: Optional[str] = None):
-        """Return a connected device, creating + connecting one if needed.
-        Honors an injected device (tests) without touching BLE."""
-        if self._device is not None:
-            if not getattr(self._device, "is_connected", False) and hasattr(self._device, "connect"):
-                try:
-                    await self._device.connect()
-                except Exception:
-                    pass
-            return self._device
-        from divoom_lib.divoom import Divoom            # pragma: no cover (needs BLE)
-        from divoom_lib.utils import discovery          # pragma: no cover
-        target = mac or self.mac
-        if not target:
-            devs = await discovery.discover_all_divoom_devices(timeout=3.0)
-            if not devs:
-                raise RuntimeError("no Divoom device found")
-            target = devs[0]["address"]
-            self.mac = target
-        self._device = Divoom(mac=target, logger=logger, use_ios_le_protocol=False)
-        await self._device.connect()
-        return self._device
-
-    @staticmethod
-    def _json_safe(value):
-        """Coerce a device-call result to something JSON-serializable."""
-        if value is None or isinstance(value, (bool, int, float, str)):
-            return value
-        if isinstance(value, (list, tuple)):
-            return [DivoomDaemon._json_safe(v) for v in value]
-        if isinstance(value, dict):
-            return {str(k): DivoomDaemon._json_safe(v) for k, v in value.items()}
-        if isinstance(value, (bytes, bytearray)):
-            return list(value)
-        return str(value)
-
-    def _cmd_device_call(self, args: dict) -> dict:
-        """Generic RPC: resolve a dotted method on the owned target and await it.
-        e.g. {"method": "display.show_light", "args": ["00FFCC", 100]}.
-        ``target``: "device" (default, the single Divoom) or "wall" (the
-        daemon-owned DivoomWall)."""
-        method = args.get("method")
-        call_args = list(args.get("args", []) or [])
-        call_kwargs = args.get("kwargs", {}) or {}
-        which = args.get("target", "device")
-        if not method:
-            return {"success": False, "error": "device_call requires 'method'"}
-
-        # Materialize any shipped binary blobs (remote clients have no shared
-        # filesystem) to temp files and substitute them into the positional args.
-        for idx_str, b64 in (args.get("blobs") or {}).items():
-            try:
-                idx = int(idx_str)
-                data = base64.b64decode(b64)
-                suffix = Path(str(call_args[idx])).suffix if idx < len(call_args) and call_args[idx] else ".bin"
-                fd, tmp_path = tempfile.mkstemp(prefix="divoom_blob_", suffix=suffix or ".bin")
-                with os.fdopen(fd, "wb") as f:
-                    f.write(data)
-                if idx < len(call_args):
-                    call_args[idx] = tmp_path
-                else:
-                    call_args.append(tmp_path)
-            except (ValueError, TypeError, IndexError) as e:
-                return {"success": False, "error": f"bad blob {idx_str}: {e}"}
-
-        async def _do():
-            if which == "wall":
-                base = self._wall
-                if base is None:
-                    raise RuntimeError("no wall configured")
-            else:
-                base = await self._ensure_device_async(args.get("mac"))
-            target = base
-            for part in str(method).split("."):
-                target = getattr(target, part)
-            result = target(*call_args, **call_kwargs)
-            if hasattr(result, "__await__"):
-                result = await result
-            return result
-
-        try:
-            result = self._run_device(_do())
-            return {"success": True, "result": self._json_safe(result)}
-        except Exception as e:
-            logger.warning(f"device_call {which}.{method} failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    async def _build_device_async(self, args: dict):
-        """Construct + connect the single owned device (BLE or LAN) from connect
-        args. Honors an injected test device (no BLE)."""
-        if self._device is not None:
-            if not getattr(self._device, "is_connected", False) and hasattr(self._device, "connect"):
-                try:
-                    await self._device.connect()
-                except Exception:
-                    pass
-            return self._device
-        from divoom_lib.divoom import Divoom              # pragma: no cover (needs BLE)
-        lan_ip = args.get("lan_ip")
-        if lan_ip:                                        # pragma: no cover
-            from divoom_lib.lan_transport import LanTransport
-            token = int(args.get("lan_token", 0) or 0)
-            dev = Divoom(mac=None, lan_ip=lan_ip, lan_token=token, logger=logger)
-            dev._lan = LanTransport(device_ip=lan_ip, local_token=token, logger=logger)
-            if not await dev._lan.probe():
-                raise RuntimeError(f"LAN device at {lan_ip} unreachable")
-            self._device = dev
-            self._lan_ip = lan_ip
-            return dev
-        mac = args.get("mac")                             # pragma: no cover
-        if not mac:
-            return await self._ensure_device_async(None)
-        self._device = Divoom(
-            mac=mac, logger=logger,
-            use_ios_le_protocol=bool(args.get("use_ios_le_protocol", True)),
-            device_name=args.get("device_name"),
-        )
-        await self._device.connect()
-        self.mac = mac
-        return self._device
-
-    def _cmd_connect(self, args: dict) -> dict:
-        try:
-            self._run_device(self._build_device_async(args))
-            return {"success": True, **self._status_fields()}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-
-    def _cmd_disconnect(self) -> dict:
-        d = self._device
-        if d is not None and hasattr(d, "disconnect"):
-            try:
-                self._run_device(d.disconnect())
-            except Exception as e:
-                logger.debug(f"disconnect: {e}")
-        self._device = None
-        self._lan_ip = None
-        w = self._wall
-        if w is not None and hasattr(w, "disconnect"):
-            try:
-                self._run_device(w.disconnect())
-            except Exception as e:
-                logger.debug(f"wall disconnect: {e}")
-        self._wall = None
-        return {"success": True, "connected": False}
-
-    def _status_fields(self) -> dict:
-        d = self._device
-        return {
-            "connected": self._device_connected(),
-            "mac": self.mac,
-            "lan_ip": self._lan_ip,
-            "wall": self._wall is not None,
-        }
-
-    def _cmd_device_status(self) -> dict:
-        return {"success": True, **self._status_fields()}
-
-    def _cmd_scan(self, args: dict) -> dict:
-        """Daemon-owned BLE scan (the GUI no longer touches the radio)."""
-        timeout = float(args.get("timeout", 15) or 15)
-        limit = int(args.get("limit", 4) or 4)
-
-        async def _scan():                               # pragma: no cover (needs BLE)
-            from divoom_lib.utils import discovery
-            results = await discovery.discover_all_divoom_devices(timeout=timeout)
-            return results[:limit] if limit > 0 else results
-
-        try:
-            results = self._run_device(_scan())
-            return {"success": True, "devices": self._json_safe(results)}
-        except Exception as e:
-            logger.warning(f"scan failed: {e}")
-            return {"success": False, "error": str(e), "devices": []}
-
-    def _cmd_wall_configure(self, args: dict) -> dict:
-        """Build + connect a daemon-owned DivoomWall from {mac: slot} config."""
-        slots = args.get("slots") or {}
-        cell = int(args.get("cell_size", 16) or 16)
-        if not slots:
-            self._wall_slots = {}
-            self._wall = None
-            return {"success": True, "wall": False}
-        # Idempotent: reuse a live wall with the same layout.
-        if (self._wall is not None and slots == self._wall_slots
-                and getattr(self._wall, "is_connected", False)):
-            return {"success": True, "wall": True}
-        self._wall_slots = slots
-
-        async def _build():                              # pragma: no cover (needs BLE)
-            from divoom_lib.wall import DivoomWall
-            configs = [{
-                "mac": mac,
-                "x": int(s.get("x", 0)), "y": int(s.get("y", 0)),
-                "size": int(s.get("size", cell)),
-                "width": int(s.get("width", 120)), "height": int(s.get("height", 120)),
-            } for mac, s in slots.items()]
-            wall = DivoomWall(configs, custom_logger=logger)
-            await wall.connect()
-            return wall
-
-        try:
-            self._wall = self._run_device(_build())
-            return {"success": True, "wall": True}
-        except Exception as e:
-            logger.warning(f"wall_configure failed: {e}")
-            self._wall = None
-            return {"success": False, "error": str(e), "wall": False}
-
-    def _cmd_sync_artwork(self, args: dict) -> dict:
-        """Download a gallery asset and stream it to the owned device or wall.
-
-        The GUI no longer holds device objects, so the per-device resize +
-        binary streaming runs here against the daemon's real targets (binary
-        never crosses the socket). ``target``: "device" or "wall".
-        ``default_size`` is used for the single device (the wall uses each
-        screen's configured size)."""
-        file_id = args.get("file_id")
-        default_size = int(args.get("default_size", 16) or 16)
-        which = args.get("target", "device")
-        if not file_id:
-            return {"success": False, "error": "sync_artwork requires 'file_id'"}
-
-        async def _do():                                 # pragma: no cover (needs BLE)
-            import urllib.request
-            from pathlib import Path as _P
-            from divoom_lib import media_decoder
-            from divoom_lib.monthly_best_daemon import stream_raw_bin_payload
-
-            dl_url = f"https://fin.divoom-gz.com/{file_id}"
-            req = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                file_bytes = resp.read()
-            if len(file_bytes) < 4:
-                return False
-
-            # Resolve targets as (device, size) against the real owned objects.
-            if which == "wall":
-                if self._wall is None:
-                    raise RuntimeError("no wall configured")
-                targets = [(d, sz) for d, _x, _y, sz, _w, _h in self._wall.devices]
-            else:
-                device = await self._ensure_device_async(args.get("mac"))
-                targets = [(device, default_size)]
-
-            extracted = media_decoder.extract_gif_from_magic_43(file_bytes)
-            is_gif = bool(extracted) or file_bytes[:6] in (b"GIF89a", b"GIF87a")
-            gif_data = extracted or file_bytes
-
-            tmp = _P(__file__).parent.parent / "scratch"
-            tmp.mkdir(parents=True, exist_ok=True)
-            results = []
-            for divoom, size in targets:
-                mac = getattr(getattr(divoom, "_conn", None), "mac", None) or "dev"
-                if is_gif:
-                    from PIL import Image
-                    src = tmp / f"sync_in_{mac}.gif"
-                    src.write_bytes(gif_data)
-                    out = tmp / f"sync_out_{mac}.gif"
-                    with Image.open(src) as img:
-                        frames, durations = [], []
-                        for i in range(img.n_frames):
-                            img.seek(i)
-                            frames.append(img.resize((int(size), int(size)), Image.Resampling.NEAREST).convert("RGB"))
-                            durations.append(img.info.get("duration", 100))
-                        frames[0].save(out, save_all=True, append_images=frames[1:],
-                                       duration=durations, loop=0)
-                    results.append(await divoom.display.show_image(str(out)))
-                else:
-                    results.append(await stream_raw_bin_payload(divoom, file_bytes))
-            return all(r is True for r in results)
-
-        try:
-            ok = self._run_device(_do())
-            return {"success": bool(ok)}
-        except Exception as e:
-            logger.warning(f"sync_artwork failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    def _cmd_probe_lan(self) -> dict:
-        d = self._device
-        lan = getattr(d, "lan", None) if d is not None else None
-        if lan is None:
-            return {"success": True, "reachable": False, "detail": "no LAN configured"}
-
-        async def _probe():                              # pragma: no cover (needs LAN)
-            return await lan.probe()
-
-        try:
-            ok = self._run_device(_probe())
-            ip = getattr(lan, "device_ip", None)
-            return {"success": True, "reachable": bool(ok), "device_ip": ip}
-        except Exception as e:
-            return {"success": False, "reachable": False, "error": str(e)}
-
     def _cleanup(self) -> None:
         self._notifier.stop_monitor()
-        if self._loop is not None:
-            try:
-                self._loop.call_soon_threadsafe(self._loop.stop)
-            except Exception:
-                pass
+        self._device_owner.stop()
 
     def status_event(self) -> dict:
         return self._notifier.status_event()
-
-    def _send_to_device(self, app_type: int, text: str) -> None:
-        if self._device_sender is not None:
-            self._device_sender(app_type, text)
-            return
-        self._send_to_device_ble(app_type, text)  # pragma: no cover (needs BLE)
-
-    def _send_to_device_ble(self, app_type: int, text: str) -> None:  # pragma: no cover
-        import asyncio
-        from divoom_lib.divoom import Divoom
-        from divoom_lib.utils import discovery
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            if not getattr(self, "_device", None) or not self._device.is_connected:
-                mac = self.mac
-                if not mac:
-                    devs = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=3.0))
-                    if not devs:
-                        return
-                    mac = devs[0]["address"]
-                self._device = Divoom(mac=mac, logger=logger, use_ios_le_protocol=False)
-                loop.run_until_complete(self._device.connect())
-            if text:
-                loop.run_until_complete(self._device.notification.show_notification_text(int(app_type), text))
-            else:
-                loop.run_until_complete(self._device.notification.show_notification(int(app_type)))
-        finally:
-            loop.close()
 
     # ── subscriber fan-out (delegated to SocketServer) ───────────────────
     def broadcast(self, event: dict) -> None:

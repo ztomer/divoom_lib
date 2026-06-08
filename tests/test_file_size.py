@@ -19,7 +19,6 @@ _LIMIT = 500
 # entry. Do not add to this list; oversized new files must be split instead.
 ALLOWLIST = {
     "divoom_gui/web_ui/settings.js",
-    "divoom_daemon/daemon.py",
     "divoom_gui/web_ui/templates.js",
     "divoom_gui/web_ui/app.js",
     "divoom_gui/media_sync.py",
