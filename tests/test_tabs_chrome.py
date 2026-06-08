@@ -192,9 +192,8 @@ def test_tab_spacing_tokens_defined_once_in_root() -> None:
         assert style.count(f"{tok}:") == 1, f"{tok} must be declared once in style.css :root"
 
 
-def test_tabs_section_uses_spacing_tokens() -> None:
-    """.tabs-section must drive its padding + bottom gap from the tokens, not
-    hardcoded px (so all three tab areas read identically)."""
+def test_tabs_section_uses_padding_tokens() -> None:
+    """.tabs-section padding comes from the tokens, not hardcoded px."""
     src = TABS_CSS.read_text()
     m = re.search(r"\.tabs-section\s*\{([^}]*)\}", src)
     assert m, "tabs.css is missing the .tabs-section rule"
@@ -202,19 +201,59 @@ def test_tabs_section_uses_spacing_tokens() -> None:
     assert "var(--tab-pane-pad-y)" in body and "var(--tab-pane-pad-x)" in body, (
         ".tabs-section padding must use --tab-pane-pad-y / --tab-pane-pad-x"
     )
-    assert "var(--tab-pane-gap)" in body, (
-        ".tabs-section bottom gap must use --tab-pane-gap"
-    )
-    # No stray hardcoded vertical padding/margin left behind.
+    # No stray hardcoded padding/margin from earlier rounds.
     assert "10px 12px" not in body and "margin-bottom: 16px" not in body
 
 
-def test_channels_grid_gap_zeroed() -> None:
-    """The Channels tab area is a grid; its gap must be zeroed so the only
-    spacing below the pane is --tab-pane-gap (no double-spacing vs Tools/Settings)."""
+def test_flex_panels_cancel_panel_gap_for_tab_pane() -> None:
+    """In flex .tab-content (Tools/Settings) the pane→content gap is the panel
+    flex gap cancelled + re-added as --tab-pane-gap (net == --tab-pane-gap)."""
+    src = TABS_CSS.read_text()
+    m = re.search(r"\.tab-content\s*>\s*\.tabs-section\s*\{([^}]*)\}", src)
+    assert m, "tabs.css must scope a `.tab-content > .tabs-section` margin rule (R28 r2)"
+    body = m.group(1)
+    assert "var(--tab-pane-gap)" in body and "var(--panel-gap)" in body, (
+        "the flex pane gap must be calc(--tab-pane-gap - --panel-gap)"
+    )
+
+
+def test_channels_grid_rows_pin_tab_pane() -> None:
+    """The Channels grid must pin the tab-pane row to content height (auto 1fr),
+    else align-content stretches it into a giant empty glass box; and the
+    pane→content gap uses the --tab-pane-gap token."""
     src = STYLE_EXTRA_CSS.read_text()
-    m = re.search(r"#control-panel\s+\.grid-layout\s*\{([^}]*gap:\s*0[^}]*)\}", src)
-    assert m, "#control-panel .grid-layout must set gap: 0 (R28)"
+    bodies = re.findall(r"#control-panel\s+\.grid-layout\s*\{([^}]*)\}", src)
+    assert bodies, "#control-panel .grid-layout rule missing"
+    joined = "\n".join(bodies)
+    assert re.search(r"grid-template-rows:\s*auto\s+1fr", joined), (
+        "#control-panel .grid-layout must set grid-template-rows: auto 1fr (R28 r2)"
+    )
+    assert "var(--tab-pane-gap)" in joined, "channels grid row-gap must use --tab-pane-gap"
+
+
+def test_tabs_row_is_left_aligned() -> None:
+    """The tab row is left-anchored (not margin auto), so it aligns with the
+    content cards and doesn't shift when the panel scrollbar toggles."""
+    src = TABS_CSS.read_text()
+    m = re.search(r"\.tabs-row\s*\{([^}]*)\}", src)
+    assert m and "margin-left: auto" not in m.group(1), (
+        ".tabs-row must not be centered with margin auto (R28 r2)"
+    )
+
+
+def test_settings_tab_pane_does_not_wrap_content() -> None:
+    """Regression: the Settings .tabs-section must close right after the tab row
+    so the content panels are siblings, not nested inside the glass pane."""
+    src = (REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js").read_text()
+    pane_open = src.index('class="tabs-section"')
+    first_content = src.index('class="settings-tab-content')
+    between = src[pane_open:first_content]
+    # The tabs-section opens, the tab row opens+closes, THEN the section closes —
+    # so there must be >= 2 </div> between the pane open and the first content panel.
+    assert between.count("</div>") >= 2, (
+        "Settings .tabs-section is not closed before the content panels "
+        "(it would wrap the whole panel)"
+    )
 
 
 # ── index.html links tabs.css ─────────────────────────────────────────

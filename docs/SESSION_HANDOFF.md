@@ -35,6 +35,16 @@ core rule in `AGENTS.md`).
     `#control-panel .grid-layout` has `gap:0` so the grid doesn't double-space
     (was 36px in Channels vs 16px in Tools/Settings). Verified live (pane→card
     gap = 1px in all three). +3 guardrail tests.
+  - **Tab layout fixes (r2).** (1) Channels giant empty glass pane → grid
+    `grid-template-rows: auto 1fr` (default align-content was stretching the tab
+    row to ~217px). (2) Tools/Settings 21px gap below the pane → `.tab-content`
+    flex `gap` tokenised as `--panel-gap`; `.tab-content > .tabs-section` margin
+    `calc(--tab-pane-gap - --panel-gap)` nets 1px in flex (matches grid). (3) Tab
+    row no longer centered (`margin auto`) — left-anchored so it aligns with cards
+    and doesn't shift as the scrollbar toggles between sub-tabs. (4) Settings
+    `.tabs-section` was never closed in `templates_settings.js` (wrapped the whole
+    panel) → added the missing `</div>`. Verified live in all 3 panels
+    (pane→card = 1px, zero sub-tab shift). Suite 1077 / 75 / 0.
   - **MCP server no longer opens its own BLE connection.** It was calling
     `_resolve_device()` → a 2nd BLE connect to the daemon-owned device (R17
     single-owner) → `DeviceConnectionError: ... was not found`, shown as a

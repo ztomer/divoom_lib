@@ -36,8 +36,23 @@
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: var(--tab-pane-pad-y) var(--tab-pane-pad-x);
-  margin: 0 0 var(--tab-pane-gap) 0;
+  /* The gap to the content below is owned by the parent context, not a fixed
+     margin here, because the parents differ: Channels nests the pane in a CSS
+     grid, while Tools/Settings make it a direct flex child of .tab-content.
+     - Channels (grid): #control-panel .grid-layout sets row-gap (style_extra.css).
+     - Tools/Settings (flex): the rule just below cancels the .tab-content flex
+       `--panel-gap` and re-adds `--tab-pane-gap` so the net gap is identical. */
+  margin: 0;
   box-sizing: border-box;
+}
+
+/* R28 r2: in a flex .tab-content (Tools, Settings) the pane is a direct child,
+   so it inherits the panel's `--panel-gap` flex gap. Cancel it and substitute
+   `--tab-pane-gap` so the pane→content gap matches the grid (Channels) context.
+   Does NOT match Channels: there the pane is nested inside .grid-layout, not a
+   direct child of .tab-content. */
+.tab-content > .tabs-section {
+  margin-bottom: calc(var(--tab-pane-gap) - var(--panel-gap));
 }
 
 .tabs-row {
@@ -52,10 +67,12 @@
      window's right edge. */
   width: fit-content;
   max-width: 100%;
-  /* R24 #4: center the tab row horizontally (macOS convention). Works in both
-     block parents (Tools/Settings) and the flex card-header (Channels). */
-  margin-left: auto;
-  margin-right: auto;
+  /* R28 r2: LEFT-aligned (was centered via margin auto). Centering made the row
+     (a) not line up with the left-aligned content cards and (b) shift left/right
+     as the panel's vertical scrollbar appeared/disappeared between sub-tabs. A
+     left anchor is stable and aligns with the cards. */
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .tabs-row .tab-btn {

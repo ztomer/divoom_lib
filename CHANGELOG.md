@@ -8,6 +8,29 @@ shipped milestone (per the project planning docs).
 
 ## Round 28 — 2026-06-08 (MCP daemon-route + scan filter + tab spacing + bitmap font)
 
+### Tab layout fixes (r2 — follow-up to the spacing centralisation)
+
+- **Channels giant glass pane.** `#control-panel .grid-layout` left its rows on
+  the grid default `align-content`, which stretched BOTH auto rows — ballooning
+  the tab pane into a ~217px empty glass box. Fixed with
+  `grid-template-rows: auto 1fr` (pane = content height, card takes the rest).
+- **Tools/Settings 21px gap below the tab pane.** `.tab-content` is a flex
+  column with `gap: 20px`, so the pane inherited a 20px flex gap (+1px margin).
+  Tokenised the panel gap (`--panel-gap: 20px`) and added
+  `.tab-content > .tabs-section { margin-bottom: calc(var(--tab-pane-gap) - var(--panel-gap)) }`
+  so the flex (Tools/Settings) and grid (Channels) contexts both yield exactly
+  `--tab-pane-gap` (1px) below the pane.
+- **Tab row shifted left/right between sub-tabs.** `.tabs-row` was centered with
+  `margin: 0 auto`; the centre moved as the panel scrollbar appeared/disappeared,
+  and it never lined up with the left-aligned cards. Now left-anchored (stable +
+  aligned).
+- **Settings glass pane wrapped the whole panel.** `templates_settings.js` never
+  closed `.tabs-section` after the tab row, so all 5 content panels were nested
+  *inside* the tab glass pane (browser auto-closed it at the fragment end). Added
+  the missing `</div>` so the panels are siblings.
+- Tests: `tests/test_tabs_chrome.py` retargeted + extended (flex gap cancel,
+  grid `auto 1fr`, left-aligned row, Settings pane-not-wrapping regression).
+
 ### Device text uses a real bitmap font (no anti-aliasing)
 
 - Text rasterised for the device (stock ticker, etc.) was drawn with PIL

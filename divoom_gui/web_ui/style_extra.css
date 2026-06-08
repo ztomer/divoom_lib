@@ -183,11 +183,15 @@ body.theme-light .arranger-node-image {
     height: 100%;
     min-height: 0;
     align-items: stretch;
-    /* R28: the Channels tab area is a grid (tabs-section + content card). Zero
-       the grid gap so the ONLY spacing below the tab pane is the tabs-section's
-       --tab-pane-gap margin — identical to the block-context Tools/Settings
-       panels. Tune spacing via the --tab-pane-* tokens in style.css, not here. */
-    gap: 0;
+    /* R28 r2: the Channels tab area is a grid (tab pane + content card). Pin the
+       first row to its content height and let the card take the rest — otherwise
+       the grid's default `align-content` stretches BOTH auto rows, ballooning the
+       tab pane into a giant empty glass box. The row-gap is the single source of
+       the pane→content spacing (matches the flex Tools/Settings via the
+       --tab-pane-gap token in style.css). */
+    grid-template-rows: auto 1fr;
+    row-gap: var(--tab-pane-gap);
+    column-gap: 0;
 }
 
 #control-panel .card {

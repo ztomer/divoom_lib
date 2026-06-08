@@ -68,6 +68,7 @@
     --tab-pane-pad-y: 2px;   /* glass-pane vertical padding (above + below the row) */
     --tab-pane-pad-x: 12px;  /* glass-pane horizontal padding */
     --tab-pane-gap:   1px;    /* gap from the pane to the cards below it */
+    --panel-gap:      20px;  /* general spacing between blocks inside a .tab-content */
 }
 
 /* ── Light Mode Redefinitions ── */

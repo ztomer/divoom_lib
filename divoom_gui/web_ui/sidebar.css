@@ -168,7 +168,7 @@
 .tab-content.active {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: var(--panel-gap);
     width: 100%;
     flex: 1;
     min-height: 0;

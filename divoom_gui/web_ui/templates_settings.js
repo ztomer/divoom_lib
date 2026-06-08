@@ -12,6 +12,9 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                     <button class="tab-btn" data-settings-tab="settings-connectivity" data-tab="settings-connectivity" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5a7 7 0 0 1 10 0M5.5 11a3.5 3.5 0 0 1 5 0" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="13" r="1" fill="currentColor"/></svg>Connectivity</button>
                     <button class="tab-btn" data-settings-tab="settings-appearance" data-tab="settings-appearance" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>Appearance</button>
                 </div>
+                </div><!-- /.tabs-section — R28 r2: close the pane HERE so the
+                       content panels below are siblings, not nested inside the
+                       tab glass pane (was wrapping the whole panel). -->
 
                 <!-- 1. DEVICES TAB -->
                 <div class="settings-tab-content active" id="settings-devices">
