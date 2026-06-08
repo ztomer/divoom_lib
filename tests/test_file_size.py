@@ -20,7 +20,6 @@ _LIMIT = 500
 ALLOWLIST = {
     "divoom_gui/media_sync.py",
     "divoom_lib/native_src/downsample.c",
-    "divoom_lib/models/constants.py",
 }
 
 
