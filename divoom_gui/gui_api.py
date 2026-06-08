@@ -43,10 +43,12 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
 
         self._daemon_client = None
 
+        # Cache-only at startup: never block (or network-fail) GUI launch on a
+        # Divoom cloud login. Real auth happens lazily when a cloud op needs it.
         try:
-            self.cached_creds = divoom_auth.get_credentials()
+            self.cached_creds = divoom_auth.get_cached_credentials()
         except Exception as e:
-            logger.warning(f"Failed to load credentials on startup: {e}")
+            logger.warning(f"Failed to load cached credentials on startup: {e}")
 
         device_cache_path = Path.home() / ".config" / "divoom-control" / "virtual_device.json"
         if not device_cache_path.exists():
