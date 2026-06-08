@@ -122,12 +122,6 @@ class DivoomMenuBarAgent(NSObject):
         NSApplication.sharedApplication().terminate_(self)
 
 
-def show_toast(title: str, message: str):
-    """Utility to trigger native macOS notifications using AppleScript."""
-    script = f'display notification "{message}" with title "{title}"'
-    subprocess.run(["osascript", "-e", script])
-
-
 def main():
     # R24 #1: single-instance — if a menu-bar agent is already running, don't
     # start a second status item.
@@ -204,7 +198,10 @@ def main():
 
     status_item.setMenu_(menu)
 
-    show_toast("Divoom Agent", "macOS Menubar Coordinator Agent launched successfully.")
+    # No "launched successfully" toast — a routine successful startup isn't worth
+    # interrupting the user with a system notification. The status item appearing
+    # is feedback enough. (Toasts are reserved for things the user actually needs
+    # to act on.)
 
     # Launch Cocoa event loop
     app.run()
