@@ -31,9 +31,20 @@ round's planning doc.
   history, the 5 named ambient effects, apply-on-select, and the unified
   picker/swatches all ship; confirm the ambient effect previews actually *loop*
   (the one residual of the old "Custom Art polish" item).
-- `OPEN` **Live UI/UX pass** (Rams/Kare) on the *running* app: contrast/legibility of
-  the glass theme, six-area IA task audit, icon coherence (imported raster EQ/VJ
-  icons vs custom SVGs). See `REVIEW_2026-06.md` §2. Needs the GUI launched.
+- `OPEN` **Channel panels have large dead space** — e.g. the Clock channel shows
+  only a "Clock Color" swatch with ~80% of the panel empty. Rams "useful / as
+  little design": either fill the panel (style options + a live device preview)
+  or size the window/panel to its content. Audit Clock/Scoreboard/Text/etc.
+- `VERIFY` **Animated previews** (Monthly Best gallery, Custom Art ambient,
+  Live Widgets) — couldn't be checked interactively in the live pass: a
+  fullscreen always-on-top overlay app ("Osaurus") intercepted all clicks to the
+  pywebview window. Re-run the pass when that overlay is off.
+
+### UI pass — confirmed good (2026-06)
+- Settings sits at the sidebar bottom; the 4 transport dots sit bottom-right;
+  sidebar + tab icons share one coherent line/Kare style. The theme is flat-dark
+  and legible — the earlier "glassmorphism vs legibility" concern (REVIEW §2) is
+  largely unfounded in practice.
 
 ### Platform / infra
 - `UPSTREAM` **Divoom cloud guest auth** fails (`RC=10 "Command is not match"`) → gallery /
