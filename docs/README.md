@@ -18,16 +18,20 @@
 - **[DIVOOM_PROTOCOL_SUMMARY.md](DIVOOM_PROTOCOL_SUMMARY.md)** — protocol cheat
   sheet.
 - **[DIVOOM_API_DOC.md](DIVOOM_API_DOC.md)** — fuller protocol/API notes.
-- **[MCP_SERVER.md](MCP_SERVER.md)** — the MCP server.
+- **[MCP_SERVER.md](MCP_SERVER.md)** — the MCP server (daemon-routed, R28).
 - **[NOTIFICATIONS_SETUP.md](NOTIFICATIONS_SETUP.md)** — macOS notification setup.
+- **Device bitmap font** — `divoom_lib/fonts/` + `scripts/extract_apk_font.py`
+  (APK-derived 1-bit font for crisp device text; R28).
 - **[TESTING_STRATEGY.md](TESTING_STRATEGY.md)** — test approach.
 - **[divoom_docs/](divoom_docs/)** — captured upstream/device docs.
 
 ## Historical audit trail (planning rounds — kept, not maintained)
-`PLANNING_ROUND3.md` … `PLANNING_ROUND20.md` record each round's plan + outcome.
+`PLANNING_ROUND3.md` … `PLANNING_ROUND28.md` record each round's plan + outcome.
 They are point-in-time records; for current state read SESSION_HANDOFF + the
 canonical docs above. Notable: R16 (daemon), R17 (3-package split + single-owner
-cutover), R19 (network server), R20 (Linux compat).
+cutover), R19 (network server), R20 (Linux compat), R26 (channel/weather fix),
+R28 (MCP-via-daemon, scan filter, tab layout, device bitmap font). (R27 command
+queue has no planning doc — see CHANGELOG + SESSION_HANDOFF.)
 
 > Stale docs (CODE_REVIEW, APP_IMPROVEMENT_PLAN, PLANNED_WORK,
 > next_phase_requirements, DESKTOP_GUI, ENGINEERING_NOTES, brightness_investigation,

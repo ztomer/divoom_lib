@@ -8,13 +8,17 @@ describes the **three-package system** the library now lives inside.
 
 ```
 divoom_lib/      pure protocol + transports + encoders + CLI + MCP + weather.
-                 The native accelerator (libdivoom_compact.{dylib|so|dll}) lives
-                 here. No host/OS/GUI deps beyond bleak. Runs on macOS + Linux.
+                 The native accelerator (libdivoom_compact.{dylib|so|dll}) and the
+                 device bitmap font (divoom_lib/fonts/, R28) live here. No
+                 host/OS/GUI deps beyond bleak. Runs on macOS + Linux.
 divoom_daemon/   headless, always-on agent: the SINGLE owner of the device
                  connection, a Unix + optional TCP event/command server, and
                  (macOS only) notification monitoring/routing + the menu-bar app.
+                 daemon_client.py holds the client plumbing (DaemonClient,
+                 DaemonDeviceProxy, ensure_daemon) shared by the GUI + MCP server.
 divoom_gui/      pywebview desktop "Control Center" — presentation only. A thin
                  client of the daemon (it owns no BLE connection). macOS today.
+                 daemon_bridge.py re-exports divoom_daemon.daemon_client.
 ```
 
 ### Single-owner model (R17 "full cutover")
@@ -25,6 +29,7 @@ device** and the GUI is a thin RPC client:
 ```mermaid
 graph LR
     GUI[divoom_gui pywebview] -- NDJSON over Unix/TCP --> Daemon[divoom_daemon]
+    MCP[divoom-control mcp-server] -- device_call --> Daemon
     CLI[divoom-control CLI] --> Lib[divoom_lib]
     Daemon -- owns --> Lib
     Lib --> Conn[DivoomConnection]
@@ -34,12 +39,19 @@ graph LR
 - The GUI proxies every device call through the daemon's generic `device_call`
   RPC (`DaemonDeviceProxy`); `current_divoom`/`wall_instance` are proxies, not
   real `Divoom` objects. The GUI auto-spawns the daemon if none is running.
+- **The MCP server is also a daemon client** (R28): `divoom-control mcp-server`
+  builds its tool catalog against a `DaemonDeviceProxy` rather than opening its
+  own BLE connection (which would fight the daemon for the single-owner device).
+  `--mac` optional; `--host/--port/--token` target a remote daemon.
 - **Daemon protocol:** newline-delimited JSON (control plane) over a Unix socket
   (local, trusted) and, optionally, TCP (`--host`/`--port`/`--token`, R19).
   Binary device data (images/GIFs) is shipped via base64 `blobs` only when the
   client is remote; locally, file paths are passed (shared filesystem).
-- See `docs/PLANNING_ROUND16.md`/`17`/`19`/`20` for the daemon, cutover, network
-  server, and Linux-compat rounds.
+- **Device-bound text** (tickers, sysmon, notifications) is rasterised with the
+  crisp 1-bit bitmap font in `divoom_lib/fonts/` (extracted from the Divoom APK,
+  R28) — never an anti-aliased TrueType font, which is unreadable at 16/32/64px.
+- See `docs/PLANNING_ROUND16.md`/`17`/`19`/`20`/`28` for the daemon, cutover,
+  network server, Linux-compat, and MCP-via-daemon/bitmap-font rounds.
 
 ### Platform support (R20)
 

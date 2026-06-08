@@ -6,15 +6,37 @@ stdio and exposes 12 device-control tools. Point any MCP-compatible
 client at this machine's `divoom-control` binary and you can drive
 your Divoom device with natural language.
 
+## Architecture (R28): the MCP server is a daemon client
+
+The MCP server does **not** open its own BLE connection. The daemon is the sole
+owner of the device (R17 single-owner model), so the MCP server builds its tool
+catalog against a `DaemonDeviceProxy` and routes every tool call through the
+daemon's `device_call` RPC. It connects to the local daemon socket (auto-spawning
+one if none is running) or, with `--host`, to a remote daemon over TCP.
+
+Consequence: **`--mac` is optional** — the daemon already knows the device. (Pre-
+R28 the server called `_resolve_device()` and grabbed its own BLE connection,
+which fought the daemon and failed with `DeviceConnectionError: ... not found`.)
+
 ## Quick start
 
 ```bash
-# CLI path (scriptable — for headless setups, CI, dotfiles, etc.)
+# CLI path (scriptable). No --mac needed; auto-spawns a local daemon if needed.
+divoom-control mcp-server
+
+# Pin a device (only matters if a daemon has to be spawned):
 divoom-control mcp-server --mac 11:75:58:3f:fd:aa
+
+# Target a remote/headless daemon over TCP (R19 network server):
+divoom-control mcp-server --host 192.168.1.50 --port 9009 --token <secret>
 
 # GUI path (Settings → Connectivity → MCP Server → Start)
 # The GUI spawns the same subprocess and tails the log file.
 ```
+
+Flags: `--socket` (daemon Unix socket, default `/tmp/divoom.sock`),
+`--host`/`--port`/`--token` (remote daemon; `--token` falls back to
+`DIVOOM_DAEMON_TOKEN`).
 
 The server reads JSON-RPC messages from stdin and writes responses
 to stdout. It runs until stdin closes (the parent MCP client closes

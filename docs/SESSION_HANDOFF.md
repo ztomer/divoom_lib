@@ -15,8 +15,11 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **R28 — MCP-via-daemon + scan filter + tab spacing + device bitmap font
-    SHIPPED. Suite 1074 / 75 / 0.**
+- **R28 — MCP-via-daemon + scan filter + tab layout + device bitmap font
+    SHIPPED. Suite 1079 / 75 / 0.** Full write-up: `docs/PLANNING_ROUND28.md`.
+    Commits: `517d9ca0` (MCP daemon-route + scan), `6aa8c747` (tab spacing
+    tokens), `eb9169ea` (bitmap font), `27892d5a` (tab layout fixes),
+    `fe36661a` (half font).
   - **Device text now uses a real bitmap font (no anti-aliasing).** Was PIL
     `ImageFont.load_default(size=…)` (AA TrueType → mush at 16/32/64px). RE'd the
     APK font format (`F2/d.smali`: 32B/glyph 16×16@1bpp, offset `(cp-0x21)*32`,
@@ -410,7 +413,22 @@ core rule in `AGENTS.md`).
 
 ## Open threads / next up
 
-### R28+
+### From R28 (this round)
+- **Half bitmap font `B`/`8` collision** (and other ~5px glyph merges). Inherent
+  to the OR-downsample. Fine for numeric tickers; if letter legibility matters,
+  swap in a purpose-built tiny font (or extract a smaller APK font if one is
+  found). Full font (`get_default_font`) is unaffected and still available.
+- **MCP client-setup examples in `docs/MCP_SERVER.md` still pass `--mac`** — now
+  optional/harmless; could be trimmed for clarity.
+- **MCP-over-daemon not hardware-verified** — unit-green only; drive a real
+  device through `divoom-control mcp-server` end-to-end.
+- **`R27` has no `docs/PLANNING_ROUND*.md`** (command queue) — only CHANGELOG +
+  this file. Backfill if an audit trail is wanted.
+- **Bundled font is ASCII-only** — CJK ranges exist in the APK `.bin` files
+  (`references/apk/.../divoom_fond16_*.bin`) if ever needed; extend
+  `scripts/extract_apk_font.py`'s codepoint ranges.
+
+### Older / standing
 - **Wire exclusive mode through `device_call`** for multi-step ops that
   need atomic access (e.g., animation streaming with 0x8B protocol).
 - **Drop `test_submit_after_stop_raises` `coro_for` was-never-awaited
