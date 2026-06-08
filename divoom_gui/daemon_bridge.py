@@ -48,24 +48,32 @@ def spawn_daemon(
     *,
     mac: str | None = None,
     python: str | None = None,
+    detach: bool = False,
 ) -> subprocess.Popen:
-    """Launch a detached daemon process (``python -m divoom_lib.cli daemon``).
+    """Launch the daemon process (``python -m divoom_lib.cli daemon``).
 
-    Detached so it outlives the GUI process; stdout/stderr inherited so its logs
-    surface where the GUI was launched. Caller is responsible for waiting until
-    the socket is live (see :func:`ensure_daemon`).
+    **macOS Bluetooth permission (TCC):** by default the daemon is spawned as a
+    NON-detached child so it inherits the launching app's "responsible process"
+    identity — and therefore the GUI's Bluetooth (TCC) grant. Detaching it
+    (``start_new_session``) makes macOS treat the daemon as its own process with
+    no Bluetooth permission, which is why BLE scan/connect crashed when the GUI
+    auto-spawned the daemon (the same scan worked when the GUI owned the radio
+    directly). Pass ``detach=True`` only for a truly standalone, GUI-independent
+    daemon (then grant Bluetooth permission to the python binary yourself).
+
+    Caller waits until the socket is live (see :func:`ensure_daemon`).
     """
     cmd = [python or sys.executable, "-m", "divoom_lib.cli", "daemon",
            "--socket", socket_path]
     if mac:
         cmd += ["--mac", mac]
-    logger.info("Spawning daemon: %s", " ".join(cmd))
+    logger.info("Spawning daemon (detach=%s): %s", detach, " ".join(cmd))
     return subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         stdin=subprocess.DEVNULL,
-        start_new_session=True,  # detach from the GUI's process group
+        start_new_session=detach,  # detached => own TCC identity (no BT grant)
         env=os.environ.copy(),
     )
 

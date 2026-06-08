@@ -15,8 +15,13 @@ from pathlib import Path
 import objc
 from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength, NSMenu, NSMenuItem,
-    NSColor, NSForegroundColorAttributeName,
+    NSColor, NSForegroundColorAttributeName, NSBackgroundColorAttributeName,
 )
+
+# App brand accent (web_ui/style.css --primary "Braun Tuner Orange"). The menu-bar
+# item uses the same orange background + white text as the app's active controls
+# for visual consistency.
+BRAND_ORANGE = "#ff5a1f"
 from Foundation import NSObject, NSAttributedString
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -62,10 +67,17 @@ class DivoomMenuBarAgent(NSObject):
         state = self.client.status.get("state", STATE_IDLE)
         title = format_status_title(state)
         try:
-            r, g, b = hex_to_rgb01(status_color(state))
-            color = NSColor.colorWithCalibratedRed_green_blue_alpha_(r, g, b, 1.0)
-            attrs = {NSForegroundColorAttributeName: color}
-            attributed = NSAttributedString.alloc().initWithString_attributes_(title, attrs)
+            # App-consistent look: orange background + white text (matches the
+            # app's active controls). Leading/trailing spaces give the orange
+            # fill some breathing room. State is conveyed by the title text.
+            r, g, b = hex_to_rgb01(BRAND_ORANGE)
+            orange = NSColor.colorWithCalibratedRed_green_blue_alpha_(r, g, b, 1.0)
+            white = NSColor.whiteColor()
+            attrs = {
+                NSForegroundColorAttributeName: white,
+                NSBackgroundColorAttributeName: orange,
+            }
+            attributed = NSAttributedString.alloc().initWithString_attributes_(f" {title} ", attrs)
             self.status_item.button().setAttributedTitle_(attributed)
         except Exception as e:
             logger.warning(f"updateStatusTitle: falling back to plain title ({e})")

@@ -33,7 +33,10 @@ round's planning doc.
   flow — crashes on the main thread AND a worker thread, so it's a pyobjc/3.14
   incompatibility, not catchable by Python. The R17 cutover compounds it: the
   scan now runs in an auto-spawned **daemon subprocess** that doesn't inherit the
-  GUI's Bluetooth TCC grant. **Fix path (not code):** run on **Python 3.13**
+  GUI's Bluetooth TCC grant — **now fixed**: the GUI spawns the daemon
+  NON-detached (`start_new_session=False`) so it inherits the GUI's Bluetooth
+  permission (a detached daemon got its own TCC identity with no grant). If a
+  native pyobjc/3.14 crash persists even with permission, run on **Python 3.13**
   (`brew install python@3.13`) where pyobjc/bleak are stable, or grant Bluetooth
   permission to the python binary. Mitigation shipped: the scan handler now has a
   `.catch()` so it fails gracefully (button re-enables + error toast) instead of
