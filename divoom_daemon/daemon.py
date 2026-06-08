@@ -15,10 +15,8 @@ testable without AppKit or a real BLE device.
 from __future__ import annotations
 
 import base64
-import hmac
 import logging
 import os
-import socket
 import sys
 import tempfile
 import threading
@@ -27,12 +25,10 @@ from typing import Callable, Optional
 
 from divoom_daemon.daemon_protocol import (
     DEFAULT_SOCKET_PATH,
-    SUBSCRIBE_COMMAND,
-    encode_message,
-    iter_messages,
     make_status_event,
     make_notification_event,
 )
+from divoom_daemon.socket_server import SocketServer
 
 logger = logging.getLogger("divoom_daemon")
 
@@ -64,13 +60,8 @@ class DivoomDaemon:
         self.host = host
         self.port = port
         self.token = token if token is not None else (os.environ.get("DIVOOM_DAEMON_TOKEN") or None)
-        self._listeners: list[socket.socket] = []
         self._monitor = monitor                 # injectable; lazily built if None
         self._device_sender = device_sender     # injectable; default = real BLE send
-        self._subscribers: list[socket.socket] = []
-        self._sub_lock = threading.Lock()
-        self._server: Optional[socket.socket] = None
-        self._running = False
         self._error: Optional[str] = None
         # R17 P5: the daemon is the SINGLE owner of the BLE device. The GUI is a
         # thin client that proxies device methods through the `device_call` RPC.
@@ -82,6 +73,13 @@ class DivoomDaemon:
         self._wall = None                       # DivoomWall (multi-device), daemon-owned
         self._wall_slots: dict = {}
         self._registry: dict[str, Callable[[dict], dict]] = {}
+        self._socket_server = SocketServer(
+            socket_path=socket_path,
+            host=host, port=port,
+            token=self.token,
+            command_handler=self.handle_command,
+            status_event_factory=self.status_event,
+        )
 
     # ── monitor (lazy, macOS) ────────────────────────────────────────────
     def _get_monitor(self):
@@ -551,146 +549,22 @@ class DivoomDaemon:
             logger.warning(f"set_routing: {e}")
             return {"success": False, "error": str(e)}
 
-    # ── subscriber fan-out ───────────────────────────────────────────────
+    # ── subscriber fan-out (delegated to SocketServer) ───────────────────
     def broadcast(self, event: dict) -> None:
-        data = encode_message(event)
-        with self._sub_lock:
-            dead = []
-            for conn in self._subscribers:
-                try:
-                    conn.sendall(data)
-                except OSError:
-                    dead.append(conn)
-            for conn in dead:
-                self._subscribers.remove(conn)
-                try:
-                    conn.close()
-                except OSError:
-                    pass
+        self._socket_server.broadcast(event)
 
-    def _add_subscriber(self, conn: socket.socket) -> None:
-        with self._sub_lock:
-            self._subscribers.append(conn)
-
-    def _remove_subscriber(self, conn: socket.socket) -> None:
-        with self._sub_lock:
-            if conn in self._subscribers:
-                self._subscribers.remove(conn)
-
-    # ── auth ─────────────────────────────────────────────────────────────
-    def _authorized(self, req: dict) -> bool:
-        """A TCP request is authorized iff it carries the right token. With no
-        token configured, the TCP listener refuses everything (fail closed)."""
-        if not self.token:
-            return False
-        supplied = req.get("token")
-        return isinstance(supplied, str) and hmac.compare_digest(supplied, self.token)
-
-    # ── connection handling ──────────────────────────────────────────────
-    def _handle_conn(self, conn: socket.socket, *, require_auth: bool = False) -> None:
-        try:
-            conn.settimeout(5.0)
-            buf = b""
-            while b"\n" not in buf:
-                chunk = conn.recv(4096)
-                if not chunk:
-                    conn.close()
-                    return
-                buf += chunk
-            msgs, _ = iter_messages(buf)
-            if not msgs:
-                conn.close()
-                return
-            req = msgs[0]
-            command = req.get("command")
-            args = req.get("args", {}) or {}
-
-            if require_auth and not self._authorized(req):
-                try:
-                    conn.sendall(encode_message({"success": False, "error": "unauthorized"}))
-                except OSError:
-                    pass
-                conn.close()
-                return
-
-            if command == SUBSCRIBE_COMMAND:
-                # Held-open stream: send current status, then block until close.
-                conn.settimeout(None)
-                self._add_subscriber(conn)
-                try:
-                    conn.sendall(encode_message(self.status_event()))
-                    while self._running:
-                        if not conn.recv(4096):  # client closed
-                            break
-                finally:
-                    self._remove_subscriber(conn)
-                    conn.close()
-                return
-
-            reply = self.handle_command(command, args)
-            conn.sendall(encode_message(reply))
-            conn.close()
-        except OSError as e:
-            logger.debug(f"conn error: {e}")
-            try:
-                conn.close()
-            except OSError:
-                pass
-
-    def _accept_loop(self, listener: socket.socket, *, require_auth: bool) -> None:
-        while self._running:
-            listener.settimeout(1.0)
-            try:
-                conn, _ = listener.accept()
-            except socket.timeout:
-                continue
-            except OSError:
-                break
-            threading.Thread(
-                target=self._handle_conn, args=(conn,),
-                kwargs={"require_auth": require_auth}, daemon=True,
-            ).start()
-
+    # ── lifecycle ────────────────────────────────────────────────────────
     def serve_forever(self) -> None:
-        if os.path.exists(self.socket_path):
-            try:
-                os.remove(self.socket_path)
-            except OSError:
-                pass
-        self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self._server.bind(self.socket_path)
-        self._server.listen(8)
-        self._listeners = [self._server]
-        self._running = True
-        logger.info(f"Divoom daemon listening on {self.socket_path}")
-
-        # Optional TCP listener (R19 headless network server). Token-gated.
-        tcp = None
-        if self.host and self.port:
-            if not self.token:
-                logger.error("TCP listener requested without a token; refusing to "
-                             "expose the daemon unauthenticated. Set DIVOOM_DAEMON_TOKEN "
-                             "or pass --token.")
-            else:
-                tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                tcp.bind((self.host, int(self.port)))
-                tcp.listen(8)
-                self._listeners.append(tcp)
-                logger.info(f"Divoom daemon listening on tcp://{self.host}:{self.port} (token required)")
-
         try:
-            if tcp is not None:
-                threading.Thread(target=self._accept_loop, args=(tcp,),
-                                 kwargs={"require_auth": True}, daemon=True,
-                                 name="daemon-tcp-accept").start()
-            # Unix accept loop runs on this (main) thread.
-            self._accept_loop(self._server, require_auth=False)
+            self._socket_server.serve_forever()
         finally:
-            self.stop()
+            self._cleanup()
 
     def stop(self) -> None:
-        self._running = False
+        self._socket_server.stop()
+        self._cleanup()
+
+    def _cleanup(self) -> None:
         mon = self._monitor
         if mon is not None and getattr(mon, "is_running", False):
             mon.stop()
@@ -699,18 +573,6 @@ class DivoomDaemon:
                 self._loop.call_soon_threadsafe(self._loop.stop)
             except Exception:
                 pass
-        for lst in self._listeners:
-            try:
-                lst.close()
-            except OSError:
-                pass
-        self._listeners = []
-        if self._server is not None:
-            try:
-                self._server.close()
-            except OSError:
-                pass
-            self._server = None
 
 
 def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH,
