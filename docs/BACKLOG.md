@@ -13,6 +13,21 @@ round's planning doc.
 
 ## Open
 
+### Regressions (likely from the R23 gui_api/web_ui refactors — HIGH priority)
+- `OPEN` **Scan devices no longer works** (worked before).
+- `OPEN` **Clock channel only shows "Clock Color"** — used to show the full clock
+  style/face options. (This is what looked like "dead space" in the UI pass — it's
+  a regression, not a design choice.)
+- `OPEN` **Channel panels empty**: EQ Visualizer empty, VJ Effects empty, Custom
+  Art shows no cached art, Ambient shows only color selection (effects missing).
+- `OPEN` **Menubar item doesn't appear** when launching the app.
+
+(Reported 2026-06-08. Strong suspicion: the pywebview bridge / JS API surface or
+web_ui script wiring broke when gui_api was split into `divoom_gui/api/*` and the
+`web_ui/*.js` files were split — JS calls to bridge methods that moved/aren't
+exposed fail silently → empty panels. Investigate the bridge method exposure +
+JS population calls first.)
+
 ### Device / protocol
 - `OPEN` **Custom Art / Design channel switch** doesn't reliably change the active
   channel on device (esp. **Divoom Max**). Suspected: `0x45` channel-switch is

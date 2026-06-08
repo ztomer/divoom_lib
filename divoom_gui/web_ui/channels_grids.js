@@ -432,5 +432,3 @@ document.addEventListener("DOMContentLoaded", () => {
     // Load initial history
     setTimeout(renderCustomArtHistory, 1500);
 });
-
-});
