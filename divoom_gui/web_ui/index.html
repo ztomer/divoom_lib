@@ -240,9 +240,9 @@
                                 </div>
                                 <!-- Custom art -->
                                 <div class="channel-panel" id="panel-design">
-                                    <div class="custom-art-scroll-container" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:12px; margin-bottom:12px; padding-right:6px; box-sizing:border-box; width:100%;">
+                                    <div class="custom-art-scroll-container" style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:12px; margin-bottom:12px; box-sizing:border-box; width:100%;">
                                         <p class="panel-hint" style="margin-top: 0; margin-bottom: 0;">Display your own custom art/GIFs on the device's "Custom" channel.</p>
-                                        <div class="custom-art-upload-section" style="display:flex; flex-direction:column; gap:12px; max-width:100%;">
+                                        <div class="custom-art-upload-section" style="display:flex; flex-direction:column; gap:12px; max-width:100%; flex:1; min-height:0;">
                                             <div style="display:flex; gap:10px; align-items:center;">
                                                 <button id="browse-custom-art-btn" class="glow-btn compact" style="margin:0; white-space:nowrap;">Browse File...</button>
                                                 <input type="text" id="custom-art-path-input" placeholder="No file selected" class="text-input" style="flex:1;" readonly>
@@ -255,16 +255,18 @@
                                             
                                             <!-- Last 5 Selected Items filmstrip preview -->
                                             <div id="custom-art-history-container" style="display:flex; flex-direction:column; gap:6px; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
-                                                <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:2px;">Last 5 Selected Items:</label>
+                                                <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:2px;">Last 10 Selected Items:</label>
                                                 <div id="custom-art-history-filmstrip" style="display:flex; gap:8px; overflow-x:auto; padding:2px; min-height:60px;">
                                                     <div class="empty-list" style="font-size:11px;">No design pushed yet.</div>
                                                 </div>
                                             </div>
                                             
-                                            <!-- Gallery Cache Selection Grid -->
-                                            <div class="gallery-cache-selector" style="margin-top: 4px;">
+                                            <!-- Gallery Cache Selection Grid — R24 #7: this is the ONLY
+                                                 scrollable region (browse + history stay fixed); with a search box. -->
+                                            <div class="gallery-cache-selector" style="margin-top: 4px; flex:1; min-height:0; display:flex; flex-direction:column;">
                                                 <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Select from Gallery Cache:</label>
-                                                <div class="selector-grid" id="custom-art-cache-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap:8px; max-height: 120px; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
+                                                <input type="text" id="custom-art-search" placeholder="Search cached art…" class="text-input" style="margin-bottom:6px; font-size:12px;">
+                                                <div class="selector-grid" id="custom-art-cache-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap:8px; flex:1; min-height:0; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
                                                     <div class="empty-list" style="grid-column: 1/-1;">No cached gallery files.</div>
                                                 </div>
                                             </div>

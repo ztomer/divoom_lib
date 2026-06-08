@@ -331,20 +331,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // Hide VJ by default
     window.updateChannelButtonsVisibility("");
 
-    function loadCustomArtCacheGrid() {
+    let _customArtCacheFiles = [];   // R24 #7a: cached so search can filter without refetching
+
+    function renderCustomArtCacheGrid(filter) {
         const grid = document.getElementById("custom-art-cache-grid");
         if (!grid) return;
-        grid.innerHTML = '<div class="empty-list" style="grid-column: 1/-1;">Loading offline cache...</div>';
-        
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_cached_gallery_files) {
-            window.pywebview.api.get_cached_gallery_files().then(json => {
-                const files = JSON.parse(json);
-                grid.innerHTML = "";
-                if (!files || files.length === 0) {
-                    grid.innerHTML = '<div class="empty-list" style="grid-column: 1/-1;">No cached gallery files. Download them in Monthly Best first!</div>';
-                    return;
-                }
-                files.forEach(f => {
+        const q = (filter || "").trim().toLowerCase();
+        const files = q
+            ? _customArtCacheFiles.filter(f => (f.name || "").toLowerCase().includes(q))
+            : _customArtCacheFiles;
+        grid.innerHTML = "";
+        if (!files || files.length === 0) {
+            grid.innerHTML = `<div class="empty-list" style="grid-column: 1/-1;">${
+                _customArtCacheFiles.length === 0
+                    ? "No cached gallery files. Download them in Monthly Best first!"
+                    : "No matches."}</div>`;
+            return;
+        }
+        files.forEach(f => {
                     const item = document.createElement("button");
                     item.className = "cache-thumb-item";
                     item.style.background = "rgba(0,0,0,0.3)";
@@ -367,10 +371,27 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (pathInput) pathInput.value = f.path;
                         if (window.showCustomArtPreview) window.showCustomArtPreview(f.path);
                     });
-                    grid.appendChild(item);
-                });
+            grid.appendChild(item);
+        });
+    }
+
+    function loadCustomArtCacheGrid() {
+        const grid = document.getElementById("custom-art-cache-grid");
+        if (!grid) return;
+        grid.innerHTML = '<div class="empty-list" style="grid-column: 1/-1;">Loading offline cache...</div>';
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_cached_gallery_files) {
+            window.pywebview.api.get_cached_gallery_files().then(json => {
+                try { _customArtCacheFiles = JSON.parse(json) || []; } catch (e) { _customArtCacheFiles = []; }
+                const search = document.getElementById("custom-art-search");
+                renderCustomArtCacheGrid(search ? search.value : "");
             });
         }
+    }
+
+    // R24 #7a: live search over the cached gallery (filters by name; no refetch).
+    const customArtSearch = document.getElementById("custom-art-search");
+    if (customArtSearch) {
+        customArtSearch.addEventListener("input", () => renderCustomArtCacheGrid(customArtSearch.value));
     }
 
     function renderCustomArtHistory() {
@@ -390,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         filmstrip.innerHTML = "";
-        history.slice(0, 5).forEach(itemData => {
+        history.slice(0, 10).forEach(itemData => {
             const item = document.createElement("button");
             item.className = "cache-thumb-item";
             item.style.background = "rgba(0,0,0,0.3)";
@@ -429,7 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         history = history.filter(h => h.path !== path);
         history.unshift({ name, path, preview_url });
-        history = history.slice(0, 5);
+        history = history.slice(0, 10);
         localStorage.setItem("divoom_custom_art_history", JSON.stringify(history));
         renderCustomArtHistory();
     };
