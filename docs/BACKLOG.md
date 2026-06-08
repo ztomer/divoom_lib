@@ -27,21 +27,7 @@ round's planning doc.
   subclasses need `objc.super(...).init()`, not Python `super()`. (2) nothing
   spawned it — `gui_main` now launches the agent on startup (macOS, detached,
   dupe-guarded). Verified live: "Divoom (idle)" status item + menu.
-- `HW`/`UPSTREAM` **Scan devices crashes the BLE backend.** Root: on this machine
-  (**Python 3.14.5**, the only one installed) a `bleak`/CoreBluetooth scan
-  **natively aborts** the process during the macOS Bluetooth-permission (TCC)
-  flow — crashes on the main thread AND a worker thread, so it's a pyobjc/3.14
-  incompatibility, not catchable by Python. The R17 cutover compounds it: the
-  scan now runs in an auto-spawned **daemon subprocess** that doesn't inherit the
-  GUI's Bluetooth TCC grant — **now fixed**: the GUI spawns the daemon
-  NON-detached (`start_new_session=False`) so it inherits the GUI's Bluetooth
-  permission (a detached daemon got its own TCC identity with no grant). If a
-  native pyobjc/3.14 crash persists even with permission, run on **Python 3.13**
-  (`brew install python@3.13`) where pyobjc/bleak are stable, or grant Bluetooth
-  permission to the python binary. Mitigation shipped: the scan handler now has a
-  `.catch()` so it fails gracefully (button re-enables + error toast) instead of
-  spinning forever. **This also means the R17 daemon BLE path is unverified on
-  real hardware here — it crashes on any real BLE op (scan/connect) under 3.14.**
+- `DONE`/`VERIFY` **Scan devices no longer crashes.** Real root cause (researched + verified live, NOT a Python/3.14 bug): macOS aborts a process (`TCC_CRASHING_DUE_TO_PRIVACY_VIOLATION`) on first CoreBluetooth use if the *responsible process's* on-disk Info.plist lacks `NSBluetoothAlwaysUsageDescription`. A bare `python3` GUI/daemon hits this; it worked from an already-granted terminal. Fix: `scripts/make_app_bundle.sh` builds `Divoom.app` (Info.plist declares the Bluetooth usage); `run_gui.sh` launches via `open Divoom.app` so the app is the responsible process WITH the declaration -> macOS shows the Allow-Bluetooth dialog instead of crashing, and the non-detached daemon inherits it. **Verified live: Scan completes gracefully and the daemon survives.** Remaining: user grants the Bluetooth prompt once (System Settings -> Privacy -> Bluetooth -> Divoom) + a device must be powered/nearby to actually appear.
 
 ### Device / protocol
 - `OPEN` **Custom Art / Design channel switch** doesn't reliably change the active
