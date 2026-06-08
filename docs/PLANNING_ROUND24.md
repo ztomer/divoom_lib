@@ -53,5 +53,27 @@ screenshot, pixel-measure). Use screenshots to make spacing changes pixel-perfec
 10. **Weather** — (item left incomplete by the user; confirm intent).
 
 ## §outcome
-(fill in as items land — commit each, keep `pytest` green, screenshot-verify the
-visual ones.)
+- **#1 SHIPPED** — single-instance GUI (flock) + menubar (pgrep); a 2nd dashboard
+  exits before spawning a menubar, killing the runaway.
+- **#2 SHIPPED** — menubar uses `NSApplicationActivationPolicyAccessory` (no Dock).
+- **#3 SHIPPED** — shared `.tabs-section` gives Tools + Settings the Channels
+  card-header spacing (mb:15/pb:10/1px). Verified identical via computed styles.
+- **#4 SHIPPED** — `.tabs-row` centers (margin-inline auto); equal 87px L/R margins.
+- **#5 SHIPPED** — FM Radio card gated to Tivoo/Ditoo (connect-time, like VJ).
+- **#6 SHIPPED** — sidebar device-preview card trimmed (100px preview, less
+  padding, margin-bottom) so it sits higher with more room above Settings.
+- **#7 SHIPPED** — Custom Art: name search, gallery-only scrollbar, history 5→10.
+- **#8 SHIPPED** — window starts 1080 wide.
+- **#9 SHIPPED** — stocks: removed Display, "+ Save"→"Add", auto-display on
+  type/select via `window.displayTicker`.
+- **#10 — INCOMPLETE in the user's message ("Weather —"); awaiting the actual ask.**
+
+Verification note: the visual items (#3/#4/#6) were verified via computed styles
++ headless measurement; live screenshot clicks on the sidebar weren't landing
+(coordinate/focus quirk), so the user should eyeball #6's sidebar spacing.
+
+BLE: the Divoom.app bundle (R24 BLE debug) was a WRONG turn — it re-attributes BT
+to an ungranted `com.divoom.control` identity. Reverted `run_gui.sh` to a direct
+launch. System Settings confirmed `python3.14` + the terminal ARE granted. Still
+needs the user to verify the real GUI scan from their granted terminal (the
+harness can't be a granted BT context). make_app_bundle.sh kept for distribution.
