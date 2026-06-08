@@ -81,6 +81,7 @@ class DivoomDaemon:
         self._lan_ip: Optional[str] = None      # set when the device is LAN-attached
         self._wall = None                       # DivoomWall (multi-device), daemon-owned
         self._wall_slots: dict = {}
+        self._registry: dict[str, Callable[[dict], dict]] = {}
 
     # ── monitor (lazy, macOS) ────────────────────────────────────────────
     def _get_monitor(self):
@@ -153,35 +154,32 @@ class DivoomDaemon:
         finally:
             loop.close()
 
-    # ── commands (request/response) ──────────────────────────────────────
+    # ── command registry ─────────────────────────────────────────────────
+    def _init_registry(self) -> None:
+        r: dict[str, Callable[[dict], dict]] = {}
+        r["ping"] = lambda _: {"success": True}
+        r["get_status"] = lambda _: {"success": True, **self.status_event()}
+        r["notification_status"] = r["get_status"]
+        r["start_notifications"] = lambda _: self._cmd_start()
+        r["stop_notifications"] = lambda _: self._cmd_stop()
+        r["set_routing"] = self._cmd_set_routing
+        r["device_call"] = self._cmd_device_call
+        r["connect"] = self._cmd_connect
+        r["disconnect"] = lambda _: self._cmd_disconnect()
+        r["device_status"] = lambda _: self._cmd_device_status()
+        r["scan"] = self._cmd_scan
+        r["wall_configure"] = self._cmd_wall_configure
+        r["probe_lan"] = lambda _: self._cmd_probe_lan()
+        r["sync_artwork"] = self._cmd_sync_artwork
+        self._registry = r
+
     def handle_command(self, command: str, args: dict) -> dict:
-        if command == "ping":
-            return {"success": True}
-        if command in ("get_status", "notification_status"):
-            return {"success": True, **self.status_event()}
-        if command == "start_notifications":
-            return self._cmd_start()
-        if command == "stop_notifications":
-            return self._cmd_stop()
-        if command == "set_routing":
-            return self._cmd_set_routing(args)
-        if command == "device_call":
-            return self._cmd_device_call(args)
-        if command == "connect":
-            return self._cmd_connect(args)
-        if command == "disconnect":
-            return self._cmd_disconnect()
-        if command == "device_status":
-            return self._cmd_device_status()
-        if command == "scan":
-            return self._cmd_scan(args)
-        if command == "wall_configure":
-            return self._cmd_wall_configure(args)
-        if command == "probe_lan":
-            return self._cmd_probe_lan()
-        if command == "sync_artwork":
-            return self._cmd_sync_artwork(args)
-        return {"success": False, "error": f"unknown command: {command}"}
+        if not self._registry:
+            self._init_registry()
+        handler = self._registry.get(command)
+        if handler is None:
+            return {"success": False, "error": f"unknown command: {command}"}
+        return handler(args)
 
     # ── device ownership (R17 P5: the daemon is the single BLE owner) ─────
     def _device_loop(self):
