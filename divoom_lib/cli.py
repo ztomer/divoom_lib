@@ -103,13 +103,26 @@ def build_parser() -> argparse.ArgumentParser:
     # conflict with the inherited definitions.
     sub.add_parser("pair", parents=[shared], help="Pair a MAC address with a device type (saves to registry).")
 
-    # MCP server (R15 §5): stdio JSON-RPC server. Connects to the
-    # device via BLE/SPP and exposes 12 tools to MCP-compatible clients
-    # (Claude Desktop, Cursor, Cline, Continue, etc.).
-    sub.add_parser(
+    # MCP server (R15 §5; R28 routes through the daemon): stdio JSON-RPC
+    # server. It does NOT open its own BLE connection — the daemon is the
+    # sole device owner, so the MCP server is a thin daemon client and
+    # exposes 12 tools to MCP-compatible clients (Claude Desktop, Cursor,
+    # Cline, Continue, etc.).
+    p_mcp = sub.add_parser(
         "mcp-server", parents=[shared],
-        help="Start the MCP stdio JSON-RPC server (use --mac to pick a device).",
+        help="Start the MCP stdio JSON-RPC server (routes through the daemon).",
     )
+    p_mcp.add_argument("--socket", default="/tmp/divoom.sock",
+                       help="Daemon Unix socket to connect to (auto-spawns a "
+                            "local daemon if none is running).")
+    p_mcp.add_argument("--host", default=None,
+                       help="Connect to a remote daemon on this TCP host "
+                            "instead of the local socket (sets DIVOOM_DAEMON_HOST).")
+    p_mcp.add_argument("--port", type=int, default=9009,
+                       help="TCP port of the remote daemon (default 9009).")
+    p_mcp.add_argument("--token", default=None,
+                       help="Shared secret for a remote (TCP) daemon "
+                            "(falls back to DIVOOM_DAEMON_TOKEN).")
 
     # Headless daemon (R16): owns the device + macOS notification routing and
     # serves status/notification events over a Unix socket. The GUI and menubar

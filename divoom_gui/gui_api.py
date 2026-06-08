@@ -417,23 +417,24 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def set_scoreboard(self, on_off: int, red: int = 0, blue: int = 0) -> bool:
         return self.tools.set_scoreboard(on_off, red, blue)
 
-    # ── Round 15 §5: MCP server subprocess control ────────────────────
+    # ── Round 15 §5 (R28: routes through the daemon) ──────────────────
     #
-    # The GUI spawns ``python -m divoom_lib.cli mcp-server --mac <MAC>``
-    # as a subprocess and tracks it via MCPController. pywebview's
-    # event loop and the MCP server's stdio loop would otherwise fight
-    # over file descriptors — subprocess isolation is the clean fix.
+    # The GUI spawns ``python -m divoom_lib.cli mcp-server`` as a subprocess and
+    # tracks it via MCPController. pywebview's event loop and the MCP server's
+    # stdio loop would otherwise fight over file descriptors — subprocess
+    # isolation is the clean fix. The MCP server no longer opens its own BLE
+    # connection: it's a daemon client, so no MAC is required.
 
     def start_mcp_server(self, mac: str = "") -> dict:
-        """Start the MCP stdio server subprocess (R15 §5).
+        """Start the MCP stdio server subprocess (R15 §5; R28 daemon-routed).
 
-        ``mac`` is optional; falls back to the active device's MAC if
-        empty. Returns a status dict (see ``mcp_server_status()``)."""
+        ``mac`` is optional and no longer required — the MCP server routes
+        through the daemon (the sole device owner). It's passed through only so a
+        spawned daemon can target a specific device. Returns a status dict (see
+        ``mcp_server_status()``)."""
         from divoom_gui.mcp_control import MCPController, status_to_dict
         ctl = MCPController.instance()
-        target_mac = mac or (self.current_divoom._conn.mac if self.current_divoom else "")
-        if not target_mac:
-            return status_to_dict(ctl.status()) | {"error": "no MAC available"}
+        target_mac = mac or None
         return status_to_dict(ctl.start(mac=target_mac))
 
     def stop_mcp_server(self) -> dict:

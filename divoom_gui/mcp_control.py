@@ -96,18 +96,23 @@ class MCPController:
             return False
         return True
 
-    def start(self, mac: str, *, python: Optional[str] = None) -> MCPStatus:
+    def start(self, mac: Optional[str] = None, *, python: Optional[str] = None) -> MCPStatus:
         """Start the MCP server subprocess.
 
-        Returns a status dict. If a server is already running, the
-        call is a no-op and the existing status is returned."""
+        ``mac`` is optional: since R28 the MCP server routes through the daemon
+        (the sole device owner), so it does not need a MAC. When provided it's
+        only passed through to target a specific device if the daemon has to be
+        spawned. Returns a status dict. If a server is already running, the call
+        is a no-op and the existing status is returned."""
         if self.is_running():
             return self.status()
         exe = python or sys.executable
         # Use ``-m divoom_lib.cli mcp-server`` so we don't depend on
         # the package being on PATH (works inside editable installs
         # and zipapps alike).
-        cmd = [exe, "-m", "divoom_lib.cli", "mcp-server", "--mac", mac]
+        cmd = [exe, "-m", "divoom_lib.cli", "mcp-server"]
+        if mac:
+            cmd += ["--mac", mac]
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
         log_fp = open(self._log_path, "ab", buffering=0)
         env = dict(os.environ)

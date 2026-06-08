@@ -15,6 +15,28 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R28 — MCP-via-daemon + scan filter SHIPPED. Suite 1061 / 75 / 0 (+6).**
+  - **MCP server no longer opens its own BLE connection.** It was calling
+    `_resolve_device()` → a 2nd BLE connect to the daemon-owned device (R17
+    single-owner) → `DeviceConnectionError: ... was not found`, shown as a
+    Python traceback in the GUI's MCP card (the subprocess logs to
+    `~/.config/divoom-control/mcp-server.log`, which the card tails; that's why
+    it was in the panel but not the terminal). `cmd_mcp_server` now builds the
+    catalog against a `DaemonDeviceProxy` via `ensure_daemon()`. `--mac`
+    optional; `--socket/--host/--port/--token` added (local or remote daemon).
+  - **Plumbing moved** `divoom_gui/daemon_bridge.py` →
+    `divoom_daemon/daemon_client.py` (lib can use it without a lib→gui dep);
+    `daemon_bridge.py` is a re-export shim. `mcp_control.start` /
+    `gui_api.start_mcp_server` no longer require a MAC (the confusing
+    CoreBluetooth UUID in the card is gone). `get_capabilities` awaits the
+    proxy's `to_dict()`.
+  - **Scan returns Divoom-only.** Removed the `discover_all_divoom_devices`
+    fallback that returned ALL named BLE devices when no Divoom matched; new
+    `is_divoom_name()` + `DIVOOM_NAME_KEYWORDS`.
+  - **`webview` ModuleNotFoundError was stale** — pywebview 6.2.1 + pyobjc are
+    installed for the Homebrew python3.14; `./run_gui.sh` imports clean now.
+  - See `CHANGELOG.md` (Round 28).
+
 - **R27 — Command queue SHIPPED.**
   Suite **1055 passed / 75 skipped / 0 failed** (+30 from 1025).
 

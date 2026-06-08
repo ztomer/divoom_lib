@@ -5,6 +5,32 @@ from bleak.exc import BleakError
 
 logger = logging.getLogger(__name__)
 
+# Known Divoom product-name keywords (lowercase). A scanned BLE peripheral is
+# treated as a Divoom only if its advertised name contains one of these. Keep
+# this list as the single source of truth for "is this a Divoom?" — extend it
+# if a real device shows up named something not covered here.
+DIVOOM_NAME_KEYWORDS = (
+    "divoom",
+    "timoo",
+    "tivoo",
+    "timebox",
+    "pixoo",
+    "ditoo",
+    "backpack",
+    "timegate",
+    "aurabox",
+    "planet",
+)
+
+
+def is_divoom_name(name: str | None) -> bool:
+    """True if a BLE advertised name looks like a Divoom device."""
+    if not name:
+        return False
+    lowered = name.lower()
+    return any(kw in lowered for kw in DIVOOM_NAME_KEYWORDS)
+
+
 async def discover_device(name_substring: str | None = None, address: str | None = None) -> tuple[BleakClient | str | None, str | None]:
     """
     Discovers a BLE device by name substring or address.
@@ -148,29 +174,18 @@ async def discover_all_divoom_devices(timeout: float = 5.0) -> list[dict]:
     """
     logger.info(f"Scanning for all nearby Divoom Bluetooth devices (timeout={timeout}s)...")
     devices = await BleakScanner.discover(timeout=timeout)
-    
-    divoom_keywords = ["timoo", "tivoo", "timebox", "pixoo", "ditoo", "backpack", "timegate"]
+
     results = []
-    
     for d in devices:
-        if d.name:
-            name_lower = d.name.lower()
-            is_divoom = any(kw in name_lower for kw in divoom_keywords)
-            if is_divoom:
-                results.append({
-                    "name": d.name,
-                    "address": d.address
-                })
-                
-    # If no explicit matches, return all devices with names as a fallback
-    if not results:
-        logger.info("No devices matching Divoom keywords found; returning all named devices in range.")
-        for d in devices:
-            if d.name:
-                results.append({
-                    "name": d.name,
-                    "address": d.address
-                })
-                
-    logger.info(f"Discovered {len(results)} candidate Divoom BLE devices.")
+        if d.name and is_divoom_name(d.name):
+            results.append({
+                "name": d.name,
+                "address": d.address,
+            })
+
+    # No fallback to "all named devices": a Divoom-only control app must not list
+    # every random BLE peripheral (headphones, watches, etc.) in range. If a
+    # device is missing, it's powered off or out of range — or its name needs
+    # adding to DIVOOM_NAME_KEYWORDS below.
+    logger.info(f"Discovered {len(results)} Divoom BLE device(s).")
     return results

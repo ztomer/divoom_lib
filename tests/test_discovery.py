@@ -175,3 +175,51 @@ def test_pick_char_uuid_empty_candidates():
     """Test pick_char_uuid with empty candidates list."""
     assert discovery.pick_char_uuid(None, []) is None
     assert discovery.pick_char_uuid("any-uuid", []) is None
+
+
+# ── is_divoom_name / discover_all_divoom_devices (R28 scan filter) ──────────
+
+def test_is_divoom_name_matches_known_products():
+    assert discovery.is_divoom_name("Ditoo-light-2")
+    assert discovery.is_divoom_name("Pixoo64")
+    assert discovery.is_divoom_name("Divoom Backpack")
+    assert discovery.is_divoom_name("TIMEBOX-Evo")  # case-insensitive
+
+
+def test_is_divoom_name_rejects_non_divoom():
+    assert not discovery.is_divoom_name("AirPods Pro")
+    assert not discovery.is_divoom_name("Galaxy Watch")
+    assert not discovery.is_divoom_name("")
+    assert not discovery.is_divoom_name(None)
+
+
+def _dev(name, address):
+    d = MagicMock()
+    d.name = name
+    d.address = address
+    return d
+
+
+@pytest.mark.asyncio
+async def test_discover_all_filters_non_divoom(mock_bleak_scanner_discover):
+    """Only Divoom-named peripherals are returned — never the whole BLE list."""
+    mock_bleak_scanner_discover.return_value = [
+        _dev("Ditoo-light-2", "AA:11"),
+        _dev("AirPods Pro", "BB:22"),
+        _dev("Pixoo64", "CC:33"),
+        _dev(None, "DD:44"),  # unnamed
+    ]
+    results = await discovery.discover_all_divoom_devices(timeout=1.0)
+    addrs = {r["address"] for r in results}
+    assert addrs == {"AA:11", "CC:33"}
+
+
+@pytest.mark.asyncio
+async def test_discover_all_no_fallback_to_all_devices(mock_bleak_scanner_discover):
+    """When nothing matches, return an empty list — NOT every named device."""
+    mock_bleak_scanner_discover.return_value = [
+        _dev("AirPods Pro", "BB:22"),
+        _dev("Galaxy Watch", "EE:55"),
+    ]
+    results = await discovery.discover_all_divoom_devices(timeout=1.0)
+    assert results == []

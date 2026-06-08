@@ -295,29 +295,52 @@ async def cmd_identify(args: argparse.Namespace) -> int:
 
 
 async def cmd_mcp_server(args: argparse.Namespace) -> int:
-    """Start the MCP stdio JSON-RPC server (R15 §5).
+    """Start the MCP stdio JSON-RPC server (R15 §5; R28 routes through the daemon).
 
-    Connects to the requested device (auto-discovers if --mac is
-    omitted), builds the tool catalog, and runs the server loop
-    reading JSON-RPC messages from stdin. Exits cleanly when the
-    parent process closes stdin."""
-    d, mac = await _resolve_device(args)
-    try:
-        from divoom_lib.mcp_server import MCPServer
-        from divoom_lib.mcp_tools import build_tool_catalog
+    The MCP server does NOT open its own BLE connection — the daemon is the sole
+    device owner (R17), so this builds the tool catalog against a
+    ``DaemonDeviceProxy`` that routes every tool call through the daemon's
+    ``device_call`` RPC. It connects to the local daemon socket (auto-spawning
+    one if needed), or to a remote daemon over TCP when ``--host`` is given.
 
-        server = MCPServer(
-            server_info={"name": "divoom-control", "version": "0.15.0"},
-        )
-        server.tools = build_tool_catalog(d)
-        sys.stderr.write(
-            f"MCP server starting: mac={mac}, tools={len(server.tools)}\n"
-        )
-        sys.stderr.flush()
-        await server.run_stdio()
-        return 0
-    finally:
-        await d.disconnect()
+    Exits cleanly when the parent process closes stdin. The proxy is stateless,
+    so there is nothing to disconnect on exit (the daemon keeps owning the
+    device for the GUI/menubar)."""
+    import os
+    from divoom_daemon.daemon_protocol import ENV_HOST, ENV_PORT, ENV_TOKEN
+    from divoom_daemon.daemon_client import ensure_daemon, DaemonDeviceProxy
+
+    # A remote daemon is selected purely via env (DaemonClient.from_env /
+    # ensure_daemon read these); mirror the CLI flags into the environment so a
+    # single code path handles local + remote.
+    host = getattr(args, "host", None)
+    if host:
+        os.environ[ENV_HOST] = host
+        os.environ[ENV_PORT] = str(getattr(args, "port", 9009))
+        token = getattr(args, "token", None) or os.environ.get(ENV_TOKEN)
+        if token:
+            os.environ[ENV_TOKEN] = token
+
+    socket_path = getattr(args, "socket", None) or "/tmp/divoom.sock"
+    client = ensure_daemon(socket_path, mac=getattr(args, "mac", None))
+    if client is None:
+        _err("could not reach or start the divoom daemon", 1)
+
+    from divoom_lib.mcp_server import MCPServer
+    from divoom_lib.mcp_tools import build_tool_catalog
+
+    proxy = DaemonDeviceProxy(client)
+    server = MCPServer(
+        server_info={"name": "divoom-control", "version": "0.15.0"},
+    )
+    server.tools = build_tool_catalog(proxy)
+    where = f"{host}:{getattr(args, 'port', 9009)}" if host else socket_path
+    sys.stderr.write(
+        f"MCP server starting: daemon={where}, tools={len(server.tools)}\n"
+    )
+    sys.stderr.flush()
+    await server.run_stdio()
+    return 0
 
 
 async def cmd_daemon(args: argparse.Namespace) -> int:

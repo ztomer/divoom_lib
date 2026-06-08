@@ -23,6 +23,7 @@ Test layout:
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -408,3 +409,56 @@ def test_cli_mcp_server_in_command_dispatch_table() -> None:
     from divoom_lib.cli import COMMANDS
     assert "mcp-server" in COMMANDS
     assert "mcp-server" in COMMANDS["mcp-server"].__name__ or True
+
+
+def test_cli_mcp_server_subcommand_accepts_no_mac() -> None:
+    """R28: --mac is no longer required (the server routes through the daemon)."""
+    from divoom_lib.cli import build_parser
+    parser = build_parser()
+    args = parser.parse_args(["mcp-server"])
+    assert args.command == "mcp-server"
+    assert args.mac is None
+    # daemon-targeting flags exist
+    assert args.socket == "/tmp/divoom.sock"
+    assert args.host is None
+    assert args.port == 9009
+
+
+def test_cmd_mcp_server_routes_through_daemon(monkeypatch) -> None:
+    """R28: cmd_mcp_server builds the catalog against a DaemonDeviceProxy via
+    ensure_daemon — it must NOT open its own BLE connection (_resolve_device)."""
+    import asyncio
+    from divoom_lib import cli_commands
+    from divoom_daemon import daemon_client
+
+    # Fail loudly if the old BLE path is taken.
+    def _boom(*a, **k):
+        raise AssertionError("cmd_mcp_server must not call _resolve_device (BLE)")
+    monkeypatch.setattr(cli_commands, "_resolve_device", _boom)
+
+    fake_client = MagicMock(name="DaemonClient")
+    fake_client.is_remote = False
+    ensure_calls = {}
+
+    def fake_ensure(socket_path, mac=None, **k):
+        ensure_calls["socket_path"] = socket_path
+        ensure_calls["mac"] = mac
+        return fake_client
+    monkeypatch.setattr(daemon_client, "ensure_daemon", fake_ensure)
+
+    # Don't actually run the stdio loop.
+    from divoom_lib.mcp_server import MCPServer
+    captured = {}
+
+    async def fake_run_stdio(self):
+        captured["tools"] = self.tools
+        return None
+    monkeypatch.setattr(MCPServer, "run_stdio", fake_run_stdio)
+
+    args = SimpleNamespace(command="mcp-server", mac=None, socket="/tmp/divoom.sock",
+                           host=None, port=9009, token=None, device_type=None,
+                           timeout=5.0)
+    rc = asyncio.run(cli_commands.cmd_mcp_server(args))
+    assert rc == 0
+    assert ensure_calls["socket_path"] == "/tmp/divoom.sock"
+    assert len(captured["tools"]) >= 12

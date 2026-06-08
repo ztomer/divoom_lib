@@ -16,7 +16,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent.parent / "divoom_gui"))
 
 from divoom_daemon.daemon import DivoomDaemon
-from divoom_gui import daemon_bridge
+# The implementation lives in divoom_daemon.daemon_client (R28); monkeypatching
+# below targets that module's globals, which ensure_daemon resolves against.
+# divoom_gui.daemon_bridge re-exports the same objects.
+from divoom_daemon import daemon_client as daemon_bridge
 from divoom_gui.daemon_bridge import (
     DaemonDeviceProxy,
     daemon_alive,

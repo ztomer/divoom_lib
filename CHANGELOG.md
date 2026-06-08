@@ -6,6 +6,47 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 28 — 2026-06-08 (MCP server routes through daemon + scan filter)
+
+### MCP server no longer owns its own BLE connection
+
+- **`cmd_mcp_server`** (`divoom_lib/cli_commands.py`) rewritten to route through
+  the daemon instead of calling `_resolve_device()` (which opened a *second* BLE
+  connection to the device the daemon already owns — R17 single-owner — and
+  failed with `DeviceConnectionError: ... was not found`, surfaced as a Python
+  traceback in the GUI's MCP card). It now builds the tool catalog against a
+  `DaemonDeviceProxy` via `ensure_daemon()`. `--mac` is optional; new
+  `--socket/--host/--port/--token` flags target a local or remote daemon
+  (mirrors the `daemon` command + the R19 network model).
+- **Daemon client plumbing moved** `divoom_gui/daemon_bridge.py` →
+  `divoom_daemon/daemon_client.py` (so `divoom_lib` can use it with no backwards
+  `lib`→`gui` dependency). `daemon_bridge.py` is now a thin re-export shim;
+  all existing `from divoom_gui.daemon_bridge import ...` call-sites/tests
+  unchanged.
+- **`mcp_control.start(mac=None)`** + `gui_api.start_mcp_server` no longer
+  require a MAC (the confusing CoreBluetooth UUID shown in the card is no longer
+  needed — the daemon already owns the device).
+- **`get_capabilities`** (`divoom_lib/mcp_tools.py`) now awaits an awaitable
+  `to_dict()` so the read-only tool works through the proxy (was returning an
+  unawaited coroutine).
+
+### Scan returns Divoom devices only
+
+- **`discover_all_divoom_devices`** (`divoom_lib/utils/discovery.py`): removed the
+  "if nothing matches, return ALL named devices" fallback that dumped every
+  random BLE peripheral (headphones, watches, …) into the device list. New
+  `is_divoom_name()` helper + `DIVOOM_NAME_KEYWORDS` single source of truth
+  (added `divoom`, `aurabox`, `planet`).
+
+### Tests
+
+- `tests/test_discovery.py`: +4 (is_divoom_name match/reject, filter, no-fallback).
+- `tests/test_mcp_server.py`: +2 (no-MAC subcommand, daemon-routing — asserts
+  `_resolve_device` is never called).
+- Suite **1061 passed / 75 skipped / 0 failed** (+6).
+
+---
+
 ## Round 26 — 2026-06-08 (Daemon channel-switch API + weather fix)
 
 ### Library — `divoom_lib/`

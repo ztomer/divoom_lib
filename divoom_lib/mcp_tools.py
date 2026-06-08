@@ -188,10 +188,19 @@ def _make_handlers(divoom) -> dict[str, Any]:
     async def get_capabilities() -> dict:
         """Read-only: return the device's capabilities (panel resolution,
         speaker, clock, etc.)."""
+        import inspect
+
         caps = divoom.capabilities
-        # Capabilities is a frozen dataclass — to_dict() is best-effort.
-        if hasattr(caps, "to_dict"):
-            return caps.to_dict()
+        # When ``divoom`` is a DaemonDeviceProxy (R28), ``caps`` is itself a
+        # proxy and ``caps.to_dict()`` returns an awaitable that routes through
+        # the daemon's device_call; for a real Divoom it's a sync dataclass
+        # method. Handle both.
+        to_dict = getattr(caps, "to_dict", None)
+        if callable(to_dict):
+            res = to_dict()
+            if inspect.isawaitable(res):
+                res = await res
+            return res
         if dataclasses.is_dataclass(caps):
             return {f.name: getattr(caps, f.name) for f in dataclasses.fields(caps)}
         return {"raw": str(caps)}
