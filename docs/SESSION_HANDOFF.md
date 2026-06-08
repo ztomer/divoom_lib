@@ -1,10 +1,13 @@
 # Session Handoff — read this first
 
+**Consolidated roadmap**: `docs/ROADMAP.md` — shipped rounds, open workstreams,
+and deferred items in one view. This file tracks the per-round state.
+
 This is the **cross-agent session state**. opencode and Claude Code keep their
 own conversation stores (they can't share a live session), so THIS FILE + the
-git history + CHANGELOG are the shared memory. Any agent (opencode or Claude)
-should read this on entry and **update it at the end of every round** (see the
-core rule in `AGENTS.md`).
+git history + CHANGELOG + ROADMAP are the shared memory. Any agent (opencode or
+Claude) should read this on entry and **update it at the end of every round**
+(see the core rule in `AGENTS.md`).
 
 ## How to resume
 
@@ -535,33 +538,10 @@ Terminal (`open *.command`). Device UUIDs + method in `docs/DEVICE_VALIDATION_PL
   See `CHANGELOG.md` + `docs/PLANNING_ROUND*.md`.
 - **Git:** R8→R14 arc is in the working tree, ready to commit + push.
 
-## Open threads / next up (see docs/PLANNING_ROUND14.md for the full plan)
+## Open threads / next up (stale — see docs/ROADMAP.md for the consolidated view)
 
-1. **R14 §1-§4 — commit + push** (current working tree): all four
-   R13 follow-up sections complete and green.
-2. **R12 §A visual pass pending** (user-run `python3 gui/gui_main.py`):
-   verify appbar corner transports, scoreboard restyle, wall toolbar,
-   font sweep, segmented-pill, tools regroup, sub-tab rename to
-   "Sessions", **and the new macOS Notifications card under
-   Settings → Devices** (R14 §3).
-3. **R12 §B hardware verification pending** (user-run): album cover
-   renders un-distorted; custom-art/live push end-to-end; weather
-   push via `divoom-control set-temperature 18 --weather clear`.
-4. **get_* read-back times out on real devices** (task #20): get
-   queries 0x42/0x46/0x13 get no parseable response (likely
-   query-framing mismatch). Gates every "read from device". See
-   `docs/DEVICE_VALIDATION_PLAN.md`.
-5. **Channel-switch hardware bug (Divoom Max):** first switch works,
-   rest don't; not root-caused. All switches are `set light mode`
-   (0x45) fire-and-forget.
-6. **Deferred features** (R12 §D): see
-   `docs/PLANNING_ROUND12_D_AUDIT.md` — Timeplan UI blocked on
-   unverified `mode`/`type` semantics; SD player blocked on task
-   #20; Game has no host UX; Drawing needs a non-trivial UI per mode;
-   Cloud HTTP is its own round (auth broken).
-7. **R14 §3 — verify the new card on a real Mac** with notifications
-   actually firing; routing JSON editor parses + saves +
-   hot-reloads the live monitor without restart.
+This section is preserved for historical reference only. All current open
+workstreams are consolidated in `docs/ROADMAP.md`.
 
 ## Hardware note
 
