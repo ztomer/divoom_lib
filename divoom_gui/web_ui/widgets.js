@@ -57,15 +57,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // enable). The button + its handler were removed.
 
     // ── 3. YAHOO STOCKS TICKER WIDGET ──
-    const applyStockBtn = document.getElementById("apply-stock-btn");
-    if (applyStockBtn) {
-        applyStockBtn.addEventListener("click", () => {
-            const symbol = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
-            if (!symbol) {
-                window.showToast("Please enter a ticker symbol!", "error");
-                return;
-            }
-
+    // R24 #9: no "Display" button — a symbol is shown automatically when typed
+    // (Enter / blur) or selected from the saved list; "Add" saves + displays.
+    window.displayTicker = function(symbol) {
+        symbol = (symbol || "").trim().toUpperCase();
+        if (!symbol) return;
+        {
             window.showToast(`Fetching Yahoo price data for ${symbol}...`, "success");
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.apply_stock_ticker(symbol).then(resJson => {
@@ -100,7 +97,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
             }
+        }
+    };
+
+    // Auto-display: Enter or leaving the symbol box shows it (no Display button).
+    const stockInput = document.getElementById("stock-symbol-input");
+    if (stockInput) {
+        stockInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); window.displayTicker(stockInput.value); }
         });
+        stockInput.addEventListener("change", () => window.displayTicker(stockInput.value));
     }
 
     function refreshStockPreview() {
@@ -149,7 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
             label.addEventListener("click", () => {
                 const input = document.getElementById("stock-symbol-input");
                 if (input) input.value = sym;
-                document.getElementById("apply-stock-btn")?.click();
+                window.displayTicker(sym);   // R24 #9: selecting displays immediately
             });
             const rm = document.createElement("button");
             rm.className = "ticker-chip-remove";
@@ -191,6 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 persistTickers();
                 window.showToast(`Saved ${sym}`, "success");
             }
+            window.displayTicker(sym);   // R24 #9: Add also displays
         });
     }
 
@@ -433,6 +440,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("tab-changed", (e) => {
         const tab = e.detail.tab;
         if (tab === "data-sources") {
+            // Auto-refresh all previews on tab open (no device push until card is selected)
+            refreshSysmonPreview();
+            refreshWeatherPreview();
+            const sym = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
+            if (sym) refreshStockPreview();
             selectWidget(selectedWidget);
         } else {
             // Stop everything when leaving the tab
@@ -470,6 +482,9 @@ document.addEventListener("DOMContentLoaded", () => {
             window.dispatchEvent(new CustomEvent("tab-changed", { detail: { tab: "data-sources" } }));
         } else {
             refreshSysmonPreview();
+            refreshWeatherPreview();
+            const sym = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
+            if (sym) refreshStockPreview();
         }
     }, 1800);
 });

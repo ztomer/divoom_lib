@@ -58,8 +58,7 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                             <div class="form-group">
                                 <div class="flex-row">
                                     <input type="text" id="stock-symbol-input" placeholder="Symbol e.g. AAPL, BTC-USD" class="text-input" value="BTC-USD">
-                                    <button id="apply-stock-btn" class="glow-btn compact">Display</button>
-                                    <button id="add-ticker-btn" class="glow-btn compact ghost">+ Save</button>
+                                    <button id="add-ticker-btn" class="glow-btn compact">Add</button>
                                 </div>
                             </div>
 
@@ -87,11 +86,11 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                                  in 1 second (Rams #4). No white/gray background panels. -->
                             <div class="sysmon-bars" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
                                 <div class="sysmon-bar-row" data-stat="cpu">
-                                    <span class="sysmon-bar-label" style="color:#00ffb4;">CPU</span>
+                                    <span class="sysmon-bar-label" style="color:#ffcc00;">CPU</span>
                                     <div class="sysmon-bar-track">
-                                        <div class="sysmon-bar-fill" data-fill-color="#00ffb4" style="width:0%; background:#00ffb4;"></div>
+                                        <div class="sysmon-bar-fill" data-fill-color="#ffcc00" style="width:0%; background:#ffcc00;"></div>
                                     </div>
-                                    <b class="sysmon-bar-value" id="sysmon-cpu" style="color:#00ffb4;">–</b>
+                                    <b class="sysmon-bar-value" id="sysmon-cpu" style="color:#ffcc00;">–</b>
                                 </div>
                                 <div class="sysmon-bar-row" data-stat="mem">
                                     <span class="sysmon-bar-label" style="color:#5aaaff;">MEM</span>
@@ -101,11 +100,11 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                                     <b class="sysmon-bar-value" id="sysmon-mem" style="color:#5aaaff;">–</b>
                                 </div>
                                 <div class="sysmon-bar-row" data-stat="bat">
-                                    <span class="sysmon-bar-label" style="color:#00ff64;">BAT</span>
+                                    <span class="sysmon-bar-label" style="color:#ff4444;">BAT</span>
                                     <div class="sysmon-bar-track">
-                                        <div class="sysmon-bar-fill" data-fill-color="#00ff64" style="width:0%; background:#00ff64;"></div>
+                                        <div class="sysmon-bar-fill" data-fill-color="#ff4444" style="width:0%; background:#ff4444;"></div>
                                     </div>
-                                    <b class="sysmon-bar-value" id="sysmon-bat" style="color:#00ff64;">–</b>
+                                    <b class="sysmon-bar-value" id="sysmon-bat" style="color:#ff4444;">–</b>
                                 </div>
                             </div>
                             <div class="hc-actions" style="display:flex; gap:10px; align-items:center;">
