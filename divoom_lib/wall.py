@@ -9,9 +9,10 @@ import logging
 import tempfile
 from pathlib import Path
 from PIL import Image, ImageSequence
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 
 from divoom_lib.divoom import Divoom
+from divoom_lib.models import DeviceSlot
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ class DivoomWall:
         """
         self.logger = custom_logger or logger
         self.device_configs = device_configs
-        self.devices: List[Tuple[Divoom, int, int, int]] = []
+        self.devices: List[DeviceSlot] = []
         
         # Calculate composite bounding box
         self.is_free_form = any("width" in config for config in self.device_configs)
@@ -95,7 +96,7 @@ class DivoomWall:
                 
                 divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=True)
                 # Store absolute bounding box: (divoom, x, y, size, width, height)
-                self.devices.append((divoom, x, y, size, width, height))
+                self.devices.append(DeviceSlot(device=divoom, x=x, y=y, size=size, width=width, height=height))
         else:
             max_x_slot = 0
             max_y_slot = 0
@@ -107,7 +108,7 @@ class DivoomWall:
                 size = config.get("size", 16)
                 
                 divoom = Divoom(mac=mac, logger=self.logger, use_ios_le_protocol=True)
-                self.devices.append((divoom, x, y, size, 0, 0)) # Mock width, height
+                self.devices.append(DeviceSlot(device=divoom, x=x, y=y, size=size))
                 
                 if x + 1 > max_x_slot:
                     max_x_slot = x + 1
@@ -126,9 +127,9 @@ class DivoomWall:
         """Establishes connections to all wall Divoom devices in parallel."""
         self.logger.info("Connecting to all Divoom display wall devices...")
         connect_tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            self.logger.info(f"Connecting to screen at Slot ({x}, {y}) MAC: {divoom.mac}...")
-            connect_tasks.append(divoom.connect())
+        for slot in self.devices:
+            self.logger.info(f"Connecting to screen at Slot ({slot.x}, {slot.y}) MAC: {slot.device.mac}...")
+            connect_tasks.append(slot.device.connect())
         await asyncio.gather(*connect_tasks)
         self.logger.info("All display wall devices connected successfully.")
 
@@ -136,15 +137,15 @@ class DivoomWall:
         """Disconnects all wall Divoom devices in parallel."""
         self.logger.info("Disconnecting from all Divoom display wall devices...")
         disconnect_tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            disconnect_tasks.append(divoom.disconnect())
+        for slot in self.devices:
+            disconnect_tasks.append(slot.device.disconnect())
         await asyncio.gather(*disconnect_tasks)
         self.logger.info("All display wall devices disconnected.")
 
     @property
     def is_connected(self) -> bool:
         """Returns True if all Divoom wall devices are connected."""
-        return all(d.is_connected for d, _, _, _, _, _ in self.devices)
+        return all(s.device.is_connected for s in self.devices)
 
     async def show_image(self, file_path: str, time: int | None = None) -> bool:
         """
@@ -166,8 +167,13 @@ class DivoomWall:
         
         # Generate temporary files for each cropped quadrant and dispatch them
         with tempfile.TemporaryDirectory() as temp_dir:
-            for device_tuple in self.devices:
-                divoom, x, y, size, width, height = device_tuple
+            for slot in self.devices:
+                divoom = slot.device
+                x = slot.x
+                y = slot.y
+                size = slot.size
+                width = slot.width
+                height = slot.height
                 
                 if self.is_free_form:
                     left = x - self.min_x
@@ -231,12 +237,12 @@ class DivoomWall:
             # Check results
             all_ok = True
             for idx, res in enumerate(results):
-                divoom, x, y, size, width, height = self.devices[idx]
+                slot = self.devices[idx]
                 if isinstance(res, Exception):
-                    self.logger.error(f"Failed to display slot ({x}, {y}) on device {divoom.mac}: {res}")
+                    self.logger.error(f"Failed to display slot ({slot.x}, {slot.y}) on device {slot.device.mac}: {res}")
                     all_ok = False
                 elif not res:
-                    self.logger.error(f"Failed to display slot ({x}, {y}) on device {divoom.mac}")
+                    self.logger.error(f"Failed to display slot ({slot.x}, {slot.y}) on device {slot.device.mac}")
                     all_ok = False
                     
             return all_ok
@@ -245,17 +251,17 @@ class DivoomWall:
         """Sets a unified solid light color across all screens in the wall."""
         self.logger.info(f"Setting solid light {color} across all screens...")
         tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            tasks.append(divoom.display.show_light(color=color, brightness=brightness))
+        for slot in self.devices:
+            tasks.append(slot.device.display.show_light(color=color, brightness=brightness))
         results = await asyncio.gather(*tasks)
         return all(results)
-        
+
     async def show_clock(self, clock: int = 0) -> bool:
         """Displays clock style on all screens in the wall."""
         self.logger.info(f"Displaying clock style {clock} across all screens...")
         tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            tasks.append(divoom.display.show_clock(clock=clock))
+        for slot in self.devices:
+            tasks.append(slot.device.display.show_clock(clock=clock))
         results = await asyncio.gather(*tasks)
         return all(results)
 
@@ -263,8 +269,8 @@ class DivoomWall:
         """Displays VJ effect style on all screens in the wall."""
         self.logger.info(f"Displaying VJ effect {number} across all screens...")
         tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            tasks.append(divoom.display.show_effects(number=number))
+        for slot in self.devices:
+            tasks.append(slot.device.display.show_effects(number=number))
         results = await asyncio.gather(*tasks)
         return all(results)
 
@@ -272,8 +278,8 @@ class DivoomWall:
         """Displays visualization EQ style on all screens in the wall."""
         self.logger.info(f"Displaying visualization EQ {number} across all screens...")
         tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            tasks.append(divoom.display.show_visualization(number=number))
+        for slot in self.devices:
+            tasks.append(slot.device.display.show_visualization(number=number))
         results = await asyncio.gather(*tasks)
         return all(results)
 
@@ -282,11 +288,11 @@ class DivoomWall:
         else BLE), matching the GUI's per-device transport choice."""
         self.logger.info(f"Setting brightness {brightness} across all screens...")
         tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            if getattr(divoom, "lan", None):
-                tasks.append(divoom.lan.set_brightness(brightness))
+        for slot in self.devices:
+            if getattr(slot.device, "lan", None):
+                tasks.append(slot.device.lan.set_brightness(brightness))
             else:
-                tasks.append(divoom.device.set_brightness(brightness))
+                tasks.append(slot.device.device.set_brightness(brightness))
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return all(res is True or isinstance(res, dict) for res in results)
 
@@ -294,8 +300,8 @@ class DivoomWall:
         """Sets volume across all screens in the wall."""
         self.logger.info(f"Setting volume {volume} across all screens...")
         tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            tasks.append(divoom.music.set_volume(volume))
+        for slot in self.devices:
+            tasks.append(slot.device.music.set_volume(volume))
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return all(res is True for res in results)
 
@@ -303,8 +309,8 @@ class DivoomWall:
         """Switches all screens in the wall to the same channel."""
         self.logger.info(f"Switching all screens to channel {channel}...")
         tasks = []
-        for divoom, x, y, size, width, height in self.devices:
-            tasks.append(divoom.display.switch_channel(channel))
+        for slot in self.devices:
+            tasks.append(slot.device.display.switch_channel(channel))
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return all(res is True or isinstance(res, dict) for res in results)
 
@@ -331,8 +337,8 @@ class DivoomWall:
             return res is not False
 
         results = []
-        for entry in self.devices:
-            divoom = entry[0]
-            sz = entry[3] if len(entry) > 3 else 16
+        for slot in self.devices:
+            divoom = slot.device
+            sz = slot.size
             results.append(await _push(divoom, int(sz)))
         return all(results)

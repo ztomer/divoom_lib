@@ -13,6 +13,7 @@ from .capabilities import (
     capabilities_from_manufacturer_data,
     ADVERTISED_FINGERPRINTS,
 )
+from .device_slot import DeviceSlot
 
 __all__ = [
     "COMMANDS",

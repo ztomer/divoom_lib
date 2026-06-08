@@ -316,7 +316,7 @@ class DeviceOwner:
             if which == "wall":
                 if self._wall is None:
                     raise RuntimeError("no wall configured")
-                targets = [(d, sz) for d, _x, _y, sz, _w, _h in self._wall.devices]
+                targets = [(slot.device, slot.size) for slot in self._wall.devices]
             else:
                 device = await self._ensure_device_async(args.get("mac"))
                 targets = [(device, default_size)]
