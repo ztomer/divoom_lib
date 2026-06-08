@@ -6,7 +6,21 @@ shipped milestone (per the project planning docs).
 
 ---
 
-## Round 28 — 2026-06-08 (MCP server routes through daemon + scan filter)
+## Round 28 — 2026-06-08 (MCP server routes through daemon + scan filter + tab spacing)
+
+### Tab chrome spacing centralised (one source of truth)
+
+- Every tab area (Channels, Tools, Settings) now sits on an identical glass pane
+  with `[2px] tab-row [2px]` vertical padding and a `1px` gap to the content
+  cards below. Previously Channels (grid) double-spaced (grid `gap:20px` +
+  `margin-bottom:16px` ≈ 36px) while Tools/Settings (block) had 16px.
+- **New tokens in `style.css :root`** — the *only* place tab spacing is defined:
+  `--tab-pane-pad-y: 2px`, `--tab-pane-pad-x: 12px`, `--tab-pane-gap: 1px`.
+  `.tabs-section` (tabs.css) consumes them; `margin-bottom` is the universal gap
+  mechanism. `#control-panel .grid-layout` gets `gap: 0` so the grid context
+  doesn't double-space (verified: actual pane→card gap = 1px in all three).
+- Tests: `tests/test_tabs_chrome.py` +3 (tokens defined once, .tabs-section uses
+  them, channels grid gap zeroed).
 
 ### MCP server no longer owns its own BLE connection
 

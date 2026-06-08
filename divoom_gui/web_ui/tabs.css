@@ -19,18 +19,24 @@
    - Optional icon prefix: `<svg class="tab-icon">` or `<img class="tab-icon">`.
    - Tooltips: `title` attribute.
 */
-/* R24 r2: every tab row sits on its OWN glass panel — the same treatment in
-   Channels, Tools, and Settings (previously only Channels had a glass panel and
-   Tools/Settings had bare tabs on a transparent strip). Tokens mirror
-   settings.css `.glass-card` so the three read identically, and `margin-bottom`
-   gives the same gap to the content cards below in all three. */
+/* R24 r2 / R28: every tab row sits on its OWN glass panel — the same treatment
+   in Channels, Tools, and Settings (previously only Channels had a glass panel
+   and Tools/Settings had bare tabs on a transparent strip). Tokens mirror
+   settings.css `.glass-card` so the three read identically.
+
+   R28: the pane's vertical padding and its gap to the content cards below are
+   driven entirely by the `--tab-pane-*` tokens in style.css `:root` — the single
+   place to tune tab spacing. `margin-bottom` is the universal gap mechanism
+   (works whether the parent is a grid like Channels or a block like
+   Tools/Settings); the Channels grid's own `gap` is zeroed so it doesn't
+   double-space (see `#control-panel .grid-layout` in style_extra.css). */
 .tabs-section {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 10px 12px;
-  margin-bottom: 16px;
+  padding: var(--tab-pane-pad-y) var(--tab-pane-pad-x);
+  margin: 0 0 var(--tab-pane-gap) 0;
   box-sizing: border-box;
 }
 

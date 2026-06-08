@@ -56,6 +56,18 @@
     --font-display: 'Outfit', sans-serif;
     --font-sans:    'Inter', sans-serif;
     --font-mono:    'Inter Mono', ui-monospace, monospace;
+
+    /* ── TAB CHROME SPACING — single source of truth (R28) ──────────────
+       Every tab area (Channels, Tools, Settings) sits on its own glass
+       pane (.tabs-section). These three tokens are the ONLY place the tab
+       spacing is defined, so the panels read identically:
+         [--tab-pane-pad-y]
+         [   tab row       ]
+         [--tab-pane-pad-y]
+       then the content cards begin --tab-pane-gap below the pane. */
+    --tab-pane-pad-y: 2px;   /* glass-pane vertical padding (above + below the row) */
+    --tab-pane-pad-x: 12px;  /* glass-pane horizontal padding */
+    --tab-pane-gap:   1px;    /* gap from the pane to the cards below it */
 }
 
 /* ── Light Mode Redefinitions ── */

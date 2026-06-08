@@ -183,6 +183,11 @@ body.theme-light .arranger-node-image {
     height: 100%;
     min-height: 0;
     align-items: stretch;
+    /* R28: the Channels tab area is a grid (tabs-section + content card). Zero
+       the grid gap so the ONLY spacing below the tab pane is the tabs-section's
+       --tab-pane-gap margin — identical to the block-context Tools/Settings
+       panels. Tune spacing via the --tab-pane-* tokens in style.css, not here. */
+    gap: 0;
 }
 
 #control-panel .card {

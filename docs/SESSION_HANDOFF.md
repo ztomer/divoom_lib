@@ -15,7 +15,14 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **R28 — MCP-via-daemon + scan filter SHIPPED. Suite 1061 / 75 / 0 (+6).**
+- **R28 — MCP-via-daemon + scan filter + tab spacing SHIPPED. Suite 1064 / 75 / 0.**
+  - **Tab spacing centralised.** Each tab area (Channels/Tools/Settings) sits on
+    its own glass pane: `[2px] tabs [2px]` vertical padding + `1px` gap to the
+    cards below. Tokens `--tab-pane-pad-y/-pad-x/-gap` in `style.css :root` are
+    the single source of truth; `.tabs-section` consumes them and
+    `#control-panel .grid-layout` has `gap:0` so the grid doesn't double-space
+    (was 36px in Channels vs 16px in Tools/Settings). Verified live (pane→card
+    gap = 1px in all three). +3 guardrail tests.
   - **MCP server no longer opens its own BLE connection.** It was calling
     `_resolve_device()` → a 2nd BLE connect to the daemon-owned device (R17
     single-owner) → `DeviceConnectionError: ... was not found`, shown as a

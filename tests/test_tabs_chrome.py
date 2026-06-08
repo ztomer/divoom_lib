@@ -16,6 +16,8 @@ REPO_ROOT = Path(__file__).parent.parent
 TABS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "tabs.css"
 SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
 CHANNELS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "channels.css"
+STYLE_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "style.css"
+STYLE_EXTRA_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "style_extra.css"
 INDEX_HTML = REPO_ROOT / "divoom_gui" / "web_ui" / "index.html"
 def _cat(paths: list[Path]) -> str:
     parts = []
@@ -177,6 +179,42 @@ def test_no_legacy_settings_tab_btn_in_templates() -> None:
         r'<button class="tab-btn active"\s+data-settings-tab="settings-devices"',
         src,
     ), "Settings Devices tab is not using .tab-btn"
+
+
+# ── R28: tab spacing is centralised in one place (style.css :root) ─────
+
+
+def test_tab_spacing_tokens_defined_once_in_root() -> None:
+    """The three tab-spacing tokens live in style.css :root and nowhere else."""
+    style = STYLE_CSS.read_text()
+    for tok in ("--tab-pane-pad-y", "--tab-pane-pad-x", "--tab-pane-gap"):
+        # Defined exactly once (the `:root` declaration).
+        assert style.count(f"{tok}:") == 1, f"{tok} must be declared once in style.css :root"
+
+
+def test_tabs_section_uses_spacing_tokens() -> None:
+    """.tabs-section must drive its padding + bottom gap from the tokens, not
+    hardcoded px (so all three tab areas read identically)."""
+    src = TABS_CSS.read_text()
+    m = re.search(r"\.tabs-section\s*\{([^}]*)\}", src)
+    assert m, "tabs.css is missing the .tabs-section rule"
+    body = m.group(1)
+    assert "var(--tab-pane-pad-y)" in body and "var(--tab-pane-pad-x)" in body, (
+        ".tabs-section padding must use --tab-pane-pad-y / --tab-pane-pad-x"
+    )
+    assert "var(--tab-pane-gap)" in body, (
+        ".tabs-section bottom gap must use --tab-pane-gap"
+    )
+    # No stray hardcoded vertical padding/margin left behind.
+    assert "10px 12px" not in body and "margin-bottom: 16px" not in body
+
+
+def test_channels_grid_gap_zeroed() -> None:
+    """The Channels tab area is a grid; its gap must be zeroed so the only
+    spacing below the pane is --tab-pane-gap (no double-spacing vs Tools/Settings)."""
+    src = STYLE_EXTRA_CSS.read_text()
+    m = re.search(r"#control-panel\s+\.grid-layout\s*\{([^}]*gap:\s*0[^}]*)\}", src)
+    assert m, "#control-panel .grid-layout must set gap: 0 (R28)"
 
 
 # ── index.html links tabs.css ─────────────────────────────────────────
