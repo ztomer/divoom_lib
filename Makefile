@@ -14,4 +14,4 @@ test-hardware: native
 	python3 -m pytest -q --run-hardware
 
 clean-native:
-	rm -f gui/libdivoom_compact.dylib
+	rm -f divoom_lib/libdivoom_compact.dylib divoom_lib/libdivoom_compact.so divoom_lib/libdivoom_compact.dll
