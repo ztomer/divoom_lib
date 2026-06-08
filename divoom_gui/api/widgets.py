@@ -22,6 +22,7 @@ class WidgetsApi(ApiBase):
 
         async def _push(d):
             info = await get_weather()
+            await d.control.set_light_mode(1)
             return await Weather(d).set(info.temperature_c, info.weather_type)
 
         return self._tool_call(_push, "weather")

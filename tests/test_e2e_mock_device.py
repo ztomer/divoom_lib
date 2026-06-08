@@ -237,6 +237,13 @@ async def test_weather_set_proxy_daemon_roundtrip():
         def logger(self):
             import logging
             return logging.getLogger(__name__)
+        @property
+        def control(self):
+            class _FakeControl:
+                async def set_light_mode(self, channel):
+                    self.commands.append(("set_light_mode", channel))
+                    return True
+            return _FakeControl()
 
     dev = _FakeWeatherDevice()
     d = DivoomDaemon(mac="11:22:33:44:55:66", socket_path=sp, monitor=object(), device=dev)
@@ -259,6 +266,90 @@ async def test_weather_set_proxy_daemon_roundtrip():
         cmd, args = dev.commands[-1]
         assert cmd == 0x5F, f"Expected 0x5F, got {cmd:#04x}"
         assert args == [22, 1], f"Expected [22, 1], got {args}"
+    finally:
+        d.stop()
+        t.join(timeout=3.0)
+        if os.path.exists(sp):
+            os.remove(sp)
+
+
+@pytest.mark.asyncio
+async def test_weather_push_switches_channel_before_data(monkeypatch):
+    """Weather push must switch to TEMPRETURE channel (mode 1) before
+    sending the 0x5F temperature data — confirmed by the decompiled APK:
+    the device only DISPLAYS the cached weather data when in TEMPRETURE
+    mode (light mode 1)."""
+    import os, threading, time
+    import asyncio
+    from divoom_daemon.daemon import DivoomDaemon
+    from divoom_daemon.daemon_protocol import DaemonClient
+    from divoom_gui.daemon_bridge import DaemonDeviceProxy
+    from divoom_gui.api.widgets import WidgetsApi
+    from divoom_gui.api import AsyncLoopThread
+    from divoom_lib.weather_provider import WeatherInfo
+
+    async def _fake_get_weather():
+        return WeatherInfo(temperature_c=22, weather_type=1,
+                          location="Test", provider="stub", fetched_at=0.0)
+
+    monkeypatch.setattr("divoom_lib.weather_provider.get_weather", _fake_get_weather)
+
+    sp = f"/tmp/divoom_weather_chan_{os.getpid()}.sock"
+    if os.path.exists(sp):
+        os.remove(sp)
+
+    commands = []
+
+    class _FakeWeatherDevice:
+        def __init__(self):
+            self.is_connected = True
+        async def send_command(self, cmd, args=None):
+            commands.append(("send_command", cmd, args))
+            return True
+        @property
+        def logger(self):
+            import logging
+            return logging.getLogger(__name__)
+        @property
+        def control(self):
+            class _FakeControl:
+                async def set_light_mode(self, channel):
+                    commands.append(("set_light_mode", channel))
+                    return True
+            return _FakeControl()
+
+    dev = _FakeWeatherDevice()
+    d = DivoomDaemon(mac="11:22:33:44:55:66", socket_path=sp, monitor=object(), device=dev)
+    t = threading.Thread(target=d.serve_forever, daemon=True)
+    t.start()
+    for _ in range(50):
+        if os.path.exists(sp):
+            break
+        time.sleep(0.02)
+
+    try:
+        client = DaemonClient(sp)
+        proxy = DaemonDeviceProxy(client)
+        loop_thread = AsyncLoopThread()
+        loop_thread.start()
+        loop_thread.ready.wait()
+        try:
+            api = WidgetsApi(loop_thread, lambda: None, lambda: {"current_divoom": proxy})
+            api._run_async = lambda coro: asyncio.run_coroutine_threadsafe(coro, loop_thread.loop).result()
+            ok = api.push_weather()
+            assert ok is True, f"push_weather returned False, commands={commands}"
+        finally:
+            loop_thread.stop()
+        # Channel switch (TEMPRETURE mode 1) must precede the weather data.
+        idx_light = next((i for i, c in enumerate(commands) if c[0] == "set_light_mode"), -1)
+        idx_send = next((i for i, c in enumerate(commands) if c[0] == "send_command"), -1)
+        assert idx_light >= 0, f"No set_light_mode call in {commands}"
+        assert commands[idx_light][1] == 1, (
+            f"Expected set_light_mode(1), got {commands[idx_light]}"
+        )
+        assert idx_light < idx_send, (
+            f"set_light_mode at pos {idx_light} should precede send_command at {idx_send}: {commands}"
+        )
     finally:
         d.stop()
         t.join(timeout=3.0)
