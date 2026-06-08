@@ -94,18 +94,22 @@ class DaemonClient:
     state (it may not be launched yet).
     """
 
-    def __init__(self, socket_path: str = DEFAULT_SOCKET_PATH, timeout: float = 2.0,
+    def __init__(self, socket_path: str = DEFAULT_SOCKET_PATH,
+                 timeout: float | None = None,
                  *, host: str | None = None, port: int | None = None,
                  token: str | None = None):
+        from divoom_daemon.daemon_config import load_daemon_config
         self.socket_path = socket_path
-        self.timeout = timeout
+        # Default the quick-command read timeout from the daemon config so the
+        # "2 seconds" lives in one place (daemon.ini) rather than here.
+        self.timeout = timeout if timeout is not None else load_daemon_config().client_timeout
         self.host = host
         self.port = port
         self.token = token
 
     @classmethod
     def from_env(cls, socket_path: str = DEFAULT_SOCKET_PATH,
-                 timeout: float = 2.0) -> "DaemonClient":
+                 timeout: float | None = None) -> "DaemonClient":
         """Build a client from env: if DIVOOM_DAEMON_HOST is set, target that
         remote daemon over TCP (with DIVOOM_DAEMON_TOKEN); else the local Unix
         socket."""
@@ -197,13 +201,20 @@ class DaemonClient:
     def device_status(self) -> dict:
         return self.send_command("device_status")
 
-    def scan(self, timeout: float = 15, limit: int = 4) -> dict:
-        # The daemon only replies AFTER scanning for `timeout` seconds, so the
-        # client must wait longer than that — otherwise the read times out before
-        # the (successful) reply arrives. Pad generously for connect/serialize.
+    def scan(self, timeout: float | None = None, limit: int | None = None) -> dict:
+        # Divoom BLE discovery is slow (a full scan can take 30-60s). The daemon
+        # only replies AFTER scanning for `timeout` seconds, so the client must
+        # wait longer than that or the read times out before the (successful)
+        # reply arrives. The fallbacks + the read slack live in daemon.ini.
+        from divoom_daemon.daemon_config import load_daemon_config
+        cfg = load_daemon_config()
+        if timeout is None:
+            timeout = cfg.scan_timeout
+        if limit is None:
+            limit = cfg.scan_limit
         return self.send_command(
             "scan", {"timeout": timeout, "limit": limit},
-            read_timeout=float(timeout) + 10.0,
+            read_timeout=cfg.scan_read_timeout(timeout),
         )
 
     def wall_configure(self, slots: dict, cell_size: int = 16) -> dict:

@@ -1,0 +1,124 @@
+"""Daemon configuration — user-tunable knobs in an INI alongside the GUI config.
+
+Lives at ``~/.config/divoom-control/daemon.ini``, next to the GUI's
+``config.ini``. On first load a commented default file is written so the knobs
+are discoverable. Every default is a NAMED constant here, so there are no magic
+numbers sprinkled through the daemon/client code — the call sites read this
+config instead.
+
+Divoom BLE discovery is genuinely slow (a full scan can take 30-60s), which is
+why the scan defaults are large. The user can always pass a per-scan ``timeout``
+from the GUI; these are the fallbacks + the slack the client adds when waiting
+for a scan reply.
+"""
+from __future__ import annotations
+
+import configparser
+import logging
+from dataclasses import dataclass, fields
+from pathlib import Path
+
+logger = logging.getLogger("divoom_daemon")
+
+CONFIG_DIR = Path.home() / ".config" / "divoom-control"
+CONFIG_FILE = CONFIG_DIR / "daemon.ini"
+SECTION = "daemon"
+
+# ── named defaults (no magic numbers at the call sites) ──────────────────────
+DEFAULT_SCAN_TIMEOUT = 15.0          # seconds to scan when the GUI sends no timeout
+DEFAULT_SCAN_LIMIT = 4               # stop after N devices (0 = no limit)
+DEFAULT_SCAN_READ_SLACK = 10.0       # client waits scan_timeout + this for the reply
+DEFAULT_CLIENT_TIMEOUT = 2.0         # socket read timeout for quick, non-scan commands
+DEFAULT_RECONNECT_SCAN_TIMEOUT = 3.0  # short scan used during auto-reconnect
+
+
+@dataclass(frozen=True)
+class DaemonConfig:
+    """Resolved daemon settings (see module docstring for the why of each)."""
+    scan_timeout: float = DEFAULT_SCAN_TIMEOUT
+    scan_limit: int = DEFAULT_SCAN_LIMIT
+    scan_read_slack: float = DEFAULT_SCAN_READ_SLACK
+    client_timeout: float = DEFAULT_CLIENT_TIMEOUT
+    reconnect_scan_timeout: float = DEFAULT_RECONNECT_SCAN_TIMEOUT
+
+    def scan_read_timeout(self, scan_timeout: float) -> float:
+        """How long a client should wait for a scan reply: the daemon only
+        answers AFTER scanning for ``scan_timeout`` seconds, so the read must
+        outlast the scan plus connect/serialize overhead."""
+        return float(scan_timeout) + self.scan_read_slack
+
+
+_DEFAULT_FILE = """\
+# divoom-control daemon configuration
+# Sits alongside the GUI config (config.ini) in this directory. The daemon reads
+# it on startup — restart the daemon to apply changes.
+#
+# Divoom BLE discovery is slow: a full scan can take 30-60s, which is why the
+# scan defaults are large. The GUI can still send a per-scan timeout; these are
+# the fallbacks used when it doesn't.
+
+[daemon]
+# Seconds to scan for devices when the GUI doesn't specify a timeout.
+scan_timeout = {scan_timeout}
+
+# Stop scanning once this many devices are found (0 = no limit, full timeout).
+scan_limit = {scan_limit}
+
+# Extra seconds a client waits for a scan reply on top of the scan duration
+# (the daemon only answers once the scan finishes). Covers connect + serialize.
+scan_read_slack = {scan_read_slack}
+
+# Socket read timeout for quick, non-scan commands (status, connect, etc.).
+client_timeout = {client_timeout}
+
+# Short scan used internally when auto-reconnecting to a known device.
+reconnect_scan_timeout = {reconnect_scan_timeout}
+"""
+
+_cache: DaemonConfig | None = None
+
+
+def _coerce(field_type, raw, fallback):
+    try:
+        return field_type(raw)
+    except (TypeError, ValueError):
+        logger.warning("daemon config: bad value %r; using %r", raw, fallback)
+        return fallback
+
+
+def _write_default(path: Path, defaults: DaemonConfig) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_DEFAULT_FILE.format(**defaults.__dict__), encoding="utf-8")
+        logger.info("Wrote default daemon config to %s", path)
+    except OSError as e:
+        logger.warning("Could not write default daemon config (%s)", e)
+
+
+def load_daemon_config(path: Path = CONFIG_FILE, *, force: bool = False) -> DaemonConfig:
+    """Load (and cache) the daemon config. Writes a commented default file the
+    first time it's missing. Never raises — falls back to the named defaults."""
+    global _cache
+    if _cache is not None and not force:
+        return _cache
+
+    defaults = DaemonConfig()
+    parser = configparser.ConfigParser()
+    try:
+        if path.exists():
+            parser.read(path)
+        else:
+            _write_default(path, defaults)
+    except (OSError, configparser.Error) as e:
+        logger.warning("daemon config read failed (%s); using defaults", e)
+        _cache = defaults
+        return defaults
+
+    sect = parser[SECTION] if parser.has_section(SECTION) else {}
+    values = {}
+    for f in fields(DaemonConfig):
+        default = getattr(defaults, f.name)
+        values[f.name] = _coerce(f.type if callable(f.type) else type(default),
+                                 sect.get(f.name), default) if f.name in sect else default
+    _cache = DaemonConfig(**values)
+    return _cache

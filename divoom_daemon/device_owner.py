@@ -90,7 +90,9 @@ class DeviceOwner:
         from divoom_lib.utils import discovery
         target = mac or self.mac
         if not target:
-            devs = await discovery.discover_all_divoom_devices(timeout=3.0)
+            from divoom_daemon.daemon_config import load_daemon_config
+            devs = await discovery.discover_all_divoom_devices(
+                timeout=load_daemon_config().reconnect_scan_timeout)
             if not devs:
                 raise RuntimeError("no Divoom device found")
             target = devs[0]["address"]
@@ -158,7 +160,9 @@ class DeviceOwner:
             if not getattr(self, "_device", None) or not self._device.is_connected:
                 mac = self.mac
                 if not mac:
-                    devs = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=3.0))
+                    from divoom_daemon.daemon_config import load_daemon_config
+                    devs = loop.run_until_complete(discovery.discover_all_divoom_devices(
+                        timeout=load_daemon_config().reconnect_scan_timeout))
                     if not devs:
                         return
                     mac = devs[0]["address"]
@@ -246,8 +250,13 @@ class DeviceOwner:
         return {"success": True, **self._status_fields()}
 
     def scan(self, args: dict) -> dict:
-        timeout = float(args.get("timeout", 15) or 15)
-        limit = int(args.get("limit", 4) or 4)
+        from divoom_daemon.daemon_config import load_daemon_config
+        cfg = load_daemon_config()
+        # 0 is a valid limit ("no cap"), so fall back to the config default only
+        # when the key is absent/None — not via `or` (which would eat the 0).
+        timeout = float(args.get("timeout") or cfg.scan_timeout)
+        raw_limit = args.get("limit")
+        limit = int(raw_limit if raw_limit is not None else cfg.scan_limit)
 
         # Diagnostic: log this daemon process's Bluetooth (TCC) state + identity so
         # we can tell a permission denial (empty/0) from "no devices" or a too-short

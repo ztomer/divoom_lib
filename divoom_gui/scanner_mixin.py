@@ -35,7 +35,17 @@ class ScannerMixin:
             logger.warning(f"Failed to save scan config: {e}")
             return False
 
-    def scan_devices(self, timeout: int = 15, limit: int = 4) -> str:
+    def scan_devices(self, timeout: int | None = None, limit: int | None = None) -> str:
+        # Fall back to the shared daemon config (daemon.ini) when the UI sends
+        # nothing, so the scan defaults live in ONE place. The UI normally passes
+        # the user's chosen timeout (Divoom scans are slow — 30-60s — hence the
+        # large defaults).
+        from divoom_daemon.daemon_config import load_daemon_config
+        cfg = load_daemon_config()
+        if timeout is None:
+            timeout = int(cfg.scan_timeout)
+        if limit is None:
+            limit = cfg.scan_limit
         logger.info(f"GUI Action: Scanning devices (daemon) timeout={timeout}, limit={limit}...")
         self.save_scan_settings(timeout, limit)
 
