@@ -8,6 +8,7 @@ APK; see ``scripts/extract_apk_font.py``).
 from divoom_lib.fonts.bitmap_font import (
     BitmapFont,
     get_default_font,
+    get_small_font,
 )
 
-__all__ = ["BitmapFont", "get_default_font"]
+__all__ = ["BitmapFont", "get_default_font", "get_small_font"]

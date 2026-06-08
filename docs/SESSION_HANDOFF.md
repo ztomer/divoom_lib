@@ -28,6 +28,11 @@ core rule in `AGENTS.md`).
     +10 tests incl. a guard that media_source uses no AA font. **Only ASCII is
     extracted** — CJK ranges exist in the APK file if ever needed (the full
     `references/apk/.../divoom_fond16_*.bin` files have them).
+  - **r3: device font halved.** Full glyphs (~9px) dominated the 16px matrix;
+    added a half-size variant (`divoom_fond16_default_half.bin`, ~5px) — each
+    glyph 2×-OR-downsampled into the same 16-cell format. `get_small_font()`;
+    `media_source.py` uses it for all device text. Verified live (16px tile fits
+    ~3 chars, still crisp).
   - **Tab spacing centralised.** Each tab area (Channels/Tools/Settings) sits on
     its own glass pane: `[2px] tabs [2px]` vertical padding + `1px` gap to the
     cards below. Tokens `--tab-pane-pad-y/-pad-x/-gap` in `style.css :root` are

@@ -31,6 +31,16 @@ shipped milestone (per the project planning docs).
 - Tests: `tests/test_tabs_chrome.py` retargeted + extended (flex gap cancel,
   grid `auto 1fr`, left-aligned row, Settings pane-not-wrapping regression).
 
+### Device text font halved (r3)
+
+- The full-size bitmap glyphs (~9–10px) dominated a 16px matrix. Added a
+  **half-size variant** (`divoom_fond16_default_half.bin`, ~5px tall): each glyph
+  is the cropped APK glyph 2×-downsampled with an OR rule (a 2×2 block lights if
+  ANY source pixel is lit, so 1px strokes survive), re-placed in the same 16-cell
+  format so `BitmapFont` reads it unchanged. `scripts/extract_apk_font.py` now
+  emits both assets. New `get_small_font()`; `media_source.py` rasterises device
+  text with it. +2 tests (asset present, small ≈ half the full height).
+
 ### Device text uses a real bitmap font (no anti-aliasing)
 
 - Text rasterised for the device (stock ticker, etc.) was drawn with PIL

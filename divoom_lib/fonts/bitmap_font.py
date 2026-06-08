@@ -22,6 +22,9 @@ from pathlib import Path
 from typing import Optional
 
 _ASSET = Path(__file__).parent / "divoom_fond16_default_ascii.bin"
+# Half-size variant (each glyph 2x-downsampled, same 16-cell format) for the tiny
+# matrix — device-bound text uses this so it doesn't dominate a 16px screen.
+_ASSET_HALF = Path(__file__).parent / "divoom_fond16_default_half.bin"
 
 _CELL = 16
 _GLYPH_BYTES = 32
@@ -144,11 +147,23 @@ class BitmapFont:
 
 
 _default: Optional[BitmapFont] = None
+_small: Optional[BitmapFont] = None
 
 
 def get_default_font() -> BitmapFont:
-    """Process-wide singleton for the default device bitmap font."""
+    """Process-wide singleton for the full-size (~9px) device bitmap font."""
     global _default
     if _default is None:
         _default = BitmapFont()
     return _default
+
+
+def get_small_font() -> BitmapFont:
+    """Process-wide singleton for the half-size (~5px) device bitmap font.
+
+    This is what we rasterise for the device — at 16/32px the full-size glyphs
+    dominate the screen, so device-bound text uses the half-size variant."""
+    global _small
+    if _small is None:
+        _small = BitmapFont(_ASSET_HALF)
+    return _small

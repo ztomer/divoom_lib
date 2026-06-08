@@ -90,6 +90,23 @@ def test_space_is_blank() -> None:
 
 def test_media_source_uses_bitmap_font_not_truetype() -> None:
     src = MEDIA_SOURCE.read_text()
-    assert "get_default_font" in src, "media_source should render device text via the bitmap font"
+    # Device text uses the half-size bitmap font (R28 r3).
+    assert "get_small_font" in src, "media_source should render device text via the small bitmap font"
     assert "ImageFont" not in src, "media_source must not import/use ImageFont (anti-aliased)"
     assert "load_default" not in src, "media_source must not use ImageFont.load_default"
+
+
+def test_small_font_is_half_height_of_default() -> None:
+    """The device (small) font is ~half the full font's glyph height."""
+    from divoom_lib.fonts import get_default_font, get_small_font
+
+    sample = "ABCDEFG0123456789"
+    full_h = get_default_font().glyph_height(sample)
+    small_h = get_small_font().glyph_height(sample)
+    assert small_h <= -(-full_h // 2) + 1, (small_h, full_h)  # ceil(full/2)(+1 slack)
+    assert small_h < full_h
+
+
+def test_small_font_asset_present() -> None:
+    half = REPO_ROOT / "divoom_lib" / "fonts" / "divoom_fond16_default_half.bin"
+    assert half.exists() and half.stat().st_size == (0x7E - 0x20 + 1) * 32

@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-from divoom_lib.fonts import get_default_font
+from divoom_lib.fonts import get_small_font
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ def render_stock_ticker_frame(symbol: str, data: dict, size: int = 16) -> Path:
     
     img = Image.new("RGB", (size, size), (5, 6, 12)) # Dark slate bg
     draw = ImageDraw.Draw(img)
-    font = get_default_font()
+    font = get_small_font()
 
     # Text colors
     is_up = data["change"] >= 0

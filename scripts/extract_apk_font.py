@@ -56,6 +56,34 @@ def _decode_apk_glyph(blob: bytes, cp: int) -> list[list[int]]:
     return [[raw[c][15 - r] for c in range(16)] for r in range(16)]
 
 
+def _halve(mat: list[list[int]]) -> list[list[int]]:
+    """Return ``mat`` at half scale, top-left aligned in a fresh 16x16 cell.
+
+    The glyph is cropped to its bounding box, 2x-downsampled with an OR rule (a
+    2x2 block is lit if ANY source pixel is lit — preserves thin 1px strokes that
+    a majority rule would erase), then placed at the cell's top-left. Output stays
+    in the 16x16 format so BitmapFont reads it unchanged; proportional rendering
+    trims to the (now ~half-size) content automatically.
+    """
+    rows = [i for i in range(16) if any(mat[i])]
+    cols = [j for j in range(16) if any(mat[i][j] for i in range(16))]
+    out = [[0] * 16 for _ in range(16)]
+    if not rows:
+        return out  # blank (e.g. space)
+    r0, r1, c0, c1 = rows[0], rows[-1], cols[0], cols[-1]
+    h, w = r1 - r0 + 1, c1 - c0 + 1
+    for R in range((h + 1) // 2):
+        for C in range((w + 1) // 2):
+            lit = 0
+            for dr in range(2):
+                for dc in range(2):
+                    sr, sc = r0 + R * 2 + dr, c0 + C * 2 + dc
+                    if sr <= r1 and sc <= c1 and mat[sr][sc]:
+                        lit = 1
+            out[R][C] = lit
+    return out
+
+
 def _pack_upright(mat: list[list[int]]) -> bytes:
     """Pack a 16x16 0/1 matrix as 2 bytes/row, MSB = leftmost pixel."""
     out = bytearray()
@@ -69,17 +97,23 @@ def _pack_upright(mat: list[list[int]]) -> bytes:
     return bytes(out)
 
 
-def extract(src: Path, dst: Path) -> int:
+def extract(src: Path, dst: Path, *, half: bool = False) -> int:
     blob = src.read_bytes()
     out = bytearray()
     for cp in range(FIRST_CP, LAST_CP + 1):
         if cp == FIRST_CP:  # space — blank cell
             out += b"\x00" * GLYPH_BYTES
             continue
-        out += _pack_upright(_decode_apk_glyph(blob, cp))
+        mat = _decode_apk_glyph(blob, cp)
+        if half:
+            mat = _halve(mat)
+        out += _pack_upright(mat)
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(out)
     return LAST_CP - FIRST_CP + 1
+
+
+DEFAULT_DST_HALF = REPO / "divoom_lib" / "fonts" / "divoom_fond16_default_half.bin"
 
 
 def main(argv: list[str]) -> int:
@@ -90,6 +124,10 @@ def main(argv: list[str]) -> int:
         return 1
     n = extract(src, dst)
     print(f"wrote {n} glyphs ({dst.stat().st_size} bytes) -> {dst}")
+    # Always emit the half-size variant alongside the full one.
+    half_dst = Path(argv[3]) if len(argv) > 3 else DEFAULT_DST_HALF
+    extract(src, half_dst, half=True)
+    print(f"wrote {n} glyphs ({half_dst.stat().st_size} bytes) -> {half_dst}")
     return 0
 
 
