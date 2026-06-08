@@ -152,11 +152,10 @@
             <!-- TAB 1: CONTROL CENTER -->
             <section id="control-panel" class="tab-content active">
                 <div class="grid-layout">
-                    <div class="card glass-card">
-                        <div class="card-header" style="display:flex; flex-direction:row; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:16px;">
-                            <!-- R15 §1+§7: tab chrome is now `.tabs-row` + `.tab-btn`
-                                 (defined in tabs.css) — same active state as Tools and
-                                 Settings. Kare icons remain as a prefix. -->
+                    <!-- R24 r2: tabs on their OWN glass strip (.tabs-section), identical to
+                         Tools + Settings; the content card follows below. Kare icons remain
+                         as a prefix on the channel tabs. -->
+                    <div class="tabs-section">
                             <div class="tabs-row" role="tablist" aria-label="Channel">
                                 <button class="tab-btn active" data-tab="clock" data-channel="clock" role="tab" aria-selected="true">
                                     <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
@@ -218,7 +217,8 @@
                                     <span>Text</span>
                                 </button>
                             </div>
-                        </div>
+                    </div>
+                    <div class="card glass-card">
                         <div class="card-body">
                             <div class="channel-panels">
                                 <!-- Clock faces (real built-in dial types) -->

@@ -19,14 +19,19 @@
    - Optional icon prefix: `<svg class="tab-icon">` or `<img class="tab-icon">`.
    - Tooltips: `title` attribute.
 */
-/* R24 #3: wrapper that gives a tab row the SAME bottom treatment as the
-   Channels card-header (the reference): a separator + consistent gap to the
-   content. Applied to Tools + Settings so all three panels match pixel-for-pixel.
-   Values mirror style.css `.card-header`. */
+/* R24 r2: every tab row sits on its OWN glass panel — the same treatment in
+   Channels, Tools, and Settings (previously only Channels had a glass panel and
+   Tools/Settings had bare tabs on a transparent strip). Tokens mirror
+   settings.css `.glass-card` so the three read identically, and `margin-bottom`
+   gives the same gap to the content cards below in all three. */
 .tabs-section {
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
 }
 
 .tabs-row {

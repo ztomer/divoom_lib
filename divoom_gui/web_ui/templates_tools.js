@@ -1,11 +1,9 @@
 /* templates_tools.js — Tools panel template */
 window.DivoomTemplates = window.DivoomTemplates || {};
 window.DivoomTemplates.tools = `
-        <!-- R15 §1+§7: tab chrome is now .tabs-row + .tab-btn
-             (defined in tabs.css) — same active state as Channels and
-             Settings. The glass-card wrapper unifies appearance with
-             the Channels tab row, which sits inside a card header. -->
-        <div class="tabs-section" style="max-width:600px; width:100%; box-sizing:border-box;">
+        <!-- R24 r2: tabs on a glass strip (.tabs-section), identical to Channels +
+             Settings. Full-width to match the content cards below. -->
+        <div class="tabs-section" style="width:100%; box-sizing:border-box;">
         <div class="tabs-row" role="tablist" aria-label="Tools">
             <button class="tab-btn active" data-tools-tab="tools-time" data-tab="tools-time" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Time</button>
             <button class="tab-btn" data-tools-tab="tools-sessions" data-tab="tools-sessions" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 9V6M6.5 2.5h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Sessions</button>
