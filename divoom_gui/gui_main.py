@@ -66,6 +66,27 @@ def _pywebview_1820_bug_present() -> bool:
     return "self.screen.origin.x + x" in src
 
 
+_GUI_LOCK_FH = None  # kept open for the process lifetime to hold the lock
+
+
+def _ensure_single_instance() -> bool:
+    """True if we got the single-instance lock; False if a Control Center is
+    already running (R24 #1 — prevents the menubar 'Launch Dashboard' →
+    dashboard → menubar runaway)."""
+    global _GUI_LOCK_FH
+    try:
+        import fcntl
+        import tempfile
+        fh = open(os.path.join(tempfile.gettempdir(), "divoom_gui.lock"), "w")
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fh.write(str(os.getpid()))
+        fh.flush()
+        _GUI_LOCK_FH = fh
+        return True
+    except (OSError, BlockingIOError):
+        return False
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Divoom Control Center")
@@ -74,6 +95,16 @@ def main():
     parser.add_argument("--tab", default=None, help="nav tab to pre-select (e.g. data-sources)")
     parser.add_argument("--card", default=None, help="card to focus within the tab (e.g. notifications)")
     cli_args, _ = parser.parse_known_args()
+
+    if sys.platform == "darwin" and not _ensure_single_instance():
+        logger.info("A Divoom Control Center is already running; focusing it and exiting.")
+        try:
+            import subprocess
+            subprocess.run(["osascript", "-e", 'tell application "Python" to activate'],
+                           check=False, capture_output=True)
+        except Exception:
+            pass
+        return
 
     api = DivoomGuiAPI()
     web_ui_dir = Path(__file__).parent / "web_ui"
@@ -147,7 +178,7 @@ def main():
         title="Divoom Control Center",
         url=url_str,
         js_api=api,
-        width=1024,
+        width=1080,   # R24 #8: fits 3 columns in Monthly Best
         height=768,
         resizable=True,
         frameless=True,  # Integrated custom Appbar

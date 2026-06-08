@@ -129,7 +129,25 @@ def show_toast(title: str, message: str):
 
 
 def main():
+    # R24 #1: single-instance — if a menu-bar agent is already running, don't
+    # start a second status item.
+    try:
+        existing = subprocess.run(
+            ["pgrep", "-f", "divoom_lib.cli menubar"], capture_output=True, text=True)
+        others = [p for p in existing.stdout.split() if p and int(p) != os.getpid()]
+        if existing.returncode == 0 and others:
+            logger.info("A Divoom menu-bar agent is already running; exiting.")
+            return
+    except Exception:
+        pass
+
     app = NSApplication.sharedApplication()
+    # R24 #2: status-bar agent — no Dock icon (accessory activation policy).
+    try:
+        from AppKit import NSApplicationActivationPolicyAccessory
+        app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+    except Exception as e:
+        logger.debug(f"setActivationPolicy(accessory) failed: {e}")
 
     # Instantiate the agent delegate
     agent = DivoomMenuBarAgent.alloc().init()
