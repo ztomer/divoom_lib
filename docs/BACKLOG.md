@@ -26,15 +26,11 @@ round's planning doc.
 ### GUI / UX
 - `VERIFY` **Monthly Best gallery animated previews** — previews should loop, not end on
   a static frame; use first-frame-as-placeholder + background-stream the GIF
-  (progressive). Verify current behavior.
-- `OPEN` **Custom Art tab polish**: filmstrip "last 5 pushed" history strip; loop-
-  animated previews for the 5 ambient effects; unify the custom color picker with
-  the preset swatches into one layout.
-- OPEN/`VERIFY` **Appbar connection tooltips** (BLE/LAN/Cloud/External dots) — confirm they
-  show on hover; repair if not (no tooltip wiring found in a quick check).
-- `VERIFY` **Widget card layout inversion** (device preview on top, inputs below) —
-  verify it matches the intended physical-radio metaphor across widget cards.
-- `OPEN` **Settings nav** — confirm "Settings" sits at the bottom of the sidebar.
+  (progressive). Confirm in the live pass.
+- `VERIFY` **Custom Art ambient animated previews** — the filmstrip "last 5 pushed"
+  history, the 5 named ambient effects, apply-on-select, and the unified
+  picker/swatches all ship; confirm the ambient effect previews actually *loop*
+  (the one residual of the old "Custom Art polish" item).
 - `OPEN` **Live UI/UX pass** (Rams/Kare) on the *running* app: contrast/legibility of
   the glass theme, six-area IA task audit, icon coherence (imported raster EQ/VJ
   icons vs custom SVGs). See `REVIEW_2026-06.md` §2. Needs the GUI launched.
@@ -53,6 +49,11 @@ round's planning doc.
   inform an embedded/appliance decision. See `REVIEW_2026-06.md` §3.
 
 ## Recently shipped (was on the backlog)
+- `DONE` Appbar transport tooltips now open upward (were rendering off the bottom
+  edge); Settings is last in the sidebar; widget cards are preview-on-top — all
+  guarded by `tests/test_appbar_sidebar.py` (R23.1)
+- `DONE` Custom Art filmstrip history + 5 ambient effects + apply-on-select +
+  unified picker (animation of ambient previews to confirm in the live pass)
 - `DONE` Live widgets immediate activation (live-song-sync toggle removed)
 - `DONE` System **audio loopback** capture (BlackHole/Loopback) for the EQ visualizer
 - `DONE` Real **macOS notification** monitoring + routing (daemon, R16/R17)
