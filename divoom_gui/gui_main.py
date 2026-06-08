@@ -186,17 +186,16 @@ def main():
         background_color="#0a0b10"
     )
     api.window = window
-    # R24: spawn the daemon EAGERLY + DETACHED, BEFORE webview.start(). At this
-    # point we're still the granted `python3.14` binary; once pywebview takes over
-    # the process is hosted as `Python.app` (not in the Bluetooth-granted list), so
-    # a daemon spawned later would inherit that ungranted TCC identity and every
-    # BLE scan would come back empty. Detached → its own granted responsible
-    # process that survives the GUI.
+    # R24: spawn the daemon EAGERLY, BEFORE webview.start(), so it's ready when
+    # the GUI first asks. The daemon's Bluetooth grant no longer depends on WHO
+    # spawns it: `spawn_daemon` uses macOS TCC responsibility-disclaim so the
+    # daemon is always attributed to the granted `python3.14` binary, not
+    # pywebview's ungranted `Python.app` host (see daemon_bridge for the why).
     if sys.platform == "darwin":
         try:
             from divoom_gui.daemon_bridge import ensure_daemon
             ensure_daemon(detach=True)
-            logger.info("Eagerly spawned daemon (granted python3.14 identity) before GUI host.")
+            logger.info("Eagerly spawned daemon (TCC-disclaimed, granted python identity) before GUI host.")
         except Exception as e:
             logger.warning(f"eager daemon spawn failed: {e}")
     _spawn_menubar_agent()

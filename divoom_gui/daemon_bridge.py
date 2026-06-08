@@ -43,23 +43,88 @@ def daemon_alive(socket_path: str = DEFAULT_SOCKET_PATH, timeout: float = 0.5) -
     return _client_alive(DaemonClient(socket_path, timeout=timeout))
 
 
+def _spawn_disclaimed_macos(cmd: list[str], log_path: str) -> int:
+    """Spawn ``cmd`` with macOS TCC responsibility DISCLAIMED, returning the pid.
+
+    This is the crux of making BLE work from the GUI without user intervention.
+    A normal child inherits the parent's "responsible process" for TCC — for the
+    GUI that's pywebview's `Python.app` (which has no Bluetooth grant), so every
+    scan comes back empty/denied. Disclaiming makes the daemon its OWN responsible
+    process, attributed to the python binary itself — which the user has already
+    granted Bluetooth (it shows as `python3.14` in Privacy > Bluetooth). Verified:
+    `CBCentralManager.authorization()` == 3 (allowed) and scans find devices,
+    regardless of whether the parent is the GUI, a terminal, or Finder.
+
+    Uses posix_spawn (libc) with `responsibility_spawnattrs_setdisclaim` +
+    POSIX_SPAWN_SETSID, redirecting stdout/stderr to ``log_path``.
+    """
+    import ctypes
+    import ctypes.util
+
+    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    attr_t = ctypes.c_void_p   # posix_spawnattr_t (opaque pointer on macOS)
+    fa_t = ctypes.c_void_p     # posix_spawn_file_actions_t
+    libc.posix_spawnattr_init.argtypes = [ctypes.POINTER(attr_t)]
+    libc.posix_spawnattr_setflags.argtypes = [ctypes.POINTER(attr_t), ctypes.c_short]
+    libc.posix_spawnattr_destroy.argtypes = [ctypes.POINTER(attr_t)]
+    libc.responsibility_spawnattrs_setdisclaim.argtypes = [ctypes.POINTER(attr_t), ctypes.c_int]
+    libc.posix_spawn_file_actions_init.argtypes = [ctypes.POINTER(fa_t)]
+    libc.posix_spawn_file_actions_destroy.argtypes = [ctypes.POINTER(fa_t)]
+    libc.posix_spawn_file_actions_addopen.argtypes = [
+        ctypes.POINTER(fa_t), ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_uint]
+    libc.posix_spawn_file_actions_adddup2.argtypes = [ctypes.POINTER(fa_t), ctypes.c_int, ctypes.c_int]
+    libc.posix_spawn.argtypes = [
+        ctypes.POINTER(ctypes.c_int), ctypes.c_char_p,
+        ctypes.POINTER(fa_t), ctypes.POINTER(attr_t),
+        ctypes.POINTER(ctypes.c_char_p), ctypes.POINTER(ctypes.c_char_p)]
+
+    POSIX_SPAWN_SETSID = 0x0400
+    attr = attr_t()
+    if libc.posix_spawnattr_init(ctypes.byref(attr)) != 0:
+        raise OSError("posix_spawnattr_init failed")
+    try:
+        libc.posix_spawnattr_setflags(ctypes.byref(attr), POSIX_SPAWN_SETSID)
+        if libc.responsibility_spawnattrs_setdisclaim(ctypes.byref(attr), 1) != 0:
+            raise OSError("responsibility_spawnattrs_setdisclaim failed")
+
+        fa = fa_t()
+        libc.posix_spawn_file_actions_init(ctypes.byref(fa))
+        try:
+            libc.posix_spawn_file_actions_addopen(ctypes.byref(fa), 0, b"/dev/null", os.O_RDONLY, 0)
+            libc.posix_spawn_file_actions_addopen(
+                ctypes.byref(fa), 1, log_path.encode(),
+                os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+            libc.posix_spawn_file_actions_adddup2(ctypes.byref(fa), 1, 2)
+
+            argv = (ctypes.c_char_p * (len(cmd) + 1))(*[a.encode() for a in cmd], None)
+            env = [f"{k}={v}" for k, v in os.environ.items()]
+            envp = (ctypes.c_char_p * (len(env) + 1))(*[e.encode() for e in env], None)
+            pid = ctypes.c_int()
+            rc = libc.posix_spawn(ctypes.byref(pid), cmd[0].encode(),
+                                  ctypes.byref(fa), ctypes.byref(attr), argv, envp)
+            if rc != 0:
+                raise OSError(f"posix_spawn failed rc={rc}")
+            return pid.value
+        finally:
+            libc.posix_spawn_file_actions_destroy(ctypes.byref(fa))
+    finally:
+        libc.posix_spawnattr_destroy(ctypes.byref(attr))
+
+
 def spawn_daemon(
     socket_path: str = DEFAULT_SOCKET_PATH,
     *,
     mac: str | None = None,
     python: str | None = None,
     detach: bool = False,
-) -> subprocess.Popen:
+):
     """Launch the daemon process (``python -m divoom_lib.cli daemon``).
 
-    **macOS Bluetooth permission (TCC):** by default the daemon is spawned as a
-    NON-detached child so it inherits the launching app's "responsible process"
-    identity — and therefore the GUI's Bluetooth (TCC) grant. Detaching it
-    (``start_new_session``) makes macOS treat the daemon as its own process with
-    no Bluetooth permission, which is why BLE scan/connect crashed when the GUI
-    auto-spawned the daemon (the same scan worked when the GUI owned the radio
-    directly). Pass ``detach=True`` only for a truly standalone, GUI-independent
-    daemon (then grant Bluetooth permission to the python binary yourself).
+    On macOS, spawn it with TCC responsibility DISCLAIMED so it's attributed to
+    the granted python binary (not the GUI's ungranted Python.app) — this is what
+    makes BLE work from the GUI with no user intervention (see
+    :func:`_spawn_disclaimed_macos`). Falls back to ``subprocess.Popen`` on other
+    platforms or if the disclaim spawn is unavailable.
 
     Caller waits until the socket is live (see :func:`ensure_daemon`).
     """
@@ -67,23 +132,30 @@ def spawn_daemon(
            "--socket", socket_path]
     if mac:
         cmd += ["--mac", mac]
-    logger.info("Spawning daemon (detach=%s): %s", detach, " ".join(cmd))
-    # Log the daemon's own output to a file (was /dev/null) so its scan/connect
-    # behavior — incl. macOS Bluetooth crashes/denials — is visible.
     log_path = os.environ.get("DIVOOM_DAEMON_LOG", "/tmp/divoom_daemon.log")
     try:
+        with open(log_path, "a", buffering=1) as fh:
+            fh.write(f"\n==== daemon spawn from pid {os.getpid()} ====\n")
+    except OSError:
+        pass
+
+    if sys.platform == "darwin":
+        try:
+            pid = _spawn_disclaimed_macos(cmd, log_path)
+            logger.info("Spawned daemon (TCC-disclaimed, granted python identity) pid=%s", pid)
+            return pid
+        except Exception as e:
+            logger.warning("Disclaimed spawn failed (%s); falling back to Popen.", e)
+
+    try:
         log_fh = open(log_path, "a", buffering=1)
-        log_fh.write(f"\n==== daemon spawn {os.getpid()} detach={detach} ====\n")
         _out = _err = log_fh
     except OSError:
         _out = _err = subprocess.DEVNULL
+    logger.info("Spawning daemon (Popen, detach=%s): %s", detach, " ".join(cmd))
     return subprocess.Popen(
-        cmd,
-        stdout=_out,
-        stderr=_err,
-        stdin=subprocess.DEVNULL,
-        start_new_session=detach,  # detached => own TCC identity (no BT grant)
-        env=os.environ.copy(),
+        cmd, stdout=_out, stderr=_err, stdin=subprocess.DEVNULL,
+        start_new_session=detach, env=os.environ.copy(),
     )
 
 

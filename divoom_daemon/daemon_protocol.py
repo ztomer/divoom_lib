@@ -130,12 +130,17 @@ class DaemonClient:
             s.connect(self.socket_path)
         return s
 
-    def send_command(self, command: str, args: dict | None = None) -> dict:
+    def send_command(self, command: str, args: dict | None = None,
+                     *, read_timeout: float | None = None) -> dict:
         """One-shot request/response. Returns the daemon's reply dict, or
-        ``{"success": False, "error": ...}`` if the daemon isn't reachable."""
+        ``{"success": False, "error": ...}`` if the daemon isn't reachable.
+
+        ``read_timeout`` overrides the socket read timeout for this call — needed
+        for long-running commands (e.g. ``scan``, whose reply only arrives after
+        the full BLE scan duration, which usually exceeds the default timeout)."""
         try:
             with self._connect() as s:
-                s.settimeout(self.timeout)
+                s.settimeout(read_timeout if read_timeout is not None else self.timeout)
                 s.sendall(encode_message(make_request(command, args, self.token)))
                 buf = b""
                 while b"\n" not in buf:
@@ -193,7 +198,13 @@ class DaemonClient:
         return self.send_command("device_status")
 
     def scan(self, timeout: float = 15, limit: int = 4) -> dict:
-        return self.send_command("scan", {"timeout": timeout, "limit": limit})
+        # The daemon only replies AFTER scanning for `timeout` seconds, so the
+        # client must wait longer than that — otherwise the read times out before
+        # the (successful) reply arrives. Pad generously for connect/serialize.
+        return self.send_command(
+            "scan", {"timeout": timeout, "limit": limit},
+            read_timeout=float(timeout) + 10.0,
+        )
 
     def wall_configure(self, slots: dict, cell_size: int = 16) -> dict:
         return self.send_command("wall_configure", {"slots": slots, "cell_size": cell_size})
