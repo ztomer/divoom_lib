@@ -218,7 +218,13 @@ class TestDivoomGuiAPI(unittest.TestCase):
         mock_monitor.is_running = False
         mock_monitor.db_path = "/fake/db.sqlite"
 
-        with patch.object(self.api, "_schedule_async") as mock_sched:
+        captured = []
+
+        def _fake_schedule(coro):
+            captured.append(coro)
+            coro.close()  # prevent "never awaited" warning
+
+        with patch.object(self.api, "_schedule_async", side_effect=_fake_schedule):
             result = self.api.start_notification_listener()
             self.assertTrue(result["running"])
             self.assertEqual(result["db_path"], "/fake/db.sqlite")
@@ -228,12 +234,13 @@ class TestDivoomGuiAPI(unittest.TestCase):
             sink = mock_monitor.start.call_args.kwargs.get("sink")
             self.assertTrue(callable(sink))
             # Verify the sink calls _schedule_async with the right shape.
+            captured.clear()
             sink(6, "Alice", "Hello")
-            mock_sched.assert_called_once()
+            self.assertEqual(len(captured), 1)
             # The sink truncates to first line.
-            mock_sched.reset_mock()
+            captured.clear()
             sink(6, "Alice", "Hello world\nsecond line")
-            mock_sched.assert_called_once()
+            self.assertEqual(len(captured), 1)
 
     @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
     def test_r13_start_notification_listener_idempotent(self, mock_monitor_cls):

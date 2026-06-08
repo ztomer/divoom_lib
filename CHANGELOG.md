@@ -6,7 +6,45 @@ shipped milestone (per the project planning docs).
 
 ---
 
-## Round 30 — 2026-06-08 (Animation streaming — MCP tool + proxy exclusive context)
+## Round 31 — 2026-06-08 (Font improvement + CJK infrastructure + warning fixes)
+
+### Better half-font downsampling
+
+- Changed half-font extraction from OR rule (any of 4) to majority rule (≥2 of 4).
+  The OR rule collapsed `B`/`8` and other glyph pairs at ~5px; majority preserves
+  glyph distinction while retaining enough stroke fidelity for the small display.
+- Regenerated `divoom_fond16_default_half.bin` with the improved algorithm.
+
+### CJK font infrastructure
+
+- Added `APK_RANGES` table (the 18 Unicode ranges from the APK's `CmdManager.C2()` /
+  `F2/d.java` including CJK 0x4E00-0x9FA5) to `divoom_lib/fonts/bitmap_font.py`.
+- `BitmapFont.__init__` now accepts an optional `range_table` parameter; when
+  provided, glyph lookup walks the range table (supports non-contiguous ranges)
+  instead of the flat ASCII offset.
+- `BitmapFont.from_apk_asset(path)` classmethod loads a raw APK font blob and
+  returns a range-table-enabled `BitmapFont` that can map CJK, Hangul, Greek,
+  Arabic, etc. glyphs.
+- `_find_glyph_offset(cp)` walks the range table — returns `None` for codepoints
+  outside all ranges (falls back to `?`).
+
+### Warning fixes
+
+- `CommandQueue.submit()` / `_add()` / `_dequeue()` / `_cancel_worker()`: close
+  coroutine objects before raising exceptions so Python 3.14's `RuntimeWarning:
+  coroutine was never awaited` is not emitted during garbage collection.
+- `test_r13_start_notification_listener_wires_sink`: mock `_schedule_async` with
+  a side-effect that closes the captured coroutine instead of discarding it.
+- Full suite clean with `-Werror::RuntimeWarning`: 1093 passed, 0 warnings.
+
+### Tests
+
+- 3 new CJK font tests: range-table CJK mapping, unknown codepoint fallback,
+  ASCII glyphs still work with full APK font.
+- Suite: 1093 passed / 75 skipped (was 1090).
+
+---
+
 
 ### `DaemonDeviceProxy.push_animation()`
 

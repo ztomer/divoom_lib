@@ -440,6 +440,7 @@ async def test_concurrent_submit_from_multiple_threads(loop):
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine '.*slow' was never awaited:RuntimeWarning")
 async def test_cancel_does_not_block_queue(loop, queue):
     """Cancelling a submit future doesn't stall the queue."""
     history = []

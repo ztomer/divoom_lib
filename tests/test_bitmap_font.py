@@ -75,14 +75,55 @@ def test_max_width_drops_whole_glyphs() -> None:
 
 
 def test_unsupported_codepoint_falls_back() -> None:
-    """Out-of-range chars render the '?' glyph rather than crashing."""
+    """ASCII-only font: out-of-range chars render the '?' glyph rather than crashing."""
     f = get_default_font()
-    assert f.glyph_matrix("中") == f.glyph_matrix("?")  # CJK -> '?'
+    assert f.glyph_matrix("中") == f.glyph_matrix("?")  # CJK -> '?' in ASCII-only font
 
 
 def test_space_is_blank() -> None:
     f = get_default_font()
     assert all(v == 0 for row in f.glyph_matrix(" ") for v in row)
+
+
+# ── CJK / full APK font support (R31) ──────────────────────────────────
+
+
+def test_apk_range_table_maps_cjk() -> None:
+    """BitmapFont.from_apk_asset loads the raw APK font with range-table
+    lookup, supporting CJK and other non-ASCII ranges."""
+    apk = REPO_ROOT / "references" / "apk" / "decompiled_src" / "resources" / "assets" / "divoom_fond16_default.bin"
+    if not apk.exists():
+        pytest.skip("APK font asset not available")
+    font = BitmapFont.from_apk_asset(apk)
+    # CJK glyphs have content distinct from '?'.
+    cjk = font.glyph_matrix("中")
+    fallback = font.glyph_matrix("?")
+    assert cjk != fallback
+    # An actual CJK ideograph has many lit pixels, not blank.
+    assert sum(sum(row) for row in cjk) > 10
+
+
+def test_apk_range_table_unknown_codepoint_falls_back() -> None:
+    """Codepoints outside all APK ranges fall back to '?'."""
+    apk = REPO_ROOT / "references" / "apk" / "decompiled_src" / "resources" / "assets" / "divoom_fond16_default.bin"
+    if not apk.exists():
+        pytest.skip("APK font asset not available")
+    font = BitmapFont.from_apk_asset(apk)
+    # U+FFFF is a non-character, outside all ranges.
+    unknown = font.glyph_matrix(chr(0xFFFF))
+    fallback = font.glyph_matrix("?")
+    assert unknown == fallback
+
+
+def test_apk_range_table_ascii_still_works() -> None:
+    """Full APK font loads ASCII glyphs correctly."""
+    apk = REPO_ROOT / "references" / "apk" / "decompiled_src" / "resources" / "assets" / "divoom_fond16_default.bin"
+    if not apk.exists():
+        pytest.skip("APK font asset not available")
+    font = BitmapFont.from_apk_asset(apk)
+    mA = font.glyph_matrix("A")
+    lit_rows = [r for r in mA if any(r)]
+    assert len(lit_rows) >= 7
 
 
 # ── guard: media_source must NOT use an anti-aliased font for the device ──

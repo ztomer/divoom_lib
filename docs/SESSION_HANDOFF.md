@@ -18,6 +18,26 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R31 — Font improvement + CJK infrastructure + warning fixes SHIPPED.**
+  Suite **1093 / 75 / 0** (+3).
+
+  **Half-font downsampling improved**: changed from OR rule (any-of-4) to
+  majority (≥2-of-4). B/8 and other glyph pairs are now distinguishable at
+  ~5px. Regenerated `divoom_fond16_default_half.bin`.
+
+  **CJK font infrastructure**: `APK_RANGES` table added to `bitmap_font.py`
+  (18 Unicode ranges from the APK's CmdManager). `from_apk_asset()` classmethod
+  loads raw APK font blobs with range-table glyph lookup — supports CJK
+  (0x4E00-0x9FA5), Hangul, Greek, Arabic, etc. `_find_glyph_offset()` method
+  implements the range-table walk. Backward compatible: existing ASCII-only fonts
+  continue to use flat-lookup fast path.
+
+  **Warning fixes**: closed orphaned coroutines in `CommandQueue` (submit, _add,
+  _dequeue timeout, _cancel_worker). Fixed test mock that created dangling
+  coroutines. Suite now clean with `-Werror::RuntimeWarning` (0 warnings).
+
+  Full write-up: `docs/PLANNING_ROUND31.md` (to be created).
+
 - **R30 — Animation streaming (MCP tool + proxy exclusive context) SHIPPED.**
   Suite **1090 / 75 / 0** (+5).
 
@@ -456,20 +476,20 @@ Claude) should read this on entry and **update it at the end of every round**
 - **MCP tools don't use exclusive mode yet** — they could be wrapped:
   `async with proxy.exclusive("mcp-1"): ...` for atomic multi-tool ops.
 
-### From R28
-- **Half bitmap font `B`/`8` collision** (and other ~5px glyph merges). Inherent
-  to the OR-downsample. Fine for numeric tickers; if letter legibility matters,
-  swap in a purpose-built tiny font (or extract a smaller APK font if one is
-  found). Full font (`get_default_font`) is unaffected and still available.
+### From R28 (resolved in R31)
+- **Half bitmap font `B`/`8` collision** — fixed in R31: majority-rule downsampling
+  (≥2-of-4) replaces the OR rule (any-of-4), making B/8 distinct at ~5px.
+- **Bundled font is ASCII-only** — CJK ranges now loadable from the raw APK asset
+  via `BitmapFont.from_apk_asset()` (added in R31).
+- **`test_submit_after_stop_raises` never-awaited warning** — fixed in R31 by closing
+  orphaned coroutines before GC in CommandQueue.
+- **`show_clock()` overlay reorder** — not changed (keep hass-divoom layout for
+  backward compatibility; `set_clock_rich()` already implements APK canonical order).
+
+### Standing
 - **`docs/MCP_SERVER.md` examples still pass `--mac`** — now optional/harmless.
 - **MCP-over-daemon not hardware-verified** — unit-green only.
 - **R27 has no `docs/PLANNING_ROUND*.md`** (command queue).
-- **Bundled font is ASCII-only** — CJK ranges exist in the APK `.bin` files.
-
-### Standing
-- **Animation streaming (0x8B protocol)** — now unblocked by exclusive mode.
-- **Drop `test_submit_after_stop_raises` `coro_for` was-never-awaited warning**.
-- `show_clock()` overlay reorder to APK layout.
 - **R12 §A visual pass / §B hardware verification** (user-driven).
 - **`get_*` read-back times out** (task #20).
 - **Deferred features** (R12 §D): see `docs/PLANNING_ROUND12_D_AUDIT.md`.

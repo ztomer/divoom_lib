@@ -59,11 +59,16 @@ def _decode_apk_glyph(blob: bytes, cp: int) -> list[list[int]]:
 def _halve(mat: list[list[int]]) -> list[list[int]]:
     """Return ``mat`` at half scale, top-left aligned in a fresh 16x16 cell.
 
-    The glyph is cropped to its bounding box, 2x-downsampled with an OR rule (a
-    2x2 block is lit if ANY source pixel is lit — preserves thin 1px strokes that
-    a majority rule would erase), then placed at the cell's top-left. Output stays
-    in the 16x16 format so BitmapFont reads it unchanged; proportional rendering
-    trims to the (now ~half-size) content automatically.
+    The glyph is cropped to its bounding box, 2x-downsampled with a coverage
+    threshold: a 2x2 block lights up if **at least 2 of its 4 source pixels**
+    are lit (majority rule).  This preserves glyph distinction (e.g. ``B`` vs
+    ``8``) better than the OR rule which collapses them at ~5px, while still
+    retaining enough stroke fidelity for the small display.
+
+    A 2px-wide stroke in the source covers 2xN blocks along its length; after
+    majority downsampling it registers as 1px-wide — the thinnest reproducible
+    feature at half scale.  1px-wide source strokes (thin serifs, the crossbar
+    of ``A``) may vanish, but at ~5px display height they are illegible anyway.
     """
     rows = [i for i in range(16) if any(mat[i])]
     cols = [j for j in range(16) if any(mat[i][j] for i in range(16))]
@@ -74,13 +79,13 @@ def _halve(mat: list[list[int]]) -> list[list[int]]:
     h, w = r1 - r0 + 1, c1 - c0 + 1
     for R in range((h + 1) // 2):
         for C in range((w + 1) // 2):
-            lit = 0
+            count = 0
             for dr in range(2):
                 for dc in range(2):
                     sr, sc = r0 + R * 2 + dr, c0 + C * 2 + dc
                     if sr <= r1 and sc <= c1 and mat[sr][sc]:
-                        lit = 1
-            out[R][C] = lit
+                        count += 1
+            out[R][C] = 1 if count >= 2 else 0
     return out
 
 

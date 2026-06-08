@@ -206,6 +206,9 @@ class CommandQueue:
                 item = await self._dequeue()
                 if item is None:
                     break
+                if item.future.cancelled():
+                    item.coro.close()
+                    continue
                 try:
                     result = await item.coro
                     if not item.future.cancelled():
@@ -238,6 +241,7 @@ class CommandQueue:
             self._cond.notify_all()
         for item in remaining:
             if not item.future.cancelled():
+                item.coro.close()  # prevent RuntimeWarning
                 item.future.set_exception(RuntimeError("queue stopped"))
         if self._worker is not None:
             try:
@@ -265,6 +269,7 @@ class CommandQueue:
             ``item_timeout``.
         """
         if self._stopped:
+            coro.close()  # prevent RuntimeWarning: coroutine was never awaited
             raise QueueStopped("queue is stopped")
         fut: concurrent.futures.Future = concurrent.futures.Future()
         done = asyncio.run_coroutine_threadsafe(
@@ -293,6 +298,7 @@ class CommandQueue:
                    token: Any, per_item_timeout: float | None | object) -> None:
         async with self._cond:
             if self._stopped:
+                coro.close()  # prevent RuntimeWarning
                 fut.set_exception(QueueStopped("queue is stopped"))
                 return
             try:
@@ -303,6 +309,7 @@ class CommandQueue:
                                timeout=effective)
                 )
             except QueueFull:
+                coro.close()  # prevent RuntimeWarning
                 fut.set_exception(QueueFull(
                     f"queue at capacity ({self._maxsize})"
                 ))
@@ -347,6 +354,7 @@ class CommandQueue:
                     if item.timeout is not None and (now - item.enqueued_at) >= item.timeout:
                         self._pending.popleft()
                         if not item.future.cancelled():
+                            item.coro.close()  # prevent RuntimeWarning
                             item.future.set_exception(TimeoutError(
                                 f"item timed out after {item.timeout:.1f}s"
                             ))

@@ -32,6 +32,30 @@ _FIRST_CP = 0x20  # space
 _LAST_CP = 0x7E   # ~
 _FALLBACK_CP = 0x3F  # '?' for unsupported codepoints
 
+# Codepoint range table matching the APK's CmdManager / F2.d internal table.
+# Each entry is (start_inclusive, end_inclusive).  Used by BitmapFont when
+# loading a full APK asset (via ``from_apk_asset`` / ``range_table=...``).
+APK_RANGES: list[tuple[int, int]] = [
+    (0x21, 0x7E),
+    (0xA1, 0x2AF),
+    (0x370, 0x52F),
+    (0x600, 0x6FF),
+    (0x750, 0x77F),
+    (0xE00, 0xE7F),
+    (0x1100, 0x11FF),
+    (0x1E00, 0x1FFF),
+    (0x2E80, 0x2FDF),
+    (0x2FF0, 0x2FFF),
+    (0x3000, 0x303F),
+    (0x3040, 0x30FF),
+    (0x3130, 0x318F),
+    (0x31C0, 0x31EF),
+    (0x31F0, 0x331F),
+    (0x4E00, 0x9FA5),
+    (0xAC00, 0xD8AF),
+    (0xFF00, 0xFFEF),
+]
+
 
 class BitmapFont:
     """A 16px 1-bit bitmap font loaded from a bundled APK-derived blob."""
@@ -39,24 +63,84 @@ class BitmapFont:
     CELL = _CELL
     SPACE_WIDTH = 3  # blank advance for ' ' (px)
 
-    def __init__(self, path: Optional[Path] = None) -> None:
+    def __init__(self, path: Optional[Path] = None,
+                 range_table: Optional[list[tuple[int, int]]] = None,
+                 expected_glyphs: Optional[int] = None) -> None:
+        """Load a bitmap font.
+
+        Parameters
+        ----------
+        path
+            Path to a ``.bin`` glyph blob.  Defaults to the ASCII-only asset.
+        range_table
+            When provided, glyph lookup walks this range table (matching the
+            APK's layout).  Without it, a contiguous flat range is assumed
+            (backward-compatible with the ASCII-only extracted blobs).
+        expected_glyphs
+            Optional check: raise if the blob doesn't hold at least this many
+            glyphs.  Ignored when ``range_table`` is set (the table itself
+            defines the expected size).
+        """
         blob = (path or _ASSET).read_bytes()
-        expected = (_LAST_CP - _FIRST_CP + 1) * _GLYPH_BYTES
-        if len(blob) < expected:
-            raise ValueError(
-                f"bitmap font {path or _ASSET} too small: {len(blob)} < {expected}"
-            )
+        if range_table is None and expected_glyphs is None:
+            expected = (_LAST_CP - _FIRST_CP + 1) * _GLYPH_BYTES
+            if len(blob) < expected:
+                raise ValueError(
+                    f"bitmap font {path or _ASSET} too small: {len(blob)} < {expected}"
+                )
+        if expected_glyphs is not None and range_table is None:
+            expected = expected_glyphs * _GLYPH_BYTES
+            if len(blob) < expected:
+                raise ValueError(
+                    f"bitmap font too small: {len(blob)} < {expected}"
+                )
         self._blob = blob
+        self._range_table = range_table
+
+    @classmethod
+    def from_apk_asset(cls, path: Path) -> BitmapFont:
+        """Load a full raw APK font blob (with the range table).
+
+        Unlike the extracted ASCII-only blobs, raw APK assets (e.g.
+        ``references/apk/.../divoom_fond16_default.bin``) contain glyphs for
+        *all* Unicode ranges used by the Divoom app — CJK, Hangul, Greek,
+        Arabic, etc. — stored rotated and in APK-native order.
+        This factory reads the blob, applies the APK range table for glyph
+        lookup, and returns a BitmapFont that maps any supported codepoint
+        (including CJK 0x4E00-0x9FA5) to its glyph.
+        """
+        return cls(path, range_table=APK_RANGES)
 
     # ── glyph access ───────────────────────────────────────────────────
+
+    def _find_glyph_offset(self, cp: int) -> Optional[int]:
+        """Walk the range table to find ``cp``'s byte offset in the blob.
+
+        Returns ``None`` when the codepoint is not in any range (caller
+        should fall back to ``?``).
+        """
+        if self._range_table is None:
+            if _FIRST_CP <= cp <= _LAST_CP:
+                return (cp - _FIRST_CP) * _GLYPH_BYTES
+            return None
+        offset = 0
+        for start, end in self._range_table:
+            if cp < start:
+                return None
+            if cp <= end:
+                return (offset + (cp - start)) * _GLYPH_BYTES
+            offset += end - start + 1
+        return None
 
     def _rows(self, ch: str) -> list[int]:
         """16 row bitmasks for ``ch`` (bit 15 = leftmost pixel)."""
         cp = ord(ch)
-        if not (_FIRST_CP <= cp <= _LAST_CP):
-            cp = _FALLBACK_CP
-        i = (cp - _FIRST_CP) * _GLYPH_BYTES
-        g = self._blob[i : i + _GLYPH_BYTES]
+        off = self._find_glyph_offset(cp)
+        if off is None:
+            off = self._find_glyph_offset(_FALLBACK_CP)
+            if off is None:
+                return [0] * _CELL
+        g = self._blob[off: off + _GLYPH_BYTES]
         return [(g[r * 2] << 8) | g[r * 2 + 1] for r in range(_CELL)]
 
     @staticmethod
