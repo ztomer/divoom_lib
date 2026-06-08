@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Callable, Optional
 
 from divoom_daemon.daemon_protocol import DEFAULT_SOCKET_PATH
@@ -84,7 +85,22 @@ class DivoomDaemon:
         r["wall_configure"] = self._device_owner.wall_configure
         r["probe_lan"] = lambda _: self._device_owner.probe_lan()
         r["sync_artwork"] = self._device_owner.sync_artwork
+        r["shutdown"] = self._cmd_shutdown
         self._registry = r
+
+    def _cmd_shutdown(self, _args: dict) -> dict:
+        """Stop the daemon process. Replies first, then stops the server shortly
+        after so the client receives the ack (used by the menu-bar 'Quit Divoom'
+        and the GUI on close — a clean kill switch for the single-owner daemon)."""
+        def _later():
+            import time
+            time.sleep(0.25)
+            try:
+                self.stop()
+            except Exception:
+                pass
+        threading.Thread(target=_later, daemon=True).start()
+        return {"success": True, "shutting_down": True}
 
     def handle_command(self, command: str, args: dict) -> dict:
         if not self._registry:

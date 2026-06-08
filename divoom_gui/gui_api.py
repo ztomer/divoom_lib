@@ -107,6 +107,13 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         self.window_mgr.maximize_window()
 
     def close_window(self) -> None:
+        # Tie the daemon's lifecycle to the GUI: stop the daemon we spawned so it
+        # doesn't linger after the window closes (clean kill switch).
+        try:
+            if self._daemon_client is not None:
+                self._daemon_client.shutdown()
+        except Exception as e:
+            logger.debug(f"daemon shutdown on close skipped: {e}")
         self.window_mgr.close_window()
 
     def set_solid_light(self, color: str, brightness: int, mode_type: int = 0) -> bool:

@@ -184,6 +184,11 @@ class DaemonClient:
     def disconnect_device(self) -> dict:
         return self.send_command("disconnect")
 
+    def shutdown(self) -> dict:
+        """Ask the daemon to stop its process (clean kill switch). Best-effort:
+        the daemon replies, then exits shortly after."""
+        return self.send_command("shutdown")
+
     def device_status(self) -> dict:
         return self.send_command("device_status")
 

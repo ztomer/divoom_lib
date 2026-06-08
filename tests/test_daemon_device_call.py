@@ -115,3 +115,18 @@ def test_connect_with_injected_device_reports_status(ctx):
     reply = DaemonClient(sp).connect_device(mac="AA:BB:CC:DD:EE:FF")
     assert reply["success"] is True
     assert reply["connected"] is True
+
+
+def test_shutdown_command_replies_then_stops(ctx):
+    """The daemon kill switch (menu-bar Quit / GUI close): `shutdown` acks, then
+    the daemon stops. Guards the `threading`-import regression too."""
+    d, dev, sp = ctx
+    reply = DaemonClient(sp, timeout=3).shutdown()
+    assert reply["success"] is True
+    assert reply.get("shutting_down") is True
+    # The deferred stop ends serve_forever; the fixture's serve thread should exit.
+    for _ in range(50):
+        if not d._socket_server._running:
+            break
+        time.sleep(0.02)
+    assert d._socket_server._running is False

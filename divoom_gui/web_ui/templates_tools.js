@@ -1,6 +1,6 @@
 /* templates_tools.js — Tools panel template */
 window.DivoomTemplates = window.DivoomTemplates || {};
-window.DivoomTemplates.tools = `        <div class="header-section"><h1>Tools</h1></div>
+window.DivoomTemplates.tools = `
         <!-- R15 §1+§7: tab chrome is now .tabs-row + .tab-btn
              (defined in tabs.css) — same active state as Channels and
              Settings. The legacy class names are aliased in settings.css

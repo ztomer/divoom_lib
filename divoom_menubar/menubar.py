@@ -110,7 +110,14 @@ class DivoomMenuBarAgent(NSObject):
         subprocess.Popen([sys.executable, str(gui_path)])
 
     def quitApp_(self, sender):
-        logger.info("Quitting status bar application...")
+        logger.info("Quitting Divoom: stopping daemon + status bar agent...")
+        # Kill switch for the single-owner daemon: tell it to shut down so it
+        # doesn't linger after the app is gone. Best-effort.
+        try:
+            from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
+            DaemonClient(DEFAULT_SOCKET_PATH, timeout=1.0).shutdown()
+        except Exception as e:
+            logger.debug(f"daemon shutdown on quit skipped: {e}")
         self.client.stop()
         NSApplication.sharedApplication().terminate_(self)
 
@@ -170,9 +177,9 @@ def main():
 
     menu.addItem_(NSMenuItem.separatorItem())
 
-    # 3. Quit option
+    # 3. Quit option — also stops the daemon (the single-owner kill switch).
     quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-        "Quit", "quitApp:", "q"
+        "Quit Divoom (stop daemon)", "quitApp:", "q"
     )
     quit_item.setTarget_(agent)
     menu.addItem_(quit_item)
