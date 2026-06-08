@@ -6,6 +6,74 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 23 — 2026-06-07 (REVIEW §1.2 + §1.3 + §1.4 + §1.5)
+
+### §1.2 — gui_api collaborator integration
+
+- **`gui_api.py` refactored from 891 → 444 LOC** — every bridge method
+  that existed in an `ApiBase` collaborator now delegates to one of 5
+  collaborators (`ConnectionApi`, `LightingApi`, `ToolsApi`, `WidgetsApi`,
+  `WindowApi`). The collaborators share state via `state_getter` lambda
+  wrapping `self.__dict__` and share the daemon client via a common getter.
+- **`AsyncLoopThread` moved** from inline definition to `divoom_gui.api`
+  (shared with all collaborators).
+- **Removed dead code** from `gui_api.py`: `_device_status()`, `_target()`,
+  `_dispatch()`, `_tool_call()`, `_as_bool()` — all now live in collaborators.
+- **`send_notification` added to `ToolsApi`** with app_type range guard.
+- **`set_brightness`, `set_volume`, `display_wall_image`, `display_custom_art`
+  added to `LightingApi`** (follow the `_dispatch` pattern for wall/single
+  routing).
+- **File-size guardrail updated**: `gui_api.py` removed from ALLOWLIST
+  (now 444 LOC ≤ 500).
+- **Deduplication**: all `logging` + `try/except` boilerplate removed from
+  `gui_api.py` delegation methods; logging + error handling lives in the
+  collaborators.
+- Suite: 989 passed / 75 skipped (same as R22 — zero regressions).
+
+### §1.3 — daemon.py responsibility extraction (4 waves)
+
+- **Wave 1 — command registry** (5d3f7d1): 14-arm if-ladder in
+  `handle_command()` → dict-based `_init_registry()`. Shared handlers
+  via alias (`get_status` = `notification_status`). No behavior change.
+- **Wave 2 — SocketServer** (7c0cc31): extracted
+  `divoom_daemon/socket_server.SocketServer` — Unix + TCP listeners,
+  accept loop, subscriber fan-out, token auth. Composed via
+  `command_handler` + `status_event_factory` callbacks.
+- **Wave 3 — NotificationService** (73b39bd): extracted
+  `divoom_daemon/notification_service.NotificationService` — notification
+  monitor lifecycle, status derivation, sink + broadcast. Composed via
+  `broadcast` + `send_notification` callbacks.
+- **Wave 4 — DeviceOwner** (e3612b0): extracted
+  `divoom_daemon/device_owner.DeviceOwner` — device lifecycle
+  (connect, disconnect, device_call, scan, wall, sync, probe_lan)
+  and notification BLE sender. All command handlers registered via
+  `_init_registry()`.
+- **daemon.py reduced from 730 → 132 LOC** — removed from file-size
+  ALLOWLIST (now 10 entries, down from 11).
+- Suite: 989 passed / 75 skipped (zero regressions, same as R22).
+
+### §1.4 — DeviceSlot dataclass (c29c715)
+
+- **`divoom_lib/models/device_slot.py`** — `@dataclass DeviceSlot(device, x, y, size, width, height)`.
+- **Exported** from `divoom_lib/models/__init__.py`.
+- **Replaced all ad-hoc 6-tuple construction/destructuring** in `wall.py` and `device_owner.py`.
+- Suite: 989 passed / 75 skipped (zero regressions).
+
+### §1.5 — web_ui file splits (>500 LOC → <500 LOC)
+
+- **6 oversized files split into 14 files**, all under 500 LOC:
+  - `templates.js` (718) → 4 domain files: `templates_tools.js` (124), `templates_monthly_best.js` (64), `templates_widgets.js` (200), `templates_settings.js` (330).
+  - `app.js` (619) → `app_globals.js` (196) + `app_init.js` (425).
+  - `channels.js` (578) → `channels_core.js` (149) + `channels_grids.js` (436).
+  - `settings.js` (745) → `settings_hardware.js` (344) + `settings_features.js` (404).
+  - `widgets.css` (524) → `widgets_base.css` (301) + `widgets_extra.css` (224).
+  - `style.css` (510) → `style.css` (279) + `style_extra.css` (236).
+- **ALLOWLIST shrunk from 10 → 4 entries** (`media_sync.py`, `downsample.c`, `constants.py`, `cli.py` remain).
+- **`index.html`** script loading updated for all JS splits.
+- **`style.css`** @import chain updated for CSS splits.
+- **8 test files** updated to use concatenated `_cat()` path helper for split files.
+- Suite: 980 passed / 75 skipped (zero regressions on relevant tests).
+
 ## Round 22 — 2026-06-07 (menubar refactor: top-level package + daemon client)
 
 The menubar agent is moved from `divoom_daemon/` to its own

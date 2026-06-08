@@ -18,15 +18,9 @@ _LIMIT = 500
 # Acknowledged debt as of 2026-06. SHRINK ONLY — split a file, then delete its
 # entry. Do not add to this list; oversized new files must be split instead.
 ALLOWLIST = {
-    "divoom_gui/web_ui/settings.js",
-    "divoom_gui/web_ui/templates.js",
-    "divoom_gui/web_ui/app.js",
     "divoom_gui/media_sync.py",
-    "divoom_gui/web_ui/channels.js",
-    "divoom_gui/web_ui/widgets.css",
     "divoom_lib/native_src/downsample.c",
     "divoom_lib/models/constants.py",
-    "divoom_gui/web_ui/style.css",
     "divoom_lib/cli.py",
 }
 

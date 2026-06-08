@@ -17,7 +17,19 @@ TABS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "tabs.css"
 SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
 CHANNELS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "channels.css"
 INDEX_HTML = REPO_ROOT / "divoom_gui" / "web_ui" / "index.html"
-TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
+def _cat(paths: list[Path]) -> str:
+    parts = []
+    for p in paths:
+        if p.exists():
+            parts.append(p.read_text())
+    return "\n".join(parts)
+
+TEMPLATES_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_tools.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+])
 
 
 # ── tabs.css basics ───────────────────────────────────────────────────
@@ -122,7 +134,7 @@ def test_channel_row_uses_tabs_row() -> None:
 
 
 def test_settings_subtabs_use_tabs_row() -> None:
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert re.search(
         r'<div class="tabs-row"[^>]*aria-label="Settings"',
         src,
@@ -130,7 +142,7 @@ def test_settings_subtabs_use_tabs_row() -> None:
 
 
 def test_tools_subtabs_use_tabs_row() -> None:
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert re.search(
         r'<div class="tabs-row"[^>]*aria-label="Tools"',
         src,
@@ -138,7 +150,7 @@ def test_tools_subtabs_use_tabs_row() -> None:
 
 
 def test_theme_buttons_use_tabs_row() -> None:
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert re.search(
         r'<div class="tabs-row theme-buttons"',
         src,
@@ -159,7 +171,7 @@ def test_no_legacy_channel_card_in_index_html() -> None:
 
 def test_no_legacy_settings_tab_btn_in_templates() -> None:
     """The Settings row uses .tab-btn, not .settings-tab-btn."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     # Active state class is the same .tab-btn, so look for the data attr.
     assert re.search(
         r'<button class="tab-btn active"\s+data-settings-tab="settings-devices"',

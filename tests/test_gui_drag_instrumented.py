@@ -32,7 +32,17 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INDEX_HTML = REPO_ROOT / "divoom_gui" / "web_ui" / "index.html"
-APP_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "app.js"
+def _cat(paths: list[Path]) -> str:
+    parts = []
+    for p in paths:
+        if p.exists():
+            parts.append(p.read_text())
+    return "\n".join(parts)
+
+APP_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "app_globals.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "app_init.js",
+])
 GUI_MAIN = REPO_ROOT / "divoom_gui" / "gui_main.py"
 
 
@@ -112,7 +122,7 @@ def test_app_js_has_no_custom_drag_handler():
     the source of multiple regressions. Replaced by the native
     pywebview drag-region (with the cocoa #1820 patch).
     """
-    src = APP_JS.read_text()
+    src = APP_JS
     assert "pywebview.api.drag_window" not in src, (
         "divoom_gui/web_ui/app.js still calls pywebview.api.drag_window — this is "
         "an OLD custom drag path. Delete the drag handler block; the "

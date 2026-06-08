@@ -17,21 +17,38 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
 WIDGETS_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "widgets.js"
-SETTINGS_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.js"
+
+def _cat(paths: list[Path]) -> str:
+    parts = []
+    for p in paths:
+        if p.exists():
+            parts.append(p.read_text())
+    return "\n".join(parts)
+
+TEMPLATES_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_tools.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+])
+
+SETTINGS_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "settings_hardware.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "settings_features.js",
+])
 
 
 def _live_widgets_block() -> str:
-    src = TEMPLATES_JS.read_text()
-    m = re.search(r"widgets:\s*`(.+?)`,\s*\n\s*settings:\s*`", src, re.DOTALL)
-    assert m, "Live Widgets (widgets:) block not found in templates.js"
+    src = TEMPLATES_JS
+    m = re.search(r"window\.DivoomTemplates\.widgets\s*=\s*`(.+?)`;", src, re.DOTALL)
+    assert m, "Live Widgets (window.DivoomTemplates.widgets) block not found in templates"
     return m.group(1)
 
 
 def _settings_devices_block() -> str:
     """The Settings → Devices block (the first settings tab)."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     m = re.search(
         r'<div class="settings-tab-content active" id="settings-devices">'
         r'(.+?)</div>\s*</div>\s*</div>\s*<!--\s*2\.\s*DIVOOM\s*TAB',
@@ -191,7 +208,7 @@ def test_widgets_js_clears_weather_active_class_on_tab_leave() -> None:
 def test_settings_js_dead_push_weather_handler_removed() -> None:
     """The old #push-weather-btn click handler in settings.js is
     dead code now (button removed in R15 §3)."""
-    src = SETTINGS_JS.read_text()
+    src = SETTINGS_JS
     assert "push-weather-btn" not in src, (
         "settings.js still references the removed #push-weather-btn — "
         "should be cleaned up."

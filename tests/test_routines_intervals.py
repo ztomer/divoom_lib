@@ -17,7 +17,19 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
+def _cat(paths: list[Path]) -> str:
+    parts = []
+    for p in paths:
+        if p.exists():
+            parts.append(p.read_text())
+    return "\n".join(parts)
+
+TEMPLATES_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_tools.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+])
 SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
 
 from divoom_lib.hotchannel_config import (
@@ -37,7 +49,7 @@ def test_display_card_no_longer_contains_danger_zone() -> None:
     card. The Display card is between the `<!-- Display -->` and
     `<!-- R15 §4: Danger zone -->` markers — we check that the div
     isn't between those two markers."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     display_start = src.find("<!-- Display (moved from Tools")
     danger_start = src.find("<!-- R15 §4: Danger zone is its own card")
     assert display_start > 0, "Display card marker not found"
@@ -49,7 +61,7 @@ def test_display_card_no_longer_contains_danger_zone() -> None:
 
 
 def test_danger_zone_card_exists() -> None:
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert re.search(
         r'<div class="card glass-card danger-card">\s*'
         r'<div class="card-header"><h3>Danger zone</h3></div>',
@@ -76,7 +88,7 @@ def test_danger_card_visual_marker() -> None:
 def test_factory_reset_btn_still_present() -> None:
     """The factory reset button must still be in the DOM (just moved
     to its own card)."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert re.search(
         r'<button\s+id="factory-reset-btn"[^>]*class="glow-btn danger"[^>]*>'
         r'\s*Factory reset device…\s*</button>',
@@ -88,7 +100,7 @@ def test_factory_reset_btn_still_present() -> None:
 
 
 def test_routines_select_has_six_options() -> None:
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     select_match = re.search(
         r'<select\s+id="routines-auto-sync-interval"[^>]*>(.+?)</select>',
         src,
@@ -106,7 +118,7 @@ def test_routines_select_has_six_options() -> None:
 
 def test_routines_interval_labels_are_human_readable() -> None:
     """Spot-check that 7d and 30d have human labels (not raw seconds)."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     select_match = re.search(
         r'<select\s+id="routines-auto-sync-interval"[^>]*>(.+?)</select>',
         src,

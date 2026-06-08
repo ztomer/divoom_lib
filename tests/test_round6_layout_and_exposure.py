@@ -33,13 +33,39 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INDEX_HTML = REPO_ROOT / "divoom_gui" / "web_ui" / "index.html"
-TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
 GALLERY_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.css"
 GALLERY_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.js"
-SETTINGS_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.js"
-APP_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "app.js"
-CHANNELS_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "channels.js"
 GUI_API_PY = REPO_ROOT / "divoom_gui" / "gui_api.py"
+
+def _cat(paths: list[Path]) -> str:
+    """Read and concatenate multiple source files."""
+    parts = []
+    for p in paths:
+        if p.exists():
+            parts.append(p.read_text())
+    return "\n".join(parts)
+
+TEMPLATES_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_tools.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+])
+
+SETTINGS_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "settings_hardware.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "settings_features.js",
+])
+
+APP_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "app_globals.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "app_init.js",
+])
+
+CHANNELS_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "channels_core.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "channels_grids.js",
+])
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -51,14 +77,14 @@ def test_monthly_best_header_is_devices_not_sync_targets():
     """The right card header in Monthly Best is now 'Devices' — the
     schedule was moved to Settings → Routines, so the header is no
     longer 'Sync Targets & Schedule'."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     # Find the right-card header (the one inside the .monthly-best-layout
     # block, not the Gallery card on the left).
     mb_match = re.search(
-        r'<div class="monthly-best-layout">(.*?)</div>\s*</div>\s*`,',
+        r'<div class="monthly-best-layout">(.*?)</div>\s*`;',
         src, re.DOTALL,
     )
-    assert mb_match is not None, "monthly-best-layout block not found in templates.js"
+    assert mb_match is not None, "monthly-best-layout block not found in templates"
     block = mb_match.group(1)
     assert "Sync Targets &amp; Schedule" not in block, (
         "Monthly Best right card still has 'Sync Targets & Schedule' — "
@@ -74,9 +100,9 @@ def test_monthly_best_schedule_block_removed():
     """The schedule block (hc-schedule + 'Enable scheduled sync' + Save
     Schedule button) must be REMOVED from Monthly Best — it moved to
     Settings → Routines."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     mb_match = re.search(
-        r'<div class="monthly-best-layout">(.*?)</div>\s*</div>\s*`,',
+        r'<div class="monthly-best-layout">(.*?)</div>\s*`;',
         src, re.DOTALL,
     )
     assert mb_match is not None, "monthly-best-layout block not found in templates.js"
@@ -150,7 +176,7 @@ def test_target_addr_css_class_removed():
 def test_settings_has_routines_subtab():
     """The Settings tab nav must include a 'Routines' sub-tab.
     (R15 §1+§7: `.settings-tab-btn` is now `.tab-btn`.)"""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert re.search(
         r'<button class="tab-btn"[^>]*data-settings-tab="settings-routines"[^>]*>'
         r'(?:\s*<svg.*?</svg>)?\s*Routines\s*</button>',
@@ -161,7 +187,7 @@ def test_settings_has_routines_subtab():
 def test_routines_subtab_content_exists():
     """The #settings-routines sub-tab content block must exist with
     the new 'Auto-Sync Gallery' card (renamed from Hot-Channel Schedule)."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert '<div class="settings-tab-content" id="settings-routines">' in src, (
         "settings-routines sub-tab content block not found in templates.js"
     )
@@ -188,7 +214,7 @@ def test_routines_subtab_content_exists():
 
 def test_settings_js_wires_routines_form():
     """settings.js must wire the routines form save + load handlers."""
-    src = SETTINGS_JS.read_text()
+    src = SETTINGS_JS
     assert "routines-auto-sync-save" in src, (
         "settings.js doesn't reference the routines save button id."
     )
@@ -254,7 +280,7 @@ def test_appbar_volume_slider_exists():
 def test_appbar_volume_handler_in_app_js():
     """app.js must handle the volume slider's change event and call
     set_volume / get_volume on the API."""
-    src = APP_JS.read_text()
+    src = APP_JS
     assert "appbar-volume-slider" in src, (
         "app.js doesn't reference the volume slider id."
     )
@@ -335,7 +361,7 @@ def test_scoreboard_now_switches_channel():
     with ambient). The scoreboard is a tool on channel 0x06, so
     switch_channel('scoreboard') switches the device to that channel
     and the user can then edit scores."""
-    src = CHANNELS_JS.read_text()
+    src = CHANNELS_JS
     # The scoreboard-specific skip must be GONE (only ambient is skipped now).
     assert 'activeChannel === "scoreboard"' not in src, (
         "channels.js: scoreboard is still in the skip list — the user "
@@ -353,7 +379,7 @@ def test_scoreboard_now_switches_channel():
 def test_scoreboard_handler_in_channels_js():
     """channels.js must wire the number inputs' `change` event to call
     set_scoreboard(1, red, blue)."""
-    src = CHANNELS_JS.read_text()
+    src = CHANNELS_JS
     assert "scoreboard-red" in src, "channels.js doesn't reference scoreboard-red"
     assert "scoreboard-blue" in src, "channels.js doesn't reference scoreboard-blue"
     # The change handler must exist and call set_scoreboard.
@@ -412,7 +438,7 @@ def test_no_battery_badge_intentionally_not_implemented():
         "command. Do not add a battery badge without first finding a "
         "real source for the device's battery level."
     )
-    appjs = APP_JS.read_text()
+    appjs = APP_JS
     assert "battery" not in appjs.lower(), (
         "Found 'battery' in app.js. See comment in "
         "test_no_battery_badge_intentionally_not_implemented."
@@ -433,7 +459,7 @@ def test_r9_display_card_exists():
     """The Display card (orientation/mirror/factory-reset) exists — it now lives
     in Settings → Devices (moved there in R12 Phase 7). R15 §4: factory reset
     moved to its own Danger zone card."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert 'id="screen-dir-select"' in src, "Display card missing orientation <select>."
     assert 'id="screen-mirror-toggle"' in src, "Display card missing mirror toggle."
     # R15 §4: factory reset moved out of the Display card into its own
@@ -448,7 +474,7 @@ def test_r9_display_card_exists():
 
 def test_r9_settings_js_wires_display_and_guards_reset():
     """settings.js wires orientation/mirror and double-confirms factory reset."""
-    src = SETTINGS_JS.read_text()
+    src = SETTINGS_JS
     assert "set_screen_dir" in src, "settings.js does not call set_screen_dir."
     assert "set_screen_mirror" in src, "settings.js does not call set_screen_mirror."
     # Factory reset must be confirmed (dialog + typed RESET token) before calling.
@@ -480,14 +506,14 @@ def test_r9_gui_api_exposes_display_bridges():
 
 def test_r10_notification_card_in_tools_device():
     """Tools→Device has a Notification card with app select, text, Send."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert 'id="notif-app-select"' in src, "Notification card missing app <select>."
     assert 'id="notif-text"' in src, "Notification card missing text input."
     assert 'id="notif-send"' in src, "Notification card missing Send button."
 
 
 def test_r10_settings_js_wires_notification():
-    src = SETTINGS_JS.read_text()
+    src = SETTINGS_JS
     assert "send_notification" in src, "settings.js does not call send_notification."
 
 
@@ -518,14 +544,14 @@ def test_r11_ambient_color_controls_gated_and_no_custom_label():
     block = amb.group(1)
     assert 'id="ambient-color-controls"' in block, "color controls need an id to gate by mode"
     assert "Custom</span>" not in block, "the 'Custom' label should be removed"
-    js = CHANNELS_JS.read_text()
+    js = CHANNELS_JS
     assert "updateAmbientColorVisibility" in js, "channels.js must gate color controls by mode"
 
 
 def test_r11_scoreboard_reset_button():
     html = INDEX_HTML.read_text()
     assert 'id="scoreboard-reset-btn"' in html, "scoreboard Reset button missing"
-    js = CHANNELS_JS.read_text()
+    js = CHANNELS_JS
     assert "scoreboard-reset-btn" in js, "Reset button not wired in channels.js"
 
 
@@ -561,7 +587,7 @@ def test_r11_appbar_phase3():
     assert ".corner-transports" in css and "position: fixed" in css, "4b corner styles"
     assert "--thumb-color" in css, "4e: brightness thumb tracks value"
 
-    app_js = APP_JS.read_text()
+    app_js = APP_JS
     assert "updateBrightnessThumb" in app_js, "4e: thumb color updated from value"
     assert "stopPropagation" in app_js and "appbar-slider" in app_js, "4d slider drag-fix"
 
@@ -591,14 +617,14 @@ def test_r11_wall_toolbar_unified():
         assert ctrl in wall, f"{ctrl} missing from unified toolbar"
     assert ">Canvas<" not in wall, "'Canvas' heading should be gone"
     assert "Layout &amp; Presets" not in wall, "'Layout & Presets' heading should be gone"
-    assert "save-preset-btn" in APP_JS.read_text()
+    assert "save-preset-btn" in APP_JS
 
 
 def test_r18_subtabs_have_icons_and_fit_content():
     """R18 a/b: Tools + Settings sub-tab buttons carry a .tab-icon (consistency
     with the channel row), and the pill row sizes to its content rather than the
     full window width."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     for did in ("tools-time", "tools-sessions", "settings-devices",
                 "settings-divoom", "settings-routines", "settings-connectivity",
                 "settings-appearance"):
@@ -684,7 +710,7 @@ def test_r12_tools_subtab_uses_sessions_not_tools_inner_collision():
     to 'Sessions' to avoid the parent-tab / sub-tab 'Tools' naming
     collision. Sessions is the device-manual term for the
     multi-timer/noise/sleep bundle."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     # The inner sub-tab button is now 'Sessions' with data-tools-tab=tools-sessions.
     # (R15 §1+§7: button class is now `.tab-btn` and has additional `data-tab` /
     # `role` / `aria-selected` attrs — the assertion uses a regex that matches
@@ -755,7 +781,7 @@ def test_r15_unified_segmented_pill_css():
 def test_r12_anniversary_moved_into_time_subtab():
     """The Anniversary/Memorial card lives in the Time sub-tab (not the
     Sessions or Device sub-tab), per the regroup."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     # Find the Time sub-tab content block.
     m = re.search(
         r'id="tools-time">(.+?)<!-- R11 item 8: SESSIONS',
@@ -782,9 +808,9 @@ def test_r12_weather_moved_into_live_widgets():
     R15 §3: the card uses the 128x128 preview (#weather-device-preview)
     — the old push-weather-btn was removed and replaced with an
     auto-push on card selection."""
-    src = TEMPLATES_JS.read_text()
-    # Live Widgets template block: between widgets: ` and settings: `.
-    lw = re.search(r"widgets:\s*`(.+?)`,\s*\n\s*settings:\s*`", src, re.DOTALL)
+    src = TEMPLATES_JS
+    # Live Widgets template block: inside window.DivoomTemplates.widgets assignment.
+    lw = re.search(r"window\.DivoomTemplates\.widgets\s*=\s*`(.+?)`;", src, re.DOTALL)
     assert lw is not None, "Live Widgets (widgets:) block not found in templates.js"
     lw_block = lw.group(1)
     assert 'id="widget-card-weather"' in lw_block, (
@@ -798,7 +824,7 @@ def test_r12_weather_moved_into_live_widgets():
         "Old push-weather-btn is still in Live Widgets — should be removed in R15 §3."
     )
     # Weather MUST NOT still be in the Tools tab.
-    tools = re.search(r"tools:\s*`(.+?)`,\s*\n\s*widgets:\s*`", src, re.DOTALL)
+    tools = re.search(r"window\.DivoomTemplates\.tools\s*=\s*`(.+?)`;", src, re.DOTALL)
     assert tools is not None, "Tools tab block not found in templates.js"
     tools_block = tools.group(1)
     assert 'id="push-weather-btn"' not in tools_block, (
@@ -809,7 +835,7 @@ def test_r12_weather_moved_into_live_widgets():
 def test_r12_device_settings_moved_to_settings_devices():
     """The Device Settings card (24h, °F, low-power, device name, etc.)
     now lives in Settings → Devices, not in the Tools tab."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     # Settings → Devices sub-tab block: between id="settings-devices" and the
     # next sub-tab id="settings-divoom" (or end of the Settings block).
     m = re.search(
@@ -824,7 +850,7 @@ def test_r12_device_settings_moved_to_settings_devices():
             f"should have moved there in R12."
         )
     # And those ids MUST NOT be in the Tools tab.
-    tools = re.search(r"tools:\s*`(.+?)`,\s*\n\s*widgets:\s*`", src, re.DOTALL)
+    tools = re.search(r"window\.DivoomTemplates\.tools\s*=\s*`(.+?)`;", src, re.DOTALL)
     assert tools is not None
     tools_block = tools.group(1)
     for _id in ["hour24-toggle", "tempf-toggle", "lowpower-toggle", "device-name-input", "sync-time-btn"]:

@@ -15,6 +15,39 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R23 — REVIEW §1.2 + §1.3 + §1.4 + §1.5 SHIPPED. Suite 980 / 0 / 75.**
+  - **§1.2** — `gui_api.py` refactored from 891 → 444 LOC by composing 5 `ApiBase`
+    collaborators (`ConnectionApi`, `LightingApi`, `ToolsApi`, `WidgetsApi`,
+    `WindowApi`). Every bridge method that existed in a collaborator now
+    delegates to it; all logging + error handling lives in collaborators.
+    `AsyncLoopThread` moved from inline definition to `divoom_gui.api`.
+    Removed dead code: `_device_status()`, `_target()`, `_dispatch()`,
+    `_tool_call()`, `_as_bool()` — all now in collaborators.
+    `send_notification` added to `ToolsApi`. `set_brightness`, `set_volume`,
+    `display_wall_image`, `display_custom_art` added to `LightingApi`.
+    File-size guardrail: `gui_api.py` removed from ALLOWLIST (444 ≤ 500).
+  - **§1.3** — daemon.py 4-wave extraction:
+    - Wave 1 (5d3f7d1): command registry (if-ladder → dict).
+    - Wave 2 (7c0cc31): `SocketServer` → `divoom_daemon/socket_server.py`.
+    - Wave 3 (73b39bd): `NotificationService` → `divoom_daemon/notification_service.py`.
+    - Wave 4 (e3612b0): `DeviceOwner` → `divoom_daemon/device_owner.py`.
+    - daemon.py: 730 → 132 LOC; removed from ALLOWLIST (10 entries).
+    - New modules: 3 (socket_server, notification_service, device_owner).
+  - **§1.4** — `DeviceSlot` dataclass shipped (c29c715):
+    - `divoom_lib/models/device_slot.py` with `@dataclass DeviceSlot(device, x, y, size, width, height)`.
+    - Exported from `divoom_lib/models/__init__.py`.
+    - Replaced all ad-hoc 6-tuple construction/destructuring in `wall.py` and `device_owner.py`.
+  - **§1.5** — 6 web_ui files > 500 LOC split into 14 files:
+    - `templates.js` (718) → 4 files: `templates_tools.js` (124), `templates_monthly_best.js` (64), `templates_widgets.js` (200), `templates_settings.js` (330).
+    - `app.js` (619) → `app_globals.js` (196) + `app_init.js` (425).
+    - `channels.js` (578) → `channels_core.js` (149) + `channels_grids.js` (436).
+    - `settings.js` (745) → `settings_hardware.js` (344) + `settings_features.js` (404).
+    - `widgets.css` (524) → `widgets_base.css` (301) + `widgets_extra.css` (224).
+    - `style.css` (510) → `style.css` (279) + `style_extra.css` (236).
+    - ALLOWLIST shrunk from 10 → 4 entries (`media_sync.py`, `downsample.c`, `constants.py`, `cli.py`).
+    - `index.html` + `style.css` @import chain updated; 8 test files updated.
+  - Suite 980 passed / 75 skipped (zero regressions across §1.2–§1.5).
+
 - **R22 — menubar refactor: top-level package + daemon client. Suite 944 / 0 / 75.**
   - New `divoom_menubar/` package (menubar_client.py, menubar.py) at repo root.
   - Menubar rewritten as pure daemon client: connects to daemon's Unix socket,
@@ -39,18 +72,17 @@ core rule in `AGENTS.md`).
     an if-ladder dispatch + 4 responsibilities; wall 6-tuple should be a dataclass.
     Rust verdict: don't rewrite the lib; the *daemon* is the only defensible Rust
     candidate, and only with an embedded/footprint driver.
-  - **Executed now:** `tests/test_file_size.py` (500-LOC guardrail with a
+  - **Executed in R21:** `tests/test_file_size.py` (500-LOC guardrail with a
     shrink-only allow-list of the 11 current offenders); README + ARCHITECTURE
-    rewritten to current reality (3-package + daemon + network + Linux); new
-    `docs/README.md` index; removed 10 stale docs (CODE_REVIEW, APP_IMPROVEMENT_
-    PLAN, PLANNED_WORK, next_phase_requirements, DESKTOP_GUI, ENGINEERING_NOTES,
-    brightness_investigation, DRAG_FIX_HISTORY, DEVICE_VALIDATION_PLAN,
-    PLANNING_ROUND2_CONTINUATION — recoverable from git).
-  - **Staged (NOT done — need approval / are large):** the >500-LOC refactors
-    (gui_api split + dispatcher, daemon command-registry + DeviceOwner/
-    NotificationService/SocketServer extraction, DeviceSlot dataclass, web_ui
-    splits); a live screenshot-based UI/UX pass; an optional Rust daemon spike.
-    Priority order in REVIEW §1.7.
+    rewritten; docs index; removed 10 stale docs.
+  - **Executed in R22:** menubar refactor into `divoom_menubar/` (daemon client).
+  - **Executed in R23:** gui_api collaborator integration (API split into 5
+    collaborators, gui_api.py 891→444 LOC, removed from ALLOWLIST).
+  - **Executed in R23 (§1.3):** daemon.py 4-wave extraction (command registry
+    + SocketServer + NotificationService + DeviceOwner; daemon.py 730→132 LOC;
+    removed from ALLOWLIST).
+  - **Staged (still need doing):** REVIEW §1.4 (DeviceSlot dataclass), §1.5
+    (web_ui splits).
 
 - **R20 — Linux compatibility (daemon + libraries) SHIPPED. Suite 991 / 0 / 75.**
   `divoom_lib` + `divoom_daemon` run on Linux; BLE via bleak/BlueZ; the R19
@@ -231,32 +263,27 @@ core rule in `AGENTS.md`).
 
 ## Open threads / next up
 
-1. **Push R15 to origin.** Local is ~6 commits ahead (R15 §1+§7, §2, §4,
-   §3, §5, §6). Round 15 is complete.
-3. **R12 §A visual pass pending** (user-run `python3 gui/gui_main.py`):
+1. **Push to origin.** Local is ~10 commits ahead (R15 §1-§6, R22 menubar,
+   R23 §1.2–§1.5).
+2. **R12 §A visual pass pending** (user-run `python3 gui/gui_main.py`):
    verify appbar corner transports, scoreboard restyle, wall toolbar,
    font sweep, segmented-pill, tools regroup, sub-tab rename to
    "Sessions", **and the new macOS Notifications card under
    Settings → Devices** (R14 §3) and the **new MCP Server card under
    Settings → Connectivity** (R15 §5).
-4. **R12 §B hardware verification pending** (user-run): album cover
+3. **R12 §B hardware verification pending** (user-run): album cover
    renders un-distorted; custom-art/live push end-to-end; weather
    push via `divoom-control set-temperature 18 --weather clear`.
-5. **get_* read-back times out on real devices** (task #20): get
+4. **get_* read-back times out on real devices** (task #20): get
    queries 0x42/0x46/0x13 get no parseable response (likely
    query-framing mismatch). Gates every "read from device". See
    `docs/DEVICE_VALIDATION_PLAN.md`.
-6. **Channel-switch hardware bug (Divoom Max):** first switch works,
+5. **Channel-switch hardware bug (Divoom Max):** first switch works,
    rest don't; not root-caused. All switches are `set light mode`
    (0x45) fire-and-forget.
-7. **Deferred features** (R12 §D): see
-   `docs/PLANNING_ROUND12_D_AUDIT.md` — Timeplan UI blocked on
-   unverified `mode`/`type` semantics; SD player blocked on task
-   #20; Game has no host UX; Drawing needs a non-trivial UI per mode;
-   Cloud HTTP is its own round (auth broken).
-8. **MCP enhancements (post-R15):** HTTP+SSE transport, `subscribe_*`
-   tools, auth (none now; macOS-only + per-user-uid is the default
-   trust boundary).
+6. **Deferred features** (R12 §D): see
+   `docs/PLANNING_ROUND12_D_AUDIT.md`.
+7. **MCP enhancements:** HTTP+SSE transport, `subscribe_*` tools.
 
 ## Hardware note
 

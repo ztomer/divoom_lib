@@ -1,0 +1,235 @@
+/* style_extra.css — Inputs, form groups, grid refinements, Kare dither, ambient, art grid */
+/* Inputs & Form Groups */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.form-group.compact {
+    margin-bottom: 0;
+}
+
+.custom-select {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    padding: 8px 32px 8px 12px;
+    color: var(--text-main);
+    outline: none;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    min-width: 140px;
+    font-size: 13px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6' viewBox='0 0 9 6'%3E%3Cpath d='M0 0h9v1H0zm1 1h7v1H1zm1 1h5v1H2zm1 1h3v1H3zm1 1h1v1H4z' fill='%2382838a'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 9px 6px;
+}
+
+.custom-select option {
+    background-color: var(--bg-base);
+}
+
+.custom-select.small {
+    padding: 6px 24px 6px 10px;
+    font-size: 12px;
+    background-position: right 8px center;
+    background-size: 11px 11px;
+}
+
+.num-input {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    padding: 8px;
+    color: var(--text-main);
+    outline: none;
+    width: 80px;
+    text-align: center;
+}
+
+.text-input {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    color: var(--text-main);
+    outline: none;
+    width: 100%;
+    font-family: var(--font-sans);
+    font-size: 13px;
+}
+
+.text-input:focus,
+.custom-select:focus {
+    border-color: var(--primary);
+}
+
+.flex-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.file-uploader {
+    flex-grow: 1;
+}
+
+/* Align grid cards to top to prevent vertical stretching */
+.grid-layout {
+    align-items: start;
+}
+/* Channels grid column sizes: narrower left side, wider right side */
+#control-panel .grid-layout {
+    grid-template-columns: 1fr;
+}
+
+/* --- Responsive Widget Grid Layout --- */
+.grid-layout.three-cols {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: stretch;
+}
+
+/* Align scanner and Wi-Fi card heights to stretch in Settings tab */
+#settings-devices .grid-layout {
+    align-items: stretch;
+}
+
+/* ── Susan Kare Retro monochrome dither filter overrides ─────────────── */
+.banner-preview img,
+.arranger-node-image {
+    image-rendering: pixelated;
+    filter: grayscale(100%) contrast(300%) brightness(110%);
+}
+
+body.theme-light .banner-preview img,
+body.theme-light .arranger-node-image {
+    filter: grayscale(100%) contrast(300%) brightness(95%) !important;
+}
+
+@media (prefers-color-scheme: light) {
+    body.theme-system .banner-preview img,
+    body.theme-system .arranger-node-image {
+        filter: grayscale(100%) contrast(300%) brightness(95%) !important;
+    }
+}
+
+/* ── Ambient Mode Grid Previews ── */
+.ambient-preview {
+    transition: background-color 0.3s;
+}
+
+@keyframes heartbeat {
+    0% { transform: scale(1); filter: brightness(1); }
+    14% { transform: scale(1.15); filter: brightness(1.2); }
+    28% { transform: scale(1); filter: brightness(1); }
+    42% { transform: scale(1.15); filter: brightness(1.2); }
+    70% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes breathe {
+    0% { opacity: 0.35; filter: brightness(0.7); }
+    50% { opacity: 1; filter: brightness(1.3); }
+    100% { opacity: 0.35; filter: brightness(0.7); }
+}
+
+@keyframes sleeping-fade {
+    0% { filter: brightness(0.15); }
+    50% { filter: brightness(1.4); }
+    100% { filter: brightness(0.15); }
+}
+
+@keyframes repeller-strobe {
+    0% { opacity: 0.4; filter: brightness(0.7); }
+    100% { opacity: 1; filter: brightness(1.3); }
+}
+
+@keyframes hue-shift {
+    0%   { background-position: 0%   50%; }
+    100% { background-position: 200% 50%; }
+}
+
+@keyframes love-color-cycle {
+    /* The Divoom "Love" ambient channel: the entire screen is a single solid
+       color, transitioning smoothly through a sequence (blue → purple → red
+       → orange → pink → back). User-described as "the whole screen is one
+       color that transitions to the next color" — i.e. NOT a rainbow
+       gradient, NOT a pulse, just one solid block fading between colors. */
+    0%   { background-color: #4d79ff; }  /* blue */
+    20%  { background-color: #9d4edd; }  /* purple */
+    40%  { background-color: #ff4d6d; }  /* red */
+    60%  { background-color: #ff7a3d; }  /* orange */
+    80%  { background-color: #ff85b3; }  /* pink */
+    100% { background-color: #4d79ff; }  /* back to blue */
+}
+
+/* ── Channels Tab: Full Height Custom Art Grid ─────────────────────── */
+#control-panel.tab-content.active {
+    height: 100%;
+    min-height: 0;
+}
+
+#control-panel .grid-layout {
+    height: 100%;
+    min-height: 0;
+    align-items: stretch;
+}
+
+#control-panel .card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#control-panel .card-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+#panel-design {
+    display: none;
+    height: 100%;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#panel-design.active {
+    display: flex;
+}
+
+#panel-design .custom-art-upload-section {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 12px;
+}
+
+#panel-design .gallery-cache-selector {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-top: 4px;
+}
+
+#panel-design #custom-art-cache-grid {
+    flex: 1;
+    max-height: none !important;
+    overflow-y: auto;
+}
+

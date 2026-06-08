@@ -19,7 +19,19 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-TEMPLATES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates.js"
+def _cat(paths: list[Path]) -> str:
+    parts = []
+    for p in paths:
+        if p.exists():
+            parts.append(p.read_text())
+    return "\n".join(parts)
+
+TEMPLATES_JS = _cat([
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_tools.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+])
 GALLERY_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.js"
 GALLERY_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.css"
 
@@ -30,7 +42,7 @@ GALLERY_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.css"
 def test_no_visible_fetch_gallery_button() -> None:
     """The button must still exist in the DOM (ghost), but be hidden
     via the HTML `hidden` attribute so it's not clickable in the UI."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     m = re.search(
         r'<button\s+id="load-gallery-btn"[^>]*>',
         src,
@@ -47,7 +59,7 @@ def test_button_text_not_in_visible_html() -> None:
     """The literal 'Fetch Gallery' string must not appear as visible UI
     text in templates.js (the hidden ghost button is acceptable, plus
     any comments explaining why the button is hidden)."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     # The hidden button still uses the old label as its textContent —
     # that's fine, it just isn't visible. We only need to assert that
     # there's no *visible* Fetch Gallery UI. The button is the only
@@ -66,7 +78,7 @@ def test_button_text_not_in_visible_html() -> None:
 
 
 def test_batch_sync_btn_renamed_to_update_device() -> None:
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert "Push Selected to Device" not in src, (
         "Old 'Push Selected to Device' label still present — should be 'Update Device'."
     )
@@ -77,7 +89,7 @@ def test_batch_sync_btn_renamed_to_update_device() -> None:
 
 
 def test_sync_all_btn_renamed_to_update_devices() -> None:
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert "Sync All" not in src, (
         "Old 'Sync All → Devices' label still present — should be 'Update Devices'."
     )
@@ -91,7 +103,7 @@ def test_refresh_targets_btn_removed() -> None:
     """R15 §2: the Refresh button on the Devices card is gone —
     the same operation lives in Settings → Devices as a manual scan,
     and the list auto-refreshes on a 30s timer."""
-    src = TEMPLATES_JS.read_text()
+    src = TEMPLATES_JS
     assert "refresh-targets-btn" not in src, (
         "Refresh button on the Devices card is still in templates.js — "
         "should be removed."
