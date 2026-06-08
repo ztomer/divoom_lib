@@ -6,7 +6,30 @@ shipped milestone (per the project planning docs).
 
 ---
 
-## Round 28 — 2026-06-08 (MCP server routes through daemon + scan filter + tab spacing)
+## Round 28 — 2026-06-08 (MCP daemon-route + scan filter + tab spacing + bitmap font)
+
+### Device text uses a real bitmap font (no anti-aliasing)
+
+- Text rasterised for the device (stock ticker, etc.) was drawn with PIL
+  `ImageFont.load_default(size=…)` — an anti-aliased TrueType font that turns to
+  grey mush at 16/32/64px. Replaced with a **1-bit bitmap font extracted from the
+  official Divoom APK** (`assets/divoom_fond16_default.bin`), so glyphs match
+  exactly what the device shows in the Divoom app.
+- **Reverse-engineered the APK font format** (from `F2/d.smali`): 32 bytes/glyph
+  (16×16 @ 1bpp), glyph for codepoint `cp` at offset `(cp-0x21)*32` for printable
+  ASCII, stored rotated 270°. `scripts/extract_apk_font.py` bakes out the
+  rotation and writes the printable-ASCII subset (95 glyphs, 3040 bytes) to
+  `divoom_lib/fonts/divoom_fond16_default_ascii.bin`.
+- **New `divoom_lib/fonts/`** (`BitmapFont`, `get_default_font()`): proportional,
+  pixel-exact rendering (`draw_text`/`render`/metrics); `max_width` drops whole
+  glyphs on narrow matrices instead of clipping mid-stroke; unsupported
+  codepoints fall back to `?`. Verified crisp: rendered pixels are only bg or fg,
+  never an AA grey.
+- `media_source.py` rewired to the bitmap font; `ImageFont` import + `_tiny_font`
+  removed. `pyproject.toml` ships `divoom_lib/fonts/*.bin`.
+- Tests: `tests/test_bitmap_font.py` +10 (asset size, upright 'A', proportional
+  widths, crispness, max_width, fallback, and a guard that media_source uses no
+  anti-aliased font).
 
 ### Tab chrome spacing centralised (one source of truth)
 

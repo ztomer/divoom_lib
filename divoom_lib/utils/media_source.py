@@ -12,7 +12,9 @@ import urllib.request
 import json
 import logging
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
+
+from divoom_lib.fonts import get_default_font
 
 logger = logging.getLogger(__name__)
 
@@ -168,16 +170,6 @@ def fetch_stock_ticker(symbol: str) -> dict | None:
     return None
 
 
-def _tiny_font(px: int = 8):
-    """A small bitmap font so short tickers fit a 16px row. Pillow >= 10.1
-    supports a size on the built-in font; older Pillow falls back to the
-    (larger) fixed default."""
-    try:
-        return ImageFont.load_default(size=px)
-    except TypeError:
-        return ImageFont.load_default()
-
-
 def render_stock_ticker_frame(symbol: str, data: dict, size: int = 16) -> Path:
     """
     Renders a neat visual stock ticker to fit Divoom grid dimensions (16x16 or 32x32).
@@ -189,32 +181,32 @@ def render_stock_ticker_frame(symbol: str, data: dict, size: int = 16) -> Path:
     
     img = Image.new("RGB", (size, size), (5, 6, 12)) # Dark slate bg
     draw = ImageDraw.Draw(img)
-    
+    font = get_default_font()
+
     # Text colors
     is_up = data["change"] >= 0
     text_color = (0, 255, 180) if is_up else (255, 60, 60) # Green vs Red
-    
+
     if size == 16:
-        # Mini 16x16 layout (R18 item 4): small arrow at top so the ticker
-        # acronym gets a full-width row in a small font and isn't clipped.
+        # Mini 16x16 layout: small arrow at top, then the ticker acronym in the
+        # crisp bitmap font (R28 — no anti-aliasing at 16px). Only whole glyphs
+        # that fit the 16px row are drawn (max_width); ~2-3 chars fit.
         if is_up:
             draw.polygon([(8, 0), (5, 4), (11, 4)], fill=text_color)  # small up triangle
         else:
             draw.polygon([(8, 4), (5, 0), (11, 0)], fill=text_color)  # small down triangle
-        # Ticker acronym across the lower rows in a small font.
-        draw.text((0, 6), symbol[:4].upper(), fill=(255, 255, 255), font=_tiny_font(8))
+        font.draw_text(draw, (0, 6), symbol.upper(), (255, 255, 255), max_width=size)
     else:
-        # 32x32 layout allows typography
-        # Draw symbol name (small font fits the full ticker)
-        draw.text((2, 2), symbol.upper()[:6], fill=(255, 255, 255), font=_tiny_font(10))
+        # 32x32+ layout allows the full ticker + price in the bitmap font.
+        font.draw_text(draw, (2, 2), symbol.upper()[:6], (255, 255, 255), max_width=size - 2)
         # Draw arrow (smaller than before)
         if is_up:
             draw.polygon([(25, 4), (21, 10), (29, 10)], fill=text_color)
         else:
             draw.polygon([(25, 10), (21, 4), (29, 4)], fill=text_color)
         # Draw price
-        draw.text((2, 16), f"${data['price']}", fill=text_color, font=_tiny_font(10))
-        
+        font.draw_text(draw, (2, 16), f"${data['price']}", text_color, max_width=size - 2)
+
     img.save(out_path)
     return out_path
 

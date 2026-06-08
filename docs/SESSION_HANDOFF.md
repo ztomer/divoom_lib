@@ -15,7 +15,19 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **R28 — MCP-via-daemon + scan filter + tab spacing SHIPPED. Suite 1064 / 75 / 0.**
+- **R28 — MCP-via-daemon + scan filter + tab spacing + device bitmap font
+    SHIPPED. Suite 1074 / 75 / 0.**
+  - **Device text now uses a real bitmap font (no anti-aliasing).** Was PIL
+    `ImageFont.load_default(size=…)` (AA TrueType → mush at 16/32/64px). RE'd the
+    APK font format (`F2/d.smali`: 32B/glyph 16×16@1bpp, offset `(cp-0x21)*32`,
+    stored rotated 270°). `scripts/extract_apk_font.py` extracts the
+    printable-ASCII subset → `divoom_lib/fonts/divoom_fond16_default_ascii.bin`
+    (95 glyphs). New `divoom_lib/fonts/` (`BitmapFont`/`get_default_font`):
+    proportional, pixel-exact, `max_width` drops whole glyphs. `media_source.py`
+    rewired (ImageFont/`_tiny_font` gone); pyproject ships `fonts/*.bin`.
+    +10 tests incl. a guard that media_source uses no AA font. **Only ASCII is
+    extracted** — CJK ranges exist in the APK file if ever needed (the full
+    `references/apk/.../divoom_fond16_*.bin` files have them).
   - **Tab spacing centralised.** Each tab area (Channels/Tools/Settings) sits on
     its own glass pane: `[2px] tabs [2px]` vertical padding + `1px` gap to the
     cards below. Tokens `--tab-pane-pad-y/-pad-x/-gap` in `style.css :root` are

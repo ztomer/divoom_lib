@@ -102,6 +102,9 @@ divoom_lib = [
     "*.dylib",
     "*.so",
     "*.dll",
+    # R28: bundled bitmap font for device-bound text (APK-derived, see
+    # divoom_lib/fonts/ + scripts/extract_apk_font.py).
+    "fonts/*.bin",
 ]
 divoom_gui = [
     "web_ui/*",
