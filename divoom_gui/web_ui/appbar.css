@@ -134,11 +134,13 @@
     box-shadow: 0 0 6px currentColor;
 }
 
-/* Custom Styled Tooltips using title attribute */
+/* Custom Styled Tooltips using title attribute. The dots are pinned to the
+   bottom-right corner (.corner-transports), so the tooltip must open UPWARD —
+   anchoring below the dot rendered it past the window's bottom edge (invisible). */
 .appbar-transports .transport-dot:hover::after {
     content: attr(title);
     position: absolute;
-    top: calc(100% + 8px);
+    bottom: calc(100% + 8px);
     right: 0;
     background: rgba(20, 21, 26, 0.95);
     color: var(--text-main);
