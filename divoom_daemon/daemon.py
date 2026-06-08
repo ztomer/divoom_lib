@@ -78,6 +78,8 @@ class DivoomDaemon:
         r["stop_notifications"] = lambda _: self._notifier.stop()
         r["set_routing"] = self._notifier.set_routing
         r["device_call"] = self._device_owner.device_call
+        r["exclusive_start"] = self._device_owner.exclusive_start
+        r["exclusive_end"] = self._device_owner.exclusive_end
         r["connect"] = self._device_owner.connect
         r["disconnect"] = lambda _: self._device_owner.disconnect()
         r["device_status"] = lambda _: self._device_owner.device_status()

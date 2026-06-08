@@ -15,6 +15,24 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R29 — Exclusive mode through daemon RPC SHIPPED. Suite 1085 / 75 / 0.**
+
+  The command queue's exclusive mode (R27) is now wired through `device_call`
+  so daemon clients can run atomic multi-phase sequences. Full write-up:
+  `docs/PLANNING_ROUND29.md`.
+
+  **New RPCs**: `exclusive_start(token)` / `exclusive_end(token)` call
+  `CommandQueue.acquire(token)` / `.release(token)` on the daemon's loop.
+  `device_call` now accepts a `token` param → forwarded to `_run_device()`.
+
+  **`DaemonDeviceProxy.exclusive(token)`** context manager issues the RPCs
+  and tags nested calls with the token.
+
+  **Files**: `daemon_protocol.py`, `device_owner.py`, `daemon.py`,
+  `daemon_client.py`. Tests: 6 new in `test_daemon_bridge.py`.
+
+  Commits: (current round, not yet committed)
+
 - **R28 — MCP-via-daemon + scan filter + tab layout + device bitmap font
     SHIPPED. Suite 1079 / 75 / 0.** Full write-up: `docs/PLANNING_ROUND28.md`.
     Commits: `517d9ca0` (MCP daemon-route + scan), `6aa8c747` (tab spacing
@@ -413,31 +431,32 @@ core rule in `AGENTS.md`).
 
 ## Open threads / next up
 
-### From R28 (this round)
+### From R29 (this round)
+- **Exclusive mode not hardware-verified** — unit-green only; drive through
+  a real multi-step sequence (e.g. animation streaming).
+- **`_run_device` blocks the caller while the item is queued** — if the
+  queue is under exclusive mode for a different token, the caller blocks
+  until that exclusive session ends. This is correct behavior but callers
+  should be aware of the timing implications.
+- **MCP tools don't use exclusive mode yet** — they could be wrapped:
+  `async with proxy.exclusive("mcp-1"): ...` for atomic multi-tool ops.
+
+### From R28
 - **Half bitmap font `B`/`8` collision** (and other ~5px glyph merges). Inherent
   to the OR-downsample. Fine for numeric tickers; if letter legibility matters,
   swap in a purpose-built tiny font (or extract a smaller APK font if one is
   found). Full font (`get_default_font`) is unaffected and still available.
-- **MCP client-setup examples in `docs/MCP_SERVER.md` still pass `--mac`** — now
-  optional/harmless; could be trimmed for clarity.
-- **MCP-over-daemon not hardware-verified** — unit-green only; drive a real
-  device through `divoom-control mcp-server` end-to-end.
-- **`R27` has no `docs/PLANNING_ROUND*.md`** (command queue) — only CHANGELOG +
-  this file. Backfill if an audit trail is wanted.
-- **Bundled font is ASCII-only** — CJK ranges exist in the APK `.bin` files
-  (`references/apk/.../divoom_fond16_*.bin`) if ever needed; extend
-  `scripts/extract_apk_font.py`'s codepoint ranges.
+- **`docs/MCP_SERVER.md` examples still pass `--mac`** — now optional/harmless.
+- **MCP-over-daemon not hardware-verified** — unit-green only.
+- **R27 has no `docs/PLANNING_ROUND*.md`** (command queue).
+- **Bundled font is ASCII-only** — CJK ranges exist in the APK `.bin` files.
 
-### Older / standing
-- **Wire exclusive mode through `device_call`** for multi-step ops that
-  need atomic access (e.g., animation streaming with 0x8B protocol).
-- **Drop `test_submit_after_stop_raises` `coro_for` was-never-awaited
-  warning**: the coroutine object is created but never executed (stop
-  rejects it before the worker can run it) — harmless but noisy.
+### Standing
+- **Animation streaming (0x8B protocol)** — now unblocked by exclusive mode.
+- **Drop `test_submit_after_stop_raises` `coro_for` was-never-awaited warning**.
 - `show_clock()` overlay reorder to APK layout.
-- **R12 §A visual pass** (user-run): glass tab strip, appbar corners, etc.
-- **R12 §B hardware verification** (user-run): album cover, custom-art/live/weather.
-- **get_* read-back times out** (task #20).
+- **R12 §A visual pass / §B hardware verification** (user-driven).
+- **`get_*` read-back times out** (task #20).
 - **Deferred features** (R12 §D): see `docs/PLANNING_ROUND12_D_AUDIT.md`.
 
 ## Hardware note

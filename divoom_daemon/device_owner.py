@@ -191,6 +191,7 @@ class DeviceOwner:
         call_args = list(args.get("args", []) or [])
         call_kwargs = args.get("kwargs", {}) or {}
         which = args.get("target", "device")
+        token = args.get("token")
         if not method:
             return {"success": False, "error": "device_call requires 'method'"}
 
@@ -225,10 +226,40 @@ class DeviceOwner:
             return result
 
         try:
-            result = self._run_device(_do())
+            result = self._run_device(_do(), token=token)
             return {"success": True, "result": _json_safe(result)}
         except Exception as e:
             logger.warning(f"device_call {which}.{method} failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    def exclusive_start(self, args: dict) -> dict:
+        token = args.get("token")
+        if not token:
+            return {"success": False, "error": "exclusive_start requires 'token'"}
+        if self._cmd_queue is None:
+            self._device_loop()
+        try:
+            # Submit acquire WITH the token so it passes the exclusive-mode
+            # gate on the queue's worker side.
+            self._run_device(self._cmd_queue.acquire(token), token=token)
+            return {"success": True, "token": token}
+        except Exception as e:
+            logger.warning(f"exclusive_start failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    def exclusive_end(self, _args: dict) -> dict:
+        token = _args.get("token")
+        if not token:
+            return {"success": False, "error": "exclusive_end requires 'token'"}
+        if self._cmd_queue is None:
+            return {"success": False, "error": "no queue"}
+        try:
+            # release token too: the queue is in exclusive mode, so only items
+            # with MATCHING tokens are dequeued.
+            self._run_device(self._cmd_queue.release(token), token=token)
+            return {"success": True}
+        except Exception as e:
+            logger.warning(f"exclusive_end failed: {e}")
             return {"success": False, "error": str(e)}
 
     def connect(self, args: dict) -> dict:

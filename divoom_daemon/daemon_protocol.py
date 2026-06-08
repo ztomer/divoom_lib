@@ -159,7 +159,8 @@ class DaemonClient:
 
     def device_call(self, method: str, args: list | None = None,
                     kwargs: dict | None = None, *, target: str = "device",
-                    blobs: dict[int, bytes] | None = None) -> dict:
+                    blobs: dict[int, bytes] | None = None,
+                    token: str | None = None) -> dict:
         """Proxy a device method through the daemon (R17 P5): the daemon owns the
         BLE connection and runs ``divoom.<method>(*args, **kwargs)``. ``target``
         selects the single device ("device") or the daemon-owned wall ("wall").
@@ -167,17 +168,34 @@ class DaemonClient:
         ``blobs`` maps an arg index → raw bytes; the daemon materializes each to
         a temp file and substitutes that arg with the path. This is how a remote
         client ships an image over the wire (the GUI and daemon don't share a
-        filesystem when the daemon is on another host). Returns the daemon reply
-        ``{"success", "result"|"error"}``."""
-        payload = {
+        filesystem when the daemon is on another host).
+
+        ``token`` — when set, the call runs in exclusive mode (only items with
+        this token are dispatched until ``exclusive_end`` is called). Multiple
+        calls with the same token form an atomic multi-phase sequence.
+
+        Returns the daemon reply ``{"success", "result"|"error"}``."""
+        payload: dict = {
             "method": method, "args": args or [], "kwargs": kwargs or {},
             "target": target,
         }
+        if token:
+            payload["token"] = token
         if blobs:
             payload["blobs"] = {
                 str(i): base64.b64encode(b).decode("ascii") for i, b in blobs.items()
             }
         return self.send_command("device_call", payload)
+
+    def exclusive_start(self, token: str) -> dict:
+        """Begin an exclusive-mode session on the daemon. Only ``device_call``
+        items whose ``token`` matches ``token`` will be dispatched until
+        ``exclusive_end`` is called. Returns the daemon reply."""
+        return self.send_command("exclusive_start", {"token": token})
+
+    def exclusive_end(self, token: str) -> dict:
+        """End the exclusive-mode session for ``token``. Returns the daemon reply."""
+        return self.send_command("exclusive_end", {"token": token})
 
     # ── device ownership / lifecycle (R17 P5 full cutover) ────────────────
     def connect_device(self, *, mac: str | None = None, lan_ip: str | None = None,

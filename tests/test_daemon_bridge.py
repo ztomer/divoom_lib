@@ -122,6 +122,80 @@ def test_proxy_conn_mac_resolves_from_device_status(live_daemon):
     assert conn.mac is None
     assert not isinstance(conn.mac, DaemonDeviceProxy)
 
+# ── exclusive mode (R29) ─────────────────────────────────────────────────
+
+
+def test_exclusive_start_and_end(live_daemon):
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    reply = client.exclusive_start("anim-1")
+    assert reply == {"success": True, "token": "anim-1"}
+    reply = client.exclusive_end("anim-1")
+    assert reply == {"success": True}
+
+
+def test_exclusive_start_requires_token(live_daemon):
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    # Call send_command directly to bypass the wrapper
+    reply = client.send_command("exclusive_start", {})
+    assert reply.get("success") is False
+    assert "token" in reply.get("error", "")
+
+
+def test_exclusive_end_requires_token(live_daemon):
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    reply = client.send_command("exclusive_end", {})
+    assert reply.get("success") is False
+    assert "token" in reply.get("error", "")
+
+
+def test_device_call_passes_token(live_daemon):
+    _, dev, sp = live_daemon
+    client = DaemonClient(sp)
+    # Start exclusive session
+    client.exclusive_start("my-token")
+    # Call with matching token
+    reply = client.device_call("display.show_light", args=["00FFCC", 100],
+                               token="my-token")
+    assert reply.get("success") is True
+    assert reply.get("result") is True
+    assert dev.calls == [("display.show_light", "00FFCC", 100)]
+    client.exclusive_end("my-token")
+
+
+def test_proxy_exclusive_context(live_daemon):
+    _, dev, sp = live_daemon
+    proxy = DaemonDeviceProxy(DaemonClient(sp))
+
+    async def go():
+        async with proxy.exclusive("test-tok") as p:
+            await p.display.show_light("FF0000", 50)
+        # After exclusive, no active session — normal dispatch resumes
+        await p.display.show_light("00FF00", 75)
+
+    _run(go())
+    assert dev.calls == [
+        ("display.show_light", "FF0000", 50),
+        ("display.show_light", "00FF00", 75),
+    ]
+
+
+def test_exclusive_call_issues_command(live_daemon):
+    """A device_call with a matching token dispatches inside an exclusive session.
+    The non-matching call is queued by CommandQueue (internal behavior tested in
+    test_command_queue.py). Here we just verify the RPC plumbing: no errors."""
+    _, dev, sp = live_daemon
+    client = DaemonClient(sp)
+    client.exclusive_start("x")
+    # Issue a matching-token call
+    reply = client.device_call("display.show_light", args=["FF0000", 20],
+                               token="x")
+    assert reply.get("success") is True
+    client.exclusive_end("x")
+
+
 def test_ensure_daemon_returns_client_when_already_up(live_daemon):
     _, _, sp = live_daemon
     client = ensure_daemon(sp, spawn=False)

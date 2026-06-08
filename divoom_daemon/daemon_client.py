@@ -223,6 +223,24 @@ class _ConnView:
 _STATUS_ATTRS = ("is_connected", "lan", "_conn")
 
 
+class _ProxyExclusiveCtx:
+    """Async context manager returned by ``DaemonDeviceProxy.exclusive()``."""
+
+    def __init__(self, proxy: "DaemonDeviceProxy", token: str) -> None:
+        self._proxy = proxy
+        self._token = token
+
+    async def __aenter__(self) -> "DaemonDeviceProxy":
+        client = self._proxy._client
+        reply = client.exclusive_start(self._token)
+        if not reply.get("success", False):
+            raise _DeviceCallError(reply.get("error", "exclusive_start failed"))
+        return self._proxy._with_token(self._token)
+
+    async def __aexit__(self, *exc: object) -> None:
+        self._proxy._client.exclusive_end(self._token)
+
+
 class DaemonDeviceProxy:
     """Attribute/method stand-in for a ``Divoom`` (or ``DivoomWall``) that routes
     through a daemon.
@@ -238,10 +256,30 @@ class DaemonDeviceProxy:
     ``_conn``) are answered synchronously from ``device_status``.
     """
 
-    def __init__(self, client: DaemonClient, _path: str = "", *, target: str = "device") -> None:
+    def __init__(self, client: DaemonClient, _path: str = "", *,
+                 target: str = "device", _token: str | None = None) -> None:
         object.__setattr__(self, "_client", client)
         object.__setattr__(self, "_path", _path)
         object.__setattr__(self, "_target", target)
+        object.__setattr__(self, "_token", _token)
+
+    def _with_token(self, token: str) -> "DaemonDeviceProxy":
+        return DaemonDeviceProxy(self._client, self._path,
+                                 target=self._target, _token=token)
+
+    def exclusive(self, token: str) -> _ProxyExclusiveCtx:
+        """Context manager for an exclusive-mode session on the daemon.
+
+        Usage::
+
+            async with proxy.exclusive("my-token") as p:
+                await p.display.show_light(255, 0, 0)
+                await p.lan.set_brightness(80)
+
+        Between ``exclusive_start`` and ``exclusive_end`` only calls tagged
+        with ``token`` are dispatched by the daemon's command queue — no
+        other callers can interleave."""
+        return _ProxyExclusiveCtx(self, token)
 
     def _status(self) -> dict:
         return self._client.device_status()
@@ -260,12 +298,13 @@ class DaemonDeviceProxy:
         if name.startswith("_"):
             raise AttributeError(name)
         path = f"{self._path}.{name}" if self._path else name
-        return DaemonDeviceProxy(self._client, path, target=self._target)
+        return DaemonDeviceProxy(self._client, path, target=self._target, _token=self._token)
 
     def __call__(self, *args: Any, **kwargs: Any):
         method = self._path
         client = self._client
         target = self._target
+        token = self._token
         call_args = list(args)
 
         # Remote daemon (TCP): no shared filesystem, so any positional arg that
@@ -285,7 +324,7 @@ class DaemonDeviceProxy:
 
         async def _invoke():
             reply = client.device_call(method, call_args, dict(kwargs),
-                                       target=target, blobs=blobs)
+                                       target=target, blobs=blobs, token=token)
             if not reply.get("success", False):
                 raise _DeviceCallError(reply.get("error", f"device_call {method} failed"))
             return reply.get("result")

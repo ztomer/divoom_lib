@@ -6,6 +6,49 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 29 — 2026-06-08 (Exclusive mode through daemon RPC)
+
+### Wire exclusive mode through device_call
+
+- **`DaemonClient.device_call()`** gets a `token` param — ships in the RPC
+  payload. The daemon's `DeviceOwner.device_call()` extracts it and passes
+  it through to `_run_device(coro, token=token)`, so the command queue's
+  exclusive-mode dispatch gates the call.
+- **`DaemonClient.exclusive_start(token)` / `exclusive_end(token)`** — new
+  RPC methods that call `CommandQueue.acquire(token)` / `.release(token)`
+  on the daemon's event loop. Both handlers submit with `token=token` so
+  the queue dispatches them inside the exclusive session.
+- **Daemon command registry** registers `exclusive_start` / `exclusive_end`
+  → `DeviceOwner.exclusive_start` / `.exclusive_end`.
+- **`DaemonDeviceProxy.exclusive(token)`** — async context manager that
+  issues `exclusive_start` / `exclusive_end` RPCs and returns a token-tagged
+  proxy for nested calls. Usage:
+  ```python
+  async with proxy.exclusive("anim-1") as p:
+      await p.display.show_light(255, 0, 0)
+      await p.lan.set_brightness(80)
+  ```
+- **Tests**: 6 new daemon-bridge tests (exclusive start/end, token
+  validation, token-through-device_call, proxy exclusive context,
+  RPC plumbing). Suite 1085 / 75 / 0 (+6).
+
+### Files touched
+
+- `divoom_daemon/daemon_protocol.py` — `device_call` accepts `token`;
+  `exclusive_start`/`exclusive_end` methods on `DaemonClient`.
+- `divoom_daemon/device_owner.py` — `exclusive_start`/`exclusive_end`
+  handlers; `device_call` forwards `token` to `_run_device`.
+- `divoom_daemon/daemon.py` — `exclusive_start`/`exclusive_end` in
+  command registry.
+- `divoom_daemon/daemon_client.py` — `DaemonDeviceProxy.exclusive()` ctx
+  manager; `__call__`/`__getattr__` propagate `_token`.
+- `tests/test_daemon_bridge.py` — 6 new exclusive-mode tests.
+- `tests/test_gui_api.py` — updated `device_call` mock expectation for
+  new `token` kwarg.
+- `docs/PLANNING_ROUND29.md` — new.
+
+---
+
 ## Round 28 — 2026-06-08 (MCP daemon-route + scan filter + tab spacing + bitmap font)
 
 ### Tab layout fixes (r2 — follow-up to the spacing centralisation)
