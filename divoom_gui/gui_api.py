@@ -98,6 +98,30 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         future = asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
         return future.result()
 
+    def _target(self):
+        """Return the active device target (wall or single), rebuilding the wall
+        if in wall mode. Returns None if no target is available."""
+        if getattr(self, "current_target_mode", "single") == "wall":
+            if not self._rebuild_wall_instance():
+                return None
+            return self.wall_instance
+        return self.current_divoom
+
+    def _dispatch(self, build_coro):
+        """Dispatch a coroutine to the active target (wall or single device).
+        
+        Args:
+            build_coro: A callable that takes a target (Divoom or DivoomWall) and
+                returns an awaitable coroutine.
+        
+        Returns:
+            The result of the coroutine, or False if no target is available.
+        """
+        target = self._target()
+        if target is None:
+            return False
+        return self._run_async(build_coro(target))
+
     def _schedule_async(self, coro) -> None:
         """Fire-and-forget: schedule ``coro`` on the main asyncio loop
         without blocking the caller. Used by the macOS notification
@@ -182,13 +206,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def set_solid_light(self, color: str, brightness: int, mode_type: int = 0) -> bool:
         logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness}, mode_type={mode_type})...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.set_light(color, brightness))
-            elif self.current_divoom:
-                return self._run_async(self.current_divoom.display.show_light(color, brightness, True, mode_type))
-            return False
+            return self._dispatch(lambda t: t.set_light(color, brightness)
+                                if t is self.wall_instance else t.display.show_light(color, brightness, True, mode_type))
         except Exception as e:
             logger.error(f"Light setting failed: {e}")
             return False
@@ -196,13 +215,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def set_clock(self, style: int, color: str = None) -> bool:
         logger.info(f"GUI Action: Applying clock style {style} with color {color}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.show_clock(clock=style))
-            elif self.current_divoom:
-                return self._run_async(self.current_divoom.display.show_clock(clock=style, color=color))
-            return False
+            return self._dispatch(lambda t: t.show_clock(clock=style)
+                                if t is self.wall_instance else t.display.show_clock(clock=style, color=color))
         except Exception as e:
             logger.error(f"Clock setting failed: {e}")
             return False
@@ -210,15 +224,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def switch_channel(self, channel: str) -> bool:
         logger.info(f"GUI Action: Switching channel to {channel}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.switch_channel(channel))
-
-            target = self.current_divoom
-            if not target:
-                return False
-            return self._run_async(target.display.switch_channel(channel))
+            return self._dispatch(lambda t: t.switch_channel(channel)
+                                if t is self.wall_instance else t.display.switch_channel(channel))
         except Exception as e:
             logger.error(f"Channel switch failed: {e}")
             return False
@@ -226,14 +233,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def set_vj_effect(self, number: int) -> bool:
         logger.info(f"GUI Action: Applying VJ effect {number}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.show_effects(number=int(number)))
-            target = self.current_divoom
-            if not target:
-                return False
-            return self._run_async(target.display.show_effects(number=int(number)))
+            return self._dispatch(lambda t: t.show_effects(number=int(number))
+                                if t is self.wall_instance else t.display.show_effects(number=int(number)))
         except Exception as e:
             logger.error(f"VJ effect failed: {e}")
             return False
@@ -241,14 +242,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def set_visualization(self, number: int) -> bool:
         logger.info(f"GUI Action: Applying visualizer {number}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.show_visualization(number=int(number)))
-            target = self.current_divoom
-            if not target:
-                return False
-            return self._run_async(target.display.show_visualization(number=int(number)))
+            return self._dispatch(lambda t: t.show_visualization(number=int(number))
+                                if t is self.wall_instance else t.display.show_visualization(number=int(number)))
         except Exception as e:
             logger.error(f"Visualizer failed: {e}")
             return False
@@ -703,9 +698,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:
-            if not self._rebuild_wall_instance(cell_size):
-                return False
-            return self._run_async(self.wall_instance.show_image(file_path))
+            return self._dispatch(lambda t: t.show_image(file_path))
         except Exception as e:
             logger.error(f"Wall display failed: {e}")
             return False
@@ -736,18 +729,9 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         logger.info(f"GUI Action: Setting brightness to {brightness}...")
         try:
             val = int(brightness)
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.set_brightness(val))
-
-            target = self.current_divoom
-            if not target:
-                return False
-            if target.lan:
-                return self._run_async(target.lan.set_brightness(val))
-            else:
-                return self._run_async(target.device.set_brightness(val))
+            return self._dispatch(lambda t: t.set_brightness(val)
+                                if t is self.wall_instance else
+                                (t.lan.set_brightness(val) if t.lan else t.device.set_brightness(val)))
         except Exception as e:
             logger.error(f"Brightness setting failed: {e}")
             return False
@@ -821,15 +805,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         logger.info(f"GUI Action: Setting volume to {volume}...")
         try:
             val = max(0, min(15, int(volume)))
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.set_volume(val))
-
-            target = self.current_divoom
-            if not target:
-                return False
-            return self._run_async(target.music.set_volume(val))
+            return self._dispatch(lambda t: t.set_volume(val)
+                                if t is self.wall_instance else t.music.set_volume(val))
         except Exception as e:
             logger.error(f"Volume setting failed: {e}")
             return False
@@ -872,15 +849,8 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def display_custom_art(self, file_path: str) -> bool:
         logger.info(f"GUI Action: Pushing custom art {file_path!r}...")
         try:
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.show_image(file_path))
-
-            target = self.current_divoom
-            if not target:
-                return False
-            return self._run_async(target.display.show_image(file_path))
+            return self._dispatch(lambda t: t.show_image(file_path)
+                                if t is self.wall_instance else t.display.show_image(file_path))
         except Exception as e:
             logger.error(f"Failed to display custom art: {e}")
             return False
