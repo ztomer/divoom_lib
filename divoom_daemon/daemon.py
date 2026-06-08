@@ -17,22 +17,18 @@ from __future__ import annotations
 import base64
 import logging
 import os
-import sys
 import tempfile
 import threading
 from pathlib import Path
 from typing import Callable, Optional
 
-from divoom_daemon.daemon_protocol import (
-    DEFAULT_SOCKET_PATH,
-    make_status_event,
-    make_notification_event,
-)
+from divoom_daemon.daemon_protocol import DEFAULT_SOCKET_PATH
 from divoom_daemon.socket_server import SocketServer
+from divoom_daemon.notification_service import NotificationService
 
 logger = logging.getLogger("divoom_daemon")
 
-# Notification-listener states (shared vocabulary with menubar_status).
+# Notification-listener states (re-exported for test compatibility).
 STATE_ACTIVE = "active"
 STATE_IDLE = "idle"
 STATE_ERROR = "error"
@@ -60,9 +56,7 @@ class DivoomDaemon:
         self.host = host
         self.port = port
         self.token = token if token is not None else (os.environ.get("DIVOOM_DAEMON_TOKEN") or None)
-        self._monitor = monitor                 # injectable; lazily built if None
-        self._device_sender = device_sender     # injectable; default = real BLE send
-        self._error: Optional[str] = None
+        self._device_sender = device_sender     # injectable notification sender; default = real BLE
         # R17 P5: the daemon is the SINGLE owner of the BLE device. The GUI is a
         # thin client that proxies device methods through the `device_call` RPC.
         self._device = device                   # injectable (tests); else lazy BLE
@@ -80,77 +74,11 @@ class DivoomDaemon:
             command_handler=self.handle_command,
             status_event_factory=self.status_event,
         )
-
-    # ── monitor (lazy, macOS) ────────────────────────────────────────────
-    def _get_monitor(self):
-        if self._monitor is None:
-            from divoom_daemon.macos_notifications import MacAppRouter, MacNotificationMonitor
-            self._monitor = MacNotificationMonitor(router=MacAppRouter(), poll_interval=1.0)
-        return self._monitor
-
-    # ── status / events ──────────────────────────────────────────────────
-    def _state(self) -> str:
-        if self._error:
-            return STATE_ERROR
-        mon = self._monitor
-        return STATE_ACTIVE if (mon is not None and mon.is_running) else STATE_IDLE
-
-    def _counters(self) -> dict:
-        mon = self._monitor
-        if mon is None:
-            return {"seen": 0, "routed": 0, "dropped": 0}
-        return {
-            "seen": getattr(mon, "records_seen", 0),
-            "routed": getattr(mon, "records_routed", 0),
-            "dropped": getattr(mon, "records_dropped", 0),
-        }
-
-    def status_event(self) -> dict:
-        return make_status_event(self._state(), self._counters())
-
-    # ── notification sink (monitor -> device + broadcast) ────────────────
-    def _sink(self, app_type: int, title: str, body: str) -> None:
-        text = ""
-        if title or body:
-            text = (title or body or "").strip().splitlines()[0] if (title or body) else ""
-        routed = True
-        try:
-            self._send_to_device(app_type, text)
-        except Exception as e:
-            logger.debug(f"device send failed: {e}")
-            routed = False
-        self.broadcast(make_notification_event(app_type, title or "", text, routed))
-        self.broadcast(self.status_event())
-
-    def _send_to_device(self, app_type: int, text: str) -> None:
-        if self._device_sender is not None:
-            self._device_sender(app_type, text)
-            return
-        self._send_to_device_ble(app_type, text)  # pragma: no cover (needs BLE)
-
-    def _send_to_device_ble(self, app_type: int, text: str) -> None:  # pragma: no cover
-        import asyncio
-        from divoom_lib.divoom import Divoom
-        from divoom_lib.utils import discovery
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            if not getattr(self, "_device", None) or not self._device.is_connected:
-                mac = self.mac
-                if not mac:
-                    devs = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=3.0))
-                    if not devs:
-                        return
-                    mac = devs[0]["address"]
-                self._device = Divoom(mac=mac, logger=logger, use_ios_le_protocol=False)
-                loop.run_until_complete(self._device.connect())
-            if text:
-                loop.run_until_complete(self._device.notification.show_notification_text(int(app_type), text))
-            else:
-                loop.run_until_complete(self._device.notification.show_notification(int(app_type)))
-        finally:
-            loop.close()
+        self._notifier = NotificationService(
+            broadcast=self._socket_server.broadcast,
+            send_notification=self._send_to_device,
+            monitor=monitor,
+        )
 
     # ── command registry ─────────────────────────────────────────────────
     def _init_registry(self) -> None:
@@ -158,9 +86,9 @@ class DivoomDaemon:
         r["ping"] = lambda _: {"success": True}
         r["get_status"] = lambda _: {"success": True, **self.status_event()}
         r["notification_status"] = r["get_status"]
-        r["start_notifications"] = lambda _: self._cmd_start()
-        r["stop_notifications"] = lambda _: self._cmd_stop()
-        r["set_routing"] = self._cmd_set_routing
+        r["start_notifications"] = lambda _: self._notifier.start()
+        r["stop_notifications"] = lambda _: self._notifier.stop()
+        r["set_routing"] = self._notifier.set_routing
         r["device_call"] = self._cmd_device_call
         r["connect"] = self._cmd_connect
         r["disconnect"] = lambda _: self._cmd_disconnect()
@@ -505,49 +433,46 @@ class DivoomDaemon:
         except Exception as e:
             return {"success": False, "reachable": False, "error": str(e)}
 
-    def _cmd_start(self) -> dict:
-        # Notification monitoring is macOS-only (reads the Notification Center
-        # SQLite DB). On other platforms with no injected monitor, report a clean
-        # "unsupported" idle state rather than an error — the rest of the daemon
-        # (device control, network server) works fine on Linux.
-        if self._monitor is None and sys.platform != "darwin":
-            self._error = None
-            logger.info("notification monitor unsupported on %s; running idle", sys.platform)
-            ev = self.status_event()
-            self.broadcast(ev)
-            return {"success": True, **ev, "unsupported": True}
-        try:
-            mon = self._get_monitor()
-            if not mon.is_running:
-                mon.start(sink=self._sink)
-            self._error = None
-        except Exception as e:
-            self._error = str(e)
-            logger.warning(f"start_notifications: {e}")
-        ev = self.status_event()
-        self.broadcast(ev)
-        return {"success": self._error is None, **ev, "error": self._error}
+    def _cleanup(self) -> None:
+        self._notifier.stop_monitor()
+        if self._loop is not None:
+            try:
+                self._loop.call_soon_threadsafe(self._loop.stop)
+            except Exception:
+                pass
 
-    def _cmd_stop(self) -> dict:
-        mon = self._monitor
-        if mon is not None and mon.is_running:
-            mon.stop()
-        self._error = None
-        ev = self.status_event()
-        self.broadcast(ev)
-        return {"success": True, **ev}
+    def status_event(self) -> dict:
+        return self._notifier.status_event()
 
-    def _cmd_set_routing(self, args: dict) -> dict:
+    def _send_to_device(self, app_type: int, text: str) -> None:
+        if self._device_sender is not None:
+            self._device_sender(app_type, text)
+            return
+        self._send_to_device_ble(app_type, text)  # pragma: no cover (needs BLE)
+
+    def _send_to_device_ble(self, app_type: int, text: str) -> None:  # pragma: no cover
+        import asyncio
+        from divoom_lib.divoom import Divoom
+        from divoom_lib.utils import discovery
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            from divoom_daemon.macos_notifications import save_routing_table, MacAppRouter
-            rules = args.get("rules") or []
-            save_routing_table([tuple(r) for r in rules])
-            mon = self._get_monitor()
-            mon._router = MacAppRouter(rules=[tuple(r) for r in rules])
-            return {"success": True}
-        except Exception as e:
-            logger.warning(f"set_routing: {e}")
-            return {"success": False, "error": str(e)}
+            if not getattr(self, "_device", None) or not self._device.is_connected:
+                mac = self.mac
+                if not mac:
+                    devs = loop.run_until_complete(discovery.discover_all_divoom_devices(timeout=3.0))
+                    if not devs:
+                        return
+                    mac = devs[0]["address"]
+                self._device = Divoom(mac=mac, logger=logger, use_ios_le_protocol=False)
+                loop.run_until_complete(self._device.connect())
+            if text:
+                loop.run_until_complete(self._device.notification.show_notification_text(int(app_type), text))
+            else:
+                loop.run_until_complete(self._device.notification.show_notification(int(app_type)))
+        finally:
+            loop.close()
 
     # ── subscriber fan-out (delegated to SocketServer) ───────────────────
     def broadcast(self, event: dict) -> None:
@@ -564,16 +489,6 @@ class DivoomDaemon:
         self._socket_server.stop()
         self._cleanup()
 
-    def _cleanup(self) -> None:
-        mon = self._monitor
-        if mon is not None and getattr(mon, "is_running", False):
-            mon.stop()
-        if self._loop is not None:
-            try:
-                self._loop.call_soon_threadsafe(self._loop.stop)
-            except Exception:
-                pass
-
 
 def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH,
         host: Optional[str] = None, port: Optional[int] = None,
@@ -582,7 +497,7 @@ def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH,
     daemon = DivoomDaemon(mac=mac, socket_path=socket_path,
                           host=host, port=port, token=token)
     # Auto-start the notification listener on launch (best-effort; idle on non-mac).
-    daemon._cmd_start()
+    daemon._notifier.start()
     try:
         daemon.serve_forever()
     except KeyboardInterrupt:
