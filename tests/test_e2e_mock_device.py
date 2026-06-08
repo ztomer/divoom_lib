@@ -169,6 +169,104 @@ async def test_written_frames_are_valid_framing():
 
 
 @pytest.mark.asyncio
+async def test_weather_set_emits_0x5f_frame():
+    """R14 §1: Weather.set() sends 0x5F command with [temp_byte, weather_type].
+    Encodes negative temps as two's complement, positive as-is."""
+    dev, mock = await _connected_divoom()
+    from divoom_lib.system.weather import Weather
+    w = Weather(dev)
+    ok = await w.set(22, 1)
+    assert ok is True
+    frames = _decoded_frames(mock)
+    cmds = [f["command_id"] for f in frames]
+    assert models.COMMANDS["set temp"] in cmds
+    weather_cmd = next(f for f in frames if f["command_id"] == models.COMMANDS["set temp"])
+    payload = list(weather_cmd["payload"])
+    assert payload[0] == 22, f"Expected temp byte 22, got {payload[0]}"
+    assert payload[1] == 1, f"Expected weather type 1, got {payload[1]}"
+
+
+@pytest.mark.asyncio
+async def test_weather_set_negative_temp():
+    """Negative temps encoded as 256 + celsius (two's complement byte)."""
+    dev, mock = await _connected_divoom()
+    from divoom_lib.system.weather import Weather
+    w = Weather(dev)
+    ok = await w.set(-5, 1)
+    assert ok is True
+    frames = _decoded_frames(mock)
+    weather_cmd = next(f for f in frames if f["command_id"] == models.COMMANDS["set temp"])
+    payload = list(weather_cmd["payload"])
+    assert payload[0] == 251, f"Expected 251 for -5°C, got {payload[0]}"
+
+
+@pytest.mark.asyncio
+async def test_weather_set_rejects_out_of_range():
+    """Temps outside -127..128 raise ValueError."""
+    dev, _ = await _connected_divoom()
+    from divoom_lib.system.weather import Weather
+    w = Weather(dev)
+    with pytest.raises(ValueError):
+        await w.set(200, 1)
+
+
+@pytest.mark.asyncio
+async def test_weather_set_proxy_daemon_roundtrip():
+    """Weather push through the daemon proxy: WidgetsApi.push_weather
+    path must resolve correctly. Uses the in-process daemon from
+    test_daemon_bridge's fixture pattern."""
+    import os, threading, time
+    import asyncio
+    from divoom_daemon.daemon import DivoomDaemon
+    from divoom_daemon.daemon_protocol import DaemonClient
+    from divoom_gui.daemon_bridge import DaemonDeviceProxy
+    from divoom_lib.system.weather import Weather
+
+    sp = f"/tmp/divoom_weather_e2e_{os.getpid()}.sock"
+    if os.path.exists(sp):
+        os.remove(sp)
+
+    class _FakeWeatherDevice:
+        def __init__(self):
+            self.is_connected = True
+            self.commands = []
+        async def send_command(self, cmd, args=None):
+            self.commands.append((cmd, args))
+            return True
+        @property
+        def logger(self):
+            import logging
+            return logging.getLogger(__name__)
+
+    dev = _FakeWeatherDevice()
+    d = DivoomDaemon(mac="11:22:33:44:55:66", socket_path=sp, monitor=object(), device=dev)
+    t = threading.Thread(target=d.serve_forever, daemon=True)
+    t.start()
+    for _ in range(50):
+        if os.path.exists(sp):
+            break
+        time.sleep(0.02)
+
+    try:
+        client = DaemonClient(sp)
+        proxy = DaemonDeviceProxy(client)
+        w = Weather(proxy)
+        ok = await w.set(22, 1)
+        assert ok is True, "weather set through proxy returned False"
+        # Verify the daemon received the send_command call with the
+        # correct wire args (0x5F, [22, 1]).
+        assert len(dev.commands) >= 1
+        cmd, args = dev.commands[-1]
+        assert cmd == 0x5F, f"Expected 0x5F, got {cmd:#04x}"
+        assert args == [22, 1], f"Expected [22, 1], got {args}"
+    finally:
+        d.stop()
+        t.join(timeout=3.0)
+        if os.path.exists(sp):
+            os.remove(sp)
+
+
+@pytest.mark.asyncio
 async def test_clock_dial_set_and_read_back_roundtrip():
     """Verify that we can set the clock style and read it back from mock device."""
     dev, mock = await _connected_divoom()

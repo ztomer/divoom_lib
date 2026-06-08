@@ -106,6 +106,19 @@ def test_daemon_alive_false_for_missing():
     assert daemon_alive(f"/tmp/divoom_absent_{os.getpid()}.sock") is False
 
 
+def test_proxy_conn_mac_resolves_from_device_status(live_daemon):
+    """``DaemonDeviceProxy._conn.mac`` resolves the MAC string from
+    ``device_status`` (R17 §P5). The bare ``.mac`` access returns a child
+    proxy because ``mac`` is NOT in ``_STATUS_ATTRS`` — call sites that
+    need the string must go through ``_conn.mac``."""
+    _, _, sp = live_daemon
+    proxy = DaemonDeviceProxy(DaemonClient(sp))
+    # _conn is in STATUS_ATTRS; returns _ConnView(mac_field_from_status).
+    conn = proxy._conn
+    # With no mac set on DeviceOwner, device_status returns None.
+    assert conn.mac is None
+    assert not isinstance(conn.mac, DaemonDeviceProxy)
+
 def test_ensure_daemon_returns_client_when_already_up(live_daemon):
     _, _, sp = live_daemon
     client = ensure_daemon(sp, spawn=False)

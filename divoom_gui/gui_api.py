@@ -423,7 +423,7 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         empty. Returns a status dict (see ``mcp_server_status()``)."""
         from divoom_gui.mcp_control import MCPController, status_to_dict
         ctl = MCPController.instance()
-        target_mac = mac or (self.current_divoom.mac if self.current_divoom else "")
+        target_mac = mac or (self.current_divoom._conn.mac if self.current_divoom else "")
         if not target_mac:
             return status_to_dict(ctl.status()) | {"error": "no MAC available"}
         return status_to_dict(ctl.start(mac=target_mac))

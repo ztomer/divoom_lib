@@ -28,10 +28,13 @@ Usage::
 """
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from divoom_lib.models import COMMANDS, WeatherType
 from divoom_lib.sender_protocol import CommandSender
+
+logger = logging.getLogger(__name__)
 
 
 class Weather:
@@ -43,7 +46,6 @@ class Weather:
 
     def __init__(self, divoom: CommandSender) -> None:
         self._divoom = divoom
-        self.logger = divoom.logger
         self._temperature: int = 0
         self._weather_type: int = WeatherType.Clear
 
@@ -79,7 +81,7 @@ class Weather:
         wt = int(weather_type)
         self._temperature = int(temperature)
         self._weather_type = wt
-        self.logger.info(
+        logger.info(
             f"Sending weather: temp={temperature}°C (0x{encoded:02X}) "
             f"weather_type={wt} (0x5F)..."
         )

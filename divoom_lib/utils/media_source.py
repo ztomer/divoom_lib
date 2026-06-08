@@ -262,20 +262,14 @@ def render_system_stats_frame(stats: dict, size: int = 16) -> Path:
     if bat is None:
         bat = 100
 
-    cpu_color = (0, 255, 180) if cpu < 70 else (255, 60, 60)
-    mem_color = (90, 170, 255) if mem < 80 else (255, 140, 0)
-    bat_color = (0, 255, 100) if bat > 25 else (255, 60, 60)
+    cpu_color = (255, 200, 0)     # yellow
+    mem_color = (90, 170, 255)    # blue
+    bat_color = (255, 60, 60)     # red
 
     if size <= 16:
-        # CPU Label + Bar at y=1
-        draw.text((1, -1), "C", fill=(255, 255, 255))
-        draw_gauge(6, 1, 9, 3, cpu, cpu_color)
-        # MEM Label + Bar at y=6
-        draw.text((1, 4), "M", fill=(255, 255, 255))
-        draw_gauge(6, 6, 9, 3, mem, mem_color)
-        # BAT Label + Bar at y=11
-        draw.text((1, 9), "B", fill=(255, 255, 255))
-        draw_gauge(6, 11, 9, 3, bat, bat_color)
+        draw_gauge(1, 1, 14, 3, cpu, cpu_color)
+        draw_gauge(1, 6, 14, 3, mem, mem_color)
+        draw_gauge(1, 11, 14, 3, bat, bat_color)
     else:
         # Larger layouts (e.g. 32x32, 64x64)
         scale = size / 32.0
@@ -293,13 +287,10 @@ def render_system_stats_frame(stats: dict, size: int = 16) -> Path:
         if bar_h < 3:
             bar_h = 3
             
-        draw.text((2, y_cpu_text), f"CPU {cpu}%", fill=cpu_color)
         draw_gauge(2, y_cpu_bar, bar_w, bar_h, cpu, cpu_color)
         
-        draw.text((2, y_mem_text), f"MEM {mem}%", fill=mem_color)
         draw_gauge(2, y_mem_bar, bar_w, bar_h, mem, mem_color)
         
-        draw.text((2, y_bat_text), f"BAT {bat}%", fill=bat_color)
         draw_gauge(2, y_bat_bar, bar_w, bar_h, bat, bat_color)
 
     img.save(out_path)
