@@ -1,0 +1,237 @@
+"""ToolsApi — alarm/sleep/timer/countdown/noise/memorial/timeplan/screen/reset (REVIEW §1.2).
+
+Extracts the scheduling/tools/device settings command surface.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import sys
+from divoom_gui.api import ApiBase
+
+logger = logging.getLogger("divoom_gui.api.tools")
+
+
+class ToolsApi(ApiBase):
+    def __init__(self, loop_thread, daemon_client_getter, state_getter):
+        super().__init__(loop_thread, daemon_client_getter, state_getter)
+
+    @staticmethod
+    def _as_bool(v) -> bool:
+        return v in (True, 1, "1", "true", "True", "on", "yes")
+
+    # ── Alarms ────────────────────────────────────────────────────────
+
+    def get_alarms(self) -> str:
+        try:
+            target = self._current_divoom
+            if not target:
+                return json.dumps([])
+            alarms = self._run_async(target.alarm.get_alarm_time())
+            return json.dumps(alarms or [])
+        except Exception as e:
+            logger.error(f"get_alarms failed: {e}")
+            return json.dumps([])
+
+    def set_alarm(self, index: int, enabled, hour: int, minute: int,
+                  week: int = 0, mode: int = 0, trigger_mode: int = 0) -> bool:
+        logger.info(f"GUI Action: Set alarm {index} {int(hour):02d}:{int(minute):02d} "
+                    f"enabled={enabled} week={week}...")
+        try:
+            status = 1 if (enabled in (True, 1, "1", "true", "True")) else 0
+            target = self._current_divoom
+            if not target:
+                return False
+            return bool(self._run_async(target.alarm.set_alarm(
+                int(index), status, int(hour), int(minute), int(week),
+                int(mode), int(trigger_mode))))
+        except Exception as e:
+            logger.error(f"set_alarm failed: {e}")
+            return False
+
+    # ── Sleep Aid ────────────────────────────────────────────────────
+
+    def start_sleep(self, minutes: int = 30, color: str = "#2040ff", volume: int = 10) -> bool:
+        logger.info(f"GUI Action: Start sleep {minutes}min color={color} vol={volume}...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return False
+            from divoom_lib.utils.converters import color_to_rgb_list
+            rgb = color_to_rgb_list(color)
+            return bool(self._run_async(target.sleep.show_sleep(
+                sleeptime=int(minutes), volume=int(volume), color=rgb, on=1)))
+        except Exception as e:
+            logger.error(f"start_sleep failed: {e}")
+            return False
+
+    def stop_sleep(self) -> bool:
+        logger.info("GUI Action: Stop sleep...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return False
+            return bool(self._run_async(target.sleep.show_sleep(on=0)))
+        except Exception as e:
+            logger.error(f"stop_sleep failed: {e}")
+            return False
+
+    # ── Tools (timer/countdown/noise) ────────────────────────────────
+
+    def _tool_call(self, fn, label: str) -> bool:
+        logger.info(f"GUI Action: Tool {label}...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return False
+            return bool(self._run_async(fn(target)))
+        except Exception as e:
+            logger.error(f"tool {label} failed: {e}")
+            return False
+
+    def set_timer(self, action: str = "start") -> bool:
+        from divoom_lib.models import (
+            STI_CTRL_FLAG_TIMER_STARTED, STI_CTRL_FLAG_TIMER_PAUSED, STI_CTRL_FLAG_TIMER_RESET)
+        flag = {"start": STI_CTRL_FLAG_TIMER_STARTED, "stop": STI_CTRL_FLAG_TIMER_PAUSED,
+                "reset": STI_CTRL_FLAG_TIMER_RESET}.get(action, STI_CTRL_FLAG_TIMER_STARTED)
+        return self._tool_call(lambda d: d.timer.set_timer(flag), f"timer {action}")
+
+    def set_countdown(self, action: str = "start", minutes: int = 5, seconds: int = 0) -> bool:
+        from divoom_lib.models import STI_CTRL_FLAG_COUNTDOWN_START, STI_CTRL_FLAG_COUNTDOWN_CANCEL
+        flag = STI_CTRL_FLAG_COUNTDOWN_CANCEL if action == "stop" else STI_CTRL_FLAG_COUNTDOWN_START
+        return self._tool_call(lambda d: d.countdown.set_countdown(flag, int(minutes), int(seconds)),
+                               f"countdown {action} {minutes}:{seconds}")
+
+    def set_noise(self, action: str = "start") -> bool:
+        from divoom_lib.models import STI_CTRL_FLAG_NOISE_START, STI_CTRL_FLAG_NOISE_STOP
+        flag = STI_CTRL_FLAG_NOISE_STOP if action == "stop" else STI_CTRL_FLAG_NOISE_START
+        return self._tool_call(lambda d: d.noise.set_noise(flag), f"noise {action}")
+
+    # ── Device settings ──────────────────────────────────────────────
+
+    def set_hour_type(self, is_24h) -> bool:
+        return self._tool_call(lambda d: d.system.set_hour_type(1 if self._as_bool(is_24h) else 0), "hour type")
+
+    def set_temp_unit(self, fahrenheit) -> bool:
+        return self._tool_call(lambda d: d.device.set_temp_type(1 if self._as_bool(fahrenheit) else 0), "temp unit")
+
+    def sync_time(self) -> bool:
+        from divoom_lib.system.date_time import DateTimeCommand
+        return self._tool_call(lambda d: DateTimeCommand(d).update_date_time(), "time sync")
+
+    def set_device_name(self, name: str) -> bool:
+        return self._tool_call(lambda d: d.device.set_device_name(str(name)), "device name")
+
+    def set_auto_power_off(self, minutes: int) -> bool:
+        from divoom_lib.system.device_settings import DeviceSettings
+        return self._tool_call(lambda d: DeviceSettings(d).set_auto_power_off(int(minutes)), "auto power off")
+
+    def set_low_power(self, on) -> bool:
+        from divoom_lib.system.device_settings import DeviceSettings
+        return self._tool_call(lambda d: DeviceSettings(d).set_low_power_switch(1 if self._as_bool(on) else 0), "low power")
+
+    def set_fm_frequency(self, freq_x10: int) -> bool:
+        return self._tool_call(lambda d: d.radio.set_radio_frequency(int(freq_x10)), "fm")
+
+    def set_memorial(self, index, enabled, month, day, hour, minute, title="") -> bool:
+        on = 1 if self._as_bool(enabled) else 0
+        have = 1 if title else 0
+        return self._tool_call(
+            lambda d: d.alarm.set_memorial_time(int(index), on, int(month), int(day),
+                                                int(hour), int(minute), have, str(title)),
+            "memorial")
+
+    def set_timeplan(self, index, enabled, hour, minute, week=0, channel=0) -> bool:
+        status = 1 if self._as_bool(enabled) else 0
+        return self._tool_call(
+            lambda d: d.timeplan.set_time_manage_info(status, int(hour), int(minute),
+                                                      int(week), int(channel), 0, 0, 10, 0),
+            "timeplan")
+
+    # ── Display orientation + factory reset ──────────────────────────
+
+    def set_screen_dir(self, direction) -> bool:
+        return self._tool_call(lambda d: d.design.set_screen_dir(int(direction)),
+                               "screen direction")
+
+    def set_screen_mirror(self, on) -> bool:
+        return self._tool_call(lambda d: d.design.set_screen_mirror(self._as_bool(on)),
+                               "screen mirror")
+
+    def factory_reset(self, confirm="") -> bool:
+        if str(confirm) != "RESET":
+            logger.warning("factory_reset refused: missing/invalid confirm token")
+            return False
+        return self._tool_call(lambda d: d.design.factory_reset(), "factory reset")
+
+    # ── Scoreboard (uses _tool_call pattern) ────────────────────────
+
+    def set_scoreboard(self, on_off: int, red: int = 0, blue: int = 0) -> bool:
+        logger.info(f"GUI Action: Setting scoreboard on_off={on_off} red={red} blue={blue}...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return False
+            return self._run_async(target.scoreboard.set_scoreboard(int(on_off), int(red), int(blue)))
+        except Exception as e:
+            logger.error(f"Scoreboard set failed: {e}")
+            return False
+
+    def get_scoreboard_state(self):
+        logger.info("GUI Action: Getting current scoreboard state...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return None
+            return self._run_async(target.scoreboard.get_scoreboard())
+        except Exception as e:
+            logger.error(f"Scoreboard get failed: {e}")
+            return None
+
+    # ── Volume / brightness getters (read-only, single device) ──────
+
+    def get_volume(self):
+        logger.info("GUI Action: Getting current volume...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return None
+            return self._run_async(target.music.get_volume())
+        except Exception as e:
+            logger.error(f"Volume get failed: {e}")
+            return None
+
+    def get_brightness(self):
+        logger.info("GUI Action: Getting current brightness...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return None
+            return self._run_async(target.device.get_brightness())
+        except Exception as e:
+            logger.error(f"Brightness get failed: {e}")
+            return None
+
+    def get_work_mode(self):
+        logger.info("GUI Action: Getting current work mode...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return None
+            return self._run_async(target.device.get_work_mode())
+        except Exception as e:
+            logger.error(f"Work mode get failed: {e}")
+            return None
+
+    def send_notification(self, app_type, text="") -> bool:
+        t = int(app_type)
+        if not (1 <= t <= 14):
+            logger.warning(f"send_notification: app_type {t} out of range 1-14")
+            return False
+        msg = str(text or "").strip()
+        if msg:
+            return self._tool_call(
+                lambda d: d.notification.show_notification_text(t, msg),
+                "notification")
+        return self._tool_call(
+            lambda d: d.notification.show_notification(t), "notification")

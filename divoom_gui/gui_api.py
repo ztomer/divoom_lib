@@ -1,38 +1,24 @@
-# gui/gui_api.py
-
 import json
 import logging
 import asyncio
 import sys
 import webview
-import threading
-import time
 from pathlib import Path
 
-from divoom_lib.divoom import Divoom
-from divoom_lib.wall import DivoomWall
 from divoom_lib import divoom_auth
 
-# Import mixins
 from presets_manager import PresetsManagerMixin
 from media_sync import MediaSyncMixin
 from scanner_mixin import ScannerMixin
 
+from divoom_gui.api import AsyncLoopThread
+from divoom_gui.api.connection import ConnectionApi
+from divoom_gui.api.lighting import LightingApi
+from divoom_gui.api.tools import ToolsApi
+from divoom_gui.api.widgets import WidgetsApi
+from divoom_gui.api.window import WindowApi
+
 logger = logging.getLogger("divoom_gui")
-
-class AsyncLoopThread(threading.Thread):
-    def __init__(self):
-        super().__init__(daemon=True)
-        self.loop = asyncio.new_event_loop()
-        self.ready = threading.Event()
-
-    def run(self):
-        asyncio.set_event_loop(self.loop)
-        self.ready.set()
-        self.loop.run_forever()
-
-    def stop(self):
-        self.loop.call_soon_threadsafe(self.loop.stop)
 
 class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     """The PyWebView JS api bridge orchestrator."""
@@ -43,29 +29,25 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
 
         self.current_divoom = None
         self.discovered_list = []
-        self.wall_slots = {}  # "mac" -> {"x": x, "y": y, "width": w, "height": h, "size": size}
+        self.wall_slots = {}
         self.wall_instance = None
         self.cached_creds = None
         self.device_pw = 0
         self.device_id = 0
-        self.window = None  # Reference to pywebview Window instance
+        self.window = None
 
         self.music_sync_active = False
         self.music_thread = None
         self.current_track_cache = None
         self.current_target_mode = "single"
 
-        # R17 P5 full cutover: the daemon is the SOLE BLE owner. The GUI proxies
-        # all device work through it (auto-spawning one if needed).
         self._daemon_client = None
 
-        # Load credentials on startup
         try:
             self.cached_creds = divoom_auth.get_credentials()
         except Exception as e:
             logger.warning(f"Failed to load credentials on startup: {e}")
 
-        # Load virtual device details for gallery API
         device_cache_path = Path.home() / ".config" / "divoom-control" / "virtual_device.json"
         if not device_cache_path.exists():
             device_cache_path = Path(__file__).parent.parent / "api_scraper" / "divoom_docs" / "virtual_device.json"
@@ -78,6 +60,17 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             except Exception as e:
                 logger.warning(f"Failed to load virtual device: {e}")
 
+        self._wire_collaborators()
+
+    def _wire_collaborators(self):
+        _state = lambda: self.__dict__
+        _dc = lambda: self._daemon_client
+        self.connection = ConnectionApi(self.loop_thread, _dc, _state)
+        self.lighting = LightingApi(self.loop_thread, _dc, _state)
+        self.tools = ToolsApi(self.loop_thread, _dc, _state)
+        self.widgets = WidgetsApi(self.loop_thread, _dc, _state)
+        self.window_mgr = WindowApi(self.loop_thread, _dc, _state)
+
     def _client(self):
         """Return a live DaemonClient, auto-spawning the daemon if needed (R17
         P5). Cached; ``None`` only if the daemon can't be reached/started."""
@@ -86,41 +79,9 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             self._daemon_client = ensure_daemon()
         return self._daemon_client
 
-    def _device_status(self) -> dict:
-        """Snapshot of the daemon-owned device: {connected, mac, lan_ip, wall}."""
-        client = self._client()
-        if client is None:
-            return {"connected": False, "mac": None, "lan_ip": None, "wall": False}
-        st = client.device_status()
-        return st if st.get("success") else {"connected": False, "mac": None, "lan_ip": None, "wall": False}
-
     def _run_async(self, coro):
         future = asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
         return future.result()
-
-    def _target(self):
-        """Return the active device target (wall or single), rebuilding the wall
-        if in wall mode. Returns None if no target is available."""
-        if getattr(self, "current_target_mode", "single") == "wall":
-            if not self._rebuild_wall_instance():
-                return None
-            return self.wall_instance
-        return self.current_divoom
-
-    def _dispatch(self, build_coro):
-        """Dispatch a coroutine to the active target (wall or single device).
-        
-        Args:
-            build_coro: A callable that takes a target (Divoom or DivoomWall) and
-                returns an awaitable coroutine.
-        
-        Returns:
-            The result of the coroutine, or False if no target is available.
-        """
-        target = self._target()
-        if target is None:
-            return False
-        return self._run_async(build_coro(target))
 
     def _schedule_async(self, coro) -> None:
         """Fire-and-forget: schedule ``coro`` on the main asyncio loop
@@ -129,412 +90,115 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
 
     def get_transport_status(self) -> str:
-        """Return live status of all four transport layers as JSON."""
-        st = self._device_status()
-        lan_ip = st.get("lan_ip")
-        mac = st.get("mac")
-        ble_connected = bool(st.get("connected") and not lan_ip)
-        cloud_ok = bool(self.cached_creds and self.cached_creds.is_valid())
-        # Note: the GUI's updateTransportPanel (settings.js) reads only
-        # ``available`` and ``detail`` from this dict. ``badge`` (emoji)
-        # and ``color`` (its hex) were removed in R14 §6; the GUI uses
-        # CSS-driven dots via the `transport-dot active/inactive` class.
-        return json.dumps({
-            "ble": {"available": ble_connected, "label": "Bluetooth", "description": "Bluetooth — 100% local, never leaves your machine.", "detail": mac if ble_connected else None},
-            "lan": {"available": bool(lan_ip), "label": "Local Network", "description": "Local Network — 100% local, WiFi-capable devices only.", "detail": f"{lan_ip}:9000" if lan_ip else "No device IP configured"},
-            "cloud": {"available": cloud_ok, "label": "Divoom Cloud", "description": "Divoom Cloud — appin.divoom-gz.com, Divoom's servers, requires account.", "detail": "Authenticated" if cloud_ok else "Not authenticated"},
-            "external": {"available": True, "label": "Public Cloud", "description": "Public Cloud — 3rd-party APIs (weather, stocks), no login required.", "detail": "Available"}
-        })
+        return self.connection.get_transport_status()
 
     def save_lan_config(self, device_ip: str, local_token: int) -> bool:
-        logger.info(f"GUI Action: Saving LAN config ip={device_ip} token={local_token}...")
-        try:
-            import configparser
-            config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
-            config_file.parent.mkdir(parents=True, exist_ok=True)
-            cfg = configparser.ConfigParser()
-            if config_file.exists():
-                cfg.read(config_file)
-            if "lan" not in cfg:
-                cfg["lan"] = {}
-            cfg["lan"]["device_ip"] = device_ip
-            cfg["lan"]["local_token"] = str(local_token)
-            with open(config_file, "w") as f:
-                cfg.write(f)
-            # The daemon owns the device; the saved LAN config is applied the
-            # next time a LAN device is connected (connect_device(lan_ip=...)).
-            return True
-        except Exception as e:
-            logger.error(f"Failed to save LAN config: {e}")
-            return False
+        return self.connection.save_lan_config(device_ip, local_token)
 
     def probe_lan(self) -> str:
-        logger.info("GUI Action: Probing LAN transport reachability (daemon)...")
-        try:
-            client = self._client()
-            if client is None:
-                return json.dumps({"reachable": False, "detail": "Daemon unavailable."})
-            reply = client.probe_lan()
-            ip = reply.get("device_ip")
-            if not ip and not reply.get("reachable"):
-                return json.dumps({"reachable": False, "detail": "No LAN IP configured. Save a device IP first."})
-            ok = bool(reply.get("reachable"))
-            return json.dumps({
-                "reachable": ok,
-                "detail": f"{' Connected' if ok else ' Unreachable'} — {ip}:9000",
-            })
-        except Exception as e:
-            return json.dumps({"reachable": False, "detail": str(e)})
+        return self.connection.probe_lan()
 
     def minimize_window(self) -> None:
-        if self.window:
-            self.window.minimize()
+        self.window_mgr.minimize_window()
 
     def maximize_window(self) -> None:
-        if self.window:
-            self.window.toggle_fullscreen()
+        self.window_mgr.maximize_window()
 
     def close_window(self) -> None:
-        if hasattr(self, "loop_thread"):
-            self.loop_thread.stop()
-        if self.window:
-            def _destroy():
-                time.sleep(0.1)
-                self.window.destroy()
-            threading.Thread(target=_destroy, daemon=True).start()
+        self.window_mgr.close_window()
 
     def set_solid_light(self, color: str, brightness: int, mode_type: int = 0) -> bool:
-        logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness}, mode_type={mode_type})...")
-        try:
-            return self._dispatch(lambda t: t.set_light(color, brightness)
-                                if t is self.wall_instance else t.display.show_light(color, brightness, True, mode_type))
-        except Exception as e:
-            logger.error(f"Light setting failed: {e}")
-            return False
+        return self.lighting.set_solid_light(color, brightness, mode_type)
 
     def set_clock(self, style: int, color: str = None) -> bool:
-        logger.info(f"GUI Action: Applying clock style {style} with color {color}...")
-        try:
-            return self._dispatch(lambda t: t.show_clock(clock=style)
-                                if t is self.wall_instance else t.display.show_clock(clock=style, color=color))
-        except Exception as e:
-            logger.error(f"Clock setting failed: {e}")
-            return False
+        return self.lighting.set_clock(style, color)
 
     def switch_channel(self, channel: str) -> bool:
-        logger.info(f"GUI Action: Switching channel to {channel}...")
-        try:
-            return self._dispatch(lambda t: t.switch_channel(channel)
-                                if t is self.wall_instance else t.display.switch_channel(channel))
-        except Exception as e:
-            logger.error(f"Channel switch failed: {e}")
-            return False
+        return self.lighting.switch_channel(channel)
 
     def set_vj_effect(self, number: int) -> bool:
-        logger.info(f"GUI Action: Applying VJ effect {number}...")
-        try:
-            return self._dispatch(lambda t: t.show_effects(number=int(number))
-                                if t is self.wall_instance else t.display.show_effects(number=int(number)))
-        except Exception as e:
-            logger.error(f"VJ effect failed: {e}")
-            return False
+        return self.lighting.set_vj_effect(number)
 
     def set_visualization(self, number: int) -> bool:
-        logger.info(f"GUI Action: Applying visualizer {number}...")
-        try:
-            return self._dispatch(lambda t: t.show_visualization(number=int(number))
-                                if t is self.wall_instance else t.display.show_visualization(number=int(number)))
-        except Exception as e:
-            logger.error(f"Visualizer failed: {e}")
-            return False
+        return self.lighting.set_visualization(number)
 
     def push_text(self, text: str, color: str = "#FFFFFF", font_size: int = 1,
                   speed: int = 50, effect_style: int = 1) -> bool:
-        """Round 7 — Text Channel: type & push scrolling text to the device.
-
-        Runs the full LPWA (0x87) sequence: display-box → font → color → speed →
-        effect → content. effect_style: 0 static, 1 scroll-left, 2 scroll-up,
-        3 hold, 4 marquee (device-dependent)."""
-        logger.info(f"GUI Action: Push text {text!r} (color={color}, speed={speed}, effect={effect_style})...")
-        from divoom_lib.models import (
-            LPWA_CONTROL_DISPLAY_BOX, LPWA_CONTROL_FONT, LPWA_CONTROL_COLOR,
-            LPWA_CONTROL_SPEED, LPWA_CONTROL_EFFECTS, LPWA_CONTROL_CONTENT,
-        )
-
-        async def _push(divoom, size: int) -> bool:
-            t = divoom.text
-            box = 0
-            await t.set_light_phone_word_attr(LPWA_CONTROL_DISPLAY_BOX, x=0, y=0,
-                                              width=size, height=size, text_box_id=box)
-            await t.set_light_phone_word_attr(LPWA_CONTROL_FONT, font_size=int(font_size), text_box_id=box)
-            await t.set_light_phone_word_attr(LPWA_CONTROL_COLOR, color=color, text_box_id=box)
-            await t.set_light_phone_word_attr(LPWA_CONTROL_SPEED, speed=int(speed), text_box_id=box)
-            await t.set_light_phone_word_attr(LPWA_CONTROL_EFFECTS, effect_style=int(effect_style))
-            res = await t.set_light_phone_word_attr(LPWA_CONTROL_CONTENT, text_content=str(text), text_box_id=box)
-            return res is not False
-
-        try:
-            if not text or not str(text).strip():
-                return False
-            if getattr(self, "current_target_mode", "single") == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self.wall_instance.push_text(
-                    str(text), color=color, font_size=int(font_size),
-                    speed=int(speed), effect_style=int(effect_style)))
-
-            target = self.current_divoom
-            if not target:
-                return False
-            size = self._active_device_size() if hasattr(self, "_active_device_size") else 16
-            return self._run_async(_push(target, int(size)))
-        except Exception as e:
-            logger.error(f"push_text failed: {e}")
-            return False
-
-    # ── Round 7: Alarms (scheduling/alarm.py, 0x42/0x43) ──────────────────
+        return self.lighting.push_text(text, color, font_size, speed, effect_style)
 
     def get_alarms(self) -> str:
-        """Read the device's 10 alarm slots as JSON. May be empty if the device
-        doesn't answer the 0x42 query (see read-back limitation)."""
-        try:
-            target = self.current_divoom
-            if not target:
-                return json.dumps([])
-            alarms = self._run_async(target.alarm.get_alarm_time())
-            return json.dumps(alarms or [])
-        except Exception as e:
-            logger.error(f"get_alarms failed: {e}")
-            return json.dumps([])
+        return self.tools.get_alarms()
 
     def set_alarm(self, index: int, enabled, hour: int, minute: int,
                   week: int = 0, mode: int = 0, trigger_mode: int = 0) -> bool:
-        """Set one alarm slot (0x43). `week` is a 7-bit weekday mask (bit0=Mon)."""
-        logger.info(f"GUI Action: Set alarm {index} {int(hour):02d}:{int(minute):02d} "
-                    f"enabled={enabled} week={week}...")
-        try:
-            status = 1 if (enabled in (True, 1, "1", "true", "True")) else 0
-            target = self.current_divoom
-            if not target:
-                return False
-            return bool(self._run_async(target.alarm.set_alarm(
-                int(index), status, int(hour), int(minute), int(week),
-                int(mode), int(trigger_mode))))
-        except Exception as e:
-            logger.error(f"set_alarm failed: {e}")
-            return False
-
-    # ── Round 7: Sleep Aid (scheduling/sleep.py) ──────────────────────────
+        return self.tools.set_alarm(index, enabled, hour, minute, week, mode, trigger_mode)
 
     def start_sleep(self, minutes: int = 30, color: str = "#2040ff", volume: int = 10) -> bool:
-        """Begin the sleep fade: dim to `color` over `minutes`, at `volume`."""
-        logger.info(f"GUI Action: Start sleep {minutes}min color={color} vol={volume}...")
-        try:
-            target = self.current_divoom
-            if not target:
-                return False
-            from divoom_lib.utils.converters import color_to_rgb_list
-            rgb = color_to_rgb_list(color)
-            return bool(self._run_async(target.sleep.show_sleep(
-                sleeptime=int(minutes), volume=int(volume), color=rgb, on=1)))
-        except Exception as e:
-            logger.error(f"start_sleep failed: {e}")
-            return False
+        return self.tools.start_sleep(minutes, color, volume)
 
     def stop_sleep(self) -> bool:
-        logger.info("GUI Action: Stop sleep...")
-        try:
-            target = self.current_divoom
-            if not target:
-                return False
-            return bool(self._run_async(target.sleep.show_sleep(on=0)))
-        except Exception as e:
-            logger.error(f"stop_sleep failed: {e}")
-            return False
-
-    # ── Round 7: Tools — timer / countdown / noise (tools/*) ──────────────
+        return self.tools.stop_sleep()
 
     def set_timer(self, action: str = "start") -> bool:
-        """Stopwatch control: action in {start, stop, reset}."""
-        from divoom_lib.models import (
-            STI_CTRL_FLAG_TIMER_STARTED, STI_CTRL_FLAG_TIMER_PAUSED, STI_CTRL_FLAG_TIMER_RESET)
-        flag = {"start": STI_CTRL_FLAG_TIMER_STARTED, "stop": STI_CTRL_FLAG_TIMER_PAUSED,
-                "reset": STI_CTRL_FLAG_TIMER_RESET}.get(action, STI_CTRL_FLAG_TIMER_STARTED)
-        return self._tool_call(lambda d: d.timer.set_timer(flag), f"timer {action}")
+        return self.tools.set_timer(action)
 
     def set_countdown(self, action: str = "start", minutes: int = 5, seconds: int = 0) -> bool:
-        """Countdown control: action in {start, stop}."""
-        from divoom_lib.models import STI_CTRL_FLAG_COUNTDOWN_START, STI_CTRL_FLAG_COUNTDOWN_CANCEL
-        flag = STI_CTRL_FLAG_COUNTDOWN_CANCEL if action == "stop" else STI_CTRL_FLAG_COUNTDOWN_START
-        return self._tool_call(lambda d: d.countdown.set_countdown(flag, int(minutes), int(seconds)),
-                               f"countdown {action} {minutes}:{seconds}")
+        return self.tools.set_countdown(action, minutes, seconds)
 
     def set_noise(self, action: str = "start") -> bool:
-        """Noise meter control: action in {start, stop}."""
-        from divoom_lib.models import STI_CTRL_FLAG_NOISE_START, STI_CTRL_FLAG_NOISE_STOP
-        flag = STI_CTRL_FLAG_NOISE_STOP if action == "stop" else STI_CTRL_FLAG_NOISE_START
-        return self._tool_call(lambda d: d.noise.set_noise(flag), f"noise {action}")
-
-    def _tool_call(self, fn, label: str) -> bool:
-        logger.info(f"GUI Action: Tool {label}...")
-        try:
-            target = self.current_divoom
-            if not target:
-                return False
-            return bool(self._run_async(fn(target)))
-        except Exception as e:
-            logger.error(f"tool {label} failed: {e}")
-            return False
-
-    # ── Round 8: Device settings / FM / weather / memorial / timeplan ─────
-    # All are one-shot SET commands routed through the single active device.
-
-    @staticmethod
-    def _as_bool(v) -> bool:
-        return v in (True, 1, "1", "true", "True", "on", "yes")
+        return self.tools.set_noise(action)
 
     def set_hour_type(self, is_24h) -> bool:
-        """12/24-hour clock format (0x2c)."""
-        return self._tool_call(lambda d: d.system.set_hour_type(1 if self._as_bool(is_24h) else 0), "hour type")
+        return self.tools.set_hour_type(is_24h)
 
     def set_temp_unit(self, fahrenheit) -> bool:
-        """Temperature unit °C/°F (0x2b)."""
-        return self._tool_call(lambda d: d.device.set_temp_type(1 if self._as_bool(fahrenheit) else 0), "temp unit")
+        return self.tools.set_temp_unit(fahrenheit)
 
     def sync_time(self) -> bool:
-        """Push the host clock to the device (0x18)."""
-        from divoom_lib.system.date_time import DateTimeCommand
-        return self._tool_call(lambda d: DateTimeCommand(d).update_date_time(), "time sync")
+        return self.tools.sync_time()
 
     def set_device_name(self, name: str) -> bool:
-        return self._tool_call(lambda d: d.device.set_device_name(str(name)), "device name")
+        return self.tools.set_device_name(name)
 
     def set_auto_power_off(self, minutes: int) -> bool:
-        from divoom_lib.system.device_settings import DeviceSettings
-        return self._tool_call(lambda d: DeviceSettings(d).set_auto_power_off(int(minutes)), "auto power off")
+        return self.tools.set_auto_power_off(minutes)
 
     def set_low_power(self, on) -> bool:
-        from divoom_lib.system.device_settings import DeviceSettings
-        return self._tool_call(lambda d: DeviceSettings(d).set_low_power_switch(1 if self._as_bool(on) else 0), "low power")
+        return self.tools.set_low_power(on)
 
     def push_weather(self) -> bool:
-        """Push current weather to the device's weather widget.
-
-        R15 §3: pulls live weather from the configured provider, then
-        writes the resulting temperature + icon to the device via
-        ``divoom.weather.set``. The legacy TempWeatherCommand shim is
-        no longer used in this path — the new Weather class is the
-        canonical source of truth (R14 §1)."""
-        from divoom_lib.system.weather import Weather
-        from divoom_lib.weather_provider import get_weather
-
-        async def _push(d):
-            info = await get_weather()
-            return await Weather(d).set(info.temperature_c, info.weather_type)
-
-        return self._tool_call(_push, "weather")
+        return self.widgets.push_weather()
 
     def get_weather(self) -> dict:
-        """Return the current weather as a dict for the Live Widgets
-        card to render. Shape::
-
-            {
-                "temperature_c": int,
-                "weather_type": int,    # divoom WeatherType enum value
-                "location": str,
-                "provider": str,        # "wttr_in" | "stub"
-                "fetched_at": float,    # unix epoch seconds
-            }
-
-        Never raises — falls back to StubProvider on any error.
-        Uses a private event loop because the GUI's loop thread is
-        for device-bound work; weather fetches don't need a device."""
-        from divoom_lib.weather_provider import get_weather
-        from divoom_lib.models import WeatherType
-        import asyncio
-
-        async def _gather():
-            info = await get_weather()
-            return {
-                "temperature_c": info.temperature_c,
-                "weather_type": info.weather_type,
-                "location": info.location,
-                "provider": info.provider,
-                "fetched_at": info.fetched_at,
-            }
-
-        try:
-            return asyncio.run(_gather())
-        except Exception as exc:  # last-ditch: never break the UI
-            logger.warning("get_weather failed: %s", exc)
-            return {
-                "temperature_c": 0,
-                "weather_type": int(WeatherType.Clear),
-                "location": "error",
-                "provider": "stub",
-                "fetched_at": 0.0,
-                "error": str(exc),
-            }
+        return self.widgets.get_weather()
 
     def set_fm_frequency(self, freq_x10: int) -> bool:
-        """Tune the FM radio. freq_x10 = MHz×10 (e.g. 875 = 87.5 MHz)."""
-        return self._tool_call(lambda d: d.radio.set_radio_frequency(int(freq_x10)), "fm")
+        return self.tools.set_fm_frequency(freq_x10)
 
     def set_memorial(self, index, enabled, month, day, hour, minute, title="") -> bool:
-        """Anniversary/memorial countdown slot (0x54)."""
-        on = 1 if self._as_bool(enabled) else 0
-        have = 1 if title else 0
-        return self._tool_call(
-            lambda d: d.alarm.set_memorial_time(int(index), on, int(month), int(day),
-                                                int(hour), int(minute), have, str(title)),
-            "memorial")
+        return self.tools.set_memorial(index, enabled, month, day, hour, minute, title)
 
     def set_timeplan(self, index, enabled, hour, minute, week=0, channel=0) -> bool:
-        """Scheduled time-plan slot: at hour:minute on weekdays `week`, switch to
-        `channel` (0x56). Basic mapping; mode=channel, defaults for the rest."""
-        status = 1 if self._as_bool(enabled) else 0
-        return self._tool_call(
-            lambda d: d.timeplan.set_time_manage_info(status, int(hour), int(minute),
-                                                      int(week), int(channel), 0, 0, 10, 0),
-            "timeplan")
+        return self.tools.set_timeplan(index, enabled, hour, minute, week, channel)
 
-    # ── Round 9: display orientation + factory reset (0xBD EXT) ──────────
-    # (Brightness already has a full LAN/multi-target bridge — see set_brightness
-    #  below + the appbar slider; not re-added here.)
     def set_screen_dir(self, direction) -> bool:
-        """Rotate the display (0xBD 0x23). direction = 0..3 (0/90/180/270°)."""
-        return self._tool_call(lambda d: d.design.set_screen_dir(int(direction)),
-                               "screen direction")
+        return self.tools.set_screen_dir(direction)
 
     def set_screen_mirror(self, on) -> bool:
-        """Mirror/flip the display (0xBD 0x24)."""
-        return self._tool_call(lambda d: d.design.set_screen_mirror(self._as_bool(on)),
-                               "screen mirror")
+        return self.tools.set_screen_mirror(on)
 
     def factory_reset(self, confirm="") -> bool:
-        """Factory-reset the device (0xBD 0x25). DESTRUCTIVE — refuses unless the
-        caller passes the literal token "RESET" (belt-and-suspenders behind the
-        UI double-confirm). Never invoked implicitly."""
         if str(confirm) != "RESET":
             logger.warning("factory_reset refused: missing/invalid confirm token")
             return False
-        return self._tool_call(lambda d: d.design.factory_reset(), "factory reset")
+        return self.tools.factory_reset(confirm)
 
-    # ── Round 10: notification mirroring (SPP_SET_ANDROID_ANCS, 0x50) ─────
     def send_notification(self, app_type, text="") -> bool:
-        """Manually trigger the device's notification display for an app type
-        (1-14, see NOTIFICATION_APPS). With text → icon+text form; else icon."""
         t = int(app_type)
         if not (1 <= t <= 14):
             logger.warning(f"send_notification: app_type {t} out of range 1-14")
             return False
-        msg = str(text or "").strip()
-        if msg:
-            return self._tool_call(
-                lambda d: d.notification.show_notification_text(t, msg),
-                "notification")
-        return self._tool_call(
-            lambda d: d.notification.show_notification(t), "notification")
+        return self.tools.send_notification(t, text)
 
     # ── Round 13 §3: macOS notification mirroring ────────────────────────
     # The monitor runs in a daemon thread that polls the macOS Notification
@@ -696,12 +360,16 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         }
 
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
-        logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
-        try:
-            return self._dispatch(lambda t: t.show_image(file_path))
-        except Exception as e:
-            logger.error(f"Wall display failed: {e}")
-            return False
+        return self.lighting.display_wall_image(file_path, cell_size)
+
+    def display_custom_art(self, file_path: str) -> bool:
+        return self.lighting.display_custom_art(file_path)
+
+    def set_brightness(self, brightness: int) -> bool:
+        return self.lighting.set_brightness(brightness)
+
+    def set_volume(self, volume: int) -> bool:
+        return self.lighting.set_volume(volume)
 
     def open_file_dialog(self) -> str | None:
         logger.info("Opening native file dialog...")
@@ -725,135 +393,20 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             logger.error(f"Error opening file dialog: {e}")
             return None
 
-    def set_brightness(self, brightness: int) -> bool:
-        logger.info(f"GUI Action: Setting brightness to {brightness}...")
-        try:
-            val = int(brightness)
-            return self._dispatch(lambda t: t.set_brightness(val)
-                                if t is self.wall_instance else
-                                (t.lan.set_brightness(val) if t.lan else t.device.set_brightness(val)))
-        except Exception as e:
-            logger.error(f"Brightness setting failed: {e}")
-            return False
-
     def get_brightness(self) -> int | None:
-        """Read the device's current brightness (0-100). Returns None on failure.
-
-        New in Round 7 (docs/PLANNING_ROUND7.md §3). Used by the appbar
-        brightness slider to initialize to the actual device value on
-        startup, matching the volume-slider pattern from Round 6.
-
-        Wire: 0x46 get light mode (parsed by divoom_lib.device.get_brightness).
-        LAN devices return a dict from the LAN transport; we extract the
-        'brightness' field if present, else fall back to None.
-        """
-        logger.info("GUI Action: Getting current brightness...")
-        try:
-            target = self.current_divoom
-            if not target:
-                return None
-            return self._run_async(target.device.get_brightness())
-        except Exception as e:
-            logger.error(f"Brightness get failed: {e}")
-            return None
+        return self.tools.get_brightness()
 
     def get_work_mode(self) -> int | None:
-        """Read the device's current work mode (0-15). Returns None on failure.
-
-        New in Round 7. Used by the Control Panel to highlight the
-        channel card that matches the device's currently-active channel.
-        Wire: 0x13 get work mode. Returns the work mode integer
-        (0=clock, 1=lightning, 2=cloud, 3=vj, 4=visualizer, 5=design,
-        6=scoreboard, 7=animation, etc.).
-        """
-        logger.info("GUI Action: Getting current work mode...")
-        try:
-            target = self.current_divoom
-            if not target:
-                return None
-            return self._run_async(target.device.get_work_mode())
-        except Exception as e:
-            logger.error(f"Work mode get failed: {e}")
-            return None
+        return self.tools.get_work_mode()
 
     def get_scoreboard_state(self) -> dict | None:
-        """Read the current scoreboard state from the device.
-
-        New in Round 7. Returns a dict with `on_off`, `red_score`,
-        `blue_score` keys, or None on failure. Used by the scoreboard
-        panel to initialize the red/blue inputs to the actual device
-        state (matching the volume/brightness slider patterns).
-
-        Wire: 0x71 0x04 (get tool info, TOOL_TYPE_SCORE).
-        """
-        logger.info("GUI Action: Getting current scoreboard state...")
-        try:
-            target = self.current_divoom
-            if not target:
-                return None
-            return self._run_async(target.scoreboard.get_scoreboard())
-        except Exception as e:
-            logger.error(f"Scoreboard get failed: {e}")
-            return None
-
-    def set_volume(self, volume: int) -> bool:
-        """Set the device volume (0-15).
-
-        New in Round 6 (docs/PLANNING_ROUND5.md §6.1). The wire command
-        is 0x08 set volume. Validated to 0-15; out-of-range is clamped.
-        """
-        logger.info(f"GUI Action: Setting volume to {volume}...")
-        try:
-            val = max(0, min(15, int(volume)))
-            return self._dispatch(lambda t: t.set_volume(val)
-                                if t is self.wall_instance else t.music.set_volume(val))
-        except Exception as e:
-            logger.error(f"Volume setting failed: {e}")
-            return False
+        return self.tools.get_scoreboard_state()
 
     def get_volume(self) -> int | None:
-        """Read the device volume (0-15). Returns None on failure.
-
-        New in Round 6. Used by the appbar volume slider to initialize
-        to the actual device value on startup. Wire command is 0x09
-        get volume.
-        """
-        logger.info("GUI Action: Getting current volume...")
-        try:
-            target = self.current_divoom
-            if not target:
-                return None
-            return self._run_async(target.music.get_volume())
-        except Exception as e:
-            logger.error(f"Volume get failed: {e}")
-            return None
+        return self.tools.get_volume()
 
     def set_scoreboard(self, on_off: int, red: int = 0, blue: int = 0) -> bool:
-        """Set the scoreboard tool (0x72 set tool, TOOL_TYPE_SCORE).
-
-        New in Round 6 (docs/PLANNING_ROUND5.md §6.1). The scoreboard
-        is a tool, not a channel — it has its own panel in the Control
-        Center and its own show/hide buttons. Wire details in
-        divoom_lib/tools/scoreboard.py.
-        """
-        logger.info(f"GUI Action: Setting scoreboard on_off={on_off} red={red} blue={blue}...")
-        try:
-            target = self.current_divoom
-            if not target:
-                return False
-            return self._run_async(target.scoreboard.set_scoreboard(int(on_off), int(red), int(blue)))
-        except Exception as e:
-            logger.error(f"Scoreboard set failed: {e}")
-            return False
-
-    def display_custom_art(self, file_path: str) -> bool:
-        logger.info(f"GUI Action: Pushing custom art {file_path!r}...")
-        try:
-            return self._dispatch(lambda t: t.show_image(file_path)
-                                if t is self.wall_instance else t.display.show_image(file_path))
-        except Exception as e:
-            logger.error(f"Failed to display custom art: {e}")
-            return False
+        return self.tools.set_scoreboard(on_off, red, blue)
 
     # ── Round 15 §5: MCP server subprocess control ────────────────────
     #
