@@ -195,7 +195,11 @@
 /* ── Sidebar Connected Device Panel ─────────────────────────────────── */
 .sidebar-device-panel {
     margin-top: 15px;
-    padding: 12px 10px;
+    /* R24 #6: trim the card — less (esp. horizontal) padding + a smaller preview
+       make it shorter so it sits higher; margin-bottom adds breathing room above
+       the Settings button. */
+    margin-bottom: 12px;
+    padding: 10px 8px;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -208,8 +212,8 @@
 }
 
 .sidebar-device-preview {
-    width: 120px;
-    height: 120px;
+    width: 100px;
+    height: 100px;
     background: transparent;
     border: none;
     border-radius: 6px;
