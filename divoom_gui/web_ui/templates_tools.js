@@ -103,8 +103,9 @@ window.DivoomTemplates.tools = `
                                 </div>
                             </div>
                         </div>
-                        <!-- FM Radio (moved into Tools, R11 item 8c) -->
-                        <div class="card glass-card">
+                        <!-- FM Radio (moved into Tools, R11 item 8c). R24 #5: hidden
+                             by default; shown only for FM-capable models on connect. -->
+                        <div class="card glass-card" id="fm-radio-card" style="display:none;">
                             <div class="card-header"><h3>FM Radio</h3></div>
                 <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
                     <p class="panel-hint" style="margin-top:0;">Tune the device's FM radio (FM-capable models only — Tivoo / Ditoo).</p>

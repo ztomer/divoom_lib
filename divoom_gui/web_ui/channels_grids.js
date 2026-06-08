@@ -305,10 +305,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ── 7. DYNAMIC VJ EFFECTS TOGGLE & GALLERY CACHE SELECTOR (R15 §1+§7: `.channel-card` → `.tab-btn`) ──
     window.updateChannelButtonsVisibility = function(name) {
+        const n = (name || "").toLowerCase();
+
+        // R24 #5: FM Radio card — only FM-capable models (Tivoo / Ditoo).
+        const fmCard = document.getElementById("fm-radio-card");
+        if (fmCard) fmCard.style.display = (n.includes("tivoo") || n.includes("ditoo")) ? "" : "none";
+
         const vjCard = document.querySelector('.tab-btn[data-channel="vj"]');
         if (!vjCard) return;
 
-        const n = (name || "").toLowerCase();
         // Timebox Evo supports VJ effects
         const supportsVJ = n.includes("timebox") || n.includes("evo");
         if (supportsVJ) {
@@ -431,4 +436,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Load initial history
     setTimeout(renderCustomArtHistory, 1500);
+
+    // Expose for cross-file access from channels_core.js showChannelPanel
+    window.loadCustomArtCacheGrid = loadCustomArtCacheGrid;
+    window.renderCustomArtHistory = renderCustomArtHistory;
 });
