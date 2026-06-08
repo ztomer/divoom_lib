@@ -249,6 +249,17 @@ class DeviceOwner:
         timeout = float(args.get("timeout", 15) or 15)
         limit = int(args.get("limit", 4) or 4)
 
+        # Diagnostic: log this daemon process's Bluetooth (TCC) state + identity so
+        # we can tell a permission denial (empty/0) from "no devices" or a too-short
+        # scan, when the daemon is spawned by the GUI vs a terminal.
+        try:
+            import sys as _sys
+            from CoreBluetooth import CBCentralManager
+            logger.info("scan: pid=%s exe=%s CBauth=%s (0=notDetermined,2=DENIED,3=ALLOWED)",
+                        os.getpid(), _sys.executable, CBCentralManager.authorization())
+        except Exception as e:
+            logger.info("scan: CB auth probe skipped: %s", e)
+
         async def _scan():
             from divoom_lib.utils import discovery
             results = await discovery.discover_all_divoom_devices(timeout=timeout)

@@ -52,6 +52,35 @@ screenshot, pixel-measure). Use screenshots to make spacing changes pixel-perfec
    symbol is typed into the box or selected from the saved list.
 10. **Weather** — (item left incomplete by the user; confirm intent).
 
+## Round-2 UI feedback (2026-06-08, with screenshots) — DEFERRED until daemon works
+(User: "write these down … focus FIRST on the daemon/gui + device detection
+without user intervention; polish UI afterwards.")
+- **#3-redo (tabs STILL inconsistent).** Only **Channels** wraps its tabs +
+  content in ONE glass panel; Tools/Settings have bare tabs floating above
+  separate content cards, and the tab→first-block distance varies a lot. Make all
+  three CONSISTENT — per the earlier Kare/Rams call, tabs **outside** the box:
+  Channels should drop the glass-panel-around-tabs so it matches Tools/Settings
+  (bare centered tab row → separator → content cards), and the tab→content gap
+  must be identical everywhere. (My `.tabs-section` pass only normalized the
+  separator/margin; the glass-panel-vs-bare structural mismatch remains.)
+- **#6-redo (device preview).** Do NOT shrink the preview image. Instead: shrink
+  the **glass panel** it sits on a little *vertically*, and **center** both the
+  preview and the "Select Screen…" selector within it. (Revert the 100px preview
+  shrink back toward 120, fix the panel padding + centering instead.)
+- Screenshots provided in chat: (1) Channels/Clock, (2) Tools/Alarms, (3)
+  Settings/Devices showing "No Bluetooth screens found." (Can't write chat images
+  to disk from here; described above.)
+
+## PRIORITY: daemon/GUI device detection without user intervention
+Confirmed: Settings → Scan → "No Bluetooth screens found", but the terminal
+diagnostics find all 4 screens and `python3.14` IS granted Bluetooth. Prime
+suspect: the GUI (pywebview hosts it as `Python.app`, NOT in the BT-granted list)
+spawns the daemon non-detached, so the daemon inherits `Python.app`'s ungranted
+TCC identity → silent denial. Fix to try: spawn the daemon DETACHED under the
+explicit granted `python3.14` binary (its own responsible process), + log
+`CBCentralManager.authorization()` from the daemon's scan so the next run is
+definitive. (May also bump the 2s default scan timeout.)
+
 ## §outcome
 - **#1 SHIPPED** — single-instance GUI (flock) + menubar (pgrep); a 2nd dashboard
   exits before spawning a menubar, killing the runaway.

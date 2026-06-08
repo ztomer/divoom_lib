@@ -128,7 +128,7 @@ def test_ensure_daemon_spawns_then_connects(live_daemon, monkeypatch):
     fake_path = f"/tmp/divoom_spawn_{os.getpid()}.sock"
     calls = {"n": 0}
 
-    def fake_spawn(socket_path, mac=None, python=None):
+    def fake_spawn(socket_path, mac=None, python=None, detach=False):
         calls["n"] += 1
         return object()
 

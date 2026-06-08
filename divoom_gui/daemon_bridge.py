@@ -93,6 +93,7 @@ def ensure_daemon(
     mac: str | None = None,
     spawn: bool = True,
     wait_timeout: float = 8.0,
+    detach: bool = False,
 ) -> DaemonClient | None:
     """Return a :class:`DaemonClient` for a *live* daemon, auto-spawning one if
     needed. Returns ``None`` if no daemon could be reached/started.
@@ -111,7 +112,7 @@ def ensure_daemon(
         return DaemonClient(socket_path)
     if not spawn:
         return None
-    spawn_daemon(socket_path, mac=mac)
+    spawn_daemon(socket_path, mac=mac, detach=detach)
     deadline = time.monotonic() + wait_timeout
     while time.monotonic() < deadline:
         if daemon_alive(socket_path):
