@@ -31,6 +31,33 @@ shipped milestone (per the project planning docs).
 - Daemon `scan()` logs `pid / sys.executable / CBCentralManager.authorization()`
   before scanning so the attribution state is visible in the daemon log.
 
+### Fixed — MCP server subprocess failed with `DaemonDeviceProxy` not a string
+
+- The MAC fallback in `start_mcp_server()` used `self.current_divoom.mac` but
+  `DaemonDeviceProxy.__getattr__` returns another proxy for any name NOT in
+  `_STATUS_ATTRS` (= `is_connected`, `lan`, `_conn`). `self.current_divoom.mac`
+  returned a `DaemonDeviceProxy(path="mac")` instead of a string, which
+  `subprocess.Popen` rejected as `TypeError: expected str, not DaemonDeviceProxy`.
+- **Fix**: `gui_api.py:426` uses `self.current_divoom._conn.mac` — `_conn`
+  resolves via status to `_ConnView(st.get("mac"))` which IS the real MAC string.
+- Test: `tests/test_daemon_bridge.py::test_proxy_conn_mac_resolves_from_device_status`
+
+### Fixed — weather push created an unawaited proxy coroutine (RuntimeWarning)
+
+- `Weather.__init__` stored `divoom.logger` on `self`. When the device is a
+  `DaemonDeviceProxy`, `divoom.logger` returns a child proxy (not a real logger),
+  and `self.logger.info(...)` in `Weather.set()` created a coroutine object that
+  was never `await`ed — producing a `RuntimeWarning` and silently leaking the
+  coroutine. The `send_command(0x5F, ...)` call after it still worked, but the
+  warning filled logs.
+- **Fix**: `Weather` now uses a module-level `logger` instead of `divoom.logger`.
+- Tests: `test_weather_set_proxy_daemon_roundtrip` (e2e proxy → daemon → wire),
+  `test_weather_set_emits_0x5f_frame`, `test_weather_set_negative_temp`.
+
+### Changed — system monitor device preview (bars, no letters, fixed colors)
+
+### Changed — custom art gallery cache: cross-scope `window.*` prefix
+
 ### Added — daemon configuration file (`daemon.ini`)
 
 - **`divoom_daemon/daemon_config.py`** — `DaemonConfig` loaded from

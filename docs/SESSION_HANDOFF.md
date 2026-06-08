@@ -16,7 +16,7 @@ core rule in `AGENTS.md`).
 ## Current state — _update this section each round_
 
 - **R24 — BLE device detection from the GUI now works WITHOUT user
-  intervention. Suite 1010 / 0 / 75.** (commit `70e69ee0`)
+  intervention. Suite 1022 / 0 / 75.** (commit `70e69ee0`)
   Two root causes, both fixed in `divoom_gui/daemon_bridge.py` +
   `divoom_daemon/daemon_protocol.py`:
   1. **macOS TCC responsible-process attribution.** pywebview re-hosts the GUI
@@ -60,18 +60,27 @@ core rule in `AGENTS.md`).
   direction was the OPPOSITE of the earlier "bare tabs" call (user now wants glass
   everywhere). **Needs a user eyeball after reload.**
 
+- **MCP fix** (`bfebca77` / this round): `self.current_divoom.mac` returned a
+  `DaemonDeviceProxy` (not a string) because `"mac"` is not in `_STATUS_ATTRS`.
+  Changed to `self.current_divoom._conn.mac` in `gui_api.py:426`.
+
+- **Weather fix** (same commit): `Weather.__init__` stored `divoom.logger` which,
+  on a `DaemonDeviceProxy`, returns a child proxy. `self.logger.info(...)` in
+  `set()` created an unawaited coroutine → `RuntimeWarning`. Switched to
+  module-level logger. Weather push now works through the daemon proxy (confirmed
+  by e2e test `test_weather_set_proxy_daemon_roundtrip`).
+
+- Also: system monitor device preview (removed C/M/B letters, fixed colours),
+  custom art cache `window.*` prefix for cross-scope function refs.
+
 - **STILL OPEN — #6-redo (device preview).** Not done yet: revert the 100px
   preview shrink in `sidebar.css` toward 120px; instead shrink the glass PANEL
-  vertically and center the preview + "Select Screen…" selector. Also confirm the
-  cut-off **#10 Weather** ask.
+  vertically and center the preview + "Select Screen…" selector.
 
 - **NEXT (deferred round-2 UI polish, per user "polish UI afterwards"):**
-  (a) tabs consistency — make all three panels share the SAME structure (tabs
-  OUTSIDE the box; drop Channels' glass-panel-around-tabs so it matches
-  Tools/Settings). (b) device preview — REVERT the 100px preview shrink in
+  (a) tabs consistency. (b) device preview — REVERT the 100px preview shrink in
   `sidebar.css` back toward 120px; instead shrink the glass PANEL vertically and
-  center the preview + "Select Screen…" selector. (c) #10 Weather — user's ask
-  was cut off ("Weather —"); confirm intent. See `docs/PLANNING_ROUND24.md`.
+  center the preview + "Select Screen…" selector. (c) confirm cut-off #10 ask.
 
 - **R23 — 500-LOC debt FULLY RETIRED. Suite 994 / 0 / 75; allow-list empty.**
   opencode did the big REVIEW §1 splits (gui_api→`divoom_gui/api/*`, daemon→
