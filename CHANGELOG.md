@@ -6,6 +6,34 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 22 — 2026-06-07 (menubar refactor: top-level package + daemon client)
+
+The menubar agent is moved from `divoom_daemon/` to its own
+top-level `divoom_menubar/` package, and rewritten as a pure daemon
+client (no BLE, no socket server). This respects R17's single-owner
+rule: the daemon owns the device + notification monitor; the menubar
+and GUI are thin clients.
+
+- **New `divoom_menubar/` package** with `menubar_client.py` (testable
+  logic, no AppKit) and `menubar.py` (Cocoa status item + menu).
+  Removed `divoom_daemon/menubar.py` + `menubar_status.py` (they had
+  their own BLE + socket server, violating single-owner).
+- **Event-driven via daemon subscription.** The menubar calls
+  `DaemonClient.subscribe()` and receives `EVENT_STATUS` events
+  (`state` + `counters`) pushed by the daemon on every notification
+  listener start/stop/error and routed notification. Title updates
+  instantly — **zero polling** (matching user feedback for MCP toggle
+  and menubar).
+- **Menu actions.** "Start/Stop Notifications" → daemon commands.
+  "Open Notifications..." launches the GUI with `--tab data-sources
+  --card notifications` (deep link to Live Widgets → Notifications).
+- **CLI entry point.** `divoom-control menubar` (synchronous handler,
+  runs Cocoa event loop).
+- **Tests.** `tests/test_menubar.py` (6 tests) — pure logic, CI-friendly.
+- Suite: 938 → 944 passed (+6 tests).
+
+---
+
 ## Round 21 — 2026-06-07 (review + documentation overhaul)
 
 - **`docs/REVIEW_2026-06.md`**: code/architecture review (Linus + Uncle Bob),

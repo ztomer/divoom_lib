@@ -15,6 +15,22 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R22 — menubar refactor: top-level package + daemon client. Suite 944 / 0 / 75.**
+  - New `divoom_menubar/` package (menubar_client.py, menubar.py) at repo root.
+  - Menubar rewritten as pure daemon client: connects to daemon's Unix socket,
+    subscribes to EVENT_STATUS events for real-time status updates. **No BLE,
+    no socket server** — respects R17 single-owner rule (daemon owns device +
+    notification monitor).
+  - Event-driven: daemon pushes EVENT_STATUS on listener start/stop/error +
+    every routed notification. Menubar title updates instantly — zero polling
+    (user explicitly rejected polling for both MCP toggle and menubar).
+  - Menu: Start/Stop Notifications → daemon commands; "Open Notifications..."
+    deep-links GUI to `--tab data-sources --card notifications`.
+  - CLI: `divoom-control menubar` (sync handler, blocks on Cocoa loop).
+  - `tests/test_menubar.py` (6 tests, pure logic, no AppKit).
+  - Deleted `divoom_daemon/menubar.py` + `menubar_status.py` (had own BLE +
+    server, violating single-owner).
+
 - **R21 — review + doc overhaul. Suite 993 / 0 / 75.**
   - `docs/REVIEW_2026-06.md`: full code/architecture review (Linus + Uncle Bob),
     UI/UX review (Rams + Kare), and the "rewrite lib+daemon in Rust?" analysis.

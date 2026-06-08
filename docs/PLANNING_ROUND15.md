@@ -646,10 +646,10 @@ that touch the same lines).
 | §4 | Settings refactor (Danger zone + 7d/30d) | `24f95690` | 10 (`test_routines_intervals.py`) | SHIPPED |
 | §3 | Live Widgets weather + Notifications move | `b7c1e4d7` | 41 (30 + 11) | SHIPPED |
 | §5 | MCP server (12 tools) + GUI toggle | `121d0b5`  | 25 (`test_mcp_server.py`) | SHIPPED |
-| §6 | Menubar notification status + actions | — | — | not started |
+| §6 | Menubar as daemon client (event-driven) | `61292a6` | 6 (`test_menubar.py`) | SHIPPED |
 
-**Suite timeline:** 829 → 846 → 856 → 866 → 907 → 932. **+103 tests** in R15.
-**Final:** 932 passed, 75 skipped, 0 failed.
+**Suite timeline:** 829 → 846 → 856 → 866 → 907 → 932 → 938. **+109 tests** in R15.
+**Final:** 938 passed, 75 skipped, 0 failed.
 
 ### §5 design notes
 
@@ -687,6 +687,41 @@ that touch the same lines).
 
 `docs/MCP_SERVER.md` ships with config snippets for Claude Desktop,
 Cursor, Cline, and Continue.
+
+### §6 design notes — Menubar as daemon client (event-driven, no polling)
+
+- **Top-level `divoom_menubar/` package.** The menubar is a second GUI
+  variant (native Cocoa status item) that shares state with the
+  pywebview GUI via the daemon. It lives at the repo root, not inside
+  `divoom_daemon/`, so it's a first-class entry point.
+- **Daemon client, not owner.** The menubar connects to the daemon's
+  Unix socket (`/tmp/divoom.sock`) as a `DaemonClient`. It has **no
+  BLE connection** and **no socket server** — R17's single-owner rule
+  is respected. The old `divoom_daemon/menubar.py` that had its own
+  BLE + server is deleted.
+- **Event-driven status via daemon subscription.** The menubar calls
+  `DaemonClient.subscribe()` and receives `EVENT_STATUS` events
+  (`state` + `counters`) pushed by the daemon on every notification
+  listener start/stop/error and on each routed notification. The
+  menubar title updates instantly on these events — **zero polling**.
+  This matches the user's "no background polling" feedback for the
+  GUI's MCP toggle and the menubar itself.
+- **Menu actions.** "Start Notifications" / "Stop Notifications" send
+  `start_notifications` / `stop_notifications` to the daemon.
+  "Open Notifications..." launches the pywebview GUI with
+  `--tab data-sources --card notifications` so it opens directly to
+  the Live Widgets → Notifications card.
+- **Title format & colours.** Status-item title is `Divoom (active)`
+  / `(idle)` / `(error)` with colour tints: green (active), grey
+  (idle), amber (error). Derived from `STATE_COLORS` shared with the
+  R14 §3 GUI status pill.
+- **CLI entry point.** `divoom-control menubar` launches the menubar
+  agent (blocks on Cocoa event loop). The `cmd_menubar` handler is
+  synchronous — the CLI dispatcher detects this and runs it without
+  `await`.
+- **Tests.** `tests/test_menubar.py` (6 tests) covers state derivation,
+  title formatting, colour mapping, and hex→RGB conversion. All pure
+  logic, no AppKit dependency, CI-friendly.
 
 ---
 
