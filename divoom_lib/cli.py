@@ -127,6 +127,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_daemon.add_argument("--token", default=None,
                           help="Shared secret required for TCP clients "
                                "(falls back to DIVOOM_DAEMON_TOKEN).")
+
+    # macOS menubar agent (R15 §6): native Cocoa status item that
+    # connects to the daemon as a client. No BLE, no socket server.
+    sub.add_parser(
+        "menubar", parents=[shared],
+        help="Launch the macOS menubar agent (connects to daemon).",
+    )
     return p
 
 
@@ -448,6 +455,21 @@ async def cmd_daemon(args: argparse.Namespace) -> int:
                       token=getattr(args, "token", None))
 
 
+def cmd_menubar(args: argparse.Namespace) -> int:
+    """Launch the macOS menubar agent (R15 §6). Connects to the daemon as a
+    client (no BLE, no socket server). This is a blocking call that runs the
+    Cocoa event loop."""
+    import sys
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    # The menubar runs its own Cocoa event loop — just import and run main()
+    from divoom_menubar.menubar import main
+    main()
+    return 0
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────
 
 
@@ -465,6 +487,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace], Awaitable[int]]] = {
     "identify":      cmd_identify,
     "mcp-server":    cmd_mcp_server,
     "daemon":        cmd_daemon,
+    "menubar":       cmd_menubar,
 }
 
 
@@ -480,7 +503,11 @@ async def amain(argv: list[str] | None = None) -> int:
     if handler is None:
         parser.print_help()
         return 2
-    return await handler(args)
+    import inspect
+    if inspect.iscoroutinefunction(handler):
+        return await handler(args)
+    else:
+        return handler(args)
 
 
 def main() -> int:

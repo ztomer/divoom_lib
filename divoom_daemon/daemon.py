@@ -157,7 +157,7 @@ class DivoomDaemon:
     def handle_command(self, command: str, args: dict) -> dict:
         if command == "ping":
             return {"success": True}
-        if command == "get_status":
+        if command in ("get_status", "notification_status"):
             return {"success": True, **self.status_event()}
         if command == "start_notifications":
             return self._cmd_start()

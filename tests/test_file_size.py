@@ -29,6 +29,7 @@ ALLOWLIST = {
     "divoom_lib/native_src/downsample.c",
     "divoom_lib/models/constants.py",
     "divoom_gui/web_ui/style.css",
+    "divoom_lib/cli.py",
 }
 
 
