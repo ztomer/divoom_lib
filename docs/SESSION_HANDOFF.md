@@ -15,6 +15,32 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **GUI crash-loop on cloud-auth failure FIXED. Suite 994 / 0 / 75.**
+  (`./run_gui.sh` was spamming `RuntimeError: UserNewGuest failed: RC=10` on
+  every transport-status poll.)
+  - Root: `api/connection.get_transport_status` (polled) called
+    `divoom_auth.get_credentials()` → network guest login → fail → exception into
+    the pywebview bridge, retried every poll. Fixed: cache-only
+    `divoom_auth.get_cached_credentials()` (no network, never raises) + a 120s
+    failure cooldown in `get_credentials()`; status guards the call. Cloud auth
+    now happens lazily only when a real cloud op needs it.
+  - Retired obsolete `gui_api._push_menubar_status` (imported the deleted
+    `divoom_daemon.menubar_status`; R22 moved the menubar to a daemon-subscribing
+    client in `divoom_menubar/`). Staged opencode's menubar-move deletions.
+  - +`tests/test_auth_resilience.py`.
+  - **OPEN — Divoom guest auth (RC=10 "Command is not match") is an upstream
+    issue.** Guest login (`_login_guest`, body carries `Command: "User/NewGuest"`)
+    is rejected; email login (`_login_email`) uses the path-only `UserLogin`
+    endpoint (no `Command` field) and is the working surface. **Cloud features
+    (gallery) need a configured Divoom email/password** in
+    `~/.config/divoom-control/config.ini` `[divoom]`, OR the guest flow updated
+    from a fresh APK capture. Local BLE/LAN control is unaffected.
+  - opencode executed the R21 review refactors: gui_api split into `divoom_gui/
+    api/` (connection/lighting/tools/widgets/window), daemon split into
+    DeviceOwner/NotificationService/SocketServer + command registry, DeviceSlot
+    dataclass, web_ui splits, menubar → daemon client.
+
+
 - **R23 — REVIEW §1.2 + §1.3 + §1.4 + §1.5 SHIPPED. Suite 980 / 0 / 75.**
   - **§1.2** — `gui_api.py` refactored from 891 → 444 LOC by composing 5 `ApiBase`
     collaborators (`ConnectionApi`, `LightingApi`, `ToolsApi`, `WidgetsApi`,
