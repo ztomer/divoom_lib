@@ -24,10 +24,10 @@ class WidgetsApi(ApiBase):
         async def _push(d):
             info = await get_weather()
             # Switch to TEMPRETURE channel (light mode 1). Per the decompiled
-            # APK (CmdManager.t2), the payload is [mode=1, temp_type, r, g, b, 0].
-            # A bare set_light_mode(1) sends only [1] → device interprets garbage
-            # for RGB → dark red/brown screen. Send white text, Celsius.
-            await d.send_command(COMMANDS["set light mode"], [1, 0, 255, 255, 255, 0])
+            # APK (CmdManager.t2), the payload is [mode=1, R, G, B, ?, 0].
+            # A bare set_light_mode(1) sends only [1] → device interprets
+            # missing bytes as garbage RGB → dark screen. Send white.
+            await d.send_command(COMMANDS["set light mode"], [1, 255, 255, 255, 0, 0])
             return await Weather(d).set(info.temperature_c, info.weather_type)
 
         return self._tool_call(_push, "weather")

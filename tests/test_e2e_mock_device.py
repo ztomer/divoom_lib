@@ -349,7 +349,7 @@ async def test_weather_push_switches_channel_before_data(monkeypatch):
                             if c[0] == "send_command" and c[1] == 0x5F), -1)
         assert idx_light >= 0, f"No 0x45 command in {commands}"
         assert commands[idx_light][1] == 0x45
-        assert commands[idx_light][2] == [1, 0, 255, 255, 255, 0], (
+        assert commands[idx_light][2] == [1, 255, 255, 255, 0, 0], (
             f"Expected 6-byte thermal payload, got {commands[idx_light]}"
         )
         assert idx_light < idx_weather, (
