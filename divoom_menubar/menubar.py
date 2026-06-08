@@ -12,6 +12,7 @@ import os
 import subprocess
 import logging
 from pathlib import Path
+import objc
 from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength, NSMenu, NSMenuItem,
     NSColor, NSForegroundColorAttributeName,
@@ -35,7 +36,10 @@ logger = logging.getLogger("divoom_menubar")
 
 class DivoomMenuBarAgent(NSObject):
     def init(self):
-        self = super(DivoomMenuBarAgent, self).init()
+        # PyObjC NSObject subclasses must chain through objc.super(...).init(),
+        # not Python's builtin super() — the latter raises
+        # "'super' object has no attribute 'init'" (crashes the menubar on launch).
+        self = objc.super(DivoomMenuBarAgent, self).init()
         if self:
             self.status_item = None
             self.client = MenubarClient()

@@ -125,7 +125,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.DivoomState.discoveredDevices = devices;
                     populateDeviceSelectors(devices);
                     window.showToast(`Discovered ${devices.length} screens!`, "success");
-                    window.renderArrangerCanvas(); 
+                    window.renderArrangerCanvas();
+                })
+                .catch(err => {
+                    // The scan runs in the daemon, which can die mid-scan (e.g. a
+                    // native BLE/CoreBluetooth crash on some Python builds). Don't
+                    // leave the spinner stuck — re-enable + surface the error.
+                    if (scanSpinner) scanSpinner.style.display = "none";
+                    if (scanBtn) scanBtn.disabled = false;
+                    window.showToast("Scan failed (device backend unavailable). See logs.", "error");
+                    console.error("scan_devices failed:", err);
                 });
         } else {
             if (scanSpinner) scanSpinner.style.display = "none";

@@ -155,7 +155,36 @@ def main():
         background_color="#0a0b10"
     )
     api.window = window
+    _spawn_menubar_agent()
     webview.start()
+
+
+def _spawn_menubar_agent() -> None:
+    """Best-effort: launch the macOS menu-bar agent alongside the GUI so its
+    status item appears on launch. Detached + dupe-guarded; never blocks or
+    fails the GUI if it can't start. macOS only."""
+    if sys.platform != "darwin":
+        return
+    try:
+        import subprocess
+        # Don't spawn a second status item if one is already running.
+        existing = subprocess.run(
+            ["pgrep", "-f", "divoom_lib.cli menubar"],
+            capture_output=True, text=True,
+        )
+        if existing.returncode == 0 and existing.stdout.strip():
+            logger.info("Menu-bar agent already running; not spawning another.")
+            return
+        repo_root = Path(__file__).resolve().parents[1]
+        subprocess.Popen(
+            [sys.executable, "-m", "divoom_lib.cli", "menubar"],
+            cwd=str(repo_root),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        logger.info("Launched macOS menu-bar agent.")
+    except Exception as e:
+        logger.warning(f"Could not launch menu-bar agent: {e}")
 
 if __name__ == "__main__":
     main()
