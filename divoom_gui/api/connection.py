@@ -89,8 +89,14 @@ class ConnectionApi(ApiBase):
         lan_ip = st.get("lan_ip")
         mac = st.get("mac")
         ble_connected = bool(st.get("connected") and not lan_ip)
+        # Cache-only: a status poll must never initiate (or block on, or crash
+        # on) a Divoom cloud login. Cloud shows "Authenticated" only once some
+        # real cloud op has cached a valid token.
         from divoom_lib import divoom_auth
-        creds = divoom_auth.get_credentials() if hasattr(divoom_auth, "get_credentials") else None
+        try:
+            creds = divoom_auth.get_cached_credentials()
+        except Exception:
+            creds = None
         cloud_ok = bool(creds and creds.is_valid())
         return json.dumps({
             "ble": {"available": ble_connected, "label": "Bluetooth", "description": "Bluetooth — 100% local, never leaves your machine.", "detail": mac if ble_connected else None},

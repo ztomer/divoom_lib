@@ -236,43 +236,35 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         except Exception as e:
             logger.debug(f"_send_notification_async: {e}")
 
-    def _push_menubar_status(self, status: dict) -> dict:
-        """Best-effort, event-driven push of the listener status to the menubar
-        agent over its Unix socket (R15 §6 — the menubar does NOT poll). Returns
-        `status` unchanged so callers can ``return self._push_menubar_status(...)``.
-        Silent no-op if the menubar agent isn't running."""
-        try:
-            from divoom_daemon.menubar_status import derive_state, push_notification_status
-            push_notification_status(derive_state(status), status.get("counters"))
-        except Exception as e:
-            logger.debug(f"menubar status push skipped: {e}")
-        return status
-
     def start_notification_listener(self) -> dict:
         """Start polling the macOS Notification Center DB. Returns a
         status dict for the JS side (``{running, db_path, error?}``).
-        Safe to call multiple times; no-op if already running."""
+        Safe to call multiple times; no-op if already running.
+
+        (R22: the menubar now subscribes to the daemon's status events directly,
+        so the GUI no longer pushes status to it — the old `_push_menubar_status`
+        was retired.)"""
         if sys.platform != "darwin":
-            return self._push_menubar_status({"running": False, "error": "macOS only"})
+            return {"running": False, "error": "macOS only"}
         try:
             monitor = self._notification_monitor()
             if monitor.is_running:
-                return self._push_menubar_status({"running": True, "db_path": str(monitor.db_path)})
+                return {"running": True, "db_path": str(monitor.db_path)}
             monitor.start(sink=self._notification_sink)
-            return self._push_menubar_status({"running": True, "db_path": str(monitor.db_path)})
+            return {"running": True, "db_path": str(monitor.db_path)}
         except FileNotFoundError as e:
             logger.warning(f"start_notification_listener: {e}")
-            return self._push_menubar_status({"running": False, "error": str(e)})
+            return {"running": False, "error": str(e)}
         except Exception as e:
             logger.exception(f"start_notification_listener: {e}")
-            return self._push_menubar_status({"running": False, "error": str(e)})
+            return {"running": False, "error": str(e)}
 
     def stop_notification_listener(self) -> dict:
         """Stop the polling thread. No-op if not running."""
         if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:
-            return self._push_menubar_status({"running": False})
+            return {"running": False}
         self._mac_monitor.stop()
-        return self._push_menubar_status({"running": False})
+        return {"running": False}
 
     def is_notification_listener_running(self) -> bool:
         if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:

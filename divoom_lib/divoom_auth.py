@@ -206,15 +206,49 @@ def _load_cache() -> DivoomCredentials | None:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+# Negative cache: after a network auth attempt fails, don't hammer the Divoom
+# cloud on every subsequent call (the GUI polls cloud-backed features). Within
+# the cooldown, get_credentials() fails fast without touching the network.
+_AUTH_FAIL_COOLDOWN = 120  # seconds
+_last_auth_fail_at: float = 0.0
+
+
+def get_cached_credentials() -> DivoomCredentials | None:
+    """Return valid cached credentials if present, else None. **Never** performs
+    a network login and **never** raises — safe for hot/polled paths such as the
+    transport-status panel, which must not initiate (or block on) a cloud login.
+    """
+    try:
+        return _load_cache()
+    except Exception as e:  # pragma: no cover - cache read is already defensive
+        print_wrn(f"Cached credential read failed: {e}")
+        return None
+
+
 def get_credentials(force_refresh: bool = False) -> DivoomCredentials:
     """
     Obtain valid Divoom credentials.
     Priority: cached → email/password login → guest fallback.
+
+    Raises RuntimeError if no cached token is available and a network login
+    fails (or was recently failing — see the cooldown). Callers that must not
+    crash on a cloud outage should use get_cached_credentials() or wrap this.
     """
+    global _last_auth_fail_at
+
     if not force_refresh:
         cached = _load_cache()
         if cached:
             return cached
+
+    # Fail fast inside the cooldown window so a down/changed cloud API can't be
+    # hammered once per poll.
+    since_fail = time.time() - _last_auth_fail_at
+    if since_fail < _AUTH_FAIL_COOLDOWN:
+        raise RuntimeError(
+            f"Divoom cloud auth unavailable (retry in "
+            f"{int(_AUTH_FAIL_COOLDOWN - since_fail)}s)"
+        )
 
     email, password = _load_config()
     if email and password:
@@ -225,7 +259,11 @@ def get_credentials(force_refresh: bool = False) -> DivoomCredentials:
         except Exception as e:
             print_wrn(f"Email login failed: {e} — falling back to guest")
 
-    creds = _login_guest()
+    try:
+        creds = _login_guest()
+    except Exception:
+        _last_auth_fail_at = time.time()
+        raise
     _save_cache(creds)
     return creds
 
