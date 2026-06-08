@@ -68,10 +68,19 @@ def spawn_daemon(
     if mac:
         cmd += ["--mac", mac]
     logger.info("Spawning daemon (detach=%s): %s", detach, " ".join(cmd))
+    # Log the daemon's own output to a file (was /dev/null) so its scan/connect
+    # behavior — incl. macOS Bluetooth crashes/denials — is visible.
+    log_path = os.environ.get("DIVOOM_DAEMON_LOG", "/tmp/divoom_daemon.log")
+    try:
+        log_fh = open(log_path, "a", buffering=1)
+        log_fh.write(f"\n==== daemon spawn {os.getpid()} detach={detach} ====\n")
+        _out = _err = log_fh
+    except OSError:
+        _out = _err = subprocess.DEVNULL
     return subprocess.Popen(
         cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=_out,
+        stderr=_err,
         stdin=subprocess.DEVNULL,
         start_new_session=detach,  # detached => own TCC identity (no BT grant)
         env=os.environ.copy(),
