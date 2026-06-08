@@ -29,6 +29,7 @@ _BUILD_SCRIPT = _REPO_ROOT / "scripts" / "build_libdivoom.sh"
 _C_SOURCES = [
     _REPO_ROOT / "divoom_lib" / "native_src" / "compact.c",
     _REPO_ROOT / "divoom_lib" / "native_src" / "downsample.c",
+    _REPO_ROOT / "divoom_lib" / "native_src" / "downsample_kernel.c",
     _REPO_ROOT / "divoom_lib" / "native_src" / "image_encode.c",
     _REPO_ROOT / "divoom_lib" / "native_src" / "image_encode_32.c",
 ]

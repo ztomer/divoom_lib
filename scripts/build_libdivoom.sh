@@ -72,6 +72,7 @@ echo "Building ${OUT} for ${OS}/${ARCH} with ${CC}…"
   -I"${NATIVE_SRC_DIR}" \
   "${NATIVE_SRC_DIR}/compact.c" \
   "${NATIVE_SRC_DIR}/downsample.c" \
+  "${NATIVE_SRC_DIR}/downsample_kernel.c" \
   "${NATIVE_SRC_DIR}/image_encode.c" \
   "${NATIVE_SRC_DIR}/image_encode_32.c" \
   "${LD_FLAGS[@]}" \

@@ -15,11 +15,10 @@ _DIRS = ["divoom_lib", "divoom_daemon", "divoom_gui"]
 _EXTS = {".py", ".c", ".js", ".css"}
 _LIMIT = 500
 
-# Acknowledged debt as of 2026-06. SHRINK ONLY — split a file, then delete its
-# entry. Do not add to this list; oversized new files must be split instead.
-ALLOWLIST = {
-    "divoom_lib/native_src/downsample.c",
-}
+# Acknowledged debt. SHRINK ONLY — split a file, then delete its entry. Do not
+# add to this list; oversized new files must be split instead.
+# 2026-06: fully retired — every divoom_* source file is now under 500 LOC.
+ALLOWLIST: set[str] = set()
 
 
 def _tracked_sources() -> list[Path]:
