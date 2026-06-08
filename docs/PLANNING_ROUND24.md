@@ -82,6 +82,17 @@ explicit granted `python3.14` binary (its own responsible process), + log
 definitive. (May also bump the 2s default scan timeout.)
 
 ## §outcome
+- **BLE detection from the GUI — RESOLVED** (commit `70e69ee0`). Two root causes:
+  (1) macOS TCC attributed the GUI-spawned daemon to pywebview's ungranted
+  `Python.app`, not the granted `python3.14` → `CBauth` 0/2, empty scans. Fix:
+  `spawn_daemon` now uses `responsibility_spawnattrs_setdisclaim` (libc
+  `posix_spawn`, new `_spawn_disclaimed_macos`) so the daemon is its OWN
+  responsible process under the granted `python3.14`. (2) The `DaemonClient` read
+  timeout (2s) was shorter than the scan duration, so the successful reply
+  surfaced as "timed out" — `send_command` now takes a `read_timeout` and `scan`
+  waits `timeout + 10s`. Verified `CBauth==3` + all 4 devices end-to-end via the
+  exact GUI startup sequence. The earlier "harness can't be a granted BT context"
+  note is moot — the disclaim makes BLE work from any parent.
 - **#1 SHIPPED** — single-instance GUI (flock) + menubar (pgrep); a 2nd dashboard
   exits before spawning a menubar, killing the runaway.
 - **#2 SHIPPED** — menubar uses `NSApplicationActivationPolicyAccessory` (no Dock).

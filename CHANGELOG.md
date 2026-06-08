@@ -6,6 +6,33 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 24 — 2026-06-08 (BLE detection from GUI, no user intervention)
+
+### Fixed — macOS BLE scan returned empty in the GUI
+
+- **TCC responsible-process attribution (the root cause).** pywebview re-hosts
+  the GUI process as `Python.app` (`org.python.python`), which is NOT in the
+  user's Bluetooth grant list, so a daemon spawned the normal way inherited that
+  ungranted identity and `CBCentralManager.authorization()` came back 0/2 →
+  every scan was silently empty (or aborted with a TCC privacy violation).
+  `spawn_daemon` (`divoom_gui/daemon_bridge.py`) now spawns the daemon with
+  **`responsibility_spawnattrs_setdisclaim`** via a libc `posix_spawn` (new
+  `_spawn_disclaimed_macos()`; POSIX_SPAWN_SETSID + file_actions redirecting
+  stdout/stderr to `/tmp/divoom_daemon.log`). The daemon becomes its OWN
+  responsible process, attributed to the granted `python3.14` binary regardless
+  of which process launched it. Verified `CBauth == 3` and all 4 devices found
+  from the GUI, a terminal, and the agent harness. Falls back to
+  `subprocess.Popen` on non-macOS or if the disclaim spawn is unavailable.
+- **Client read timeout shorter than the scan.** The daemon only replies after
+  scanning for `timeout` seconds, but `DaemonClient.send_command` read with its
+  2s default socket timeout, so a successful reply arrived too late and showed up
+  as `"timed out"`. `send_command` gained a `read_timeout` override and `scan`
+  now waits `timeout + 10s`.
+- Daemon `scan()` logs `pid / sys.executable / CBCentralManager.authorization()`
+  before scanning so the attribution state is visible in the daemon log.
+
+---
+
 ## Round 23 — 2026-06-07 (REVIEW §1.2 + §1.3 + §1.4 + §1.5)
 
 ### §1.2 — gui_api collaborator integration

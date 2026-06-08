@@ -15,6 +15,36 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R24 — BLE device detection from the GUI now works WITHOUT user
+  intervention. Suite 1010 / 0 / 75.** (commit `70e69ee0`)
+  Two root causes, both fixed in `divoom_gui/daemon_bridge.py` +
+  `divoom_daemon/daemon_protocol.py`:
+  1. **macOS TCC responsible-process attribution.** pywebview re-hosts the GUI
+     as `Python.app` (org.python.python — NOT in the Bluetooth grant list), so a
+     normally-spawned daemon inherited that ungranted identity →
+     `CBCentralManager.authorization()` == 0/2, scans silently empty/abort. Fix:
+     `spawn_daemon` now uses `_spawn_disclaimed_macos()` —
+     `responsibility_spawnattrs_setdisclaim` via libc `posix_spawn` (+
+     POSIX_SPAWN_SETSID, file_actions → `/tmp/divoom_daemon.log`) so the daemon
+     becomes its OWN responsible process, attributed to the granted `python3.14`
+     binary regardless of parent. **Verified CBauth==3 and all 4 devices found
+     from GUI/terminal/harness.** Falls back to `subprocess.Popen` on non-macOS
+     or if the disclaim spawn fails.
+  2. **Client read timeout < scan duration.** The daemon only replies AFTER
+     scanning `timeout` seconds, but `DaemonClient` read with its 2s default →
+     the successful reply arrived too late and surfaced as "timed out". Fix:
+     `send_command(read_timeout=…)` override; `scan` uses `timeout + 10s`.
+  Verified end-to-end with the exact GUI startup sequence (eager detached
+  `ensure_daemon` → fresh-client `scan`) → all 4 Divoom screens.
+
+- **NEXT (deferred round-2 UI polish, per user "polish UI afterwards"):**
+  (a) tabs consistency — make all three panels share the SAME structure (tabs
+  OUTSIDE the box; drop Channels' glass-panel-around-tabs so it matches
+  Tools/Settings). (b) device preview — REVERT the 100px preview shrink in
+  `sidebar.css` back toward 120px; instead shrink the glass PANEL vertically and
+  center the preview + "Select Screen…" selector. (c) #10 Weather — user's ask
+  was cut off ("Weather —"); confirm intent. See `docs/PLANNING_ROUND24.md`.
+
 - **R23 — 500-LOC debt FULLY RETIRED. Suite 994 / 0 / 75; allow-list empty.**
   opencode did the big REVIEW §1 splits (gui_api→`divoom_gui/api/*`, daemon→
   DeviceOwner/NotificationService/SocketServer + command registry, DeviceSlot,
