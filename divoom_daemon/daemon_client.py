@@ -267,6 +267,33 @@ class DaemonDeviceProxy:
         return DaemonDeviceProxy(self._client, self._path,
                                  target=self._target, _token=token)
 
+    async def push_animation(self, file_or_data: str | bytes,
+                              *,
+                              token: str | None = None) -> bool:
+        """Push an animation (GIF/image) to the device inside an exclusive
+        session.  ``file_or_data`` is either a local path *or* raw bytes
+        (written to a temp file first).  Calls ``display.show_image()``
+        which does the 0x8B 3-phase streaming internally.
+
+        Returns ``True`` on success.
+        """
+        import tempfile
+        if isinstance(file_or_data, bytes):
+            tmp = tempfile.NamedTemporaryFile(suffix=".gif", delete=False)
+            try:
+                tmp.write(file_or_data)
+                tmp.close()
+                path = tmp.name
+            except OSError:
+                tmp.close()
+                raise
+        else:
+            path = file_or_data
+
+        effective_token = token or f"push-anim-{id(path)}"
+        async with self.exclusive(effective_token) as p:
+            return bool(await p.display.show_image(path))
+
     def exclusive(self, token: str) -> _ProxyExclusiveCtx:
         """Context manager for an exclusive-mode session on the daemon.
 

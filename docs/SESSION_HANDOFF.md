@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R30 — Animation streaming (MCP tool + proxy exclusive context) SHIPPED.**
+  Suite **1090 / 75 / 0** (+5).
+
+  `DaemonDeviceProxy.push_animation(file_or_data, *, token)` — convenience
+  method that calls `display.show_image()` inside an exclusive-mode session.
+  Accepts file path or raw bytes.
+
+  MCP `push_animation` tool (13th tool) — accepts `file` (local path) or
+  `data` (base64). Uses exclusive mode when connected through daemon proxy.
+
+  Full write-up: `docs/PLANNING_ROUND30.md`.
+
 - **R29 — Exclusive mode through daemon RPC SHIPPED. Suite 1085 / 75 / 0.**
 
   The command queue's exclusive mode (R27) is now wired through `device_call`

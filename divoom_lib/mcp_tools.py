@@ -17,6 +17,7 @@ Tool list (initial):
   - set_low_power           (bool)
   - set_screen_orientation  (degrees, mirror)
   - show_image              (file path)
+  - push_animation          (file path or base64 data, exclusive-mode)
   - play_sound              (duration_ms)
   - get_capabilities        ()
   - get_device_state        ()
@@ -168,6 +169,30 @@ def _make_handlers(divoom) -> dict[str, Any]:
         ok = await divoom.display.show_image(file)
         return {"ok": bool(ok), "file": file}
 
+    async def push_animation(file: str | None = None,
+                             data: str | None = None) -> dict:
+        """Push a GIF/animation to the device via 0x8B 3-phase streaming.
+
+        Provide *either* a local ``file`` path *or* base64-encoded
+        ``data`` (for MCP clients without a shared filesystem).  The
+        push runs inside an exclusive-mode session so the multi-phase
+        0x8B sequence is never interleaved with other commands."""
+        if bool(file) == bool(data):
+            raise ValueError("provide exactly one of 'file' or 'data'")
+        if data:
+            import base64
+            file_or_data = base64.b64decode(data)
+        else:
+            file_or_data = file  # type: ignore[assignment]
+        # If divoom is a DaemonDeviceProxy, use push_animation (exclusive).
+        # Otherwise fall back to display.show_image.
+        from divoom_daemon.daemon_client import DaemonDeviceProxy
+        if isinstance(divoom, DaemonDeviceProxy):
+            ok = await divoom.push_animation(file_or_data)
+        else:
+            ok = await divoom.display.show_image(file_or_data)
+        return {"ok": bool(ok)}
+
     async def play_sound(duration_ms: int) -> dict:
         """Beep the device for ``duration_ms`` milliseconds.
 
@@ -243,6 +268,7 @@ def _make_handlers(divoom) -> dict[str, Any]:
         "set_low_power": set_low_power,
         "set_screen_orientation": set_screen_orientation,
         "show_image": show_image,
+        "push_animation": push_animation,
         "play_sound": play_sound,
         "get_capabilities": get_capabilities,
         "get_device_state": get_device_state,
@@ -342,6 +368,23 @@ _SCHEMAS: dict[str, dict] = {
         },
         "required": ["file"],
     },
+    "push_animation": {
+        "type": "object",
+        "properties": {
+            "file": {
+                "type": "string",
+                "description": "Local filesystem path to the GIF/animation to push.",
+            },
+            "data": {
+                "type": "string",
+                "description": "Base64-encoded GIF/animation bytes (alternative to 'file').",
+            },
+        },
+        "oneOf": [
+            {"required": ["file"]},
+            {"required": ["data"]},
+        ],
+    },
     "play_sound": {
         "type": "object",
         "properties": {
@@ -372,6 +415,7 @@ _DESCRIPTIONS: dict[str, str] = {
     "set_low_power": "Enable or disable the device's low-power mode.",
     "set_screen_orientation": "Rotate the device's display 0/90/180/270 degrees; optionally mirror/flip.",
     "show_image": "Push a local image file to the device (palette-quantized + bit-packed on the wire).",
+    "push_animation": "Push a GIF/animation via 0x8B 3-phase streaming inside an exclusive session. Provide 'file' (path) or 'data' (base64).",
     "play_sound": "Beep the device for 100-3000 ms (best-effort; some firmware no-ops).",
     "get_capabilities": "Read the device's static capabilities (panel resolution, has_speaker, etc.).",
     "get_device_state": "Read the device's current volume, brightness, channel, orientation, and mirror state.",

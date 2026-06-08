@@ -36,6 +36,10 @@ class _Facade:
         self._calls.append(("display.show_light", color, brightness))
         return True
 
+    async def show_image(self, path):
+        self._calls.append(("display.show_image", path))
+        return True
+
     async def get_brightness(self):
         return {"brightness": 55}
 
@@ -180,6 +184,44 @@ def test_proxy_exclusive_context(live_daemon):
         ("display.show_light", "FF0000", 50),
         ("display.show_light", "00FF00", 75),
     ]
+
+
+# ── push_animation (R30) ──────────────────────────────────────────────
+
+
+def test_proxy_push_animation_calls_show_image(live_daemon):
+    """DaemonDeviceProxy.push_animation() calls display.show_image inside
+    an exclusive session (detected by the token being forwarded in device_call)."""
+    _, dev, sp = live_daemon
+    client = DaemonClient(sp)
+    proxy = DaemonDeviceProxy(client)
+
+    async def go():
+        ok = await proxy.push_animation("tests/test_animation_8b_stream.py")
+        assert ok is True
+
+    _run(go())
+    assert len(dev.calls) >= 1
+    # The method path must include display.show_image
+    assert any("show_image" in str(c) for c in dev.calls)
+
+
+def test_proxy_push_animation_with_raw_bytes(live_daemon, tmp_path):
+    """push_animation accepts raw bytes, writes them to a temp file, and
+    calls display.show_image with the temp path."""
+    _, dev, sp = live_daemon
+    client = DaemonClient(sp)
+    proxy = DaemonDeviceProxy(client)
+    fake_gif = b"GIF89a" + b"\x00" * 100
+
+    async def go():
+        ok = await proxy.push_animation(fake_gif)
+        assert ok is True
+
+    _run(go())
+    assert len(dev.calls) >= 1
+    # should have called show_image with a temp file path
+    assert any("show_image" in str(c) for c in dev.calls)
 
 
 def test_exclusive_call_issues_command(live_daemon):

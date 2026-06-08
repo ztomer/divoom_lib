@@ -166,13 +166,14 @@ async def test_tools_list_returns_full_catalog() -> None:
     resp = await s.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
     assert resp["id"] == 2
     tools = resp["result"]["tools"]
-    # 12 tools in the initial catalog.
-    assert len(tools) == 12
+    # 13 tools in the catalog.
+    assert len(tools) == 13
     names = {t["name"] for t in tools}
     assert names == {
         "set_volume", "set_brightness", "set_light_mode", "set_weather",
         "set_alarm", "set_radio", "set_low_power",
-        "set_screen_orientation", "show_image", "play_sound",
+        "set_screen_orientation", "show_image", "push_animation",
+        "play_sound",
         "get_capabilities", "get_device_state",
     }
     # Every tool has the 3 required descriptor fields.
@@ -240,6 +241,52 @@ async def test_tools_call_set_weather_ok() -> None:
     assert payload["ok"] is True
     assert payload["temperature_c"] == 15
     divoom.weather.set.assert_awaited_once_with(15, 6)  # 6 = Rain
+
+
+@pytest.mark.asyncio
+async def test_tools_call_push_animation_with_file() -> None:
+    """push_animation with 'file' calls display.show_image."""
+    divoom = _fake_divoom()
+    s = _build_server(divoom)
+    resp = await s.handle({
+        "jsonrpc": "2.0", "id": 4, "method": "tools/call",
+        "params": {"name": "push_animation",
+                   "arguments": {"file": "/tmp/test.gif"}},
+    })
+    payload = json.loads(resp["result"]["content"][0]["text"])
+    assert payload["ok"] is True
+    divoom.display.show_image.assert_awaited_once_with("/tmp/test.gif")
+
+
+@pytest.mark.asyncio
+async def test_tools_call_push_animation_with_data() -> None:
+    """push_animation with base64 'data' decodes and calls display.show_image."""
+    import base64
+    divoom = _fake_divoom()
+    s = _build_server(divoom)
+    raw = b"GIF89a" + b"\x00" * 50
+    encoded = base64.b64encode(raw).decode("ascii")
+    resp = await s.handle({
+        "jsonrpc": "2.0", "id": 5, "method": "tools/call",
+        "params": {"name": "push_animation",
+                   "arguments": {"data": encoded}},
+    })
+    payload = json.loads(resp["result"]["content"][0]["text"])
+    assert payload["ok"] is True
+    # Should have called display.show_image with the raw bytes
+    divoom.display.show_image.assert_awaited_once_with(raw)
+
+
+@pytest.mark.asyncio
+async def test_tools_call_push_animation_requires_one_of() -> None:
+    """push_animation rejects providing both or neither of file/data."""
+    s = _build_server()
+    resp = await s.handle({
+        "jsonrpc": "2.0", "id": 6, "method": "tools/call",
+        "params": {"name": "push_animation",
+                   "arguments": {"file": "/tmp/a.gif", "data": "AAAA"}},
+    })
+    assert resp.get("error") or resp.get("result", {}).get("isError")
 
 
 @pytest.mark.asyncio
@@ -332,7 +379,7 @@ async def test_handle_request_bytes_notification() -> None:
 def test_catalog_has_twelve_tools() -> None:
     from divoom_lib.mcp_tools import build_tool_catalog
     catalog = build_tool_catalog(_fake_divoom())
-    assert len(catalog) == 12
+    assert len(catalog) == 13
 
 
 def test_each_tool_has_required_schema_fields() -> None:

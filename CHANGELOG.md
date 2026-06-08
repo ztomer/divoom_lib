@@ -6,6 +6,40 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 30 — 2026-06-08 (Animation streaming — MCP tool + proxy exclusive context)
+
+### `DaemonDeviceProxy.push_animation()`
+
+- New convenience method on the daemon proxy: `push_animation(file_or_data, *, token)`
+  accepts a local file path *or* raw bytes (written to a temp file). Runs
+  `display.show_image()` inside an exclusive-mode session so the 0x8B 3-phase
+  streaming sequence is never interleaved with other commands.
+
+### MCP `push_animation` tool
+
+- 13th MCP tool: `push_animation(file|data)` — pushes a GIF/animation via 0x8B.
+  Accepts a local `file` path OR base64-encoded `data` (for remote clients without
+  a shared filesystem). When `divoom` is a `DaemonDeviceProxy`, uses
+  `push_animation()` for exclusive-mode protection; otherwise falls back to
+  `display.show_image()`.
+- Schema uses `oneOf` to require exactly one of `file` or `data`.
+
+### Tests
+
+- 3 MCP tests: file path, base64 data, both/neither validation.
+- 2 bridge tests: push_animation with file path, push_animation with raw bytes.
+- Suite **1090 / 75 / 0** (+5).
+
+### Files touched
+
+- `divoom_daemon/daemon_client.py` — `DaemonDeviceProxy.push_animation()`.
+- `divoom_lib/mcp_tools.py` — `push_animation` tool handler, schema, description.
+- `tests/test_mcp_server.py` — 3 new tests, tool count 12→13.
+- `tests/test_daemon_bridge.py` — 2 new tests; `_Facade.show_image()` added.
+- `docs/PLANNING_ROUND30.md` — new.
+
+---
+
 ## Round 29 — 2026-06-08 (Exclusive mode through daemon RPC)
 
 ### Wire exclusive mode through device_call
