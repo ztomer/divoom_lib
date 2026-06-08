@@ -2,8 +2,9 @@
 window.DivoomTemplates = window.DivoomTemplates || {};
 window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome is now .tabs-row + .tab-btn
                      (defined in tabs.css) — same active state as Channels and
-                     Tools. The legacy class names are aliased in settings.css
-                     for backward compat with the JS selectors. -->
+                     Tools. The glass-card wrapper unifies appearance with
+                     the Channels tab row, which sits inside a card header. -->
+                <div class="tabs-section" style="width:100%; box-sizing:border-box;">
                 <div class="tabs-row" role="tablist" aria-label="Settings">
                     <button class="tab-btn active" data-settings-tab="settings-devices" data-tab="settings-devices" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Devices</button>
                     <button class="tab-btn" data-settings-tab="settings-divoom" data-tab="settings-divoom" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 12h6a3 3 0 0 0 .4-6A4 4 0 0 0 4 7a3 3 0 0 0 1 5z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>Divoom</button>

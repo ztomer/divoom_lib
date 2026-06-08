@@ -19,6 +19,16 @@
    - Optional icon prefix: `<svg class="tab-icon">` or `<img class="tab-icon">`.
    - Tooltips: `title` attribute.
 */
+/* R24 #3: wrapper that gives a tab row the SAME bottom treatment as the
+   Channels card-header (the reference): a separator + consistent gap to the
+   content. Applied to Tools + Settings so all three panels match pixel-for-pixel.
+   Values mirror style.css `.card-header`. */
+.tabs-section {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .tabs-row {
   display: flex;
   gap: 6px;
@@ -31,6 +41,10 @@
      window's right edge. */
   width: fit-content;
   max-width: 100%;
+  /* R24 #4: center the tab row horizontally (macOS convention). Works in both
+     block parents (Tools/Settings) and the flex card-header (Channels). */
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .tabs-row .tab-btn {
