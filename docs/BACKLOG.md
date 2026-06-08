@@ -13,20 +13,32 @@ round's planning doc.
 
 ## Open
 
-### Regressions (likely from the R23 gui_api/web_ui refactors — HIGH priority)
-- `OPEN` **Scan devices no longer works** (worked before).
-- `OPEN` **Clock channel only shows "Clock Color"** — used to show the full clock
-  style/face options. (This is what looked like "dead space" in the UI pass — it's
-  a regression, not a design choice.)
-- `OPEN` **Channel panels empty**: EQ Visualizer empty, VJ Effects empty, Custom
-  Art shows no cached art, Ambient shows only color selection (effects missing).
-- `OPEN` **Menubar item doesn't appear** when launching the app.
-
-(Reported 2026-06-08. Strong suspicion: the pywebview bridge / JS API surface or
-web_ui script wiring broke when gui_api was split into `divoom_gui/api/*` and the
-`web_ui/*.js` files were split — JS calls to bridge methods that moved/aren't
-exposed fail silently → empty panels. Investigate the bridge method exposure +
-JS population calls first.)
+### Regressions reported 2026-06-08 — root-caused
+- `DONE` **Clock / EQ / Custom Art / Ambient panels were empty** (and VJ "missing").
+  Root: a stray duplicate `});` in `channels_grids.js` (R23 web_ui split) was a JS
+  **syntax error** that halted the whole file, so every grid builder silently
+  never ran. Fixed (one brace) + guarded by `tests/test_web_ui_js_syntax.py`
+  (`node --check` all web_ui JS). Verified live: clock-faces grid, 12 EQ effects,
+  Custom Art panel all render again. (VJ Effects is *correctly* hidden unless the
+  device is a Timebox Evo — `updateChannelButtonsVisibility`; it only showed
+  before because the syntax error stopped that filter running.)
+- `DONE` **Menubar item didn't appear on launch.** Two bugs: (1) the agent
+  crashed at startup — `'super' object has no attribute 'init'`; PyObjC NSObject
+  subclasses need `objc.super(...).init()`, not Python `super()`. (2) nothing
+  spawned it — `gui_main` now launches the agent on startup (macOS, detached,
+  dupe-guarded). Verified live: "Divoom (idle)" status item + menu.
+- `HW`/`UPSTREAM` **Scan devices crashes the BLE backend.** Root: on this machine
+  (**Python 3.14.5**, the only one installed) a `bleak`/CoreBluetooth scan
+  **natively aborts** the process during the macOS Bluetooth-permission (TCC)
+  flow — crashes on the main thread AND a worker thread, so it's a pyobjc/3.14
+  incompatibility, not catchable by Python. The R17 cutover compounds it: the
+  scan now runs in an auto-spawned **daemon subprocess** that doesn't inherit the
+  GUI's Bluetooth TCC grant. **Fix path (not code):** run on **Python 3.13**
+  (`brew install python@3.13`) where pyobjc/bleak are stable, or grant Bluetooth
+  permission to the python binary. Mitigation shipped: the scan handler now has a
+  `.catch()` so it fails gracefully (button re-enables + error toast) instead of
+  spinning forever. **This also means the R17 daemon BLE path is unverified on
+  real hardware here — it crashes on any real BLE op (scan/connect) under 3.14.**
 
 ### Device / protocol
 - `OPEN` **Custom Art / Design channel switch** doesn't reliably change the active
