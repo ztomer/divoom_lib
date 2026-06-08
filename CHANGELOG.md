@@ -1240,3 +1240,55 @@ a Show button + an Enabled checkbox + a Hide button
   switched separately.
 - Removed test `test_weather_push_switches_channel_before_data` which tested
   the reverted behaviour.
+
+---
+
+## Round 27 — 2026-06-08 (Command queue with ring buffer, maxsize, item timeout)
+
+### Added — `divoom_daemon/command_queue.py`
+
+- **`CommandQueue` class** (`divoom_daemon/command_queue.py`): FIFO command
+  queue wrapping the daemon's asyncio loop. Replaces direct
+  ``asyncio.run_coroutine_threadsafe(coro, loop).result()`` in
+  ``DeviceOwner._run_device()`` so all device-call dispatch is serialised
+  through a single queue.
+
+- **`maxsize` parameter** (constructor): bounded queue with pre-allocated
+  ring buffer (``_Ring``). ``submit()`` raises ``QueueFull`` when at
+  capacity. Zero = unbounded (dynamic list-backed).
+
+- **`item_timeout` parameter** (constructor): per-item timeout checked at
+  dequeue time. Expired items are transparently rejected with
+  ``TimeoutError`` before the worker picks the next item.
+
+- **`timeout` parameter** (``submit()`` / ``submit_async()``): per-submit
+  override of the queue-wide ``item_timeout``. ``None`` disables timeout for
+  that item; omit to inherit the queue default.
+
+- **Exclusive mode** (``queue.exclusive(token)`` context manager, lines
+  240-250): atomic multi-phase scopes. Items with a matching token are
+  dispatched; non-matching items queue behind the exclusive session.
+
+- **``QueueFull`` / ``QueueStopped``** exception classes: raised
+  synchronously from ``submit()`` when the queue is at capacity or stopped.
+
+### Changed — `divoom_daemon/device_owner.py`
+
+- **``_run_device()``** now routes through ``self._cmd_queue.submit()``
+  instead of ``asyncio.run_coroutine_threadsafe``. Lazily creates the queue
+  via ``_device_loop()`` if not yet initialised (fixed regression where
+  queue was ``None`` for early callers).
+
+- **``DeviceOwner.stop()``** now stops the command queue before stopping
+  the loop, preventing "Task was destroyed" warnings.
+
+### Tests — `tests/test_command_queue.py`
+
+- 30 tests total (was 14). Added:
+  - Exclusive mode: multiple tokens, token=None with exclusive active
+  - Stress: 50 concurrent submissions, 30-thread sync submit, 100-item burst
+  - Lifecycle: submit after stop raises QueueStopped, start/stop cycle
+  - Maxsize: full rejection, at-capacity acceptance, active-item exclusion
+  - Item timeout: stale expiry, per-submit override, explicit None survival
+  - Exception propagation: all built-in exception types
+  - Null result: coroutine returning ``None``

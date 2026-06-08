@@ -15,34 +15,50 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **R26 — Daemon channel-switch API + weather fix SHIPPED.**
-  Suite **1025 passed / 75 skipped / 0 failed** (+3 from 1022).
+- **R27 — Command queue SHIPPED.**
+  Suite **1055 passed / 75 skipped / 0 failed** (+30 from 1025).
 
-  **Library changes:**
-  - `Display.set_temperature_channel()` — APK-canonical 6-byte 0x45 format
-    `[0x01, temp_type, R, G, B, 0x00]`. Switches device to TEMPRETURE display
-    mode.
-  - `Display.set_clock_rich()` — APK C2() 10-byte 0x45 format with correct
-    humidity/weather/date overlay positions. Kept alongside existing
-    `show_clock()` for backward compat.
-  - `TEMPRETURE_CHANNEL = 0x01` constant added.
+  **New module: `divoom_daemon/command_queue.py`**
+  - `CommandQueue` class with `_Ring` pre-allocated ring buffer (O(1) FIFO,
+    no reallocation). When `maxsize > 0` the backing array is pre-allocated
+    and never grows.
+  - `submit()` / `submit_async()` — thread-safe coroutine submission.
+    Sync `submit()` blocks briefly to raise `QueueFull`/`QueueStopped`
+    synchronously (not asynchronously on the future).
+  - `maxsize` (constructor, 0 = unbounded): bounded queue with
+    `QueueFull` exception at capacity.
+  - `item_timeout` (constructor) + `timeout` (submit param): items that sit
+    too long in the queue are transparently rejected with `TimeoutError`
+    at dequeue time. `None` disables per-item.
+  - Exclusive mode (`queue.exclusive(token)` context manager): atomic
+    multi-phase scopes where only matching-token items are dispatched.
+  - Worker lifecycle: `start()` / `stop()`. `stop()` drains pending items
+    with `RuntimeError`, cancels stuck worker after 2s timeout.
 
-  **Weather push fix:**
-  - `WidgetsApi.push_weather()` now does two-step: (1) 0x45 APK-canonical channel
-    switch, (2) 0x5F data push. Previously sent 0x5F only.
-  - Weather card has a "Push to Device" button + `pushWeatherToDevice()` JS.
+  **Integration: `divoom_daemon/device_owner.py`**
+  - `_run_device()` now routes through `self._cmd_queue.submit()` instead
+    of direct `asyncio.run_coroutine_threadsafe`. Lazily initialises the
+    queue via `_device_loop()` if not yet set (fixes regression).
+  - `DeviceOwner.stop()` stops the queue before the loop, eliminating
+    "Task was destroyed" warnings.
 
-  **GUI bridge:**
-  - `WidgetsApi.set_temperature_channel()` — standalone channel switch.
-  - `LightingApi.set_clock_rich()` / `set_temperature_channel()` — display ops.
-  - `DivoomGuiAPI.set_temperature_channel()` / `set_clock_rich()` — pywebview.
+  **Tests: `tests/test_command_queue.py`** — 30 tests (was 14):
+  - FIFO, result/exception propagation, exclusive mode (multi-token,
+    deferral, token=None), concurrent submisssions (10-way, 50-way,
+    30-thread sync), lifecycle (stop drain, idempotent start, start/stop
+    cycle, submit-after-stop), maxsize (full rejection, active-item
+    exclusion), item timeout (stale expiry, per-submit override, explicit
+    None), stress (100-item burst, exclusive+deferred), edge cases
+    (cancel non-blocking, empty queue survival, exception types, None
+    result).
 
-  **Tests:**
-  - 3 new E2E mock-device tests verifying exact APK wire bytes.
-  - Contract test updated for the Push to Device button.
+  **See** `CHANGELOG.md`, `docs/PLANNING_ROUND27.md`.
 
+- **R26 — Daemon channel-switch API + weather fix SHIPPED. Suite 1025 / 75 / 0.**
+  Library: `Display.set_temperature_channel()`, `set_clock_rich()`,
+  `TEMPRETURE_CHANNEL`. Weather fix: `push_weather()` two-step (0x45 channel
+  switch + 0x5F data push). GUI: Push to Device button on weather card.
   See `CHANGELOG.md`, `docs/LLD_R26.md`, `docs/PLANNING_ROUND26.md`.
-  **Not pushed** (deferred to R27 commit cycle).
 
 - **R23 — 500-LOC debt FULLY RETIRED. Suite 994 / 0 / 75; allow-list empty.**
   opencode did the big REVIEW §1 splits (gui_api→`divoom_gui/api/*`, daemon→
@@ -338,15 +354,12 @@ core rule in `AGENTS.md`).
 
 ## Open threads / next up
 
-### R27 — push to origin + command queue
-1. **Push** uncommitted R26 work to origin (channel research docs, LLD, R26 plan,
-   weather fix, tests).
-2. **Daemon-level command queue** for multi-phase 0x8B protection (animation
-   streaming).
-3. **Re-add** `test_weather_push_switches_channel_before_data` or equivalent
-   daemon-proxy roundtrip test for the two-step sequence.
-
-### Deferred to R28+
+### R28+
+- **Wire exclusive mode through `device_call`** for multi-step ops that
+  need atomic access (e.g., animation streaming with 0x8B protocol).
+- **Drop `test_submit_after_stop_raises` `coro_for` was-never-awaited
+  warning**: the coroutine object is created but never executed (stop
+  rejects it before the worker can run it) — harmless but noisy.
 - `show_clock()` overlay reorder to APK layout.
 - **R12 §A visual pass** (user-run): glass tab strip, appbar corners, etc.
 - **R12 §B hardware verification** (user-run): album cover, custom-art/live/weather.

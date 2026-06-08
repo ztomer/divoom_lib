@@ -46,6 +46,7 @@ class DeviceOwner:
         self._lan_ip: Optional[str] = None
         self._wall = None                       # DivoomWall (multi-device)
         self._wall_slots: dict = {}
+        self._cmd_queue = None                  # CommandQueue, created with loop
 
     # ── device loop ──────────────────────────────────────────────────────
     def _device_loop(self):
@@ -54,6 +55,7 @@ class DeviceOwner:
             if self._loop is not None:
                 return self._loop
             import asyncio
+            from divoom_daemon.command_queue import CommandQueue
             loop = asyncio.new_event_loop()
             ready = threading.Event()
 
@@ -66,13 +68,21 @@ class DeviceOwner:
             self._loop_thread.start()
             ready.wait(2.0)
             self._loop = loop
+            self._cmd_queue = CommandQueue(loop)
+            self._cmd_queue.start()
             return self._loop
 
-    def _run_device(self, coro):
-        """Run a coroutine on the persistent device loop, blocking for the result."""
-        import asyncio
-        loop = self._device_loop()
-        return asyncio.run_coroutine_threadsafe(coro, loop).result()
+    def _run_device(self, coro, *, token=None):
+        """Run a coroutine through the command queue, blocking for the result.
+
+        All device access goes through the queue (FIFO, exclusive-mode
+        support).  This is the only path that touches the device event loop.
+        ``CommandQueue.submit()`` is thread-safe and returns a
+        ``concurrent.futures.Future`` — we block on ``.result()`` here.
+        """
+        if self._cmd_queue is None:
+            self._device_loop()
+        return self._cmd_queue.submit(coro, token=token).result()
 
     def _device_connected(self) -> bool:
         d = self._device
@@ -393,6 +403,11 @@ class DeviceOwner:
 
     # ── lifecycle ────────────────────────────────────────────────────────
     def stop(self) -> None:
+        if self._cmd_queue is not None:
+            try:
+                self._cmd_queue.stop()
+            except Exception:
+                pass
         if self._loop is not None:
             try:
                 self._loop.call_soon_threadsafe(self._loop.stop)
