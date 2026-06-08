@@ -340,15 +340,20 @@ async def test_weather_push_switches_channel_before_data(monkeypatch):
             assert ok is True, f"push_weather returned False, commands={commands}"
         finally:
             loop_thread.stop()
-        # Channel switch (TEMPRETURE mode 1) must precede the weather data.
-        idx_light = next((i for i, c in enumerate(commands) if c[0] == "set_light_mode"), -1)
-        idx_send = next((i for i, c in enumerate(commands) if c[0] == "send_command"), -1)
-        assert idx_light >= 0, f"No set_light_mode call in {commands}"
-        assert commands[idx_light][1] == 1, (
-            f"Expected set_light_mode(1), got {commands[idx_light]}"
+        # Channel switch (TEMPRETURE mode 1, 6-byte payload) must precede
+        # the weather data send.  Per APK CmdManager.t2: [1, temp_type,
+        # r, g, b, 0].
+        idx_light = next((i for i, c in enumerate(commands)
+                          if c[0] == "send_command" and c[1] == 0x45), -1)
+        idx_weather = next((i for i, c in enumerate(commands)
+                            if c[0] == "send_command" and c[1] == 0x5F), -1)
+        assert idx_light >= 0, f"No 0x45 command in {commands}"
+        assert commands[idx_light][1] == 0x45
+        assert commands[idx_light][2] == [1, 0, 255, 255, 255, 0], (
+            f"Expected 6-byte thermal payload, got {commands[idx_light]}"
         )
-        assert idx_light < idx_send, (
-            f"set_light_mode at pos {idx_light} should precede send_command at {idx_send}: {commands}"
+        assert idx_light < idx_weather, (
+            f"0x45 at pos {idx_light} should precede 0x5F at {idx_weather}: {commands}"
         )
     finally:
         d.stop()
