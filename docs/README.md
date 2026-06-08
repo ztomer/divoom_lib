@@ -8,6 +8,7 @@
   Uncle Bob), UI/UX (Rams + Kare), and "rewrite in Rust?" review.
 - **[SESSION_HANDOFF.md](SESSION_HANDOFF.md)** — live cross-session state + open
   threads. Update every round.
+- **[BACKLOG.md](BACKLOG.md)** — the single living roadmap of open features/fixes.
 - **[../CHANGELOG.md](../CHANGELOG.md)** — shipped milestones.
 - **[../AGENTS.md](../AGENTS.md)** / **[../CONTRIBUTING.md](../CONTRIBUTING.md)** —
   conventions for agents + humans.
