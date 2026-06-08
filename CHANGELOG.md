@@ -46,6 +46,25 @@ shipped milestone (per the project planning docs).
 - Tests: `tests/test_daemon_config.py` (defaults, file-write, override parse,
   0-limit edge, bad-value + missing-section fallback, slack helper).
 
+### Fixed — switching devices failed with "Daemon connect failed: timed out"
+
+- The `connect`/`disconnect` RPCs used `DaemonClient`'s 2s default read timeout,
+  but BLE connection setup is far slower — the client abandoned the connect
+  exactly 2.000s in while the daemon was still mid-handshake. Added a
+  `connect_timeout` knob (default 20s) to `daemon.ini`, applied to
+  `connect_device` + `disconnect_device`. Quick commands keep the short
+  `client_timeout`.
+
+### Changed — unified tab rows on a glass strip (all three panels)
+
+- Previously only Channels had a glass panel behind its tabs; Tools + Settings
+  had bare tabs on a transparent strip. Now `.tabs-section` is a glass panel
+  (matching `.glass-card`) holding the centered tab row in Channels, Tools, and
+  Settings, with a consistent gap to the content below. Channels' tab row moved
+  out of the content card-header into its own `.tabs-section` strip; Tools went
+  full-width. (No menubar "launched successfully" toast either — removed as a
+  routine, non-actionable notification.)
+
 ---
 
 ## Round 23 — 2026-06-07 (REVIEW §1.2 + §1.3 + §1.4 + §1.5)

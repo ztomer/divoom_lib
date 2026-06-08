@@ -55,14 +55,15 @@ screenshot, pixel-measure). Use screenshots to make spacing changes pixel-perfec
 ## Round-2 UI feedback (2026-06-08, with screenshots) — DEFERRED until daemon works
 (User: "write these down … focus FIRST on the daemon/gui + device detection
 without user intervention; polish UI afterwards.")
-- **#3-redo (tabs STILL inconsistent).** Only **Channels** wraps its tabs +
-  content in ONE glass panel; Tools/Settings have bare tabs floating above
-  separate content cards, and the tab→first-block distance varies a lot. Make all
-  three CONSISTENT — per the earlier Kare/Rams call, tabs **outside** the box:
-  Channels should drop the glass-panel-around-tabs so it matches Tools/Settings
-  (bare centered tab row → separator → content cards), and the tab→content gap
-  must be identical everywhere. (My `.tabs-section` pass only normalized the
-  separator/margin; the glass-panel-vs-bare structural mismatch remains.)
+- **#3-redo (tabs STILL inconsistent) — RESOLVED** (commit `5b70646b`). Final
+  direction (user, 2026-06-08): the OPPOSITE of the earlier "bare tabs" call —
+  *all three* tab rows should sit on a **glass background** with consistent
+  spacing. Implemented one model everywhere: `.tabs-section` is now a glass panel
+  (same tokens as `.glass-card`) holding the centered tab row, with a uniform
+  `margin-bottom` gap to the content cards. Channels' tab row was moved OUT of the
+  content card-header into its own `.tabs-section` strip above the content card
+  (channel-switch JS untouched — it selects `.tab-btn[data-channel]` globally).
+  Tools dropped its `max-width:600px` so the strip is full-width like the others.
 - **#6-redo (device preview).** Do NOT shrink the preview image. Instead: shrink
   the **glass panel** it sits on a little *vertically*, and **center** both the
   preview and the "Select Screen…" selector within it. (Revert the 100px preview

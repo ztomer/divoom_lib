@@ -48,6 +48,23 @@ core rule in `AGENTS.md`).
   user-sent per-scan timeout still wins; the config is just the fallback. No more
   15/4/2.0/3.0/10.0 literals scattered around. Tests: `test_daemon_config.py`.
 
+- **R24 follow-ups (this session).** (a) **Connect timeout fix** (`62b2d244`):
+  switching devices failed `connect failed: timed out` at exactly 2.000s — the
+  `connect`/`disconnect` RPCs used the 2s `client_timeout` while BLE setup is
+  slower. New `connect_timeout` knob (default 20s) in `daemon.ini`, applied to
+  both. (b) **No "launched successfully" menubar toast** (`77162457`) — routine
+  success isn't worth a notification. (c) **Unified glass tab strip**
+  (`5b70646b`): `.tabs-section` is now a glass panel in ALL three panels
+  (Channels/Tools/Settings) with consistent spacing — Channels' tabs moved out of
+  the content card-header into their own strip; Tools went full-width. Final
+  direction was the OPPOSITE of the earlier "bare tabs" call (user now wants glass
+  everywhere). **Needs a user eyeball after reload.**
+
+- **STILL OPEN — #6-redo (device preview).** Not done yet: revert the 100px
+  preview shrink in `sidebar.css` toward 120px; instead shrink the glass PANEL
+  vertically and center the preview + "Select Screen…" selector. Also confirm the
+  cut-off **#10 Weather** ask.
+
 - **NEXT (deferred round-2 UI polish, per user "polish UI afterwards"):**
   (a) tabs consistency — make all three panels share the SAME structure (tabs
   OUTSIDE the box; drop Channels' glass-panel-around-tabs so it matches
