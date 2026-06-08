@@ -23,14 +23,25 @@ class WidgetsApi(ApiBase):
 
         async def _push(d):
             info = await get_weather()
-            # Switch to TEMPRETURE channel (light mode 1). Per the decompiled
-            # APK (CmdManager.t2), the payload is [mode=1, R, G, B, ?, 0].
-            # A bare set_light_mode(1) sends only [1] → device interprets
-            # missing bytes as garbage RGB → dark screen. Send white.
-            await d.send_command(COMMANDS["set light mode"], [1, 255, 255, 255, 0, 0])
+            # Step 1: switch to TEMPRETURE channel (APK canonical 0x45)
+            await d.send_command(
+                COMMANDS["set light mode"],
+                [0x01, 0x00, 0xFF, 0xFF, 0xFF, 0x00],
+            )
+            # Step 2: push temperature + weather data
             return await Weather(d).set(info.temperature_c, info.weather_type)
 
         return self._tool_call(_push, "weather")
+
+    def set_temperature_channel(self, celsius: bool = True, color: str = "#ffffff") -> bool:
+        from divoom_lib.models import COMMANDS
+
+        async def _call(d):
+            temp_type = 0 if celsius else 1
+            payload = [0x01, temp_type, 0xFF, 0xFF, 0xFF, 0x00]
+            return await d.send_command(COMMANDS["set light mode"], payload)
+
+        return self._tool_call(_call, "set_temperature_channel")
 
     def _tool_call(self, fn, label: str) -> bool:
         logger.info(f"GUI Action: Tool {label}...")

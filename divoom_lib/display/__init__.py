@@ -22,6 +22,32 @@ class Display:
         self.communicator = communicator
         self.logger = communicator.logger
 
+    async def set_temperature_channel(self, celsius: bool = True, color: str = "#ffffff") -> bool:
+        """Switch to TEMPRETURE display mode (APK canonical 0x45).
+
+        Wire: 0x45 [0x01, temp_type, R, G, B, 0x00]
+        temp_type: 0 = Celsius, 1 = Fahrenheit
+        Does NOT push weather data — use Weather.set() after.
+        """
+        temp_type = 0 if celsius else 1
+        rgb = self.communicator.convert_color(color)
+        payload = [0x01, temp_type, rgb[0], rgb[1], rgb[2], 0x00]
+        return await self.communicator.send_command("set light mode", payload)
+
+    async def set_clock_rich(self, style: int = 0, twentyfour: bool = True, humidity: bool = False, weather: bool = False, date: bool = False, color: str = "#ffffff") -> bool:
+        """Set CLOCK channel using APK C2() 10-byte format (0x45).
+
+        Wire: 0x45 [0x00, time_type, style, 0x01, humidity, weather, date, R, G, B]
+        Different overlay positions than show_clock() — APK canonical.
+        """
+        rgb = self.communicator.convert_color(color)
+        payload = [
+            0x00, int(twentyfour), style & 0xFF, 0x01,
+            int(humidity), int(weather), int(date),
+            rgb[0], rgb[1], rgb[2],
+        ]
+        return await self.communicator.send_command("set light mode", payload)
+
     async def show_clock(self, clock: int = 0, twentyfour: bool = True, weather: bool = False, temp: bool = False, calendar: bool = False, color: str | None = None, hot: bool | None = None) -> bool:
         """Show clock on the Divoom device in the color"""
         clock = to_int_if_str(clock)

@@ -3,8 +3,8 @@ R15 §3 — tests for the Live Widgets weather card.
 
 Three contract tests:
 1. The Weather card lives in Live Widgets (not in Settings) and has
-   no text content (no .panel-hint inside, no button) — just the
-   128x128 preview.
+   no .panel-hint text — just the 128x128 preview + a "Push to Device"
+   button (R26: manual push alongside auto-push).
 2. The macOS Notification + manual Notification cards also live in
    Live Widgets (R15 §3 move) and the matching cards are gone from
    Settings → Devices.
@@ -78,13 +78,13 @@ def test_weather_card_in_live_widgets() -> None:
 
 
 def test_weather_card_has_no_panel_hint() -> None:
-    """The Weather card body is JUST the 128x128 preview — no
-    panel-hint text, no buttons (Kare: the preview is the only thing
-    the user needs to see; auto-push fires on card selection)."""
+    """The Weather card body has no panel-hint text. A "Push to Device"
+    button is allowed (R26: manual push alongside auto-push)."""
     lw = _live_widgets_block()
-    # Extract the weather card.
+    # Extract the weather card. Use greedy match to capture the FULL
+    # card content (not stopping at the first triple </div>).
     m = re.search(
-        r'<div class="card glass-card" id="widget-card-weather"[^>]*>(.+?)</div>\s*</div>\s*</div>',
+        r'<div class="card glass-card" id="widget-card-weather"[^>]*>([\s\S]+)</div>\s*</div>\s*</div>',
         lw,
         re.DOTALL,
     )
@@ -92,14 +92,15 @@ def test_weather_card_has_no_panel_hint() -> None:
     body = m.group(1)
     # The card-header is allowed (it has the title), but the card-body
     # should not have any panel-hint.
-    body_match = re.search(r'<div class="card-body"[^>]*>(.+?)</div>\s*</div>', body, re.DOTALL)
+    body_match = re.search(r'<div class="card-body"[^>]*>([\s\S]+)</div>\s*</div>', body, re.DOTALL)
     assert body_match, "weather card-body not found"
     body_inner = body_match.group(1)
     assert "panel-hint" not in body_inner, (
         "Weather card has a panel-hint — should be preview-only."
     )
-    assert "<button" not in body_inner, (
-        "Weather card has a button — should be preview-only."
+    # R26: manual "Push to Device" button added alongside auto-push.
+    assert 'onclick="pushWeatherToDevice()"' in body_inner, (
+        "Weather card missing the Push to Device button."
     )
 
 

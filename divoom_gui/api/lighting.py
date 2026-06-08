@@ -126,6 +126,30 @@ class LightingApi(ApiBase):
             logger.error(f"Wall display failed: {e}")
             return False
 
+    def set_temperature_channel(self, celsius: bool = True, color: str = "#ffffff") -> bool:
+        logger.info(f"GUI Action: Setting temperature channel (celsius={celsius}, color={color})...")
+        try:
+            return self._dispatch(lambda t: t.display.set_temperature_channel(celsius=celsius, color=color)
+                                if t is self._wall_instance else t.display.set_temperature_channel(celsius=celsius, color=color))
+        except Exception as e:
+            logger.error(f"Temperature channel failed: {e}")
+            return False
+
+    def set_clock_rich(self, style: int = 0, twentyfour: bool = True,
+                       humidity: bool = False, weather: bool = False,
+                       date: bool = False, color: str = "#ffffff") -> bool:
+        logger.info(f"GUI Action: Setting rich clock (style={style}, twentyfour={twentyfour}, ...)")
+        try:
+            return self._dispatch(lambda t: t.display.set_clock_rich(style=style, twentyfour=twentyfour,
+                                                                     humidity=humidity, weather=weather,
+                                                                     date=date, color=color)
+                                if t is self._wall_instance else t.display.set_clock_rich(style=style, twentyfour=twentyfour,
+                                                                                          humidity=humidity, weather=weather,
+                                                                                          date=date, color=color))
+        except Exception as e:
+            logger.error(f"Rich clock failed: {e}")
+            return False
+
     def display_custom_art(self, file_path: str) -> bool:
         logger.info(f"GUI Action: Pushing custom art {file_path!r}...")
         try:

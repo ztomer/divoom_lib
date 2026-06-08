@@ -178,6 +178,14 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def push_weather(self) -> bool:
         return self.widgets.push_weather()
 
+    def set_temperature_channel(self, celsius: bool = True, color: str = "#ffffff") -> bool:
+        return self.widgets.set_temperature_channel(celsius, color)
+
+    def set_clock_rich(self, style: int = 0, twentyfour: bool = True,
+                       humidity: bool = False, weather: bool = False,
+                       date: bool = False, color: str = "#ffffff") -> bool:
+        return self.lighting.set_clock_rich(style, twentyfour, humidity, weather, date, color)
+
     def get_weather(self) -> dict:
         return self.widgets.get_weather()
 

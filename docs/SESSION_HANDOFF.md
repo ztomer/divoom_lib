@@ -15,72 +15,34 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
-- **R24 — BLE device detection from the GUI now works WITHOUT user
-  intervention. Suite 1022 / 0 / 75.** (commit `70e69ee0`)
-  Two root causes, both fixed in `divoom_gui/daemon_bridge.py` +
-  `divoom_daemon/daemon_protocol.py`:
-  1. **macOS TCC responsible-process attribution.** pywebview re-hosts the GUI
-     as `Python.app` (org.python.python — NOT in the Bluetooth grant list), so a
-     normally-spawned daemon inherited that ungranted identity →
-     `CBCentralManager.authorization()` == 0/2, scans silently empty/abort. Fix:
-     `spawn_daemon` now uses `_spawn_disclaimed_macos()` —
-     `responsibility_spawnattrs_setdisclaim` via libc `posix_spawn` (+
-     POSIX_SPAWN_SETSID, file_actions → `/tmp/divoom_daemon.log`) so the daemon
-     becomes its OWN responsible process, attributed to the granted `python3.14`
-     binary regardless of parent. **Verified CBauth==3 and all 4 devices found
-     from GUI/terminal/harness.** Falls back to `subprocess.Popen` on non-macOS
-     or if the disclaim spawn fails.
-  2. **Client read timeout < scan duration.** The daemon only replies AFTER
-     scanning `timeout` seconds, but `DaemonClient` read with its 2s default →
-     the successful reply arrived too late and surfaced as "timed out". Fix:
-     `send_command(read_timeout=…)` override; `scan` uses `timeout + 10s`.
-  Verified end-to-end with the exact GUI startup sequence (eager detached
-  `ensure_daemon` → fresh-client `scan`) → all 4 Divoom screens.
+- **R26 — Daemon channel-switch API + weather fix SHIPPED.**
+  Suite **1025 passed / 75 skipped / 0 failed** (+3 from 1022).
 
-- **R24 — daemon config + scan magic-number cleanup. Suite 1016 / 0 / 75.**
-  (commit `4be1144c`) New `divoom_daemon/daemon_config.py` → `DaemonConfig` from
-  `~/.config/divoom-control/daemon.ini` (sits beside the GUI's `config.ini`; a
-  commented default file is written on first load). Knobs: `scan_timeout`,
-  `scan_limit` (0 = no cap, honored), `scan_read_slack` (replaces the hardcoded
-  `+10s` client read padding), `client_timeout` (replaces `DaemonClient`'s 2.0s),
-  `reconnect_scan_timeout` (replaces 3.0s). Wired through `DaemonClient`,
-  `DeviceOwner.scan` + both reconnect scans, and `ScannerMixin.scan_devices`. The
-  user-sent per-scan timeout still wins; the config is just the fallback. No more
-  15/4/2.0/3.0/10.0 literals scattered around. Tests: `test_daemon_config.py`.
+  **Library changes:**
+  - `Display.set_temperature_channel()` — APK-canonical 6-byte 0x45 format
+    `[0x01, temp_type, R, G, B, 0x00]`. Switches device to TEMPRETURE display
+    mode.
+  - `Display.set_clock_rich()` — APK C2() 10-byte 0x45 format with correct
+    humidity/weather/date overlay positions. Kept alongside existing
+    `show_clock()` for backward compat.
+  - `TEMPRETURE_CHANNEL = 0x01` constant added.
 
-- **R24 follow-ups (this session).** (a) **Connect timeout fix** (`62b2d244`):
-  switching devices failed `connect failed: timed out` at exactly 2.000s — the
-  `connect`/`disconnect` RPCs used the 2s `client_timeout` while BLE setup is
-  slower. New `connect_timeout` knob (default 20s) in `daemon.ini`, applied to
-  both. (b) **No "launched successfully" menubar toast** (`77162457`) — routine
-  success isn't worth a notification. (c) **Unified glass tab strip**
-  (`5b70646b`): `.tabs-section` is now a glass panel in ALL three panels
-  (Channels/Tools/Settings) with consistent spacing — Channels' tabs moved out of
-  the content card-header into their own strip; Tools went full-width. Final
-  direction was the OPPOSITE of the earlier "bare tabs" call (user now wants glass
-  everywhere). **Needs a user eyeball after reload.**
+  **Weather push fix:**
+  - `WidgetsApi.push_weather()` now does two-step: (1) 0x45 APK-canonical channel
+    switch, (2) 0x5F data push. Previously sent 0x5F only.
+  - Weather card has a "Push to Device" button + `pushWeatherToDevice()` JS.
 
-- **MCP fix** (`bfebca77` / this round): `self.current_divoom.mac` returned a
-  `DaemonDeviceProxy` (not a string) because `"mac"` is not in `_STATUS_ATTRS`.
-  Changed to `self.current_divoom._conn.mac` in `gui_api.py:426`.
+  **GUI bridge:**
+  - `WidgetsApi.set_temperature_channel()` — standalone channel switch.
+  - `LightingApi.set_clock_rich()` / `set_temperature_channel()` — display ops.
+  - `DivoomGuiAPI.set_temperature_channel()` / `set_clock_rich()` — pywebview.
 
-- **Weather fix** (same commit): `Weather.__init__` stored `divoom.logger` which,
-  on a `DaemonDeviceProxy`, returns a child proxy. `self.logger.info(...)` in
-  `set()` created an unawaited coroutine → `RuntimeWarning`. Switched to
-  module-level logger. Weather push now works through the daemon proxy (confirmed
-  by e2e test `test_weather_set_proxy_daemon_roundtrip`).
+  **Tests:**
+  - 3 new E2E mock-device tests verifying exact APK wire bytes.
+  - Contract test updated for the Push to Device button.
 
-- Also: system monitor device preview (removed C/M/B letters, fixed colours),
-  custom art cache `window.*` prefix for cross-scope function refs.
-
-- **STILL OPEN — #6-redo (device preview).** Not done yet: revert the 100px
-  preview shrink in `sidebar.css` toward 120px; instead shrink the glass PANEL
-  vertically and center the preview + "Select Screen…" selector.
-
-- **NEXT (deferred round-2 UI polish, per user "polish UI afterwards"):**
-  (a) tabs consistency. (b) device preview — REVERT the 100px preview shrink in
-  `sidebar.css` back toward 120px; instead shrink the glass PANEL vertically and
-  center the preview + "Select Screen…" selector. (c) confirm cut-off #10 ask.
+  See `CHANGELOG.md`, `docs/LLD_R26.md`, `docs/PLANNING_ROUND26.md`.
+  **Not pushed** (deferred to R27 commit cycle).
 
 - **R23 — 500-LOC debt FULLY RETIRED. Suite 994 / 0 / 75; allow-list empty.**
   opencode did the big REVIEW §1 splits (gui_api→`divoom_gui/api/*`, daemon→
@@ -376,27 +338,20 @@ core rule in `AGENTS.md`).
 
 ## Open threads / next up
 
-1. **Push to origin.** Local is ~10 commits ahead (R15 §1-§6, R22 menubar,
-   R23 §1.2–§1.5).
-2. **R12 §A visual pass pending** (user-run `python3 gui/gui_main.py`):
-   verify appbar corner transports, scoreboard restyle, wall toolbar,
-   font sweep, segmented-pill, tools regroup, sub-tab rename to
-   "Sessions", **and the new macOS Notifications card under
-   Settings → Devices** (R14 §3) and the **new MCP Server card under
-   Settings → Connectivity** (R15 §5).
-3. **R12 §B hardware verification pending** (user-run): album cover
-   renders un-distorted; custom-art/live push end-to-end; weather
-   push via `divoom-control set-temperature 18 --weather clear`.
-4. **get_* read-back times out on real devices** (task #20): get
-   queries 0x42/0x46/0x13 get no parseable response (likely
-   query-framing mismatch). Gates every "read from device". See
-   `docs/DEVICE_VALIDATION_PLAN.md`.
-5. **Channel-switch hardware bug (Divoom Max):** first switch works,
-   rest don't; not root-caused. All switches are `set light mode`
-   (0x45) fire-and-forget.
-6. **Deferred features** (R12 §D): see
-   `docs/PLANNING_ROUND12_D_AUDIT.md`.
-7. **MCP enhancements:** HTTP+SSE transport, `subscribe_*` tools.
+### R27 — push to origin + command queue
+1. **Push** uncommitted R26 work to origin (channel research docs, LLD, R26 plan,
+   weather fix, tests).
+2. **Daemon-level command queue** for multi-phase 0x8B protection (animation
+   streaming).
+3. **Re-add** `test_weather_push_switches_channel_before_data` or equivalent
+   daemon-proxy roundtrip test for the two-step sequence.
+
+### Deferred to R28+
+- `show_clock()` overlay reorder to APK layout.
+- **R12 §A visual pass** (user-run): glass tab strip, appbar corners, etc.
+- **R12 §B hardware verification** (user-run): album cover, custom-art/live/weather.
+- **get_* read-back times out** (task #20).
+- **Deferred features** (R12 §D): see `docs/PLANNING_ROUND12_D_AUDIT.md`.
 
 ## Hardware note
 

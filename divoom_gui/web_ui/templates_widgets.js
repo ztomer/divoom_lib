@@ -132,6 +132,11 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                                 </svg>
                             </div>
                             <span id="weather-preview-location" style="margin:0; font-size:11px; font-family: var(--font-mono); color: var(--text-muted);">--</span>
+                            <div class="weather-card-actions" style="display:flex; gap:6px; margin-top:2px;">
+                                <button class="btn btn-sm" onclick="pushWeatherToDevice()">
+                                    Push to Device
+                                </button>
+                            </div>
                         </div>
                     </div>
 

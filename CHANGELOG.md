@@ -6,6 +6,111 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 26 — 2026-06-08 (Daemon channel-switch API + weather fix)
+
+### Library — `divoom_lib/`
+
+- **New `Display.set_temperature_channel()`** (`divoom_lib/display/__init__.py`):
+  APK-canonical 6-byte 0x45 format `[0x01, temp_type, R, G, B, 0x00]`. Switches
+  device to TEMPRETURE display mode — the essential first step that was missing
+  (weather data alone via 0x5F does nothing without the channel switch).
+
+- **New `Display.set_clock_rich()`** (`divoom_lib/display/__init__.py`):
+  APK C2() 10-byte 0x45 format with correct humidity/weather/date overlay
+  positions. Kept alongside existing `show_clock()` (hass-divoom layout) for
+  backward compat — no overlay reorder.
+
+- **`TEMPRETURE_CHANNEL = 0x01`** constant added (`divoom_lib/models/constants.py`):
+  canonical APK alias for the TEMPRETURE display mode channel.
+
+### GUI — `divoom_gui/`
+
+- **`WidgetsApi.push_weather()` fixed** (`divoom_gui/api/widgets.py`): now a
+  two-step sequence — (1) switch to TEMPRETURE channel via 0x45 APK-canonical
+  bytes, (2) push weather data via 0x5F. Previously sent 0x5F only (no channel
+  switch), so weather data would not display.
+
+- **New `WidgetsApi.set_temperature_channel()`** — standalone bridge for channel
+  switch without a weather data push.
+
+- **New `LightingApi.set_clock_rich()` / `set_temperature_channel()`** —
+  GUI bridge methods exposing the new display primitives.
+
+- **New `DivoomGuiAPI.set_temperature_channel()` / `set_clock_rich()`** —
+  pywebview JS-accessible bridge methods.
+
+- **Weather card "Push to Device" button** (`divoom_gui/web_ui/templates_widgets.js`):
+  manual push alongside existing auto-push on card selection. Wired via
+  `pushWeatherToDevice()` in `widgets.js`.
+
+### Tests
+
+- **+3 tests** (`tests/test_e2e_mock_device.py`):
+  `test_temperature_channel_switch_apk_format` — APK 6-byte 0x45 format,
+  `test_temperature_channel_fahrenheit_red` — Fahrenheit + red channel,
+  `test_clock_rich_apk_format` — APK C2() 10-byte 0x45 format.
+
+- **Contract test updated** (`tests/test_widgets_weather.py`):
+  `test_weather_card_has_no_panel_hint` relaxed to allow "Push to Device"
+  button (was asserting no buttons at all).
+
+- **Suite: 1025 passed / 75 skipped / 0 failed** (+3 from 1022).
+
+### Docs
+
+- **`docs/LLD_R26.md`** — comprehensive three-layer low-level design covering
+  library (`Display.*`), GUI (`WidgetsApi`/`LightingApi`/bridge), and daemon
+  (zero new commands — `device_call` dispatch handles routing automatically).
+
+## Round 25 — 2026-06-08 (Channel architecture cross-verification)
+
+### Research — `docs/CHANNEL_ARCHITECTURE.md` written and cross-verified
+
+- **Authoritative channel architecture doc** (`docs/CHANNEL_ARCHITECTURE.md`, 370+ lines)
+  covering all 7 light channels, 5 work modes, APK byte formats, device-specific
+  variations, overlay toggle positions, weather codes, BLE pacing, and interleaving
+  risks. Cross-verified against 3 sources: APK decompile (authoritative), hass-divoom
+  (secondary), futpib (tertiary).
+
+- **4 errors found and corrected during cross-verification**:
+  1. **futpib channel table was wrong** — incorrectly mapped futpib modes to APK
+     channel IDs 0x00-0x06. futpib uses a different numbering scheme (0x01=Light
+     with sub_modes 0-6, 0x02=Hot, 0x03=Special, 0x04=Music; no 0x00/0x05/0x06).
+  2. **"Both 10-byte CLOCK formats work" was speculative** — changed to documented
+     divergence with unknown device compatibility.
+  3. **Weather code table incomplete** — added APK's full 18-code OpenWeatherMap
+     mapping (had only the 6-code hass-divoom subset).
+  4. **hass-divoom transport mischaracterized** — it uses persistent TCP SPP, not
+     BLE reconnection per command (only futpib reconnects).
+
+- **TEMPRETURE 6-byte format CONFIRMED** from APK `CmdManager.t2()`:
+  `[1, temp_type, R, G, B, 0]` — our committed code used a rotated byte order.
+  Firmware-tested order may differ (documented as device-specific divergence).
+
+- **CLOCK dual 10-byte format conflict documented**: APK C2() uses byte 4=humidity,
+  5=weather, 6=date. hass-divoom/our lib uses 4=weather, 5=temp, 6=calendar.
+  APK format takes precedence for new code.
+
+- **5 divergences from APK catalogued**: CLOCK 10-byte layout, missing TEMPRETURE
+  channel switch, weather code subset, constant naming, command naming.
+
+- **APK-first authority established** — explicit priority hierarchy in doc preamble.
+- **Emoji-free policy maintained** — cross/checkmark symbols replaced with `[conflict]`/`[same]`.
+
+### Fixed — TEMPRETURE channel switch byte order (committed)
+
+- Corrected byte order: `[1, R, G, B, ?, 0]` (rotated) was a decompile
+  misinterpretation. APK's `t2()` field order is `(mode, temp_type, r, g, b)`.
+  Working tree reverted to no channel switch pending R26 APK-correct implementation.
+
+- **Removed test** `test_weather_push_switches_channel_before_data` (tested the
+  wrong byte order). Re-add in R26 with correct APK payload assertion.
+
+### Planning
+
+- `docs/PLANNING_ROUND26.md` created — R26 focuses on daemon channel-switch API
+  with APK-canonical byte formats.
+
 ## Round 24 — 2026-06-08 (BLE detection from GUI, no user intervention)
 
 ### Fixed — macOS BLE scan returned empty in the GUI
@@ -1112,3 +1217,26 @@ a Show button + an Enabled checkbox + a Hide button
 - 7: Cleanup — dead `.appbar-device` CSS removed;
   `appbarSelect` → `sidebarDeviceSelect`.
 - 8: Phasing (A–E) — all phases A–E executed.
+
+## Round 25 — 2026-06-08 (Channel architecture research)
+
+### Added
+
+- `docs/CHANNEL_ARCHITECTURE.md` — comprehensive research doc from the
+  decompiled APK covering all 7 light modes, the 6-byte vs 10-byte CLOCK
+  formats, overlay toggle byte positions, TEMPRETURE channel payload, and
+  the two-model split (`m`/LightInfo vs `k`/LightCache). Includes a
+  byte-by-byte comparison of our `show_clock()` vs the APK's `CmdManager.C2()`
+  (our bytes 4-6 are shifted — we set "weather" where the APK expects
+  "humidity"). See doc for full implementation recommendations.
+
+### Fixed
+
+- **Weather push reverted** (`push_weather()` in `widgets.py`): the APK
+  decouples data push (0x5F) from channel switch (0x45). The 0x45 TEMPRETURE
+  channel switch with arbitrary model-field values was sending garbage bytes
+  that could crash the device. Removed the channel switch — weather data is
+  now pushed as 0x5F only (consistent with the APK). The channel must be
+  switched separately.
+- Removed test `test_weather_push_switches_channel_before_data` which tested
+  the reverted behaviour.

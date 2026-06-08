@@ -311,6 +311,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    function pushWeatherToDevice() {
+        if (!window.pywebview?.api?.push_weather) return;
+        window.pywebview.api.push_weather().then(ok => {
+            if (ok) showToast("Weather pushed", "success", " BLE");
+            else showToast("Weather push failed", "error");
+        });
+    }
+
     function selectWidget(widgetId) {
         selectedWidget = widgetId;
 
