@@ -15,6 +15,26 @@ core rule in `AGENTS.md`).
 
 ## Current state — _update this section each round_
 
+- **R23 — 500-LOC debt FULLY RETIRED. Suite 994 / 0 / 75; allow-list empty.**
+  opencode did the big REVIEW §1 splits (gui_api→`divoom_gui/api/*`, daemon→
+  DeviceOwner/NotificationService/SocketServer + command registry, DeviceSlot,
+  web_ui splits, menubar→daemon client). This session finished the long tail:
+  - `cli.py` 521 → `cli.py` 212 + `cli_commands.py` 352. (Also fixed a test-only
+    crash: `test_cli` patched `cli._resolve_device`; handlers now resolve it from
+    `cli_commands`, so patch the latter — else the real BLE scan ran and aborted
+    the interpreter on py3.14.)
+  - `constants.py` 517 → 393 + `constants_scheduling.py` 136 (re-exported via
+    `from .constants_scheduling import *`; `divoom_lib.models.*` unchanged).
+  - `media_sync.py` 593 → 459 + `audio_visualizer.py` (extracted
+    AudioVisualizerWorker).
+  - `downsample.c` 522 → 392 + `downsample_kernel.{c,h}` (LANCZOS weight
+    precompute as its own TU). **Byte-identical output verified** via the
+    dual-impl `test_encoder_both_impls` against a fresh build + x86_64
+    cross-compile. build_libdivoom.sh + conftest compile the new TU.
+  - `tests/test_file_size.py` ALLOWLIST is now empty → the 500-LOC rule is fully
+    enforced and clean.
+
+
 - **GUI crash-loop on cloud-auth failure FIXED. Suite 994 / 0 / 75.**
   (`./run_gui.sh` was spamming `RuntimeError: UserNewGuest failed: RC=10` on
   every transport-status poll.)

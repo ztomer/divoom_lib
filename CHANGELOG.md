@@ -102,6 +102,25 @@ and GUI are thin clients.
 
 ---
 
+## Round 23 — 2026-06-07 (500-LOC debt fully retired + GUI cloud-auth crash fix)
+
+- **GUI no longer crash-loops when Divoom cloud auth fails**: the polled
+  transport-status panel triggered a failing network guest login each tick and
+  let the exception escape into pywebview. Added cache-only
+  `divoom_auth.get_cached_credentials()` + a 120s failure cooldown; status (and
+  GUI startup) read the cache only. Verified clean launch. Retired the obsolete
+  `gui_api._push_menubar_status` (imported a deleted module). Root cause
+  (guest login RC=10) is upstream Divoom; cloud features need a configured
+  account — local BLE/LAN control is unaffected.
+- **Every `divoom_*` source file is now under 500 LOC** and `tests/test_file_size.py`
+  enforces it (allow-list empty). The 2026-06 regression was retired across R23:
+  gui_api → `divoom_gui/api/*`, daemon → DeviceOwner/NotificationService/
+  SocketServer + command registry, `DeviceSlot`, web_ui splits, menubar → daemon
+  client (opencode), then `cli.py`→`cli_commands.py`, `constants.py`→
+  `constants_scheduling.py`, `media_sync.py`→`audio_visualizer.py`, and
+  `downsample.c`→`downsample_kernel.{c,h}` (byte-identical output verified).
+- Suite 994 / 0 / 75.
+
 ## Round 21 — 2026-06-07 (review + documentation overhaul)
 
 - **`docs/REVIEW_2026-06.md`**: code/architecture review (Linus + Uncle Bob),

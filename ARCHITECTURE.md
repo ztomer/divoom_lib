@@ -125,11 +125,14 @@ The system architecture is governed by strict technical guidelines established d
 ## Strict Architectural Standards
 
 To maintain high maintainability, rapid semantic searches, and easy codebase updates for both human developers and AI agents, the project targets a strict limit:
-*   **No File Above 500 Lines of Code (LOC)**: No single Python, JS, or CSS source file should exceed 500 lines of code.
-*   **Status (2026-06): regressed — 11 files currently exceed 500 LOC** (notably
-    `divoom_gui/gui_api.py` 921, `divoom_daemon/daemon.py` 730, and four
-    `web_ui/*.js/css`). A guardrail test + the refactor plan are in
-    `docs/REVIEW_2026-06.md` §1. Treat the rule as enforced going forward.
+*   **No File Above 500 Lines of Code (LOC)**: no Python/C/JS/CSS source file in
+    `divoom_lib`/`divoom_daemon`/`divoom_gui` exceeds 500 LOC.
+*   **Status (2026-06): enforced + clean.** The 2026-06 regression (11 oversized
+    files incl. `gui_api.py` 921, `daemon.py` 730) was fully retired via R23
+    (gui_api/daemon collaborator splits, cli→cli_commands, constants→
+    constants_scheduling, media_sync→audio_visualizer, downsample→downsample_kernel
+    + web_ui splits). `tests/test_file_size.py` fails the suite on any new
+    >500-LOC file (allow-list now empty).
 *   **Agent/Developer Rationale**:
     *   **LLM Context Optimization**: Under 500 LOC ensures an AI assistant can read and reason about the *entire* file without truncation or loss of precision.
     *   **Strict Modularity**: A 500 LOC ceiling forces developers to apply the Single Responsibility Principle, separating framing logic, networking, and data processing.
