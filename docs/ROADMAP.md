@@ -31,18 +31,23 @@ See `docs/PLANNING_ROUND*.md` for detailed scope per round.
 | **R26** | Daemon channel-switch API + weather push fix | 1025/75/0 | `set_temperature_channel()`, `push_weather()` |
 | **R27** | Command queue (ring buffer, maxsize, item timeout) | 1055/75/0 | `divoom_daemon/command_queue.py` |
 | **R28** | MCP-via-daemon, scan filter, tab layout, bitmap font | 1079/75/0 | `daemon_client.py`, `fonts/`, `tabs.css` |
-| **R29** | Exclusive mode wired through daemon RPC | **1085/75/0** | `device_call(token)`, `DaemonDeviceProxy.exclusive()` |
+| **R29** | Exclusive mode wired through daemon RPC | 1085/75/0 | `device_call(token)`, `DaemonDeviceProxy.exclusive()` |
+| **R30** | Animation streaming — MCP tool + proxy exclusive context | **1090/75/0** | `push_animation()`, MCP 13th tool |
+| **R31** | Font improvement + CJK infrastructure + warning fixes | **1093/75/0** | majority-rule half-font, CJK `from_apk_asset()`, coroutine cleanup |
+| **R32** | Monthly Best reorg + Routines + device selector + Text fix | **1094/75/0** | gallery multi-select, per-device gallery style, 0x87→image text push |
+| **R33** | Sidebar reorg + Settings polish + per-device gallery style | **1094/75/0** | Routines nav, device dots, toggle-switch settings, appbar gear |
+| **R34** | Hot-channel sync fix + Routines polish + APK-aligned 0x8b upload | **1185/75/0** | `sync_read_timeout`, device-dot pulse, alarms week-table, device-driven 0x8b flow |
 
-Suite: **1085 passed / 75 skipped / 0 failed** (current).
+Suite: **1185 passed / 75 skipped / 0 failed** (current).
 
 ---
 
 ## Current debt & quality
 
 - **500-LOC rule**: fully enforced, ALLOWLIST empty (R23).
-- **Font**: APK bitmap font extracted (ASCII only), half-size variant for device text.
-- **Tests**: hardware tests gated/skip by default; 30 command-queue tests; 18 E2E mock-device tests; 6 exclusive-mode RPC tests.
-- **C module**: `libdivoom` (LANCZOS downsampler) compiled via `build_libdivoom.sh`; dual-impl parity tested.
+- **Font**: APK bitmap font extracted (ASCII + CJK via `from_apk_asset()`), half-size variant with majority-rule downsampling.
+- **Tests**: hardware tests gated/skip by default; 60 native-downscaler parity tests; alarms editor JS guard; 18 E2E mock-device.
+- **C module**: `libdivoom` (LANCZOS downsampler) compiled via `build_libdivoom.sh`; normalize-then-quantize kernel matches PIL byte-for-byte (60/60 parity tests).
 
 ---
 
@@ -52,7 +57,6 @@ Suite: **1085 passed / 75 skipped / 0 failed** (current).
 
 | Workstream | Depends on | Notes |
 |-----------|-----------|-------|
-| **Animation streaming (0x8B)** | R29 (exclusive mode) | First consumer of `DaemonDeviceProxy.exclusive()`. Multi-phase 0x8B protocol needs atomic queue access. |
 | **MCP hardware-verify** | R28 (MCP-via-daemon) | Drive a real device through `divoom-control mcp-server` end-to-end. |
 | **Exclusive-mode hardware verify** | R29 | Drive a real multi-step sequence through the proxy exclusive context. |
 
@@ -61,10 +65,7 @@ Suite: **1085 passed / 75 skipped / 0 failed** (current).
 | Workstream | Depends on | Notes |
 |-----------|-----------|-------|
 | **`show_clock()` overlay reorder** | — | Align overlay positions with APK C2() layout (current has mismatched humidity/weather/date coords). |
-| **Half-bitmap-font `B`/`8` collision** | — | ~5px downsampled glyphs merge. Fine for numeric tickers; swap in purpose-built tiny font if letter legibility needed. |
-| **CJK font support** | — | CJK ranges exist in the APK `.bin` files (`references/apk/...`); extend `extract_apk_font.py` codepoint ranges. |
-| **`test_submit_after_stop_raises` warning** | — | Harmless `coro_for` was-never-awaited warning. |
-| **`get_*` read-back timeouts** | — | Real hardware read-back commands time out. |
+| **`get_*` read-back timeouts** | — | Real hardware read-back commands time out (mitigated: alarms `alarms.json` cache). |
 | **R12 visual pass** | user-driven | Glass tab strip, appbar corners, etc. |
 | **R12 hardware verification** | user-driven | Album cover, custom-art/live/weather on real device. |
 
@@ -116,3 +117,7 @@ See `docs/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
 | R27 | *(missing — only CHANGELOG + SESSION_HANDOFF)* | backfill wanted |
 | R28 | `docs/PLANNING_ROUND28.md` | current |
 | R29 | `docs/PLANNING_ROUND29.md` | current |
+| R30 | `docs/PLANNING_ROUND30.md` | current |
+| R31 | `docs/PLANNING_ROUND31.md` | current |
+| R32 | `docs/PLANNING_ROUND32.md` | current |
+| R34 | `docs/PLANNING_ROUND34.md` | current |
