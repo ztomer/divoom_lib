@@ -37,32 +37,53 @@ class TestDivoomGuiAPI(unittest.TestCase):
             mock_thread.assert_called_once()
 
     def test_push_text(self):
-        """R7 Text Channel: push_text runs the LPWA sequence ending with content."""
-        from divoom_lib.models import LPWA_CONTROL_CONTENT, LPWA_CONTROL_COLOR, LPWA_CONTROL_SPEED
+        """R32 §D Text Channel: push_text renders the text to a device-sized
+        image and pushes it via display.show_image (the LPWA 0x87 path didn't
+        render on the LED matrices — nothing appeared)."""
+        import os
         dev = MagicMock()
         dev.is_connected = True
-        dev.text.set_light_phone_word_attr = AsyncMock(return_value=True)
+        captured = {}
+
+        async def _show_image(path):
+            # Capture while the temp file still exists (push_text unlinks it).
+            captured["path"] = path
+            captured["exists"] = os.path.isfile(path)
+            captured["ends_png"] = str(path).endswith(".png")
+            return True
+
+        dev.display.show_image = AsyncMock(side_effect=_show_image)
         self.api.current_divoom = dev
         self.api.current_target_mode = "single"
-        with patch.object(type(self.api), "_active_device_size", return_value=16):
-            ok = self.api.push_text("HELLO", color="#FF0000", speed=40, effect_style=1)
+        ok = self.api.push_text("HI", color="#FF0000", speed=40, effect_style=1)
         self.assertTrue(ok)
-        calls = dev.text.set_light_phone_word_attr.call_args_list
-        controls = [c.args[0] for c in calls]
-        self.assertIn(LPWA_CONTROL_COLOR, controls)
-        self.assertIn(LPWA_CONTROL_SPEED, controls)
-        self.assertIn(LPWA_CONTROL_CONTENT, controls)
-        content_call = next(c for c in calls if c.args[0] == LPWA_CONTROL_CONTENT)
-        self.assertEqual(content_call.kwargs.get("text_content"), "HELLO")
+        dev.display.show_image.assert_awaited_once()
+        self.assertTrue(captured.get("exists"), "text image should exist during the push")
+        self.assertTrue(captured.get("ends_png"))
 
     def test_push_text_empty_noop(self):
-        """Empty text is a no-op (returns False, sends nothing)."""
+        """Empty text is a no-op (returns False, pushes nothing)."""
         dev = MagicMock()
-        dev.text.set_light_phone_word_attr = AsyncMock(return_value=True)
+        dev.display.show_image = AsyncMock(return_value=True)
         self.api.current_divoom = dev
         self.api.current_target_mode = "single"
         self.assertFalse(self.api.push_text("   "))
-        dev.text.set_light_phone_word_attr.assert_not_called()
+        dev.display.show_image.assert_not_called()
+
+    def test_render_text_png_produces_sized_image(self):
+        """The text renderer produces a square device-sized RGB PNG with the
+        requested color present (no anti-aliasing)."""
+        from PIL import Image
+        from divoom_gui.api.lighting import LightingApi
+        path = LightingApi._render_text_png("HI", "#FF0000", 16, 1)
+        try:
+            img = Image.open(path).convert("RGB")
+            self.assertEqual(img.size, (16, 16))
+            colors = {c for _, c in img.getcolors(maxcolors=4096)}
+            self.assertIn((255, 0, 0), colors, "the fill color should appear in the render")
+        finally:
+            import os
+            os.unlink(path)
 
     def test_set_alarm(self):
         """R7 Alarms: set_alarm maps enabled→status and weekday mask through."""

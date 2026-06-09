@@ -61,41 +61,78 @@ class LightingApi(ApiBase):
 
     def push_text(self, text: str, color: str = "#FFFFFF", font_size: int = 1,
                   speed: int = 50, effect_style: int = 1) -> bool:
-        from divoom_lib.models import (
-            LPWA_CONTROL_DISPLAY_BOX, LPWA_CONTROL_FONT, LPWA_CONTROL_COLOR,
-            LPWA_CONTROL_SPEED, LPWA_CONTROL_EFFECTS, LPWA_CONTROL_CONTENT,
-        )
+        """Render the text to a device-sized bitmap and push it as an image.
 
-        async def _push(divoom, size: int) -> bool:
-            t = divoom.text
-            box = 0
-            await t.set_light_phone_word_attr(LPWA_CONTROL_DISPLAY_BOX, x=0, y=0,
-                                              width=size, height=size, text_box_id=box)
-            await t.set_light_phone_word_attr(LPWA_CONTROL_FONT, font_size=int(font_size), text_box_id=box)
-            await t.set_light_phone_word_attr(LPWA_CONTROL_COLOR, color=color, text_box_id=box)
-            await t.set_light_phone_word_attr(LPWA_CONTROL_SPEED, speed=int(speed), text_box_id=box)
-            await t.set_light_phone_word_attr(LPWA_CONTROL_EFFECTS, effect_style=int(effect_style))
-            res = await t.set_light_phone_word_attr(LPWA_CONTROL_CONTENT, text_content=str(text), text_box_id=box)
-            return res is not False
-
+        R32 §D: the old path used the 0x87 "set light phone word attr" (LPWA)
+        sequence, which does NOT render on the Pixoo-class LED matrices these
+        devices are — so nothing appeared. The known-working reference
+        (hass-divoom) and futpib both render text into image frames and push
+        them via the normal image path; we do the same here with our own
+        no-AA bitmap font. ``speed``/``effect_style`` are accepted for call
+        compatibility but unused for now (static image); scrolling frames are
+        a follow-up. ``font_size`` selects the small vs. full glyph set."""
         try:
             if not text or not str(text).strip():
                 return False
-            if self._current_target_mode == "wall":
-                if not self._rebuild_wall_instance():
-                    return False
-                return self._run_async(self._wall_instance.push_text(
-                    str(text), color=color, font_size=int(font_size),
-                    speed=int(speed), effect_style=int(effect_style)))
-
-            target = self._current_divoom
-            if not target:
-                return False
-            size = self._state_getter().get("_active_device_size", lambda: 16)()
-            return self._run_async(_push(target, int(size)))
+            size = self._device_size()
+            png_path = self._render_text_png(str(text), color, int(size), int(font_size))
+            try:
+                return self._dispatch(lambda t: t.show_image(png_path)
+                                    if t is self._wall_instance else t.display.show_image(png_path))
+            finally:
+                try:
+                    import os
+                    os.unlink(png_path)
+                except OSError:
+                    pass
         except Exception as e:
             logger.error(f"push_text failed: {e}")
             return False
+
+    def _device_size(self) -> int:
+        getter = self._state_getter().get("_active_device_size")
+        try:
+            return int(getter() if callable(getter) else (getter or 16))
+        except Exception:
+            return 16
+
+    @staticmethod
+    def _render_text_png(text: str, color: str, size: int, font_size: int) -> str:
+        """Render ``text`` centered on a ``size``×``size`` black canvas using the
+        device bitmap font, scaling down to fit when it overflows. Returns a
+        temp PNG path (caller deletes it)."""
+        import os
+        import tempfile
+        from PIL import Image
+        from divoom_lib.fonts.bitmap_font import get_default_font, get_small_font
+        from divoom_lib.utils.converters import color_to_rgb_list
+
+        rgb_list = color_to_rgb_list(color) or [255, 255, 255]
+        rgb = tuple(rgb_list[:3]) if len(rgb_list) >= 3 else (255, 255, 255)
+        # Small glyphs fit more characters on the narrow 16px matrix; the full
+        # set is used when the caller asks for the larger font or on bigger
+        # screens where it stays legible.
+        font = get_small_font() if (font_size <= 1 or size <= 16) else get_default_font()
+        text_img = font.render(text, fill=rgb, bg=(0, 0, 0), mode="RGB")
+
+        sz = max(1, int(size))
+        tw, th = text_img.size
+        scale = 1.0
+        if tw > sz:
+            scale = sz / tw
+        if th * scale > sz:
+            scale = min(scale, sz / th)
+        if scale < 1.0:
+            text_img = text_img.resize(
+                (max(1, int(tw * scale)), max(1, int(th * scale))), Image.NEAREST)
+            tw, th = text_img.size
+
+        canvas = Image.new("RGB", (sz, sz), (0, 0, 0))
+        canvas.paste(text_img, (max(0, (sz - tw) // 2), max(0, (sz - th) // 2)))
+        fd, path = tempfile.mkstemp(prefix="divoom_text_", suffix=".png")
+        os.close(fd)
+        canvas.save(path)
+        return path
 
     def set_brightness(self, brightness: int) -> bool:
         logger.info(f"GUI Action: Setting brightness to {brightness}...")
