@@ -110,23 +110,26 @@ class TestFrameBodyFormat:
         assert palette[0:3] == bytes([200, 150, 100])
         assert len(palette) == nn * 3
 
-    def test_32x32_rr_is_0x03_divergence(self):
+    def test_32x32_rr_is_0x00_matches_apk(self):
+        """APK uses RR=0x00 for ALL sizes (R35d fix)."""
         rgb = np.zeros((32, 32, 3), dtype=np.uint8)
         encoded = encode_animation_frame_32(_flat(rgb), 32, 32, 100)
-        assert encoded[5] == 0x03
+        assert encoded[5] == 0x00
 
-    def test_32x32_nn_is_2bytes_divergence(self):
+    def test_32x32_nn_is_1byte_matches_apk(self):
+        """APK uses 1-byte NN for ALL sizes (R35d fix)."""
         rgb = np.zeros((32, 32, 3), dtype=np.uint8)
-        # black bg (1) + red quadrant (1) = 2 colors
         rgb[0:16, 0:16] = [255, 0, 0]
         encoded = encode_animation_frame_32(_flat(rgb), 32, 32, 100)
-        nn = int.from_bytes(encoded[6:8], "little")
+        nn = encoded[6]
         assert nn == 2
 
-    def test_32x32_header_is_8bytes(self):
+    def test_32x32_header_is_7bytes(self):
+        """Standard AA format header is 7 bytes (matching 16x16)."""
         rgb = _flat(np.zeros((32, 32, 3), dtype=np.uint8))
         encoded = encode_animation_frame_32(rgb, 32, 32, 100)
-        assert len(encoded) > 8
+        assert len(encoded) > 7
+        # Header: AA(1) + LLLL(2) + TTTT(2) + RR(1) + NN(1) = 7 bytes
 
 
 class TestFramingLayer:

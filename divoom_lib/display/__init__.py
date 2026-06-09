@@ -162,8 +162,8 @@ class Display:
         frames, frames_count, _w, _h = process_image(
             file, time=time, size=screensize
         )
-        if frames_count >= 1 and screensize != 32:
-            # Route ALL 16px pushes (single still AND multi-frame) through the
+        if frames_count >= 1:
+            # Route ALL pushes (single still AND multi-frame) through the
             # 0x8B 3-phase protocol. This matches the futpib reference, whose
             # `send_image` pushes a still PNG through the *same* animation path
             # (`create_network_packets_from`) as a GIF — there is no separate
@@ -171,6 +171,11 @@ class Display:
             # 0x49, which is why cover art (a single frame) did not render
             # (R11 item 2a). Uses the proven streamer (chunk-index offset ids,
             # 256-byte chunks, write-with-response + pacing). Falls back to 0x49.
+            #
+            # R35d: removed `screensize != 32` guard. The APK uses the same
+            # AA-format frame encoding for ALL sizes; the hass-divoom 32×32
+            # pre-frames and RR=0x03 are NOT in the APK. 0x8B now works for
+            # 32×32 devices too.
             from .animation_8b import _build_animation_blob
             blob = _build_animation_blob(frames)
             anim = getattr(self.communicator, "animation", None)
@@ -185,13 +190,8 @@ class Display:
                     "show_image: 0x8B stream failed, falling back to 0x49"
                 )
 
-        # 1-frame or fallback path: 0x49 chunked animation.
-        # Round 4: use 32×32 encoder if screensize=32.
-        if screensize == 32:
-            from ..utils.divoom_image_encode_32 import encode_animation_32
-            blobs = encode_animation_32(frames)
-        else:
-            blobs = encode_animation(frames)
+        # Fallback path: 0x49 chunked animation.
+        blobs = encode_animation(frames)
         result = None
         for packet in blobs:
             result = await self.communicator.send_command(

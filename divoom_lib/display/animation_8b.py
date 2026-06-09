@@ -60,9 +60,10 @@ def _build_animation_blob(frames: List[Frame]) -> bytes:
 
     The 0x8B protocol's file_size = sum of all encoded frame bodies.
     Each body uses the per-frame wire format:
-        16x16: AA LLLL(LE) TTTT(LE) RR=0x00 NN COLOR_DATA PIXEL_DATA
-        32x32: AA LLLL(LE) TTTT(LE) RR=0x03 NN_NN(LE u16) COLOR_DATA PIXEL_DATA
-    Dispatches on (w, h) to pick the right encoder.
+        AA LLLL(LE) TTTT(LE) RR=0x00 NN COLOR_DATA PIXEL_DATA
+    (RR=0x00, 1-byte NN for ALL screen sizes — APK confirmed R35d)
+    Dispatches on (w, h) to pick the right encoder; 32×32 now uses
+    the same standard format as 16×16.
     """
     out = bytearray()
     for (rgb, w, h, t) in frames:

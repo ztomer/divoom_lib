@@ -1,22 +1,24 @@
 /*
  * divoom_lib/native_src/image_encode_32.c
  *
- * 32x32 PixooMax / extended-LED Divoom device encoder (Round 4).
+ * 32x32 Divoom device encoder.
  *
- * Mirrors the 16x16 encoder in image_encode.c, with the 32x32 quirks
- * from hass-divoom/devices/divoom.py:
- *   - palette flag = 0x03 (not 0x00)
- *   - color count is LE u16 (not u8)
- *   - frame header is 8 bytes (AA + LLLL + TTTT + RR + NN_NN)
- *   - 32x32 pixels (1024), so pixel data is up to 1024 bytes
+ * APK comparison (R35d): the APK uses the **same** AA-format frame encoding
+ * for ALL screen sizes via `NDKMain.pixelEncode()`. The hass-divoom-derived
+ * pre-frames (0x05/0x06), extended palette flag (RR=0x03), and 2-byte color
+ * count are NOT in the APK.
  *
- * Plus the 0x8B 3-phase protocol chunker (per futpib animation.rs):
- *   - StartSeeding:  [0x00][file_size LE u32]
- *   - SendingData:   [0x01][file_size LE u32][offset_id LE u16][<=256 bytes]
+ * This file therefore uses the **standard** 7-byte frame header:
+ *   AA + LLLL(LE u16) + TTTT(LE u16) + RR=0x00 + NN(u8)
+ * matching image_encode.c's divoom_encode_animation_frame exactly.
+ *
+ * The pre-frame functions (divoom_write_pre_frame_1/2) are kept for C API
+ * backward compatibility but are no longer called by the Python wrapper.
+ *
+ * Also provides the 0x8B 3-phase protocol chunker (per futpib animation.rs):
+ *   - StartSeeding:   [0x00][file_size LE u32]
+ *   - SendingData:    [0x01][file_size LE u32][offset_id LE u16][<=256 bytes]
  *   - TerminateSending: [0x02]
- *
- * Lives in a separate compilation unit from image_encode.c to keep
- * both files under the 500 LOC limit.
  *
  * Byte-for-byte equivalence with divoom_image_encode_32.py is the
  * design contract. tests/test_native_image_encoder.py asserts this.
@@ -25,7 +27,9 @@
 #include <string.h>
 
 #define DIVOOM_PALETTE_MAX_32  256
-#define DIVOOM_FRAME_HEADER_SIZE_32 8   /* AA + LLLL + TTTT + RR + NN_NN */
+/* Standard 7-byte frame header: AA + LLLL + TTTT + RR + NN (RR=0x00, NN=u8).
+ * APK uses this same header for ALL screen sizes (R35d). */
+#define DIVOOM_FRAME_HEADER_SIZE_32 7
 #define DIVOOM_HASH_TABLE_SIZE_32 512
 #define DIVOOM_8B_CHUNK_SIZE 256
 #define DIVOOM_SCREENSIZE 32
@@ -184,16 +188,16 @@ int divoom_encode_animation_frame_32(
         }
     }
 
-    /* Header: AA + LLLL(LE) + TTTT(LE) + RR=0x03 + NN_NN(LE u16) */
-    uint16_t nn_u16 = (n < DIVOOM_PALETTE_MAX_32) ? (uint16_t)n : 0;
+    /* Header: AA + LLLL(LE) + TTTT(LE) + RR=0x00 + NN(u8) — standard
+     * AA format matching APK's pixelEncode() for ALL screen sizes. */
+    uint8_t nn_byte = (n < DIVOOM_PALETTE_MAX_32) ? (uint8_t)n : 0;
     out_buf[0] = 0xAA;
     out_buf[1] = (uint8_t)(llll & 0xFF);
     out_buf[2] = (uint8_t)((llll >> 8) & 0xFF);
     out_buf[3] = (uint8_t)(time_ms & 0xFF);
     out_buf[4] = (uint8_t)((time_ms >> 8) & 0xFF);
-    out_buf[5] = 0x03;  /* RR = 0x03 palette flag for 32x32 */
-    out_buf[6] = (uint8_t)(nn_u16 & 0xFF);
-    out_buf[7] = (uint8_t)((nn_u16 >> 8) & 0xFF);
+    out_buf[5] = 0x00;  /* RR = 0x00 (reset palette) — matches APK */
+    out_buf[6] = nn_byte;
 
     if (color_data_bytes > 0) {
         memcpy(out_buf + DIVOOM_FRAME_HEADER_SIZE_32, palette, color_data_bytes);

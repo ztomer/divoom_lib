@@ -23,31 +23,35 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-# ---- 32x32 pre-frames ----
+# ---- 32x32 pre-frames (DEPRECATED — APK does NOT use pre-frames) ----
 
-def test_pre_frame_1_c_matches_python():
+def test_pre_frame_1_c_still_produces_classic_output():
+    """C pre-frame functions remain for API backward compat but are unused."""
     p1 = image_encoder._c_write_pre_frame_1()
     assert p1 is not None
-    expected = py_pre_frames()[0]
-    assert p1 == expected
     # Layout: [AA][LLLL LE u16] + 5-byte body
     assert p1[0] == 0xAA
     assert p1[1:3] == (8).to_bytes(2, "little")
     assert p1[3:8] == bytes([0x00, 0x00, 0x05, 0x00, 0x00])
 
 
-def test_pre_frame_2_c_matches_python():
+def test_pre_frame_2_c_still_produces_classic_output():
     p2 = image_encoder._c_write_pre_frame_2()
     assert p2 is not None
-    expected = py_pre_frames()[1]
-    assert p2 == expected
     assert p2[0] == 0xAA
     assert p2[1:3] == (9).to_bytes(2, "little")
     assert p2[3:9] == bytes([0x00, 0x00, 0x06, 0x00, 0x00, 0x00])
 
 
-def test_pre_frames_32_wrapper_uses_c_when_available():
+def test_pre_frames_32_wrapper_returns_empty_python():
+    """Python pre_frames() returns empty list (APK has no pre-frames)."""
+    assert py_pre_frames() == []
+
+
+def test_pre_frames_32_wrapper_still_uses_c_when_available():
+    """Wrapper uses C path when available (C still has the old functions)."""
     pf = image_encoder.pre_frames_32()
+    # C path still returns the classic 2 pre-frames
     assert len(pf) == 2
     assert pf[0][0] == 0xAA
     assert pf[1][0] == 0xAA
@@ -81,20 +85,20 @@ def test_32x32_4color_frame_parity():
 
 
 def test_32x32_header_layout():
-    """The 32x32 frame header uses palette flag 0x03 + 2-byte color count."""
+    """The 32x32 frame header now uses the standard AA format (RR=0x00, 1-byte NN)."""
     w, h = 32, 32
     rgb = bytes((0xAA, 0xBB, 0xCC)) * (w * h)
     out = image_encoder.encode_animation_frame_32(rgb, w, h, 100)
     assert out[0] == 0xAA
-    # 32x32 LLLL = 8 (header) + 3 (palette 1 color) + 128 (1024 pixels / 8)
-    expected_llll = 8 + 3 + 128
+    # Standard LLLL = 7 (header) + 3 (palette 1 color) + 128 (1024 pixels / 8)
+    expected_llll = 7 + 3 + 128
     assert out[1:3] == expected_llll.to_bytes(2, "little")
     # TTTT = 100 (LE)
     assert out[3:5] == (100).to_bytes(2, "little")
-    # RR = 0x03 (32x32 palette flag)
-    assert out[5] == 0x03
-    # NN_NN = 1 (LE u16) — one unique color
-    assert out[6:8] == (1).to_bytes(2, "little")
+    # RR = 0x00 (standard format, matches APK)
+    assert out[5] == 0x00
+    # NN = 1 (u8) — one unique color
+    assert out[6] == 1
 
 
 def test_32x32_wrong_dimensions_rejected():
@@ -112,7 +116,7 @@ def test_8b_empty_input_returns_empty():
 
 
 def test_8b_single_frame_phases_layout():
-    """A single small frame produces 3 phases: start(5) + data(7+chunk) + terminate(1)."""
+    """A single small frame produces 2 phases: start(5) + data(7+chunk)."""
     w, h = 16, 16
     rgb = bytes((0x11, 0x22, 0x33)) * (w * h)
     frames = [(rgb, w, h, 100)]
@@ -127,8 +131,7 @@ def test_8b_single_frame_phases_layout():
     # SendingData: 7 + chunk_size bytes
     assert c_phases[1][0] == 0x01  # CTRL_SENDING_DATA
     assert c_phases[1][5:7] == (0).to_bytes(2, "little")  # offset_id=0
-    # TerminateSending: 1 byte
-    assert c_phases[-1] == bytes([0x02])
+    # No terminate phase (R35d — APK does not send CW=2)
 
 
 def test_8b_multi_frame_phases_match_python():
