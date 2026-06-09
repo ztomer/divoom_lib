@@ -121,13 +121,11 @@ def test_load_gallery_exposed_on_window() -> None:
 
 def test_classify_change_auto_fetches() -> None:
     js = GALLERY_JS.read_text()
-    # R32 §A2: the change handler calls loadGallery() and persists the style
-    # per device, so it's now an arrow wrapper rather than a bare reference.
+    # The gallery style tabs trigger loadGallery() on click.
     assert re.search(
-        r"document\.getElementById\(\"gallery-classify\"\)"
-        r"[\s\S]*?addEventListener\(\"change\",[\s\S]*?loadGallery\(\)",
+        r"#gallery-classify-tabs[\s\S]*?click[\s\S]*?loadGallery\(\)",
         js,
-    ), "classify <select> is missing a 'change' → loadGallery() hook."
+    ), "gallery-classify-tabs is missing a click → loadGallery() hook."
 
 
 def test_tab_activation_auto_fetches() -> None:

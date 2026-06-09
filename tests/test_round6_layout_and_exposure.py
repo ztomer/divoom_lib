@@ -190,7 +190,7 @@ def test_routines_panel_content_exists():
     )
     # The form elements must exist.
     assert 'id="routines-auto-sync-enabled"' in src, "Missing routines-auto-sync-enabled toggle"
-    assert 'id="routines-gallery-style"' in src, "Missing routines-gallery-style selector"
+    assert 'id="routines-gallery-tabs"' in src, "Missing routines-gallery-tabs"
     assert 'id="routines-interval-tabs"' in src, "Missing routines-interval-tabs"
     assert 'id="sync-all-btn"' in src, "Missing sync-all-btn"
 

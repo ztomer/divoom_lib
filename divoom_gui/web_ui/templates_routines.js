@@ -20,14 +20,14 @@ window.DivoomTemplates.routines = `
                     </label>
                 </div>
                 <div class="card-body">
-                    <div class="form-group" style="margin-bottom:14px;">
-                        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block;">Gallery style</label>
-                        <select id="routines-gallery-style" class="custom-select" style="width:100%;">
-                            <option value="18">Recommend</option>
-                            <option value="3">Cartoon</option>
-                            <option value="9">Creative</option>
-                            <option value="6">Nature</option>
-                        </select>
+                    <div style="margin-bottom:14px;">
+                        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;">Gallery style</label>
+                        <div class="tabs-row" role="tablist" id="routines-gallery-tabs">
+                            <button class="tab-btn active" data-style="18">Recommend</button>
+                            <button class="tab-btn" data-style="3">Cartoon</button>
+                            <button class="tab-btn" data-style="9">Creative</button>
+                            <button class="tab-btn" data-style="6">Nature</button>
+                        </div>
                     </div>
 
                     <div id="sync-targets-list" class="sync-targets-list" style="margin-bottom:14px;"></div>

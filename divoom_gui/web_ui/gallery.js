@@ -27,8 +27,23 @@ document.addEventListener("DOMContentLoaded", () => {
         return 16;
     }
 
+    // ── Gallery style helpers (shared with routines) ──
+    window.getGalleryStyle = function(prefix) {
+        const tabs = document.getElementById(prefix + "-gallery-tabs");
+        if (!tabs) return 18;
+        const active = tabs.querySelector(".tab-btn.active");
+        return parseInt(active?.getAttribute("data-style")) || 18;
+    };
+    window.setGalleryStyle = function(prefix, style) {
+        const tabs = document.getElementById(prefix + "-gallery-tabs");
+        if (!tabs) return;
+        tabs.querySelectorAll(".tab-btn").forEach(b => {
+            b.classList.toggle("active", b.getAttribute("data-style") === String(style));
+        });
+    };
+
     function loadGallery() {
-        const classify = parseInt(document.getElementById("gallery-classify")?.value || "18");
+        const classify = window.getGalleryStyle("gallery-classify");
         if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">Fetching public community gallery...</div>`;
         window.DivoomState.loadedArtworks = [];
         window.DivoomState.selectedArtworkIndex = null;
@@ -69,8 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.loadPreferredGalleryStyle = function() {
         if (window.pywebview?.api?.get_gallery_style) {
             return window.pywebview.api.get_gallery_style(activeDeviceAddr()).then(style => {
-                const sel = document.getElementById("gallery-classify");
-                if (sel && style !== null && style !== undefined) sel.value = String(style);
+                if (style !== null && style !== undefined) window.setGalleryStyle("gallery-classify", style);
                 return style;
             });
         }
@@ -78,12 +92,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // R32 §A2: auto-fetch on classify (gallery style) change. Also persist
-    // the chosen style as the preferred style for the active device, so a
-    // restart restores the device's last-fetched gallery.
-    const classifySelect = document.getElementById("gallery-classify");
-    if (classifySelect) classifySelect.addEventListener("change", () => {
+    // the chosen style as the preferred style for the active device.
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest("#gallery-classify-tabs .tab-btn");
+        if (!btn) return;
+        document.querySelectorAll("#gallery-classify-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
         loadGallery();
-        if (window.persistGalleryStyle) window.persistGalleryStyle(classifySelect.value);
+        if (window.persistGalleryStyle) window.persistGalleryStyle(btn.getAttribute("data-style"));
     });
 
     // R32 §A3: each tile carries a selection checkbox (checked by default).

@@ -17,12 +17,12 @@ window.DivoomTemplates.monthlyBest = `                <div class="monthly-best-l
                                 <button id="gallery-clear-btn" class="glow-btn compact wall-tool-btn" title="Deselect every image">Clear</button>
                             </div>
                             <div class="header-actions">
-                                <select id="gallery-classify" class="custom-select small">
-                                    <option value="18">Recommend</option>
-                                    <option value="3">Cartoon</option>
-                                    <option value="9">Creative</option>
-                                    <option value="6">Nature</option>
-                                </select>
+                                <div class="tabs-row" role="tablist" id="gallery-classify-tabs" style="margin:0;">
+                                    <button class="tab-btn active" data-style="18">Recommend</button>
+                                    <button class="tab-btn" data-style="3">Cartoon</button>
+                                    <button class="tab-btn" data-style="9">Creative</button>
+                                    <button class="tab-btn" data-style="6">Nature</button>
+                                </div>
                             </div>
                         </div>
                         <div class="card-body" style="flex:1; overflow:hidden; min-height:0; display:flex; flex-direction:column;">

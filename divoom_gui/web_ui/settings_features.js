@@ -32,19 +32,21 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
         if (window.updateSyncTargetList) window.updateSyncTargetList();
-        // Update gallery style selector per current selection.
         if (window.pywebview?.api?.get_gallery_style) {
             window.pywebview.api.get_gallery_style("").then(v => {
-                const style = document.getElementById("routines-gallery-style");
-                if (style && v !== null && v !== undefined) style.value = String(v);
+                if (v !== null && v !== undefined) window.setGalleryStyle("routines", v);
             });
         }
     }
 
     // Auto-save on any change.
     document.getElementById("routines-auto-sync-enabled")?.addEventListener("change", saveSchedule);
-    document.getElementById("routines-gallery-style")?.addEventListener("change", () => {
-        const val = parseInt(document.getElementById("routines-gallery-style")?.value) || 18;
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest("#routines-gallery-tabs .tab-btn");
+        if (!btn) return;
+        document.querySelectorAll("#routines-gallery-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const val = parseInt(btn.getAttribute("data-style")) || 18;
         if (window.pywebview?.api?.set_gallery_style) {
             window.pywebview.api.set_gallery_style("", val);
         }
