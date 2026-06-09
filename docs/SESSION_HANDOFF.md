@@ -48,7 +48,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
   **E**: removed the Connectivity & Privacy explainer legend.
 
-  Browser-preview verified the dots, gallery multi-select, and Routines card.
+  **Post-R32 follow-up (user feedback)**: device dots moved into a glass pill
+  *below* the preview (recycling the corner connectivity-dot chrome, wraps for
+  >4 devices, rebuilds on add/remove). **Settings moved to an appbar gear pill**
+  (`#appbar-settings-btn`, right of the brightness/volume bars) — the Settings
+  nav button was removed from the sidebar, and the device-selector panel is
+  pinned to the sidebar bottom (where Settings was). `?tab=settings` deep-link
+  now matches any `[data-tab]`.
+
+  Browser-preview + fresh-Playwright verified the dots, gear (opens Settings,
+  28px round pill), gallery multi-select, and Routines card.
 
 - **R31 — Font improvement + CJK infrastructure + warning fixes SHIPPED.**
   Suite **1093 / 75 / 0** (+3).

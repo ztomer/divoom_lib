@@ -100,6 +100,20 @@ Suite **1094 passed / 75 skipped / 0 failed**. All of A–E landed across 6 comm
 ### E — Connectivity cleanup (templates_settings.js, settings.css)
 - Removed the Connectivity & Privacy legend markup + `.connectivity-legend*` CSS.
 
+### Post-R32 follow-ups (user feedback, same session)
+- **Dots in a glass pill below the preview** (index.html, sidebar.css, app_globals.js):
+  moved out of the preview overlay; recycles the corner connectivity-dot chrome
+  (`.corner-transports` pill + `.transport-dot`), per-device colors, wraps for >4
+  devices (no cap), rebuilds on add/remove (via `updateDeviceSelectorDropdown` +
+  `syncArrangerToPython`).
+- **Settings → appbar gear pill** (index.html, appbar.css, sidebar.css,
+  settings_hardware.js): round glass `#appbar-settings-btn` to the right of the
+  brightness/volume bars opens the Settings tab (highlights the gear; cleared when
+  a sidebar nav is chosen). The sidebar Settings button was removed and the
+  device-selector panel pinned to the sidebar bottom (`margin-top:auto`).
+  `?tab=settings` deep-link now matches any `[data-tab]`. Test + visual-tester
+  updated; verified in fresh Playwright (gear opens settings, 28px round pill).
+
 ### Follow-ups / not done
 - **D scrolling text**: current fix is a static centered render; long text on a
   16px matrix scales down small. A futpib-style scrolling-frame animation that
