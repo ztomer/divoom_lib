@@ -6,6 +6,24 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Review verification + `/zreview` command
+
+- Verified the DeepSeek multi-lens review (`docs/REVIEW_2026-06.md`) against the
+  actual code. Added **§0 Verification Pass** tagging each finding
+  confirmed/partial/false-positive.
+- **False positives caught**: §1.1 `cmd_push_gif`→`show_image` is correct, not a
+  bug (`show_image` is the animation path); §1.11 `iscoroutinefunction` is not in
+  `mcp_server.py`; the §3 "0% on CLI/MCP/LAN" coverage claims are false
+  (38/66/52%) and `framing.py` is 92% not 13%. Real TOTAL coverage **62%**.
+- **Corrected priority order** in §0.5; genuinely thin coverage areas are
+  `scheduling/`, `display/drawing.py`, `tool.py`.
+- Added `.claude/commands/zreview.md` — repeatable four-lens (Bob/Linus/Rams/Kare)
+  + coverage review with mandatory per-finding verification; documents that the
+  suite runs on `/opt/homebrew/bin/python3.14`.
+- Suite re-run on py3.14: **1094 passed, 75 skipped**.
+
+---
+
 ## Round 32 — 2026-06-08 (Monthly Best reorg + Routines + device selector + Text fix)
 
 ### A — Monthly Best → full-width multi-select gallery

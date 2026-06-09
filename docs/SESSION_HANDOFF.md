@@ -18,6 +18,45 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Review verification pass (2026-06-09).** Verified the DeepSeek multi-lens
+  review in `docs/REVIEW_2026-06.md` against the code; added **§0**. Key
+  corrections: §1.1 `cmd_push_gif` is **not** a bug (`show_image` *is* the
+  animation path); the §3 coverage table is wrong (CLI/MCP/LAN are 38/66/52%,
+  not 0%; `framing.py` is 92%, not 13%; real TOTAL **62%**). Suite runs only on
+  `/opt/homebrew/bin/python3.14` (**1094/75/0**). Added `/zreview` slash command
+  (`.claude/commands/zreview.md`) that encodes the four-lens + coverage review
+  *with mandatory per-finding verification*. Real coverage to chase:
+  `scheduling/`, `display/drawing.py`, `tool.py`. No coverage config in
+  `pyproject.toml` yet (the one §3 rec worth keeping).
+
+- **R33 — Sidebar reorg + Settings polish + per-device gallery style SHIPPED.**
+  Suite **1094 / 75 / 0** (0 regressions). Full write-up: `docs/PLANNING_ROUND33.md`.
+
+  **A — Sidebar reorg**: removed Tools nav button; added Routines nav button
+  (Schedule + Time sub-tabs). Sessions moved to Channels as a sub-tab
+  (`data-channel="sessions"`, overflow:visible, Sleep Aid / Tools / FM Radio
+  static cards). Device dots live outside the glass card, tooltip text `#e8e9eb`.
+
+  **B — Routines — Schedule tab**: global gallery-style tab selector removed.
+  Each device row in `#sync-targets-list` now has its own inline gallery-style
+  tab selector (Recommend/Cartoon/Creative/Nature) + toggle switch. Persisted
+  per-device in `hotchannel_config.json` under `device_galleries`. Daemon uses
+  `get_device_classify()` to fetch per-classify groups. Interval tab selector
+  (1h/6h/12h/24h/7d/30d), auto-save on any change, "Sync devices now" button.
+
+  **C — Settings polish**: checkboxes → toggle switches (hour24, tempf, lowpower,
+  mirror); orientation `<select>` → 4-way tab selector (0°/90°/180°/270°); MCP
+  stop/start → toggle switch. `scrollbar-gutter:stable` prevents centered-tab
+  shift when panel scrollbar toggles.
+
+  **D — App window**: `min_size=(1050, 400)` prevents resize below 1050px wide.
+  Tab rows (Channels, Routines, Settings) centered with `margin: auto`.
+
+  **E — Multi-perspective review**: code/architecture/design/coverage review
+  documented at `docs/REVIEW_2026-06.md`.
+
+  **R33 in git**: multiple commits on `main` — see `git log` for the full trail.
+
 - **R32 — Monthly Best reorg + Routines + device selector + Text fix SHIPPED.**
   Suite **1094 / 75 / 0** (+1). Full write-up: `docs/PLANNING_ROUND32.md`.
 
