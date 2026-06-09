@@ -18,6 +18,13 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Scheduling coverage (2026-06-09).** Added `tests/test_scheduling_mock.py`
+  (24 mock-sender tests). The pre-existing scheduling tests require a real device
+  and skip, which is why `scheduling/` sat at 17-23%. Now: `alarm.py` 98%,
+  `sleep.py` 100%, `timeplan.py` 100% (remaining alarm branches are defensive
+  loop-continues that exact-length responses can't trigger). Suite **1118/75/0**.
+  Next thin areas from REVIEW §0.5: `display/drawing.py` (20%), `tool.py` (18%).
+
 - **Review verification pass (2026-06-09).** Verified the DeepSeek multi-lens
   review in `docs/REVIEW_2026-06.md` against the code; added **§0**. Key
   corrections: §1.1 `cmd_push_gif` is **not** a bug (`show_image` *is* the

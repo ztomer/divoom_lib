@@ -6,6 +6,17 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Scheduling coverage (mock-device tests)
+
+- Added `tests/test_scheduling_mock.py` (24 tests) driving the alarm/sleep/
+  timeplan command builders against a recording `MockSender` — verifies on-wire
+  command ids + argument bytes without hardware.
+- Coverage: `scheduling/alarm.py` 20%→98%, `sleep.py` 23%→100%,
+  `timeplan.py` 17%→100%. Addresses REVIEW_2026-06 §0.5 priority #2.
+- Suite: **1118 passed, 75 skipped** (+24, zero regressions).
+
+---
+
 ## 2026-06-09 — Review verification + `/zreview` command
 
 - Verified the DeepSeek multi-lens review (`docs/REVIEW_2026-06.md`) against the
