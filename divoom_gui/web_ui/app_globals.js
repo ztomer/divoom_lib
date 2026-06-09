@@ -11,8 +11,15 @@ window.DivoomState = {
     registeredLanDevices: [],
     loadedArtworks: [],
     selectedArtworkIndex: null,
-    savedTickers: []
+    savedTickers: [],
+    // R32 §C2: last image pushed to each device (address → image src).
+    devicePreviews: {}
 };
+
+// R32 §C2: persist last-pushed previews across restarts via localStorage.
+try {
+    window.DivoomState.devicePreviews = JSON.parse(localStorage.getItem("divoomDevicePreviews") || "{}");
+} catch (e) { window.DivoomState.devicePreviews = {}; }
 
 // ── 2. GLOBAL UTILITY FUNCTIONS ──
 window.showToast = function(message, type = "success", transport = null) {
@@ -36,6 +43,59 @@ window.deviceColor = function(key) {
     let h = 0, s = String(key || "");
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
     return `hsl(${h % 360}, 70%, 55%)`;
+};
+
+// ── R32 §C2: last-pushed device preview ───────────────────────────────
+// The device can't report its framebuffer, so we mirror the last image
+// this app pushed. setDevicePreview() is called from the image-push sites
+// (gallery, custom art); restoreDevicePreview() runs on connect / switch.
+window.setDevicePreview = function(address, src) {
+    if (!address || !src) return;
+    window.DivoomState.devicePreviews[address] = src;
+    try {
+        localStorage.setItem("divoomDevicePreviews", JSON.stringify(window.DivoomState.devicePreviews));
+    } catch (e) { /* quota — non-fatal */ }
+    const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+    if (activeMac === address) {
+        const img = document.getElementById("banner-device-image");
+        if (img) img.src = src;
+    }
+};
+
+window.restoreDevicePreview = function(address, fallbackSrc) {
+    const img = document.getElementById("banner-device-image");
+    if (!img) return;
+    const stored = window.DivoomState.devicePreviews[address];
+    img.src = stored || fallbackSrc || "assets/pixoo.png";
+};
+
+// ── R32 §C3: per-device switch dots overlaid on the preview ───────────
+window.renderDeviceDots = function() {
+    const host = document.getElementById("device-dots");
+    if (!host) return;
+    const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+    const entries = [];
+    (window.DivoomState.discoveredDevices || []).forEach(d => {
+        if (d.address) entries.push({ value: d.address, name: d.name || "Bluetooth Screen" });
+    });
+    (window.DivoomState.registeredLanDevices || []).forEach(d => {
+        if (d.ip) entries.push({ value: `LAN:${d.ip}`, name: `Wi-Fi: ${d.ip}` });
+    });
+    if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) {
+        entries.push({ value: "MatrixWall", name: "Matrix Wall Grid" });
+    }
+    host.innerHTML = "";
+    entries.forEach(e => {
+        const dot = document.createElement("span");
+        dot.className = "device-dot" + (e.value === activeMac ? " active" : "");
+        const color = window.deviceColor(e.value);
+        dot.style.background = color;
+        if (e.value === activeMac) dot.style.boxShadow = `0 0 6px ${color}`;
+        dot.title = e.name;
+        dot.setAttribute("role", "tab");
+        dot.addEventListener("click", () => window.connectDevice(e.name, e.value));
+        host.appendChild(dot);
+    });
 };
 
 window.getDeviceDimensions = function(name) {
@@ -71,8 +131,12 @@ window.connectDevice = function(name, address) {
                 
                 document.getElementById("banner-device-name").textContent = name;
                 document.getElementById("banner-device-mac").textContent = address;
+                // R32 §C2: prefer the last-pushed preview; fall back to the
+                // product icon when this device hasn't been pushed to yet.
                 const dims = window.getDeviceDimensions(name);
-                document.getElementById("banner-device-image").src = dims.image;
+                window.restoreDevicePreview(address, dims.image);
+                // R32 §C3: refresh the switch dots so the active one highlights.
+                if (window.renderDeviceDots) window.renderDeviceDots();
                 // banner-device-res and banner-device-speaker moved to Settings → Devices.
                 // Their textContent assignments are intentionally skipped here.
                 const isSpk = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo");
@@ -114,6 +178,8 @@ window.updateDeviceSelectorDropdown = function() {
     window.DivoomState.discoveredDevices.forEach(d => addOpt(d.address, d.name));
     window.DivoomState.registeredLanDevices.forEach(d => addOpt(`LAN:${d.ip}`, d.ip));
     if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) addOpt("MatrixWall", " Matrix Wall Grid");
+    // R32 §C3: the dots mirror the (now hidden) select's options.
+    if (window.renderDeviceDots) window.renderDeviceDots();
 };
 
 // ── 4. FREE-FORM DISPLAY WALL ARRANGER CANVAS ──

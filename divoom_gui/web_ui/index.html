@@ -125,12 +125,18 @@
                 </button>
             </nav>
             
-            <!-- Connected Device Panel (Moved from channels) -->
+            <!-- Connected Device Panel (Moved from channels).
+                 R32 §C2: the preview shows the last image this app pushed to
+                 the active device (falls back to the product icon).
+                 R32 §C3: the dropdown is replaced by per-device dots overlaid
+                 on the preview — color-coded, tooltipped, click to switch.
+                 The <select> is kept hidden as the canonical selection state. -->
             <div class="sidebar-device-panel" id="connected-device-banner">
                 <div class="sidebar-device-preview">
                     <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
+                    <div id="device-dots" class="device-dots" role="tablist" aria-label="Switch device"></div>
                 </div>
-                <select id="sidebar-device-select" class="sidebar-device-select">
+                <select id="sidebar-device-select" class="sidebar-device-select" hidden>
                     <option value="">Select Screen…</option>
                 </select>
                 <span id="banner-device-name" style="display: none;">No Connected Screen</span>

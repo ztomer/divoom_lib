@@ -221,6 +221,39 @@
     align-items: center;
     justify-content: center;
     margin: 0 auto 8px auto;
+    position: relative; /* R32 §C3: anchor the device-dots overlay */
+}
+
+/* R32 §C3: per-device switch dots, overlaid along the bottom of the preview. */
+.device-dots {
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 3px 0;
+}
+
+.device-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    opacity: 0.55;
+    transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.device-dot:hover {
+    opacity: 1;
+    transform: scale(1.25);
+}
+
+.device-dot.active {
+    opacity: 1;
+    transform: scale(1.2);
 }
 
 .sidebar-device-preview img {

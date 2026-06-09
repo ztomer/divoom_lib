@@ -194,6 +194,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (window.addCustomArtToHistory) {
                             window.addCustomArtToHistory(filename, path, "file://" + path);
                         }
+                        // R32 §C2: mirror the pushed artwork as the device preview.
+                        const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+                        if (activeMac && window.setDevicePreview) {
+                            window.setDevicePreview(activeMac, "file://" + path);
+                        }
                     } else {
                         window.showToast("Failed to display", "error");
                     }

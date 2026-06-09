@@ -181,6 +181,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (r.ok) window.showToast(`Pushed ${r.synced.length} image(s)`, "success", " BLE");
                         else window.showToast(`Pushed ${r.synced.length}, ${r.failed.length} failed`, "error");
                     } catch (e) { window.showToast("Push failed", "error"); }
+                    // R32 §C2: mirror the last pushed image as the device preview.
+                    const last = checked[checked.length - 1];
+                    const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+                    if (last && last.preview_url && activeMac && window.setDevicePreview) {
+                        window.setDevicePreview(activeMac, last.preview_url);
+                    }
                 });
             }
         });
