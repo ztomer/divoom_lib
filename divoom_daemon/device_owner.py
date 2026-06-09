@@ -362,15 +362,20 @@ class DeviceOwner:
             return {"success": False, "error": "sync_artwork requires 'file_id'"}
 
         async def _do():
-            import urllib.request
+            import asyncio
+            import aiohttp
             from pathlib import Path as _P
             from divoom_lib import media_decoder
             from divoom_lib.monthly_best_daemon import stream_raw_bin_payload
 
             dl_url = f"https://fin.divoom-gz.com/{file_id}"
-            req = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                file_bytes = resp.read()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    dl_url,
+                    headers={"User-Agent": "okhttp/4.12.0"},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    file_bytes = await resp.read()
             if len(file_bytes) < 4:
                 return False
 
@@ -382,12 +387,28 @@ class DeviceOwner:
                 device = await self._ensure_device_async(args.get("mac"))
                 targets = [(device, default_size)]
 
+            tmp = _P(__file__).parent.parent / "scratch"
+            tmp.mkdir(parents=True, exist_ok=True)
+
+            # Resolve the download to a plain GIF (R36). Cloud containers
+            # (magic 9/18/26) are APP-SIDE AES ciphertext — the device cannot
+            # decode them, so raw-streaming them "succeeds" (every chunk ACKed)
+            # but renders NOTHING (the R36 Ditoo bug). The APK decodes
+            # (PixelBean.initWithCloudData) and re-encodes before any BLE send;
+            # we do the same: decode → GIF → show_image (our APK-aligned
+            # encoder + 0x8B).
             extracted = media_decoder.extract_gif_from_magic_43(file_bytes)
             is_gif = bool(extracted) or file_bytes[:6] in (b"GIF89a", b"GIF87a")
             gif_data = extracted or file_bytes
+            if not is_gif and file_bytes[0] in media_decoder.CLOUD_CONTAINER_MAGICS:
+                decoded = tmp / "sync_decoded.gif"
+                if await asyncio.to_thread(
+                        media_decoder.decode_cloud_to_gif, file_bytes, decoded):
+                    is_gif = True
+                    gif_data = decoded.read_bytes()
+                    logger.info(f"sync_artwork: decoded cloud container "
+                                f"(magic {file_bytes[0]}) → {len(gif_data)}B GIF")
 
-            tmp = _P(__file__).parent.parent / "scratch"
-            tmp.mkdir(parents=True, exist_ok=True)
             results = []
             for divoom, size in targets:
                 mac = getattr(getattr(divoom, "_conn", None), "mac", None) or "dev"
@@ -396,16 +417,21 @@ class DeviceOwner:
                     src = tmp / f"sync_in_{mac}.gif"
                     src.write_bytes(gif_data)
                     out = tmp / f"sync_out_{mac}.gif"
-                    with Image.open(src) as img:
-                        frames, durations = [], []
-                        for i in range(img.n_frames):
-                            img.seek(i)
-                            frames.append(img.resize((int(size), int(size)), Image.Resampling.NEAREST).convert("RGB"))
-                            durations.append(img.info.get("duration", 100))
-                        frames[0].save(out, save_all=True, append_images=frames[1:],
-                                       duration=durations, loop=0)
+                    def _resize():
+                        with Image.open(src) as img:
+                            frames, durations = [], []
+                            for i in range(img.n_frames):
+                                img.seek(i)
+                                frames.append(img.resize((int(size), int(size)), Image.Resampling.NEAREST).convert("RGB"))
+                                durations.append(img.info.get("duration", 100))
+                            frames[0].save(out, save_all=True, append_images=frames[1:],
+                                           duration=durations, loop=0)
+                    await asyncio.to_thread(_resize)
                     results.append(await divoom.display.show_image(str(out)))
                 else:
+                    # Last resort for unknown magics: legacy raw 0x8B stream.
+                    logger.warning(f"sync_artwork: unknown payload magic "
+                                   f"{file_bytes[0]}; raw-streaming as-is")
                     results.append(await stream_raw_bin_payload(divoom, file_bytes))
             return all(r is True for r in results)
 
