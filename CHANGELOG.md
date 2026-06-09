@@ -6,7 +6,20 @@ shipped milestone (per the project planning docs).
 
 ---
 
-## Round 35 — 2026-06-09 (upload progress indicator + gallery button alignment)
+## Round 35 — 2026-06-09 (fix 0x8b spinner, upload progress, gallery button alignment)
+
+**Critical bugfix: 0x8b start-phase notification routing.**
+- Root cause: `_handle_ios_le_notification` drops the device's "[0] → ready" response
+  because `_expected_response_command` is `None` — `send_command` doesn't set it.
+- Fix: set `_expected_response_command = 0x8b` on the BLE transport *before* sending
+  the START packet, so the notification handler routes the ACK to the queue.
+- Previously the ACK was silently dropped → `_await_8b_device_ready` blocked 3s →
+  0.5s sleep fallback → **3.5s dead air** → device internal spinner timeout (~1-2s) →
+  permanent spinner. APK has no such gap: it sends START, then waits reactively for
+  the device's `[0]` response (event-driven). Our fix makes the wait actually work.
+- Reduced `_await_8b_device_ready` timeout from 3s → 2s (device typically responds
+  within 200ms).
+- APK comparison documented in `docs/PLANNING_ROUND35.md` outcome section.
 
 **Files changed:**
 - `divoom_gui/gallery_sync.py` — `sync_hot_channel`: `evaluate_js()` progress callback after each file

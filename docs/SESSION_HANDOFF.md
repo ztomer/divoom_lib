@@ -18,12 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **R35 SHIPPED (2026-06-09) — Upload progress indicator + gallery button alignment.**
+- **R35 SHIPPED (2026-06-09) — fix 0x8b spinner, upload progress, gallery button alignment.**
   Plan + outcomes: `docs/PLANNING_ROUND35.md`.
-  - §1 (this session): `sync_hot_channel` now fires `window.onGallerySyncProgress(index, total, fileId, success, errorStr)` after each file. JS handler shows three APK-matched states: idle→"Updating `(i/N)`"→"✓ Synced N" / "✗ X ok, Y failed". Double-press guarded via `_syncInFlight`/`_syncAllInFlight`. Same for Routines "Sync devices now".
-  - §2 (verification): device dot pulse confirmed shipped in R34 §2 — no changes needed.
-  - §3 (this session): removed `wall-tool-btn` from gallery Select All / Clear buttons; added `.gallery-select-btn` CSS with solid background (was transparent → hollow look).
-  - Core tests: 237 passed.
+  - **CRITICAL FIX** (this session): `_handle_ios_le_notification` was dropping the
+    device's `[0]→ready` ACK to the 0x8b START packet, because `send_command` doesn't
+    set `_expected_response_command`. The ACK was silently lost → `_await_8b_device_ready`
+    blocked 3s → 0.5s sleep fallback → 3.5s dead air → device spinner timeout → permanent
+    spinner. Fix: set `_expected_response_command = 0x8b` on the BLE transport BEFORE
+    sending START, so the handler routes the ACK to the queue. Timeout reduced 3→2s.
+    APK comparison: APK uses event-driven reactive wait (no sleep), we now match that
+    pattern on BLE with the notification fix.
+  - §1: `sync_hot_channel` fires `window.onGallerySyncProgress` after each file.
+  - §2: device dot pulse uses device accent color (CSS var, amber fallback).
+  - §3: removed `wall-tool-btn` from gallery Select All/Clear; added `.gallery-select-btn`.
+  - Core tests: 192 passed.
 
 - **R34 §1b SHIPPED (2026-06-09) — APK-aligned 0x8b upload flow.** (`5f419002`)
   Compared our chunked upload against the decompiled APK: wire format identical;

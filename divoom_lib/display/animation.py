@@ -151,22 +151,33 @@ class Animation(AnimationUserDefine):
         if file_size <= 0:
             return False
 
-        if not await self.app_new_send_gif_cmd(
-            control_word=ANSGC_CONTROL_START_SENDING, file_size=file_size
-        ):
-            self.logger.error("0x8B start phase failed")
-            return False
-
         is_lan = getattr(self.communicator, "lan", None) is not None
         is_spp = getattr(self.communicator, "use_spp", False)
         is_ble = not is_lan and not is_spp
         write_with_response = is_ble
         delay = 0.01 if is_ble else 0.0
 
+        # APK §2: set _expected_response_command BEFORE sending START so the
+        # iOS LE notification handler routes the device's "[0] → ready" reply
+        # into the notification_queue instead of dropping it. Without this the
+        # handler sees expected_cmd=None, the device's ACK is lost, and we
+        # sleep the full timeout before sending data — ~3.5s dead air which
+        # exceeds the device's internal spinner timeout (~1-2s).
+        if is_ble and hasattr(self.communicator, '_expected_response_command'):
+            self.communicator._expected_response_command = COMMANDS["app new send gif cmd"]
+
+        if not await self.app_new_send_gif_cmd(
+            control_word=ANSGC_CONTROL_START_SENDING, file_size=file_size
+        ):
+            self.logger.error("0x8B start phase failed")
+            if is_ble and hasattr(self.communicator, '_expected_response_command'):
+                self.communicator._expected_response_command = None
+            return False
+
         # APK: wait for the device's "ready, send it" reply to the start packet
         # rather than guessing how long buffer allocation takes. Fall back to
         # the legacy 0.5s sleep when no reply arrives.
-        if not (is_ble and await self._await_8b_device_ready()):
+        if not (is_ble and await self._await_8b_device_ready(timeout=2.0)):
             await asyncio.sleep(0.5)  # let the device allocate buffers
 
         chunk_size = 256  # MUST match futpib/APK (hVar.q(256)); chunk N → byte N*256

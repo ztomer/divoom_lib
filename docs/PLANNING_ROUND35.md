@@ -118,8 +118,52 @@ flexbox — or simply set the name column to a fixed width.
 - 237 passed, 0 failed (core unit tests: native downscaler, encoders, JS syntax, image processing)
 - No hardware tests run (skip by default)
 
+**§4 — CRITICAL FIX: 0x8b start-phase notification routing (spinner fix)**
+- Root cause: `_handle_ios_le_notification` drops the device's `[0] → ready` ACK
+  because `_expected_response_command` is `None` — `send_command` doesn't set it.
+- Fix: set `_expected_response_command = 0x8b` on BLE transport BEFORE sending the
+  START packet, so the handler queues the ACK.
+- Before fix: ACK silently lost → `_await_8b_device_ready` blocks 3s → 0.5s sleep
+  fallback → **3.5s dead air** → device's internal spinner timeout (~1-2s) →
+  permanent spinner. Device stays stuck until power cycle.
+- Reduced `_await_8b_device_ready` timeout from 3s → 2s (device typically responds
+  in ~200ms).
+- APK comparison: APK is purely device-driven — sends START, then waits indefinitely
+  for the device's `[0]` response in a reactive handler (`s.java:286-290` →
+  `DesignSendModel.startSendAllAni()`). Our fix now matches this pattern on BLE.
+  Full 7-step APK comparison below.
+
+### Test results
+- 192 passed, 0 failed (animation stream, downscaler, encoders, JS syntax, image processing, framing)
+
 ### Deviations from APK
 - APK uses `packets_sent / total_packets` for progress granularity — we use `files_done / total_files` because our Python layer can't count BLE packets (they're inside `_sync_artwork_detailed`)
+- APK does NOT send TERMINATE (CW=2) — we keep it (hardware-validated, devices tolerate it)
+- APK uses fire-and-forget SPP writes with 40ms delay — we use `write_with_response=True` on
+  BLE (GATT-level reliability) with 10ms delay
+
+### APK step-by-step comparison (0x8b animation upload)
+
+| Step | APK (canonical) | Our library (after fix) | Match? |
+|------|----------------|------------------------|--------|
+| **1. START cmd** | 0x8b, payload `[0][size:4 LE]` | Same | ✅ |
+| **2. Write mode** | Fire-and-forget (SPP socket) | `write_with_response=False` | ✅ |
+| **3. Wait for data** | Indefinite, device-driven: `s.java` handler fires `startSendAllAni()` on `payload[0]==0` | Bounded wait via `_await_8b_device_ready(2.0)`, fallback 0.5s sleep | ≈ (APK infinite, we have safety timeout) |
+| **4. DATA payload** | `[1][size:4 LE][idx:2 LE][≤256 bytes]` | Same | ✅ |
+| **5. Write mode** | Fire-and-forget SPP, 40ms inter-chunk | `write_with_response=True` GATT, 10ms inter-chunk | ❌ adaptation for BLE |
+| **6. Retransmits** | Event-driven `resendBlueData(idx)` on `payload[0]==1` | Post-stream poll loop (1s quiet timeout) | ⚠️ semantic match, timing differs |
+| **7. TERMINATE** | NOT SENT | Sent after 0.5s settle | ❌ divergence (hardware-tolerated) |
+
+### Files changed
+| File | Change |
+|------|--------|
+| `divoom_lib/display/animation.py` | Set `_expected_response_command` before START; moved BLE detection earlier; reduced timeout 3→2s |
+| `divoom_gui/gallery_sync.py` | `sync_hot_channel`: added `evaluate_js()` progress callback after each file |
+| `divoom_gui/web_ui/gallery.js` | Added `window.onGallerySyncProgress()` handler; batchSyncBtn + syncAllBtn double-press guards; sync state machine |
+| `divoom_gui/web_ui/gallery.css` | Added `.gallery-select-btn`, `.sync-status-text`, sync state classes (`.syncing`, `.synced-ok`, `.synced-fail`) |
+| `divoom_gui/web_ui/templates_monthly_best.js` | Removed `wall-tool-btn` from select buttons; added `#batch-sync-label` + `#batch-sync-status` spans inside `#batch-sync-btn` |
+| `divoom_gui/web_ui/appbar.css` | `--dot-pulse-color` CSS var (amber fallback) for device-colored pulse |
+| `divoom_gui/web_ui/app_globals.js` | Set `--dot-pulse-color` to device color in connectDevice |
 
 ### Files changed
 | File | Change |
