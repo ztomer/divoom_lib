@@ -4,8 +4,10 @@
   (position:fixed; bottom:10px), so the :hover tooltip must open UPWARD. It was
   anchored `top: calc(100% + 8px)` → rendered past the window's bottom edge
   (invisible). This asserts the ::after tooltip anchors above the dot.
-- #58 Settings at the bottom of the sidebar: the Settings nav button must be the
-  last interactive element in `.sidebar`.
+- #58 (R32 revision): Settings moved out of the sidebar into an appbar gear pill;
+  the device panel is now the bottom element of the sidebar. The sidebar must NOT
+  contain a Settings nav button, and the appbar must carry a #appbar-settings-btn
+  with data-tab="settings".
 
 Loads the real index.html via file:// in headless Chromium. Skipped if Playwright
 / a browser isn't available (these run when a browser is installed).
@@ -17,7 +19,7 @@ INDEX_HTML = Path(__file__).parent.parent / "divoom_gui" / "web_ui" / "index.htm
 
 
 @pytest.mark.asyncio
-async def test_settings_is_last_in_sidebar():
+async def test_settings_moved_to_appbar_gear():
     pytest.importorskip("playwright.async_api")
     from playwright.async_api import async_playwright
 
@@ -27,13 +29,23 @@ async def test_settings_is_last_in_sidebar():
             page = await browser.new_page()
             await page.goto(f"file://{INDEX_HTML}")
             await page.wait_for_load_state("domcontentloaded")
-            last_tab = await page.evaluate(
+            result = await page.evaluate(
                 """() => {
-                    const btns = [...document.querySelectorAll('.sidebar .nav-btn[data-tab]')];
-                    return btns.length ? btns[btns.length - 1].getAttribute('data-tab') : null;
+                    const sidebarSettings = [...document.querySelectorAll('.sidebar .nav-btn[data-tab]')]
+                        .some(b => b.getAttribute('data-tab') === 'settings');
+                    const gear = document.querySelector('header .appbar-gear[data-tab="settings"]');
+                    const sidebar = document.querySelector('.sidebar');
+                    const lastChild = sidebar && sidebar.lastElementChild;
+                    return {
+                        sidebarSettings,
+                        hasGear: !!gear,
+                        lastIsDevicePanel: !!(lastChild && lastChild.id === 'connected-device-banner'),
+                    };
                 }"""
             )
-            assert last_tab == "settings", f"last sidebar nav button is {last_tab!r}, expected 'settings'"
+            assert not result["sidebarSettings"], "Settings nav button should be removed from the sidebar (R32)"
+            assert result["hasGear"], "appbar must have a Settings gear pill with data-tab='settings'"
+            assert result["lastIsDevicePanel"], "device panel should be the bottom element of the sidebar"
         finally:
             await browser.close()
 

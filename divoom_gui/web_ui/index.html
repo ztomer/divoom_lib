@@ -62,6 +62,14 @@
             <span id="appbar-volume-value">7/15</span>
         </div>
 
+        <!-- R32: Settings moved out of the sidebar into a round glass pill here,
+             to the right of the brightness + volume bars. Opens the Settings tab. -->
+        <button id="appbar-settings-btn" class="appbar-gear" data-tab="settings" title="Settings" aria-label="Open settings">
+            <svg class="kare-icon" viewBox="0 0 16 16">
+                <path d="M8,6 C6.9,6 6,6.9 6,8 C6,9.1 6.9,10 8,10 C9.1,10 10,9.1 10,8 C10,6.9 9.1,6 8,6 Z M8,0 L6,3 L10,3 Z M8,16 L10,13 L6,13 Z M0,8 L3,6 L3,10 Z M16,8 L13,10 L13,6 Z"/>
+            </svg>
+        </button>
+
     </header>
 
     <!-- R11 4b: connection indicators live in the bottom-right corner, not the appbar. -->
@@ -145,15 +153,10 @@
                 <span id="banner-device-name" style="display: none;">No Connected Screen</span>
                 <span id="banner-device-mac" style="display: none;">-</span>
             </div>
-
-            <!-- Settings placed below the device preview -->
-            <button class="nav-btn" data-tab="settings">
-                <span class="btn-icon">
-                    <svg class="kare-icon" viewBox="0 0 16 16">
-                        <path d="M8,6 C6.9,6 6,6.9 6,8 C6,9.1 6.9,10 8,10 C9.1,10 10,9.1 10,8 C10,6.9 9.1,6 8,6 Z M8,0 L6,3 L10,3 Z M8,16 L10,13 L6,13 Z M0,8 L3,6 L3,10 Z M16,8 L13,10 L13,6 Z"/>
-                    </svg>
-                </span> Settings
-            </button>
+            <!-- R32: the Settings nav button was removed from the sidebar — it
+                 now lives as a gear pill in the appbar. The device panel above
+                 is pinned to the bottom (margin-top:auto) so it occupies the
+                 spot the Settings button used to. -->
         </aside>
         
         <main class="main-content">

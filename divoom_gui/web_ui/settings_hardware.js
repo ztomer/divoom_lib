@@ -5,21 +5,29 @@ document.addEventListener("DOMContentLoaded", () => {
     // ── 1. MAIN TAB SWITCH NAVIGATION ──
     const navButtons = document.querySelectorAll(".nav-btn");
     const tabContents = document.querySelectorAll(".tab-content");
-    
-    navButtons.forEach(btn => {
-        btn.addEventListener("click", () => {
-            navButtons.forEach(b => b.classList.remove("active"));
-            tabContents.forEach(t => t.classList.remove("active"));
-            
-            btn.classList.add("active");
-            const targetTab = btn.getAttribute("data-tab");
-            const el = document.getElementById(targetTab);
-            if (el) el.classList.add("active");
+    // R32: Settings is now an appbar gear pill, not a sidebar nav button.
+    const settingsGear = document.getElementById("appbar-settings-btn");
 
-            // Dispatch custom event to notify other scripts (e.g. widgets or gallery)
-            window.dispatchEvent(new CustomEvent("tab-changed", { detail: { tab: targetTab } }));
-        });
+    function activateTab(targetTab, sourceBtn) {
+        navButtons.forEach(b => b.classList.remove("active"));
+        tabContents.forEach(t => t.classList.remove("active"));
+        if (settingsGear) settingsGear.classList.remove("active");
+
+        if (sourceBtn) sourceBtn.classList.add("active");
+        const el = document.getElementById(targetTab);
+        if (el) el.classList.add("active");
+
+        // Dispatch custom event to notify other scripts (e.g. widgets or gallery)
+        window.dispatchEvent(new CustomEvent("tab-changed", { detail: { tab: targetTab } }));
+    }
+
+    navButtons.forEach(btn => {
+        btn.addEventListener("click", () => activateTab(btn.getAttribute("data-tab"), btn));
     });
+
+    if (settingsGear) {
+        settingsGear.addEventListener("click", () => activateTab("settings", settingsGear));
+    }
 
     // R15 §6: honor ?tab=&card= (the menubar "Open Notifications..." item opens
     // the GUI focused on a tab/card). Best-effort; unknown values are ignored.
@@ -27,7 +35,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const params = new URLSearchParams(window.location.search);
         const wantTab = params.get("tab");
         if (wantTab) {
-            const navBtn = document.querySelector(`.nav-btn[data-tab="${wantTab}"]`);
+            // R32: match any element carrying data-tab (the Settings gear lives
+            // in the appbar now, not the sidebar) so ?tab=settings still works.
+            const navBtn = document.querySelector(`[data-tab="${wantTab}"]`);
             if (navBtn) navBtn.click();
         }
         const wantCard = params.get("card");

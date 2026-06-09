@@ -194,7 +194,9 @@
 
 /* ── Sidebar Connected Device Panel ─────────────────────────────────── */
 .sidebar-device-panel {
-    margin-top: 15px;
+    /* R32: Settings left the sidebar (now an appbar gear), so the device panel
+       is pinned to the bottom — taking the spot the Settings button vacated. */
+    margin-top: auto;
     /* R24 #6: trim the card — less (esp. horizontal) padding + a smaller preview
        make it shorter so it sits higher; margin-bottom adds breathing room above
        the Settings button. */

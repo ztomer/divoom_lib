@@ -166,7 +166,7 @@ class HeadlessGuiTester:
             self.capture_screenshot("4_live_widgets")
 
             # Step 5: Settings / Devices View
-            window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'settings\']").click();')
+            window.evaluate_js('document.querySelector("[data-tab=\'settings\']").click();')
             time.sleep(1.0)
             self.capture_screenshot("5_settings_devices")
 

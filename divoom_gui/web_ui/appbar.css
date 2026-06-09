@@ -178,6 +178,40 @@
     color: var(--text-muted);
 }
 
+/* R32: round glass gear pill (Settings) — same chrome as the slider pills,
+   just circular. Sits to the right of the brightness/volume bars. */
+.appbar-gear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-left: 12px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+    transition: color 0.2s, border-color 0.2s, background-color 0.2s, transform 0.2s;
+}
+.appbar-gear .kare-icon {
+    width: 14px;
+    height: 14px;
+}
+.appbar-gear:hover {
+    color: var(--text-main);
+    border-color: var(--primary);
+    background: rgba(255, 90, 31, 0.06);
+    transform: rotate(30deg);
+}
+.appbar-gear.active {
+    color: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 0 8px var(--primary-glow);
+}
+
 .appbar-slider {
     -webkit-appearance: none;
     appearance: none;
