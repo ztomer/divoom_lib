@@ -18,6 +18,12 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Next-phase roadmap (2026-06-09).** `docs/PLANNING_NEXT_PHASE.md` sequences
+  remaining work: (1) inline-style batch 1 = zero-risk utility-layer addition
+  [start here], (2) notification Phases 2–3, (3) inline-style batches 2–5,
+  (4) stretch §1.5 split / §4.2 bus. All 9 review-cleanup commits pushed to
+  `origin/main` through `d871c350`. Suite 1158/75.
+
 - **Inline-style migration scoped (2026-06-09).** `docs/PLANNING_inline_styles.md`
   — REVIEW §2.1. Real count is **138** (4 of "142" were `data-style="…"` false
   matches). ~50 are genuinely-unique (per §2.1's own exception → leave inline);
