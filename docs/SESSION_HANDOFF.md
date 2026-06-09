@@ -56,6 +56,10 @@ Claude) should read this on entry and **update it at the end of every round**
   pinned to the sidebar bottom (where Settings was). `?tab=settings` deep-link
   now matches any `[data-tab]`.
 
+  Also removed the bottom-right connectivity indicator pill
+  (`.corner-transports` + the four `#tr-*-dot` dots) — no longer relevant; took
+  the dead transport-status 5s poll (`refreshTransportStatus`) with it.
+
   Browser-preview + fresh-Playwright verified the dots, gear (opens Settings,
   28px round pill), gallery multi-select, and Routines card.
 

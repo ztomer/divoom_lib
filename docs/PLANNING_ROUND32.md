@@ -113,6 +113,11 @@ Suite **1094 passed / 75 skipped / 0 failed**. All of A–E landed across 6 comm
   device-selector panel pinned to the sidebar bottom (`margin-top:auto`).
   `?tab=settings` deep-link now matches any `[data-tab]`. Test + visual-tester
   updated; verified in fresh Playwright (gear opens settings, 28px round pill).
+- **Removed the bottom-right connectivity indicator pill** (index.html,
+  appbar.css, settings_hardware.js): the fixed `.corner-transports` pill + four
+  `#tr-*-dot` dots are gone (the per-device sidebar dots convey state now), along
+  with the now-dead `updateTransportPanel`/`refreshTransportStatus` 5s poll that
+  only fed it. Tests assert the indicator is removed.
 
 ### Follow-ups / not done
 - **D scrolling text**: current fix is a static centered render; long text on a
