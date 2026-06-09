@@ -18,6 +18,14 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **appbar.css `!important` cleanup (2026-06-09).** Removed the 6 `!important`
+  flags on `#global-status-dot.*` (REVIEW §2.3) — they were unnecessary (the
+  ID+class state selectors already out-rank the base rule; JS clears inline
+  styles). Verified all 5 dot states (ble/lan/wall/connecting/inactive) compute
+  identical colours in a static browser harness via the preview tools. The lone
+  remaining `!important` is `.transport-dot.connecting` (equal-specificity
+  competitor in sidebar.css — left as-is). Suite green.
+
 - **Notifications single-owner — Phase 1 SHIPPED (2026-06-09).** The §1.2
   double-route is fixed: the GUI no longer runs its own `MacNotificationMonitor`.
   `start/stop_notification_listener`, `is_notification_listener_running`,

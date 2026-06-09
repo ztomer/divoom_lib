@@ -6,6 +6,19 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — appbar.css !important cleanup (§2.3)
+
+- Removed the 6 `!important` flags on the `#global-status-dot.*` state rules.
+  They were unnecessary: the ID+class selectors already out-rank the base
+  `#global-status-dot` rule and the `.transport-dot.*` rules (which set no
+  colour), and the JS clears inline styles (`removeAttribute("style")`).
+- Verified all 5 dot states (ble/lan/wall/connecting/inactive) resolve to the
+  same computed background/box-shadow/opacity in a browser harness (preview
+  tools). No visual change. The 1 remaining flag (`.transport-dot.connecting`)
+  is left — equal-specificity competitor in sidebar.css.
+
+---
+
 ## 2026-06-09 — Notifications single-owner (Phase 1)
 
 - Fix the §1.2 double-route: the GUI no longer runs its own

@@ -32,11 +32,16 @@
     display: inline-block;
     flex-shrink: 0;
 }
-#global-status-dot.active.ble { background-color: var(--transport-ble, #3b82f6) !important; color: var(--transport-ble, #3b82f6) !important; box-shadow: 0 0 8px var(--transport-ble, #3b82f6) !important; opacity: 1; }
-#global-status-dot.active.lan { background-color: var(--transport-lan, #22c55e) !important; color: var(--transport-lan, #22c55e) !important; box-shadow: 0 0 8px var(--transport-lan, #22c55e) !important; opacity: 1; }
-#global-status-dot.active.wall { background-color: #8b5cf6 !important; color: #8b5cf6 !important; box-shadow: 0 0 8px #8b5cf6 !important; opacity: 1; }
-#global-status-dot.connecting { background-color: #f59e0b !important; color: #f59e0b !important; box-shadow: 0 0 8px #f59e0b !important; opacity: 1; animation: dot-pulse 1s ease-in-out infinite; }
-#global-status-dot.inactive { background-color: #6b7280 !important; color: #6b7280 !important; opacity: 0.3; box-shadow: none !important; }
+/* These ID+class selectors (specificity 1,1,0 / 1,2,0) already out-rank the
+   base `#global-status-dot` rule and the `.transport-dot.*` rules in
+   settings.css (0,2,0, which don't set colour anyway). The JS also clears any
+   inline style (`removeAttribute("style")`), so no `!important` is needed to
+   win the cascade — see REVIEW_2026-06 §2.3. */
+#global-status-dot.active.ble { background-color: var(--transport-ble, #3b82f6); color: var(--transport-ble, #3b82f6); box-shadow: 0 0 8px var(--transport-ble, #3b82f6); opacity: 1; }
+#global-status-dot.active.lan { background-color: var(--transport-lan, #22c55e); color: var(--transport-lan, #22c55e); box-shadow: 0 0 8px var(--transport-lan, #22c55e); opacity: 1; }
+#global-status-dot.active.wall { background-color: #8b5cf6; color: #8b5cf6; box-shadow: 0 0 8px #8b5cf6; opacity: 1; }
+#global-status-dot.connecting { background-color: #f59e0b; color: #f59e0b; box-shadow: 0 0 8px #f59e0b; opacity: 1; animation: dot-pulse 1s ease-in-out infinite; }
+#global-status-dot.inactive { background-color: #6b7280; color: #6b7280; opacity: 0.3; box-shadow: none; }
 
 /* "Connecting" state for the shared transport dot (amber pulse) */
 .transport-dot.connecting {
