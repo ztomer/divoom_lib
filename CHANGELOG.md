@@ -6,6 +6,32 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 34 — 2026-06-09 (hot-channel sync fix + Routines polish)
+
+### Fixed — hot-channel sync falsely reported every upload failed (§1)
+
+- `DaemonClient.sync_artwork` used the 2s quick-command read timeout, but the
+  daemon only replies after downloading the asset AND streaming it to the device
+  over BLE. New `sync_read_timeout` knob in `daemon.ini` (default 120s).
+- `sync_hot_channel` now returns a per-file `errors` map (reason strings)
+  alongside `synced`/`failed`, via the shared `_sync_artwork_detailed` core.
+
+### Added — connect pulse + Routines UI (§2-§4)
+
+- **Device dots pulse while connecting** — the clicked sidebar device dot gets
+  the existing amber `dot-pulse` for the duration of the connect attempt.
+- **Auto-Sync Gallery rows fit one line** — Schedule grid 540→760px, nowrap
+  rows, long device names ellipsize.
+- **Alarms weekday table** — one weekday header row + day-cell toggles per
+  alarm; only non-empty alarms shown; "+ Add alarm" / "Clear all" / per-row ×;
+  changes write to the device immediately (debounced 500ms per row — no Save
+  button). `set_alarm` caches last-written state to
+  `~/.config/divoom-control/alarms.json`; `get_alarms` falls back to it when the
+  device read is empty (the get_* read-back is flaky on hardware, task #20).
+  Editor lives in new `web_ui/alarms_editor.js` (500-LOC rule).
+
+---
+
 ## 2026-06-09 — Downscaler kernel weight normalization: RGB parity bug fixed
 
 - `downsample_kernel.c`: Changed `kernel1d_init` from quantize-then-normalize

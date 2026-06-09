@@ -104,4 +104,24 @@ empty-slot predicate + debounce wiring if feasible in the JS-guard style.
 §2 (tiny) → §3 (small CSS) → §4 (the big one).
 
 ## §outcome
-_(fill in as items ship)_
+- **§1 SHIPPED** (`ade3c0cc`) — root cause confirmed as predicted: `sync_artwork`
+  used the 2s quick-command read timeout while the daemon downloads + streams
+  over BLE. New `sync_read_timeout` knob (120s) in daemon.ini; `sync_hot_channel`
+  now returns a per-file `errors` map. APK protocol diff NOT needed unless real
+  device errors remain after this fix — re-check `/tmp/divoom_daemon.log` on the
+  next user-run hot-channel sync.
+- **§2 SHIPPED** (`a3865133`) — device dots carry `data-value`; `connectDevice`
+  adds the existing amber `.transport-dot.connecting` dot-pulse during the
+  attempt; cleared on success (re-render) and failure (explicit re-render,
+  hue restored). Preview-verified.
+- **§3 SHIPPED** (`405dc811`) — Schedule grid 540→760px, rows nowrap, names
+  ellipsize (tooltip keeps full name), row padding 6→10px. Preview-verified at
+  1080px: long-name row stays single-line (54px).
+- **§4 SHIPPED** (`0877db09`) — alarms weekday table (header row + day-cell
+  toggles), only non-empty alarms shown, +Add / Clear all / per-row ×, live
+  debounced writes (500ms/row, no Save button), `alarms.json` last-written cache
+  as get_alarms fallback (task #20 read-back flakiness). Editor split into
+  `web_ui/alarms_editor.js` (500-LOC rule). Preview-verified: empty-slot hiding,
+  bitmask mapping, add/remove/clear, debounce (3 changes → 1 write).
+- Suite 1182 / 0 / 75. Remaining: hardware re-test of hot-channel sync by the
+  user (daemon log will now show the truth).

@@ -18,6 +18,24 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R34 SHIPPED (2026-06-09) — hot-channel sync fix + Routines polish.**
+  Plan + outcomes: `docs/PLANNING_ROUND34.md`. Suite **1182/75/0**.
+  - §1 (`ade3c0cc`): hot-channel "failed to upload" was the client read timeout
+    (2s) vs. the daemon's download+BLE-stream; new `sync_read_timeout` (120s) in
+    daemon.ini; `sync_hot_channel` returns per-file `errors`. **User should
+    re-run a hot-channel sync** — if anything still fails, `/tmp/divoom_daemon.log`
+    now shows the real reason; only then is the APK protocol diff warranted.
+  - §2 (`a3865133`): sidebar device dot pulses amber (existing dot-pulse) while
+    connecting; clears on success/failure.
+  - §3 (`405dc811`): Auto-Sync Gallery rows single-line (grid 540→760px, nowrap,
+    name ellipsis).
+  - §4 (`0877db09`): alarms = weekday TABLE (header row + day-cell toggles),
+    only non-empty shown, +Add/Clear all/per-row ×, live debounced writes (no
+    Save button), `alarms.json` last-written cache backs get_alarms (task #20
+    read-back flakiness). New `web_ui/alarms_editor.js` (500-LOC split).
+  - All UI verified headlessly via the static-server + preview technique
+    (stubbed `window.pywebview.api`).
+
 - **Downscaler kernel normalization + 22 edge case tests SHIPPED (2026-06-09).**
   Fixed root cause of the 1 LSB RGB parity bug: `kernel1d_init` used
   quantize-then-normalize while PIL uses normalize-then-quantize. Changed to
