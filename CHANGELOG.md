@@ -6,6 +6,25 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 36 — 2026-06-09 (hot-channel renders on real hardware)
+
+### Fixed — hot-channel sync rendered nothing on a real Ditoo
+
+- Root cause (hardware iteration + payload forensics): magic 9/18/26 cloud
+  downloads are app-side AES-CBC ciphertext. `sync_artwork` raw-streamed the
+  encrypted container over 0x8B — the device ACKs every chunk (so every
+  protocol-level check "passed") but cannot decode it, displaying nothing.
+  The APK decodes (`PixelBean.initWithCloudData`) and re-encodes before BLE.
+- `media_decoder.decode_cloud_frames` / `decode_cloud_to_gif` (native-size;
+  the preview path now wraps the same core); `sync_artwork` decodes
+  magic 9/18/26 to GIF and routes through `show_image` (APK-aligned encoder +
+  0x8B). Raw streaming only remains for unknown magics.
+- Verified on the Ditoo via daemon RPCs: 32KB container → 5.8KB / 24-frame
+  GIF, start-ACK, 3/3 batch at 2-4s per image (was 15s of ciphertext).
+- Suite greened: stale R35 button-regex test, `test_hardware_smoke` pytest
+  collection error, no-emoji violations in R35 docs. 1216 / 75 / 0.
+
+
 ## Round 35 — 2026-06-09 (APK encoding parity, terminate removal, UI polish)
 
 ### Critical bugfix: 0x8b start-phase notification routing.

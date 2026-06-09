@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R36 SHIPPED (2026-06-09) — hot-channel now renders on the Ditoo.**
+  (`4d7aae3d` fix, `6937a468` suite green; plan+runlog
+  `docs/PLANNING_ROUND36.md`.) Root cause: magic 9/18/26 cloud files are
+  AES-CBC ciphertext; we raw-streamed them over 0x8B — device ACKs everything
+  (false-positive "success") but can't decode. Now: decode
+  (`media_decoder.decode_cloud_frames`) → GIF → `show_image`. HW-verified on
+  Ditoo via daemon RPCs (24-frame GIF, start-ACK, 3/3 batch). Suite
+  **1216/75/0**. KEY LESSON: transfer-level PASS (incl. `test_hardware_smoke`)
+  is NOT render-level proof — only eyes on the device confirm pixels.
+  AWAITING: user glance at the Ditoo after an "Update Device" run.
+
 - **R35 SHIPPED (2026-06-09) — APK encoding parity + terminate removal + UI polish.**
   Plan + outcomes: `docs/PLANNING_ROUND35.md`.
   - **R35a — CRITICAL FIX**: `_handle_ios_le_notification` dropped the device's
