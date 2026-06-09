@@ -85,12 +85,6 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         future = asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
         return future.result()
 
-    def _schedule_async(self, coro) -> None:
-        """Fire-and-forget: schedule ``coro`` on the main asyncio loop
-        without blocking the caller. Used by the macOS notification
-        monitor's polling thread (which must not block on BLE)."""
-        asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
-
     def get_transport_status(self) -> str:
         return self.connection.get_transport_status()
 
@@ -217,76 +211,49 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             return False
         return self.tools.send_notification(t, text)
 
-    # ── Round 13 §3: macOS notification mirroring ────────────────────────
-    # The monitor runs in a daemon thread that polls the macOS Notification
-    # Center SQLite DB. The sink callback (called on the polling thread)
-    # schedules the BLE send on the main asyncio loop via _schedule_async
-    # so the polling thread never blocks on BLE roundtrips.
+    # ── macOS notification mirroring (daemon-owned) ───────────────────────
+    # The daemon is the SINGLE owner of the macOS Notification Center monitor
+    # (see docs/PLANNING_daemon_ownership.md). It polls the DB, routes each
+    # notification to the device it owns, and broadcasts events. The GUI must
+    # NOT run its own monitor — doing so double-routes every notification. These
+    # methods are thin pass-throughs to the daemon's RPCs.
 
-    def _notification_monitor(self):
-        """Lazy accessor for the macOS monitor singleton. Imports
-        ``divoom_daemon.macos_notifications`` lazily so non-macOS hosts don't
-        fail to import this module."""
-        if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:
-            from divoom_daemon.macos_notifications import MacAppRouter, MacNotificationMonitor
-            router = MacAppRouter()
-            self._mac_monitor = MacNotificationMonitor(router=router, poll_interval=1.0)
-        return self._mac_monitor
-
-    def _notification_sink(self, app_type: int, title: str, body: str) -> None:
-        """Sink for the monitor. Truncates to a single line of text and
-        schedules a fire-and-forget BLE send."""
-        text = (title or body or "").strip().splitlines()[0] if (title or body) else ""
-        self._schedule_async(self._send_notification_async(app_type, text))
-
-    async def _send_notification_async(self, app_type: int, text: str) -> None:
-        """Coroutines run on the main loop. Logs + sends; ignores failures
-        (we'd rather drop a notification than back up the polling thread)."""
-        d = self.current_divoom
-        if d is None or not d.is_connected:
-            return
-        try:
-            if text:
-                await d.notification.show_notification_text(int(app_type), text)
-            else:
-                await d.notification.show_notification(int(app_type))
-        except Exception as e:
-            logger.debug(f"_send_notification_async: {e}")
+    @staticmethod
+    def _daemon_state_running(reply: dict) -> bool:
+        return reply.get("state") == "active"
 
     def start_notification_listener(self) -> dict:
-        """Start polling the macOS Notification Center DB. Returns a
-        status dict for the JS side (``{running, db_path, error?}``).
-        Safe to call multiple times; no-op if already running.
-
-        (R22: the menubar now subscribes to the daemon's status events directly,
-        so the GUI no longer pushes status to it — the old `_push_menubar_status`
-        was retired.)"""
+        """Ask the daemon to start its notification monitor. Returns a status
+        dict for the JS side (``{running, db_path, error?}``). Idempotent."""
         if sys.platform != "darwin":
             return {"running": False, "error": "macOS only"}
-        try:
-            monitor = self._notification_monitor()
-            if monitor.is_running:
-                return {"running": True, "db_path": str(monitor.db_path)}
-            monitor.start(sink=self._notification_sink)
-            return {"running": True, "db_path": str(monitor.db_path)}
-        except FileNotFoundError as e:
-            logger.warning(f"start_notification_listener: {e}")
-            return {"running": False, "error": str(e)}
-        except Exception as e:
-            logger.exception(f"start_notification_listener: {e}")
-            return {"running": False, "error": str(e)}
+        client = self._client()
+        if client is None:
+            return {"running": False, "error": "daemon unavailable"}
+        reply = client.start_notifications()
+        from divoom_daemon.macos_notifications import find_notification_db_path
+        db_path = find_notification_db_path()
+        out = {
+            "running": self._daemon_state_running(reply),
+            "db_path": str(db_path) if db_path else None,
+        }
+        if reply.get("error"):
+            out["error"] = reply["error"]
+        return out
 
     def stop_notification_listener(self) -> dict:
-        """Stop the polling thread. No-op if not running."""
-        if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:
+        """Ask the daemon to stop its notification monitor. No-op if idle."""
+        client = self._client()
+        if client is None:
             return {"running": False}
-        self._mac_monitor.stop()
-        return {"running": False}
+        reply = client.stop_notifications()
+        return {"running": self._daemon_state_running(reply)}
 
     def is_notification_listener_running(self) -> bool:
-        if not hasattr(self, "_mac_monitor") or self._mac_monitor is None:
+        client = self._client()
+        if client is None:
             return False
-        return self._mac_monitor.is_running
+        return self._daemon_state_running(client.notification_status())
 
     def get_notification_listener_status(self) -> dict:
         """Rich status snapshot for the Settings → Devices card.
@@ -303,7 +270,9 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
               "error": str | None,
             }
         """
-        from divoom_daemon.macos_notifications import ROUTING_PATH, load_routing_table
+        from divoom_daemon.macos_notifications import (
+            ROUTING_PATH, load_routing_table, find_notification_db_path,
+        )
         if sys.platform != "darwin":
             return {
                 "platform_supported": False,
@@ -314,26 +283,34 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
                 "counters": {"seen": 0, "routed": 0, "dropped": 0},
                 "error": "macOS notifications are only supported on macOS",
             }
-        monitor = self._notification_monitor()
-        rules = [list(r) for r in monitor._router.rules]
+        # The daemon owns the monitor; ask it for live state + counters. The
+        # routing table and DB path are read from disk (no monitor needed).
+        client = self._client()
+        if client is None:
+            return {
+                "platform_supported": True,
+                "running": False,
+                "db_path": None,
+                "routing_path": str(ROUTING_PATH),
+                "rules": [list(r) for r in load_routing_table()],
+                "counters": {"seen": 0, "routed": 0, "dropped": 0},
+                "error": "daemon unavailable",
+            }
+        status = client.notification_status()
+        db_path = find_notification_db_path()
         return {
             "platform_supported": True,
-            "running": monitor.is_running,
-            "db_path": str(monitor.db_path) if monitor.db_path else None,
+            "running": self._daemon_state_running(status),
+            "db_path": str(db_path) if db_path else None,
             "routing_path": str(ROUTING_PATH),
-            "rules": rules,
-            "counters": {
-                "seen":    monitor.records_seen,
-                "routed":  monitor.records_routed,
-                "dropped": monitor.records_dropped,
-            },
-            "error": None,
+            "rules": [list(r) for r in load_routing_table()],
+            "counters": status.get("counters") or {"seen": 0, "routed": 0, "dropped": 0},
+            "error": status.get("error"),
         }
 
     def save_notification_routing(self, json_text: str) -> dict:
-        """Save a user-edited routing table. Persists to disk and
-        hot-reloads the running monitor's router (no listener restart
-        required).
+        """Save a user-edited routing table. Validated here, then persisted +
+        hot-reloaded on the daemon (which owns the monitor) via ``set_routing``.
 
         Returns ``{"rules": [[substr, app_type], ...], "error": str|None}``.
 
@@ -341,32 +318,30 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         unchanged and a non-null ``error`` string — the GUI shows the
         error and keeps the user's draft.
         """
-        from divoom_daemon.macos_notifications import (
-            ROUTING_PATH, load_routing_table, save_routing_table,
-        )
+        from divoom_daemon.macos_notifications import load_routing_table
         import json as _json
         try:
             parsed = _json.loads(json_text) if json_text.strip() else []
         except _json.JSONDecodeError as e:
             return {"rules": [list(r) for r in load_routing_table()], "error": f"Invalid JSON: {e}"}
         try:
-            path = save_routing_table(
-                [(s, int(t)) for s, t in parsed], path=ROUTING_PATH
-            )
+            rules = [(s, int(t)) for s, t in parsed]
         except (ValueError, TypeError) as e:
             return {
                 "rules": [list(r) for r in load_routing_table()],
                 "error": f"Invalid routing entries: {e}",
             }
-        # Hot-reload the running monitor's router.
-        monitor = self._notification_monitor()
-        from divoom_daemon.macos_notifications import MacAppRouter
-        monitor._router = MacAppRouter.from_file(path)
-        logger.info(f"save_notification_routing: saved {len(parsed)} rules to {path}")
-        return {
-            "rules": [list(r) for r in load_routing_table(path)],
-            "error": None,
-        }
+        client = self._client()
+        if client is None:
+            return {"rules": [list(r) for r in load_routing_table()], "error": "daemon unavailable"}
+        reply = client.set_routing(rules)
+        if not reply.get("success"):
+            return {
+                "rules": [list(r) for r in load_routing_table()],
+                "error": reply.get("error") or "set_routing failed",
+            }
+        logger.info(f"save_notification_routing: saved {len(rules)} rules via daemon")
+        return {"rules": [list(r) for r in load_routing_table()], "error": None}
 
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         return self.lighting.display_wall_image(file_path, cell_size)

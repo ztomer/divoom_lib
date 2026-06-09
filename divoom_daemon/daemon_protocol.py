@@ -197,6 +197,26 @@ class DaemonClient:
         """End the exclusive-mode session for ``token``. Returns the daemon reply."""
         return self.send_command("exclusive_end", {"token": token})
 
+    # ── notifications (the daemon owns the single macOS monitor) ──────────
+    def start_notifications(self) -> dict:
+        """Start the daemon's macOS notification monitor. Returns
+        ``{success, state, counters, error?, unsupported?}``. The daemon is the
+        single owner of the monitor — the GUI must NOT poll the DB itself."""
+        return self.send_command("start_notifications")
+
+    def stop_notifications(self) -> dict:
+        """Stop the daemon's notification monitor. Returns ``{success, state, ...}``."""
+        return self.send_command("stop_notifications")
+
+    def notification_status(self) -> dict:
+        """Current monitor state + counters (``{state, counters, ...}``)."""
+        return self.send_command("notification_status")
+
+    def set_routing(self, rules) -> dict:
+        """Persist + hot-reload the app routing table on the daemon. ``rules`` is
+        an iterable of ``(substring, app_type)`` pairs."""
+        return self.send_command("set_routing", {"rules": [list(r) for r in rules]})
+
     # ── device ownership / lifecycle (R17 P5 full cutover) ────────────────
     def connect_device(self, *, mac: str | None = None, lan_ip: str | None = None,
                        lan_token: int = 0, device_name: str | None = None,

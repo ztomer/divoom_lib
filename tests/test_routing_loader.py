@@ -34,13 +34,16 @@ def test_load_returns_defaults_when_file_missing(tmp_path: Path) -> None:
     assert rules == DEFAULT_ROUTING
 
 
-def test_load_returns_defaults_when_env_var_points_at_missing_file(
+def test_load_returns_defaults_when_configured_path_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("DIVOOM_CONTROL_ROUTING", str(tmp_path / "nope.json"))
-    # The module-level ROUTING_PATH is bound at import time, so we
-    # must read the env-resolved path via load_routing_table() with
-    # no argument. This is the documented behavior.
+    # ROUTING_PATH is resolved (from the env var) at IMPORT time, so a
+    # post-import setenv has no effect — patch the bound module attribute,
+    # which is what load_routing_table(None) reads at call time. (Setting the
+    # env var here used to make the test depend on the absence of the user's
+    # real ~/.config file, which is flaky.)
+    import divoom_daemon.macos_notifications as macos_notif
+    monkeypatch.setattr(macos_notif, "ROUTING_PATH", tmp_path / "nope.json")
     rules = load_routing_table()
     assert rules == DEFAULT_ROUTING
 

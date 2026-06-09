@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Notifications single-owner — Phase 1 SHIPPED (2026-06-09).** The §1.2
+  double-route is fixed: the GUI no longer runs its own `MacNotificationMonitor`.
+  `start/stop_notification_listener`, `is_notification_listener_running`,
+  `get_notification_listener_status`, `save_notification_routing` now delegate to
+  the daemon over new `DaemonClient` RPCs (`start_notifications`/
+  `stop_notifications`/`notification_status`/`set_routing`). Deleted GUI monitor
+  machinery (`_notification_monitor`/`_notification_sink`/`_send_notification_async`/
+  `_schedule_async`). Regression test asserts the GUI never instantiates
+  `MacNotificationMonitor`. Also fixed a flaky pre-existing test
+  (`test_routing_loader`) that read the user's real `~/.config` file. Suite
+  **green** on py3.14. Phases 2-3 (UI reflects daemon state via broadcasts) still
+  open — see `docs/PLANNING_daemon_ownership.md`.
+
 - **Daemon-ownership investigation (2026-06-09).** Scoped REVIEW §1.3/§4.1/§1.2
   read-only → `docs/PLANNING_daemon_ownership.md`. **Key correction:** the
   device-access migration is essentially DONE — there is NO direct BLE in

@@ -222,107 +222,109 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.api.current_divoom = None
         self.assertFalse(self.api.send_notification(6))
 
-    # ── R13 §3: macOS notification mirroring ────────────────────────────
+    # ── macOS notification mirroring (daemon-owned) ─────────────────────
+    # The daemon is the single owner of the monitor; the GUI delegates over
+    # RPC and must NOT poll the DB itself (docs/PLANNING_daemon_ownership.md).
 
-    def test_r13_notification_listener_initial_state(self):
-        """is_running returns False before start; stop is a no-op."""
-        self.assertFalse(self.api.is_notification_listener_running())
-        # stop_notification_listener with no monitor must not raise.
-        result = self.api.stop_notification_listener()
-        self.assertFalse(result["running"])
+    def _fake_client(self, *, state="idle", counters=None, error=None):
+        """A DaemonClient stub whose notification RPCs return canned replies."""
+        c = MagicMock()
+        reply = {"success": error is None, "state": state,
+                 "counters": counters or {"seen": 0, "routed": 0, "dropped": 0}}
+        if error:
+            reply["error"] = error
+        c.start_notifications.return_value = reply
+        c.stop_notifications.return_value = {"success": True, "state": "idle"}
+        c.notification_status.return_value = reply
+        c.set_routing.return_value = {"success": True}
+        return c
 
-    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
-    def test_r13_start_notification_listener_wires_sink(self, mock_monitor_cls):
-        """start_notification_listener constructs a monitor with a sink
-        that schedules a coroutine on the main loop, then calls .start()."""
-        mock_monitor = mock_monitor_cls.return_value
-        mock_monitor.is_running = False
-        mock_monitor.db_path = "/fake/db.sqlite"
+    def test_notification_listener_initial_state(self):
+        """No daemon → not running; stop is a safe no-op."""
+        with patch.object(self.api, "_client", return_value=None):
+            self.assertFalse(self.api.is_notification_listener_running())
+            self.assertFalse(self.api.stop_notification_listener()["running"])
 
-        captured = []
-
-        def _fake_schedule(coro):
-            captured.append(coro)
-            coro.close()  # prevent "never awaited" warning
-
-        with patch.object(self.api, "_schedule_async", side_effect=_fake_schedule):
+    @patch("sys.platform", new="darwin")
+    @patch("divoom_daemon.macos_notifications.find_notification_db_path",
+           return_value=Path("/fake/db.sqlite"))
+    def test_start_notification_listener_delegates_to_daemon(self, _db):
+        client = self._fake_client(state="active")
+        with patch.object(self.api, "_client", return_value=client):
             result = self.api.start_notification_listener()
-            self.assertTrue(result["running"])
-            self.assertEqual(result["db_path"], "/fake/db.sqlite")
-            mock_monitor_cls.assert_called_once()
-            mock_monitor.start.assert_called_once()
-            # The sink is passed as a keyword arg to monitor.start.
-            sink = mock_monitor.start.call_args.kwargs.get("sink")
-            self.assertTrue(callable(sink))
-            # Verify the sink calls _schedule_async with the right shape.
-            captured.clear()
-            sink(6, "Alice", "Hello")
-            self.assertEqual(len(captured), 1)
-            # The sink truncates to first line.
-            captured.clear()
-            sink(6, "Alice", "Hello world\nsecond line")
-            self.assertEqual(len(captured), 1)
-
-    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
-    def test_r13_start_notification_listener_idempotent(self, mock_monitor_cls):
-        """If the monitor is already running, start() is a no-op."""
-        mock_monitor = mock_monitor_cls.return_value
-        mock_monitor.is_running = True
-        mock_monitor.db_path = "/fake/db.sqlite"
-        result = self.api.start_notification_listener()
         self.assertTrue(result["running"])
-        mock_monitor.start.assert_not_called()
+        self.assertEqual(result["db_path"], "/fake/db.sqlite")
+        client.start_notifications.assert_called_once()
 
-    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
-    def test_r13_start_notification_listener_filenotfound(self, mock_monitor_cls):
-        """If start() raises FileNotFoundError, return error dict."""
-        mock_monitor = mock_monitor_cls.return_value
-        mock_monitor.is_running = False
-        mock_monitor.start.side_effect = FileNotFoundError("db not found")
+    @patch("sys.platform", new="darwin")
+    def test_start_notification_listener_no_daemon(self):
+        with patch.object(self.api, "_client", return_value=None):
+            result = self.api.start_notification_listener()
+        self.assertFalse(result["running"])
+        self.assertIn("daemon", result["error"])
+
+    @patch("sys.platform", new="linux")
+    def test_start_notification_listener_macos_only(self):
         result = self.api.start_notification_listener()
+        self.assertFalse(result["running"])
+        self.assertIn("macOS", result["error"])
+
+    @patch("sys.platform", new="darwin")
+    @patch("divoom_daemon.macos_notifications.find_notification_db_path",
+           return_value=Path("/fake/db.sqlite"))
+    def test_start_notification_listener_reports_daemon_error(self, _db):
+        client = self._fake_client(state="error", error="db not found")
+        with patch.object(self.api, "_client", return_value=client):
+            result = self.api.start_notification_listener()
         self.assertFalse(result["running"])
         self.assertIn("db not found", result["error"])
 
-    def test_r13_stop_notification_listener_calls_monitor_stop(self):
-        """Stop calls monitor.stop() on the existing monitor."""
-        # Create a monitor first via start (mocked).
-        with patch("divoom_daemon.macos_notifications.MacNotificationMonitor") as mock_cls:
-            mock_monitor = mock_cls.return_value
-            mock_monitor.is_running = False
-            mock_monitor.db_path = "/fake/db.sqlite"
-            self.api.start_notification_listener()
-            mock_monitor.is_running = True
+    def test_stop_notification_listener_delegates(self):
+        client = self._fake_client(state="active")
+        with patch.object(self.api, "_client", return_value=client):
             result = self.api.stop_notification_listener()
-            self.assertFalse(result["running"])
-            mock_monitor.stop.assert_called_once()
+        self.assertFalse(result["running"])
+        client.stop_notifications.assert_called_once()
 
-    # ── R14 §3: status snapshot + routing save (Settings card) ────────
+    def test_gui_does_not_instantiate_local_monitor(self):
+        """Regression for the §1.2 double-route fix: the GUI must never build
+        its own MacNotificationMonitor — that is the daemon's job."""
+        with patch("divoom_daemon.macos_notifications.MacNotificationMonitor") as mock_cls, \
+             patch.object(self.api, "_client", return_value=self._fake_client(state="active")), \
+             patch("sys.platform", new="darwin"), \
+             patch("divoom_daemon.macos_notifications.find_notification_db_path", return_value=None), \
+             patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[]):
+            self.api.start_notification_listener()
+            self.api.stop_notification_listener()
+            self.api.is_notification_listener_running()
+            self.api.get_notification_listener_status()
+        mock_cls.assert_not_called()
 
-    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
-    def test_r14_get_notification_listener_status_shape(self, mock_monitor_cls):
-        """The status dict has every key the JS side renders."""
-        mock_monitor = mock_monitor_cls.return_value
-        mock_monitor.is_running = True
-        mock_monitor.db_path = "/fake/db.sqlite"
-        mock_monitor.records_seen = 12
-        mock_monitor.records_routed = 8
-        mock_monitor.records_dropped = 4
-        # _router.rules is a list of tuples.
-        mock_monitor._router.rules = [("whatsapp", 6), ("com.apple.mail", 7)]
+    # ── status snapshot + routing save (Settings card) ────────────────
 
-        s = self.api.get_notification_listener_status()
+    @patch("sys.platform", new="darwin")
+    @patch("divoom_daemon.macos_notifications.find_notification_db_path",
+           return_value=Path("/fake/db.sqlite"))
+    def test_get_notification_listener_status_shape(self, _db):
+        """The status dict has every key the JS side renders; counters + state
+        come from the daemon, rules from disk."""
+        client = self._fake_client(state="active",
+                                   counters={"seen": 12, "routed": 8, "dropped": 4})
+        with patch("divoom_daemon.macos_notifications.load_routing_table",
+                   return_value=[("whatsapp", 6), ("com.apple.mail", 7)]), \
+             patch.object(self.api, "_client", return_value=client):
+            s = self.api.get_notification_listener_status()
 
         self.assertTrue(s["platform_supported"])
         self.assertTrue(s["running"])
         self.assertEqual(s["db_path"], "/fake/db.sqlite")
         self.assertEqual(s["counters"], {"seen": 12, "routed": 8, "dropped": 4})
-        # Rules is a list of [str, int] pairs (not tuples) for JSON.
         self.assertEqual(s["rules"], [["whatsapp", 6], ["com.apple.mail", 7]])
         self.assertIn("routing_path", s)
         self.assertIsNone(s["error"])
 
     @patch("sys.platform", new="linux")
-    def test_r14_status_unsupported_off_macos(self):
+    def test_status_unsupported_off_macos(self):
         """On non-darwin, status reports unsupported and the toggle is disabled upstream."""
         s = self.api.get_notification_listener_status()
         self.assertFalse(s["platform_supported"])
@@ -331,45 +333,38 @@ class TestDivoomGuiAPI(unittest.TestCase):
         # Rules still load from the file (or defaults) even off-macOS.
         self.assertIsInstance(s["rules"], list)
 
-    @patch("divoom_daemon.macos_notifications.MacNotificationMonitor")
-    @patch("divoom_daemon.macos_notifications.save_routing_table")
-    @patch("divoom_daemon.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
-    def test_r14_save_notification_routing_roundtrip(self, mock_save, mock_monitor_cls):
-        """save_notification_routing persists and returns the cleaned rules."""
-        mock_monitor = mock_monitor_cls.return_value
-        mock_monitor.is_running = False
-        mock_monitor._router.rules = []
-        mock_save.return_value = "/tmp/fake-routing.json"
-
-        with patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[("whatsapp", 6)]):
+    def test_save_notification_routing_delegates_to_daemon(self):
+        """save_notification_routing validates then forwards to set_routing."""
+        client = self._fake_client()
+        with patch("divoom_daemon.macos_notifications.load_routing_table",
+                   return_value=[("whatsapp", 6)]), \
+             patch.object(self.api, "_client", return_value=client):
             result = self.api.save_notification_routing('[["whatsapp", 6]]')
-
         self.assertIsNone(result["error"])
         self.assertEqual(result["rules"], [["whatsapp", 6]])
-        mock_save.assert_called_once()
-        # Hot-reload: a fresh MacAppRouter.from_file replaced the old one.
-        self.assertEqual(len(mock_monitor._router.rules), 1)
+        client.set_routing.assert_called_once_with([("whatsapp", 6)])
 
-    @patch("divoom_daemon.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
-    def test_r14_save_notification_routing_rejects_invalid_json(self):
-        """Invalid JSON returns the previous rules and a non-null error."""
-        bad = "this is not json"
-        with patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[("whatsapp", 6)]):
-            result = self.api.save_notification_routing(bad)
+    def test_save_notification_routing_rejects_invalid_json(self):
+        """Invalid JSON returns the previous rules and a non-null error,
+        without ever touching the daemon."""
+        client = self._fake_client()
+        with patch("divoom_daemon.macos_notifications.load_routing_table",
+                   return_value=[("whatsapp", 6)]), \
+             patch.object(self.api, "_client", return_value=client):
+            result = self.api.save_notification_routing("this is not json")
         self.assertIsNotNone(result["error"])
         self.assertIn("Invalid", result["error"])
         self.assertEqual(result["rules"], [["whatsapp", 6]])
+        client.set_routing.assert_not_called()
 
-    @patch("divoom_daemon.macos_notifications.ROUTING_PATH", new="/tmp/fake-routing.json")
-    def test_r14_save_notification_routing_drops_bad_entries_silently(self):
-        """Bad entries are dropped (the loader warns) and the clean
-        list is returned. The save still succeeds — empty rule list
-        is a valid config (drop everything)."""
-        with patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[]):
-            result = self.api.save_notification_routing('[["x", 999]]')
-        self.assertIsNone(result["error"])
-        # The bad entry was dropped; the saved rules list is empty.
-        self.assertEqual(result["rules"], [])
+    def test_save_notification_routing_daemon_unavailable(self):
+        """No daemon → previous rules + error, nothing written."""
+        with patch("divoom_daemon.macos_notifications.load_routing_table",
+                   return_value=[("whatsapp", 6)]), \
+             patch.object(self.api, "_client", return_value=None):
+            result = self.api.save_notification_routing('[["whatsapp", 6]]')
+        self.assertIn("daemon", result["error"])
+        self.assertEqual(result["rules"], [["whatsapp", 6]])
 
     def test_scan_devices(self):
         """R17 P5: scanning is owned by the daemon; the GUI proxies via scan()."""

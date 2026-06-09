@@ -1,6 +1,8 @@
 # Planning — Daemon ownership (REVIEW_2026-06 §1.3 / §4.1 / §1.2)
 
-**Status: scoped, not started.** Read-only investigation done 2026-06-09.
+**Status: Phase 1 SHIPPED 2026-06-09** (GUI delegates notifications to the daemon;
+the double-route is gone). Phases 2-3 still open. Read-only investigation +
+correction below.
 
 ## TL;DR — the "biggest risk" is mostly already fixed
 
@@ -54,16 +56,17 @@ The fix is cheap because the daemon already exposes the right RPCs:
 
 ## Plan — single-owner notifications
 
-**Phase 1 — GUI delegates instead of polling (the fix).**
-- Rewrite `start_notification_listener` / `stop_notification_listener` to call
-  `client.start_notifications()` / `client.stop_notifications()` over the daemon
-  RPC rather than constructing a local `MacNotificationMonitor`.
-- Delete the GUI-side monitor machinery: `_notification_monitor`,
-  `_notification_sink`, `_send_notification_async`, `_mac_monitor`
-  ([gui_api.py:220-280](divoom_gui/gui_api.py:220)). The daemon's
-  `NotificationService` already does monitor → route.
+**Phase 1 — GUI delegates instead of polling (the fix). DONE 2026-06-09.**
+- `start_notification_listener` / `stop_notification_listener` /
+  `is_notification_listener_running` / `get_notification_listener_status` /
+  `save_notification_routing` now call the daemon's
+  `start_notifications` / `stop_notifications` / `notification_status` /
+  `set_routing` RPCs (new wrappers on `DaemonClient`, daemon_protocol.py).
+- Deleted the GUI-side monitor machinery: `_notification_monitor`,
+  `_notification_sink`, `_send_notification_async`, `_schedule_async`.
 - The web UI toggle (`settings_features.js`) keeps the same JS API surface
-  (`{running, db_path?, error?}`); only the Python implementation changes.
+  (`{running, db_path?, error?}`); only the Python implementation changed.
+- Regression test: `test_gui_does_not_instantiate_local_monitor`.
 
 **Phase 2 — surface daemon notification state to the GUI.**
 - The daemon `NotificationService` is wired to `broadcast=self._socket_server.broadcast`

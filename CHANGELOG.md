@@ -6,6 +6,24 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Notifications single-owner (Phase 1)
+
+- Fix the §1.2 double-route: the GUI no longer runs its own
+  `MacNotificationMonitor` alongside the daemon's. `start/stop_notification_listener`,
+  `is_notification_listener_running`, `get_notification_listener_status`, and
+  `save_notification_routing` now delegate to the daemon.
+- New `DaemonClient` RPC wrappers: `start_notifications`, `stop_notifications`,
+  `notification_status`, `set_routing` (daemon_protocol.py).
+- Deleted dead GUI machinery: `_notification_monitor`, `_notification_sink`,
+  `_send_notification_async`, `_schedule_async`.
+- Tests: rewrote the GUI notification suite to the delegation contract incl. a
+  regression test that the GUI never instantiates `MacNotificationMonitor`.
+- Fixed flaky `test_routing_loader` (read the user's real `~/.config` file at
+  call time; now patches the bound module attribute). Suite green on py3.14.
+- See `docs/PLANNING_daemon_ownership.md` Phase 1.
+
+---
+
 ## 2026-06-09 — Daemon-ownership investigation + plan
 
 - Read-only investigation of REVIEW §1.3/§4.1/§1.2 → new
