@@ -270,10 +270,15 @@ class DaemonClient:
     def sync_artwork(self, file_id: str, *, default_size: int = 16,
                      target: str = "device") -> dict:
         """Ask the daemon to download a gallery asset and stream it to the owned
-        device/wall (binary stays in the daemon process)."""
+        device/wall (binary stays in the daemon process).
+
+        Uses the long ``sync_read_timeout`` — the daemon only replies after the
+        download + full BLE stream, which takes far longer than the quick-command
+        timeout (a short read here falsely reported every upload as failed)."""
+        from divoom_daemon.daemon_config import load_daemon_config
         return self.send_command("sync_artwork", {
             "file_id": file_id, "default_size": default_size, "target": target,
-        })
+        }, read_timeout=load_daemon_config().sync_read_timeout)
 
     def subscribe(
         self,

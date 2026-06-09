@@ -31,6 +31,7 @@ DEFAULT_SCAN_READ_SLACK = 10.0       # client waits scan_timeout + this for the 
 DEFAULT_CLIENT_TIMEOUT = 2.0         # socket read timeout for quick, non-scan commands
 DEFAULT_RECONNECT_SCAN_TIMEOUT = 3.0  # short scan used during auto-reconnect
 DEFAULT_CONNECT_TIMEOUT = 20.0       # client read timeout for connect/disconnect (BLE is slow)
+DEFAULT_SYNC_READ_TIMEOUT = 120.0    # client read timeout for sync_artwork (download + BLE stream)
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class DaemonConfig:
     client_timeout: float = DEFAULT_CLIENT_TIMEOUT
     reconnect_scan_timeout: float = DEFAULT_RECONNECT_SCAN_TIMEOUT
     connect_timeout: float = DEFAULT_CONNECT_TIMEOUT
+    sync_read_timeout: float = DEFAULT_SYNC_READ_TIMEOUT
 
     def scan_read_timeout(self, scan_timeout: float) -> float:
         """How long a client should wait for a scan reply: the daemon only
@@ -79,6 +81,11 @@ reconnect_scan_timeout = {reconnect_scan_timeout}
 # Client read timeout for connect/disconnect. BLE connection setup is slow, so
 # this is much larger than client_timeout — otherwise the GUI gives up mid-handshake.
 connect_timeout = {connect_timeout}
+
+# Client read timeout for syncing artwork (hot channel / gallery push). The
+# daemon downloads the asset and streams it to the device over BLE, which can
+# take a minute or more per image — a short read here falsely reports failure.
+sync_read_timeout = {sync_read_timeout}
 """
 
 _cache: DaemonConfig | None = None

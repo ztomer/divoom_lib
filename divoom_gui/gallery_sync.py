@@ -267,6 +267,12 @@ class GallerySyncMixin:
         decodes + resizes + streams the asset against its real device/wall
         (binary never crosses the socket). The GUI just resolves the target
         (single vs. wall) and the single-device size."""
+        ok, _err = self._sync_artwork_detailed(artwork_json)
+        return ok
+
+    def _sync_artwork_detailed(self, artwork_json: str) -> tuple[bool, str | None]:
+        """Core of batch_sync_artwork that keeps the failure REASON, so callers
+        like sync_hot_channel can report per-file errors instead of a bare bool."""
         logger.info(f"GUI Action: Batch syncing artwork details: {artwork_json}")
         try:
             art = json.loads(artwork_json)
@@ -274,24 +280,26 @@ class GallerySyncMixin:
             client = self._client()
             if client is None:
                 logger.error("Batch sync failed: no daemon available")
-                return False
+                return False, "no daemon available"
 
             is_wall = (getattr(self, "current_target_mode", "single") == "wall"
                        or (not self.current_divoom and self.wall_slots))
             if is_wall:
                 if not self._rebuild_wall_instance():
-                    return False
+                    return False, "wall not configured"
                 reply = client.sync_artwork(file_id, target="wall")
             elif self.current_divoom and (self.current_divoom.is_connected
                                           or getattr(self.current_divoom, "lan", None)):
                 size = self._active_device_size() if hasattr(self, "_active_device_size") else 16
                 reply = client.sync_artwork(file_id, default_size=int(size), target="device")
             else:
-                return False
-            return bool(reply.get("success"))
+                return False, "no connected device"
+            if reply.get("success"):
+                return True, None
+            return False, str(reply.get("error", "unknown daemon error"))
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
-            return False
+            return False, str(e)
 
     @staticmethod
     def _coerce_list(args, kwargs, key) -> list:
@@ -438,15 +446,21 @@ class GallerySyncMixin:
 
     def sync_hot_channel(self, *file_ids_arg, **kwargs) -> str:
         file_ids = self._coerce_list(file_ids_arg, kwargs, "file_ids")
-        synced, failed = [], []
+        synced, failed, errors = [], [], {}
         for fid in file_ids:
-            ok = False
+            ok, err = False, None
             try:
-                ok = self.batch_sync_artwork(json.dumps({"file_id": fid}))
+                ok, err = self._sync_artwork_detailed(json.dumps({"file_id": fid}))
             except Exception as e:
-                logger.error(f"hot-channel sync of {fid} failed: {e}")
-            (synced if ok else failed).append(fid)
-        return json.dumps({"ok": len(failed) == 0, "synced": synced, "failed": failed})
+                err = str(e)
+            if ok:
+                synced.append(fid)
+            else:
+                logger.error(f"hot-channel sync of {fid} failed: {err}")
+                failed.append(fid)
+                errors[fid] = err or "unknown error"
+        return json.dumps({"ok": len(failed) == 0, "synced": synced,
+                           "failed": failed, "errors": errors})
 
     def get_animated_preview(self, file_id: str) -> str:
         """Helper to retrieve base64 encoded animated GIF for progressive loading."""

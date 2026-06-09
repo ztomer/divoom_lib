@@ -23,6 +23,13 @@ def test_defaults_match_named_constants():
     assert cfg.client_timeout == dc.DEFAULT_CLIENT_TIMEOUT
     assert cfg.reconnect_scan_timeout == dc.DEFAULT_RECONNECT_SCAN_TIMEOUT
     assert cfg.connect_timeout == dc.DEFAULT_CONNECT_TIMEOUT
+    assert cfg.sync_read_timeout == dc.DEFAULT_SYNC_READ_TIMEOUT
+
+
+def test_sync_read_timeout_covers_slow_ble_stream():
+    # Artwork sync = download + full BLE stream; must far exceed quick timeout.
+    cfg = dc.DaemonConfig()
+    assert cfg.sync_read_timeout > cfg.connect_timeout
 
 
 def test_connect_timeout_is_longer_than_quick_timeout():
