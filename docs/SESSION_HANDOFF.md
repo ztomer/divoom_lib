@@ -18,6 +18,13 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **tool.py + drawing.py coverage (2026-06-09).** Extended `tests/test_drawing.py`
+  (+19 tests, all 14 Drawing builders incl. sand_paint/pic_scan dispatch) and
+  added `tests/test_tool_mock.py` (18 tests, timer/score/noise/countdown). Both
+  used to skip without hardware. Now: `display/drawing.py` 20%→**100%**,
+  `tool.py` 18%→**97%** (remaining branches are unreachable defensive len-checks).
+  All four REVIEW §0.5 thin areas now covered.
+
 - **Scheduling coverage (2026-06-09).** Added `tests/test_scheduling_mock.py`
   (24 mock-sender tests). The pre-existing scheduling tests require a real device
   and skip, which is why `scheduling/` sat at 17-23%. Now: `alarm.py` 98%,

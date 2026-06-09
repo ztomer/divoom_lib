@@ -6,6 +6,18 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — tool.py + drawing.py coverage (mock-device tests)
+
+- Extended `tests/test_drawing.py` (+19) to cover all 14 Drawing command
+  builders, including the `sand_paint_ctrl` / `pic_scan_ctrl` dispatch tables
+  and their missing-param / unknown-control error paths.
+- Added `tests/test_tool_mock.py` (18) covering get/set tool info for
+  timer/score/noise/countdown, including response parsing and ValueError paths.
+- Coverage: `display/drawing.py` 20%→100%, `tool.py` 18%→97%. Completes the
+  four thin areas from REVIEW_2026-06 §0.5.
+
+---
+
 ## 2026-06-09 — Scheduling coverage (mock-device tests)
 
 - Added `tests/test_scheduling_mock.py` (24 tests) driving the alarm/sleep/
