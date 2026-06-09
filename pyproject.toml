@@ -124,3 +124,20 @@ markers = [
     "hardware: requires a real BLE device (skipped on CI)",
     "e2e: end-to-end test (slow; skip on CI)",
 ]
+
+[tool.coverage.run]
+# Reproducible baseline so `coverage run -m pytest` measures the same tree
+# every time (see REVIEW_2026-06 §0.3 — the prior review quoted a coverage
+# table that did not match reality). Real TOTAL was 62% on 2026-06-09.
+source = ["divoom_lib", "divoom_gui", "divoom_daemon"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
