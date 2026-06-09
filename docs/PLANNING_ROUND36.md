@@ -139,3 +139,61 @@ devices unharmed, suite green.
   human eyes on the device.
 - **REMAINING (user)**: glance at the Ditoo after a hot-channel "Update
   Device" run — the last three synced artworks should now actually display.
+
+## R36b — user feedback: images display, but on the CUSTOM channel
+
+User (2026-06-09): "I can see all the updates loading up and displaying on the
+screen — I don't think it updates the hot channel, but instead it may be
+updating the custom channel." CORRECT — `show_image` starts with
+`show_design()`: it's the APK's drawing-send flow ("display now"), not a hot
+channel update. The REAL hot-channel update is a dedicated protocol
+(`LightHotFragment` → `HotUpdateHandle` + `CmdManager.y1/x1/I/E1`), fully
+reverse-engineered below.
+
+### The APK hot-update protocol (device-driven file store)
+
+HTTP (no auth): `POST https://appin.divoom-gz.com/Hot/GetHotFiles32`
+`{"DeviceType": 1, "IsTest": false}` (DeviceType: 1=16px, 0=32px, 2=64,
+3=128, 4=256) → `VendorList[] = {VendorId, FileList[]: {FileId, Version,
+Sha1}}`. Live probe: vendor 40005454, 27 files. Download each
+`https://fin.divoom-gz.com/{FileId}` and verify sha1. **For devices < 128px the
+RAW cloud container is sent as-is** (`C1301b.d()` returns the file unmodified —
+device firmware stores + decodes hot files itself); 128/256px re-encode via
+`PixelBean.initWithCloudData` + `pixelEncode`.
+
+BLE command family (payload offsets relative to our parsed `payload`, which is
+APK's `bArr[6:]`):
+
+| Cmd | Dir | Payload |
+|---|---|---|
+| `SPP_SEND_HOT_FILE_LIST` **155 (0x9B)** | app→dev | `[count]` + per vendor `{vendorId:4 LE, newestVersion:4 LE}` |
+| `SPP_REQUEST_NEW_FILE_INFO` **247 (0xF7)** | dev→app | `[vendorId:4 LE][version:4 LE]` — device asks for a file |
+| `SPP_HOT_UPDATE_FILE_INFO` **157 (0x9D)** | app→dev | `[vendorId:4 LE][fileSize:4 LE][checksum:4 LE][version:4 LE]` (checksum = u32 byte-sum of the file) |
+| 157 response | dev→app | `[0][startPacket:2 LE]` → begin streaming from that packet |
+| `SPP_HOT_SEND_FILE_DATA` **158 (0x9E)** | app→dev | `[packetIdx:2 LE][256-byte chunk, zero-padded last]`, ~20ms apart |
+| 158 response | dev→app | `[0][idx:2 LE]` = resend packet idx; `[1]`/`[2]` = file done |
+| `SPP_HOT_PAUSE_FILE_SEND` **159 (0x9F)** | both | cancel/pause |
+
+Flow: send 155 manifest → device replies 247 for each vendor/version it wants
+(exact match, else lowest version ≥ requested, else newest) → app sends 157
+info → device picks start packet → app streams 158 chunks → device sends done →
+device requests the NEXT file via 247 → … → 5s of silence = up to date
+(`HotStatusOK`). Viewing: channel switch 0x45 `[HOT_MODE=2]`
+(`CmdManager.w2`), sub-page select `SPP_SEND_HOTCTRL` 133 `[1, page]`.
+
+KEY OBJECTIVE-VERIFICATION property: unlike 0x8B, this protocol has real
+device-side confirmations (247 requests + per-file done acks) — hardware
+success is measurable without eyes.
+
+### R36b implementation plan
+1. `ble_transport.wait_for_any_response([ids], timeout)` (the flow listens for
+   several inbound cmds at once); facade passthrough.
+2. `divoom_lib/tools/hot_update.py`: the engine (HTTP manifest, download +
+   sha1 + byte-sum checksum, 155 → 247/157/158 device-driven loop, progress
+   log). Raw container bytes for ≤64px devices per APK.
+3. Daemon `hot_update` command + `DaemonClient.hot_update()` (long read
+   timeout — 27 files ≈ 1-2 min); CLI `hot-update` for testing.
+4. After update, switch device to HOT_MODE so the result is visible.
+5. HW iterate on Ditoo via daemon; success = device requests files, per-file
+   done acks, final quiet; then user glances at the hot channel.
+6. GUI wiring (button) after the protocol is hardware-proven.
