@@ -25,11 +25,13 @@ authoritative reference; divergences are noted and categorized by risk.
 | **Frame body header:** `AA LLLL TTTT RR NN` | ✅ MATCH | none | APK native `NDKMain.pixelEncode()` output, our `encode_animation_frame()` |
 | **Color palette:** 3-byte RGB, first-seen order | ✅ MATCH | none | APK `W2.c.F()` `bArr.length % 768`, our palette construction |
 | **Pixel data:** LSB-first continuous bit pack | ✅ MATCH | none | RomRider protocol (both derive from same spec) |
-| **0x49 packet format** `TOTAL_LEN LE u16 + PACKET_NUM u8 + chunk` | ⚠️ MINOR | low | Our counter is **1-based**, APK is **0-based** |
+| **0x49 packet index** `PACKET_NUM u8` | ❌ MISMATCH | medium | APK `e3/h.java` `f()` loop starts at **i12=0** (0-based). Our code starts at **1** (1-based). Verified by APK source. |
+| **0x49 total_len + index field sizes** (16px: 2B+1B; 32px: 4B+2B) | ✅ MATCH | none | APK `e3/h.java` lines 164-168: `i9={2,4}`, `i11={1,2}` by screen mode. Our code matches. |
 | **BLE wire framing** | ❌ DIFFERENT | low (transport) | Our: iOS LE `FE EF AA 55 ... CMD ... CK CK 02`. APK: SPP Basic `01 LL LL CMD ... CK CK 02`. Both preserve same cmd+payload. |
 | **0x8B TERMINATE (CW=2)** | ❌ EXTRA | medium | APK does NOT send terminate — relies on `file_size` in START. We send `[0x02]` after 0.5s settle (futpib ref, hardware-tolerated). |
-| **32x32 pre-frames (0x05/0x06)** | ❌ UNVERIFIED | **high** | These come from **hass-divoom**, NOT the APK. APK handles 32x32 entirely in native library. |
-| **32x32 frame header RR value** | ❌ UNVERIFIED | medium | We use `RR=0x03`, 2-byte NN. APK native library likely uses different header for 32x32. |
+| **32x32 pre-frames (0x05/0x06)** | ❌ NOT IN APK | **high** | `0x05` and `0x06` only appear as **SPP escape sequences** (`s.java` `l()` method), NOT as pre-frames. Our pre-frames come from **hass-divoom**. No APK code path sends them. |
+| **32x32 frame header RR=0x03, 2-byte NN** | ❌ NOT IN APK | **high** | APK uses same `AA LLLL TTTT RR NN` format via `NDKMain.pixelEncode()` for ALL sizes (`RR=0x00`, 1-byte NN). Our RR=0x03, 2-byte NN come from **hass-divoom**. |
+| **APK BlueHigh encoding (`pixelEncodeBlueHigh`)** | ❌ NOT IMPLEMENTED | medium | APK has a SEPARATE native encoding path for high-res (Pixoo Max): header byte `0x25`/`0x2A` + `rowCnt`/`columnCnt`. We don't use this — our AA format matches the standard `pixelEncode()` path. |
 | **Color quantization** (>256 colors) | ❌ MISSING | low | APK native has `colorQuantityV1/V2`. We raise ValueError. OK as long as callers pre-quantize. |
 | **0x8B device-ready wait** | ✅ FIXED (R35) | none | `_expected_response_command` now set before START so iOS LE notification handler routes device's `[0]` ACK. |
 | **0x8B retransmit serving** `[1][idx:2 LE]` | ⚠️ TIMING DIFF | low | Our: post-stream poll loop (1s quiet timeout). APK: event-driven, interleaved with initial send. |
@@ -66,30 +68,56 @@ Header is 6 bytes (no TTTT, no RR, 3 zero bytes where TTTT+RR would be).
 
 Header is 7 bytes.
 
-### 2.3 Animation Frame (`encode_animation_frame_32`, 32x32)
+### 2.3 Animation Frame (`encode_animation_frame_32`, 32x32) — DEPARTURE FROM APK
 
-| Offset | Size | Field | Our value | APK value | Match |
-|--------|------|-------|-----------|-----------|-------|
-| 0 | 1 | AA | `0xAA` | Native output includes `0xAA` | ✅ |
-| 1-2 | 2 | LLLL | LE u16 = `8 + 3*N + pixel_bytes` | Native handles | ⚠️ |
-| 3-4 | 2 | TTTT | LE u16, display time | Same (from `speed`) | ✅ |
-| 5 | 1 | RR | **`0x03`** (not 0x00) | Native handles | ❌ UNVERIFIED |
-| 6-7 | 2 | NN | **LE u16** (not u8) | Native handles | ❌ UNVERIFIED |
-| 8.. | N*3 | COLOR_DATA | R G B | Same | ✅ |
-| ... | P | PIXEL_DATA | LSB-first bit pack | Same | ✅ |
-
-Header is 8 bytes. RR=0x03 and 2-byte NN come from hass-divoom, NOT the APK.
-
-### 2.4 32x32 Pre-Frames (sent before any data frames)
-
+**APK standard path** (`NDKMain.pixelEncode()`, used for all sizes on most devices):
 ```
-Pre-frame 1: [0xAA] [0x05 0x00] [0x00 0x00 0x05 0x00 0x00]
-Pre-frame 2: [0xAA] [0x06 0x00] [0x00 0x00 0x06 0x00 0x00 0x00]
+Same AA LLLL TTTT RR NN format as 16x16:
+  [0xAA][LLLL LE u16][TTTT LE u16][0x00][NN u8][COLOR_DATA][PIXEL_DATA]
+Header is 7 bytes. RR=0x00, NN=1 byte, same as 16x16.
 ```
 
-These come from hass-divoom. **The APK does not send these.** They may be
-firmware-specific (Pixoo Max). To verify: remove them and compare device
-behavior.
+**Our 32x32 path** (`encode_animation_frame_32`, from hass-divoom):
+```
+  [0xAA][LLLL LE u16][TTTT LE u16][0x03][NN_NN LE u16][COLOR_DATA][PIXEL_DATA]
+Header is 8 bytes. RR=0x03, NN=2 bytes (u16).
+```
+
+**APK BlueHigh path** (`NDKMain.pixelEncodeBlueHigh()`, for Pixoo Max 32x32+):
+```
+APK header before calling native:
+  header = {0x25, validCnt, speed>>8, speed&255, rowCnt, columnCnt}
+  For 32x32: {0x25=37, 1, speed_hi, speed_lo, 2, 2}
+Native output: (unknown internal format, wrapped with header)
+```
+
+**Verdict:** Our RR=0x03 and 2-byte NN come from **hass-divoom**, not the APK.
+The APK's standard `pixelEncode()` produces the same 7-byte AA format for
+ALL display sizes. The BlueHigh path (0x25 format) is separate and we
+don't use it. Test on hardware: does RR=0x00 + 1-byte NN work for 32x32?
+
+### 2.4 32x32 Pre-Frames — NOT IN APK
+
+**Our pre-frames** (from hass-divoom):
+```
+Pre-frame 1: [0xAA] [0x05 0x00] [0x00 0x00 0x05 0x00 0x00]    (LLLL=5, body=5 bytes)
+Pre-frame 2: [0xAA] [0x06 0x00] [0x00 0x00 0x06 0x00 0x00 0x00]  (LLLL=6, body=6 bytes)
+```
+
+**APK finding:** `0x05` and `0x06` only appear in `s.java` `l()` method as
+**SPP escape sequences** (byte-stuffing for old-mode framing):
+- `0x01` → `[0x03, 0x04]`  (escape for SPP start byte)
+- `0x02` → `[0x03, 0x05]`  (escape for SPP end byte)
+- `0x03` → `[0x03, 0x06]`  (escape for SPP escape byte)
+
+No APK code path sends a `0x05` or `0x06` byte as a "pre-frame" before pixel
+data. The APK's 32x32 encoding either:
+1. Goes through standard `pixelEncode()` → standard AA format (no pre-frames)
+2. Goes through BlueHigh `pixelEncodeBlueHigh()` → 0x25/0x2A header (no pre-frames)
+
+**To verify on hardware:** Remove the two pre-frames from
+`divoom_image_encode_32.py` and test a 32x32 animation. If it works, the
+pre-frames are unnecessary for this device/firmware.
 
 ---
 
@@ -138,15 +166,39 @@ not chunk index).
 
 ### 3.2 0x49 Chunked Animation (legacy)
 
-APK source: `CmdManager.o()`.
+APK source: `CmdManager.o()` → `e3/h.java` `f()` method.
 Our source: `image_encode.c` `_py_encode_animation`.
 
 ```
-APK:   TOTAL_LEN(LE u16) + PACKET_NUM(u8, 0-based) + chunk(≤200 bytes)
+APK:   TOTAL_LEN(i9 bytes LE) + PACKET_NUM(i11 bytes LE, 0-based) + chunk(≤chunk_size bytes)
 Ours:  TOTAL_LEN(LE u16) + PACKET_NUM(u8, 1-based) + chunk(≤200 bytes)
 ```
-DIVERGENCE: counter offset (1 vs 0). Working on tested hardware but
-should be fixed to match APK.
+
+**Packet index counter — CONFIRMED 0-based in APK.**
+APK `e3/h.java` line 178-179:
+```java
+for (int i12 = 0; i12 < iCeil; i12++) {
+    byte[] bArrC = L.c(L.b(L.d(L.d(bArrB, length, i9, false),
+         i12, i11, false), ...), ...);
+```
+The loop iterates `i12 = 0, 1, 2, ...` and encodes it directly. **Our 1-based
+counter is wrong.** Should be fixed to 0-based.
+
+**Field sizes:**
+
+| Screen size | APK `i9` (total_len) | APK `i11` (index) | Our total_len | Our index |
+|-------------|----------------------|-------------------|---------------|-----------|
+| 16px | 2 bytes LE u16 | 1 byte u8 | 2 bytes LE u16 | 1 byte u8 (1-based ❌) |
+| 32px+ | 4 bytes LE u32 | 2 bytes LE u16 | 4 bytes LE u32 (via C) | 2 bytes LE u16 |
+
+**Chunk size:**
+- APK default: `f30418k = 200` bytes (set in `e3/h.java`)
+- APK 0x8B path: `hVar.q(256)` → 256 bytes
+- Our 0x49 path: 200 bytes — MATCHES APK default
+- Our 0x8B path: 256 bytes — MATCHES APK
+
+**To fix:** Change `packet_num` from 1-based to 0-based in the 0x49 encoder
+(`image_encode.c` and Python fallback).
 
 ### 3.3 0x44 Static Image
 
@@ -576,13 +628,33 @@ When testing on real hardware, run through these items in order:
 
 1. **TERMINATE packet:** Does any Divoom device REQUIRE the 0x02 terminate
    packet? The APK doesn't send it. Test by removing it temporarily.
-2. **32x32 pre-frames:** Are 0x05/0x06 required for Pixoo Max? They come
-   from hass-divoom, not APK. Test with and without on a 32x32 device.
-3. **0x49 counter offset:** Does 1-based vs 0-based matter on any device?
-   The APK sends `packet_num` starting from 0, we start from 1. Test
-   both on a device that uses the 0x49 path.
-4. **RR=0x03 vs native:** Does the native library handle 32x32 differently
-   than our hass-divoom-derived encoding? Without a 32x32 device for
-   testing, we can't know.
-5. **Color quantization fallback:** Should we add a simple median-cut
+2. **32x32 pre-frames:** Are they required for any device? APK doesn't use them.
+   Test with and without on 32x32 hardware. Remove from code if unnecessary.
+3. **32x32 RR=0x00 vs RR=0x03:** Does the standard `AA LLLL TTTT 0x00 NN` format
+   work on 32x32 devices? Our hass-divoom-derived format uses RR=0x03, 2-byte NN.
+   Test both encodings on 32x32 hardware.
+4. **0x49 counter offset:** Fix to 0-based (matching APK) and test on a device
+   that uses the 0x49 path. Currently 1-based, APK uses 0-based.
+5. **BlueHigh vs standard encoding:** Our `encode_animation_frame` produces
+   the standard `pixelEncode()` format. The APK's `pixelEncodeBlueHigh()`
+   produces a different format (0x25 header + rowCnt/columnCnt). Do any of our
+   target devices require the BlueHigh format?
+6. **Color quantization fallback:** Should we add a simple median-cut
    quantizer instead of raising ValueError? APK's native library has it.
+
+### Hardware testing plan (4 devices available)
+
+Test these scenarios on each device and record result:
+
+| Test | What to check | Pass criterion |
+|------|--------------|----------------|
+| A | 0x8B single GIF 16x16 → sync | Animation plays correctly |
+| B | 0x8B multi-frame GIF 16x16 → sync | All frames cycle |
+| C | 0x8B 5-image batch sync | All images push, no spinner |
+| D | Remove TERMINATE (CW=2) from 0x8B stream | Animation still plays |
+| E | 32x32 image/gif sync (if device supports it) | Displays correctly |
+| F | 32x32 without pre-frames | Works/doesn't work |
+| G | 32x32 with RR=0x00 (standard format) | Works/doesn't work |
+| H | 0x49 legacy path (force with flag) | Animation plays |
+| I | Device dot pulse in device color | Pulses in device hue, not amber |
+| J | Upload progress indicator | Button shows "Updating (3/5)" |
