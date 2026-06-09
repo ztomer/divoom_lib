@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Inline-style migration scoped (2026-06-09).** `docs/PLANNING_inline_styles.md`
+  — REVIEW §2.1. Real count is **138** (4 of "142" were `data-style="…"` false
+  matches). ~50 are genuinely-unique (per §2.1's own exception → leave inline);
+  ~90 repeated patterns map to a small utility layer (`.row/.col/.gap-*`,
+  `.label-sm/.label-xs/.text-sm`, `--warn`/`--error` tokens) added to
+  `style_extra.css` (where `.flex-row` already lives). 5 batches, one template
+  file each, visual-verify between (the static-server + preview technique from
+  the §2.3 fix works headlessly). NOT started. Batch 1 (add utilities) is a
+  zero-risk pure addition.
+
 - **appbar.css `!important` cleanup (2026-06-09).** Removed the 6 `!important`
   flags on `#global-status-dot.*` (REVIEW §2.3) — they were unnecessary (the
   ID+class state selectors already out-rank the base rule; JS clears inline

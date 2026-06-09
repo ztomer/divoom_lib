@@ -6,6 +6,17 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Inline-style migration plan (§2.1)
+
+- Scoped the inline-style → CSS-token migration → `docs/PLANNING_inline_styles.md`.
+- Correction: real count is 138, not 142 (4 were `data-style="…"` regex false
+  matches). ~50 are genuinely-unique per §2.1's own exception (leave inline);
+  ~90 repeated patterns map to a small utility layer.
+- 5 batches (one template file each) with per-batch visual verification via the
+  static-server + preview technique. Not yet implemented.
+
+---
+
 ## 2026-06-09 — appbar.css !important cleanup (§2.3)
 
 - Removed the 6 `!important` flags on the `#global-status-dot.*` state rules.
