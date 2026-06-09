@@ -13,8 +13,8 @@ window.DivoomTemplates.monthlyBest = `                <div class="monthly-best-l
                     <div class="card glass-card" style="height: 100%;">
                         <div class="card-header flex-header">
                             <div class="gallery-select-actions row gap-8">
-                                <button id="gallery-select-all-btn" class="glow-btn compact wall-tool-btn" title="Select every image">Select All</button>
-                                <button id="gallery-clear-btn" class="glow-btn compact wall-tool-btn" title="Deselect every image">Clear</button>
+                                <button id="gallery-select-all-btn" class="gallery-select-btn" title="Select every image">Select All</button>
+                                <button id="gallery-clear-btn" class="gallery-select-btn" title="Deselect every image">Clear</button>
                             </div>
                             <div class="header-actions">
                                 <div class="tabs-row" role="tablist" id="gallery-classify-tabs" style="margin:0;">
@@ -30,7 +30,10 @@ window.DivoomTemplates.monthlyBest = `                <div class="monthly-best-l
                                 <div class="empty-list">Loading community gallery...</div>
                             </div>
                             <div class="gallery-actions flex gap-10" style="margin-top:auto;">
-                                <button id="batch-sync-btn" class="glow-btn" style="flex:1; margin:0;">Update Device</button>
+                                <button id="batch-sync-btn" class="glow-btn" style="flex:1; margin:0;">
+                                    <span id="batch-sync-label">Update Device</span>
+                                    <span id="batch-sync-status" class="sync-status-text"></span>
+                                </button>
                             </div>
                         </div>
                     </div>

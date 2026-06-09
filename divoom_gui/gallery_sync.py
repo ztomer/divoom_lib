@@ -447,7 +447,8 @@ class GallerySyncMixin:
     def sync_hot_channel(self, *file_ids_arg, **kwargs) -> str:
         file_ids = self._coerce_list(file_ids_arg, kwargs, "file_ids")
         synced, failed, errors = [], [], {}
-        for fid in file_ids:
+        total = len(file_ids)
+        for idx, fid in enumerate(file_ids):
             ok, err = False, None
             try:
                 ok, err = self._sync_artwork_detailed(json.dumps({"file_id": fid}))
@@ -459,6 +460,18 @@ class GallerySyncMixin:
                 logger.error(f"hot-channel sync of {fid} failed: {err}")
                 failed.append(fid)
                 errors[fid] = err or "unknown error"
+            # Progress callback to JS (fire-and-forget; PyWebView queues it)
+            if self.window:
+                try:
+                    js = (
+                        f"if(window.onGallerySyncProgress)"
+                        f"window.onGallerySyncProgress({idx + 1},{total},"
+                        f"{json.dumps(fid)},{str(ok).lower()},"
+                        f"{json.dumps(err or '')});"
+                    )
+                    self.window.evaluate_js(js)
+                except Exception:
+                    pass
         return json.dumps({"ok": len(failed) == 0, "synced": synced,
                            "failed": failed, "errors": errors})
 

@@ -126,12 +126,16 @@ window.connectDevice = function(name, address) {
     window.showToast(`Connecting to ${name}...`, "success");
     const statusDot = document.getElementById("global-status-dot");
     if (statusDot) { statusDot.className = "transport-dot connecting"; statusDot.removeAttribute("style"); }
-    // R34 §2: pulse the sidebar device dot being connected (same amber
-    // dot-pulse the appbar dot uses). Cleared by re-render on success or
-    // explicitly on failure.
+    // R35 §2: pulse the sidebar device dot being connected, in the device's
+    // own accent color (CSS var --dot-pulse-color, amber fallback for the
+    // global dot). Cleared by re-render on success or explicitly on failure.
     const deviceDot = document.querySelector(
         `#device-dots .transport-dot[data-value="${(window.CSS && CSS.escape) ? CSS.escape(address) : address}"]`);
-    if (deviceDot) { deviceDot.classList.add("connecting"); deviceDot.removeAttribute("style"); }
+    if (deviceDot) {
+        deviceDot.classList.add("connecting");
+        // Pulse in the device's accent color (CSS var, fallback amber).
+        deviceDot.style.setProperty("--dot-pulse-color", window.deviceColor(address));
+    }
 
     if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.connect_single_device(address).then(res => {

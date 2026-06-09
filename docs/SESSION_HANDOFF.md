@@ -18,6 +18,13 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R35 SHIPPED (2026-06-09) — Upload progress indicator + gallery button alignment.**
+  Plan + outcomes: `docs/PLANNING_ROUND35.md`.
+  - §1 (this session): `sync_hot_channel` now fires `window.onGallerySyncProgress(index, total, fileId, success, errorStr)` after each file. JS handler shows three APK-matched states: idle→"Updating `(i/N)`"→"✓ Synced N" / "✗ X ok, Y failed". Double-press guarded via `_syncInFlight`/`_syncAllInFlight`. Same for Routines "Sync devices now".
+  - §2 (verification): device dot pulse confirmed shipped in R34 §2 — no changes needed.
+  - §3 (this session): removed `wall-tool-btn` from gallery Select All / Clear buttons; added `.gallery-select-btn` CSS with solid background (was transparent → hollow look).
+  - Core tests: 237 passed.
+
 - **R34 §1b SHIPPED (2026-06-09) — APK-aligned 0x8b upload flow.** (`5f419002`)
   Compared our chunked upload against the decompiled APK: wire format identical;
   flow diverged (APK is device-driven). `stream_animation_8b` now waits for the

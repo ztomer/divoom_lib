@@ -6,6 +6,19 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 35 — 2026-06-09 (upload progress indicator + gallery button alignment)
+
+**Files changed:**
+- `divoom_gui/gallery_sync.py` — `sync_hot_channel`: `evaluate_js()` progress callback after each file
+- `divoom_gui/web_ui/gallery.js` — `window.onGallerySyncProgress()` handler; double-press guards for batchSyncBtn + syncAllBtn
+- `divoom_gui/web_ui/gallery.css` — `.gallery-select-btn`, `.sync-status-text`, sync-state classes (`.syncing`, `.synced-ok`, `.synced-fail`)
+- `divoom_gui/web_ui/templates_monthly_best.js` — removed `wall-tool-btn` from gallery select buttons; added status spans inside `#batch-sync-btn`
+- `docs/PLANNING_ROUND35.md` — plan + outcome
+
+**Test baseline:** 237 passed (core unit: downscaler, encoders, JS syntax, image processing)
+
+---
+
 ## Round 34 — 2026-06-09 (hot-channel sync fix + Routines polish)
 
 ### Fixed — hot-channel sync falsely reported every upload failed (§1)

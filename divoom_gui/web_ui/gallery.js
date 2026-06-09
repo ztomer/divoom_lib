@@ -178,25 +178,75 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // R32 §A3: "Update Device" pushes every CHECKED gallery image to the
-    // currently-connected device (was: a single click-selected artwork).
+    // R32 §A3 (amended R35 §1): "Update Device" pushes every CHECKED gallery
+    // image to the currently-connected device. Shows real-time progress via
+    // window.onGallerySyncProgress (called from Python after each file).
+    let _syncInFlight = false;
+    window.onGallerySyncProgress = function(index, total, fileId, success, errorStr) {
+        const btn = document.getElementById("batch-sync-btn");
+        const label = document.getElementById("batch-sync-label");
+        const status = document.getElementById("batch-sync-status");
+        if (!btn || !label || !status) return;
+        if (index === 1 && total > 1) {
+            // first call — switch to syncing state
+            btn.classList.add("syncing");
+            label.textContent = "Updating";
+            status.textContent = `(${index}/${total})`;
+        } else if (index === total) {
+            // last file — show completion
+            btn.classList.remove("syncing");
+            const totalFail = errorStr ? 1 : 0;
+            if (totalFail === 0) {
+                btn.classList.add("synced-ok");
+                status.textContent = "",
+                label.textContent = `✓ Synced ${total}`;
+            } else {
+                btn.classList.add("synced-fail");
+                status.textContent = "";
+                label.textContent = `✗ ${total - totalFail} ok, ${totalFail} failed`;
+            }
+            _syncInFlight = false;
+            setTimeout(() => {
+                btn.classList.remove("synced-ok", "synced-fail");
+                label.textContent = "Update Device";
+                status.textContent = "";
+            }, totalFail === 0 ? 3000 : 5000);
+        } else {
+            status.textContent = `(${index}/${total})`;
+        }
+    };
+
     const batchSyncBtn = document.getElementById("batch-sync-btn");
     if (batchSyncBtn) {
         batchSyncBtn.addEventListener("click", () => {
+            if (_syncInFlight) return;
             const checked = window.getCheckedGalleryArtworks();
             if (!checked.length) {
                 window.showToast("Select at least one image first.", "error");
                 return;
             }
             const fileIds = checked.map(a => a.file_id).filter(Boolean);
-            window.showToast(`Pushing ${fileIds.length} image(s) to the device…`, "success");
+            _syncInFlight = true;
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.sync_hot_channel(JSON.stringify(fileIds)).then(json => {
                     try {
                         const r = JSON.parse(json);
-                        if (r.ok) window.showToast(`Pushed ${r.synced.length} image(s)`, "success", " BLE");
-                        else window.showToast(`Pushed ${r.synced.length}, ${r.failed.length} failed`, "error");
-                    } catch (e) { window.showToast("Push failed", "error"); }
+                        if (r.ok) {
+                            if (_syncInFlight) {
+                                // progress handler already showed completion;
+                                // just ensure state is clean
+                            }
+                        }
+                    } catch (e) {
+                        window.showToast("Push failed", "error");
+                        _syncInFlight = false;
+                        const btn2 = document.getElementById("batch-sync-btn");
+                        const lbl2 = document.getElementById("batch-sync-label");
+                        if (btn2 && lbl2) {
+                            btn2.classList.remove("syncing", "synced-ok", "synced-fail");
+                            lbl2.textContent = "Update Device";
+                        }
+                    }
                     // R32 §C2: mirror the last pushed image as the device preview.
                     const last = checked[checked.length - 1];
                     const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
@@ -211,22 +261,29 @@ document.addEventListener("DOMContentLoaded", () => {
     // ── 2. MULTI-TARGET SYNC (Routines → "Sync devices now") ──
     // The button now lives in Settings → Routines (R32 §B); the handler stays
     // here so it shares the gallery selection state.
+    let _syncAllInFlight = false;
     const syncAllBtn = document.getElementById("sync-all-btn");
     if (syncAllBtn) {
         syncAllBtn.addEventListener("click", () => {
+            if (_syncAllInFlight) return;
             const checked = window.getCheckedGalleryArtworks();
             if (!checked.length) {
                 window.showToast("Open Monthly Best and select images first.", "error");
                 return;
             }
             const fileIds = checked.map(a => a.file_id).filter(Boolean);
-            window.showToast(`Syncing ${fileIds.length} image(s) to targets…`, "success");
+            _syncAllInFlight = true;
+            syncAllBtn.disabled = true;
+            syncAllBtn.textContent = `Syncing ${fileIds.length} image(s)…`;
             window.pywebview.api.sync_hot_channel(JSON.stringify(fileIds)).then(json => {
                 try {
                     const r = JSON.parse(json);
                     if (r.ok) window.showToast(`Synced ${r.synced.length} image(s)`, "success", " BLE");
                     else window.showToast(`Synced ${r.synced.length}, ${r.failed.length} failed`, "error");
                 } catch (e) { window.showToast("Sync failed", "error"); }
+                _syncAllInFlight = false;
+                syncAllBtn.disabled = false;
+                syncAllBtn.textContent = "Sync devices now";
             });
         });
     }

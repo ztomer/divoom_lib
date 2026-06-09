@@ -287,6 +287,53 @@
     flex-shrink: 0;
 }
 
+/* ── Gallery selection buttons (Select All / Clear) ─────────────────── */
+.gallery-select-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font-display);
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: background 0.2s, border-color 0.2s;
+    background: #2e2f36;
+    border: 1px solid #3e3f46;
+    color: #e8e9eb;
+    box-shadow: none;
+    line-height: 1.4;
+}
+.gallery-select-btn:hover {
+    background: #3d3e46;
+}
+
+/* ── Sync progress status text ─────────────────────────────────────── */
+#batch-sync-btn {
+    position: relative;
+}
+#batch-sync-btn .sync-status-text {
+    font-weight: 400;
+    font-size: 11px;
+    opacity: 0.85;
+}
+#batch-sync-btn.syncing {
+    pointer-events: none;
+    opacity: 0.7;
+    background: #a0520a;
+    border-color: #c06812;
+}
+#batch-sync-btn.synced-ok {
+    background: #166534;
+    border-color: #22c55e;
+}
+#batch-sync-btn.synced-fail {
+    background: #7f1d1d;
+    border-color: #ef4444;
+}
+
 /* ── Gallery Card Item Info and Ellipsis ────────────────────────────── */
 .gallery-item-info {
     display: flex;
