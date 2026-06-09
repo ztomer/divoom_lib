@@ -24,6 +24,14 @@ Claude) should read this on entry and **update it at the end of every round**
   (4) stretch §1.5 split / §4.2 bus. All 9 review-cleanup commits pushed to
   `origin/main` through `d871c350`. Suite 1158/75.
 
+- **Inline-style batch 1 SHIPPED (2026-06-09).** Added the utility/token layer
+  to `style_extra.css` (`.row/.col/.row-between/.wrap/.gap-*`,
+  `.label-sm/.label-xs/.text-sm/.text-mono-sm`, `.text-warn/.text-error`) + the
+  `--warn`/`--error` tokens in style.css `:root`. Pure addition — no template
+  references them yet; `.flex-row` untouched. Verified via preview that rules
+  parse + compute correctly. Next: batch 2 (templates_tools + monthly_best) per
+  `docs/PLANNING_inline_styles.md`.
+
 - **Inline-style migration scoped (2026-06-09).** `docs/PLANNING_inline_styles.md`
   — REVIEW §2.1. Real count is **138** (4 of "142" were `data-style="…"` false
   matches). ~50 are genuinely-unique (per §2.1's own exception → leave inline);

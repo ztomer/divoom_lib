@@ -71,6 +71,11 @@ the component, not sprinkled.
 
 1. **Add the utility/token layer** to `style_extra.css` (+ `--warn`/`--error`
    tokens). No template edits yet — pure addition, zero risk. Land it.
+   **DONE 2026-06-09:** added `.row/.row-top/.row-between/.col/.wrap`,
+   `.gap-{6,8,10,12,14}`, `.label-sm/.label-xs/.text-sm/.text-mono-sm`,
+   `.text-warn/.text-error`, and `--warn`/`--error` in style.css `:root`.
+   Verified via preview that the rules parse and compute correctly (warn
+   #ffcc00, error #ff4444, col→column, gap-12→12px). `.flex-row` left untouched.
 2. **`templates_tools.js` (1) + `templates_monthly_best.js` (7)** — smallest
    surface, good shakedown of the new classes.
 3. **`templates_routines.js` (21).**

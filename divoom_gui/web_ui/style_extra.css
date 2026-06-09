@@ -81,6 +81,43 @@
     gap: 15px;
 }
 
+/* ── Layout + typography utilities (REVIEW_2026-06 §2.1 batch 1) ──────────
+   A small token layer to replace repeated inline styles in templates_*.js.
+   Pure addition — no template references them yet; the per-file batches
+   (PLANNING_inline_styles.md) migrate the markup. `.flex-row` above predates
+   this and stays (gap:15px); the `.row`/`.gap-*` split below is the
+   composable replacement for the many ad-hoc `display:flex` strings. */
+.row        { display: flex; align-items: center; }
+.row-top    { display: flex; align-items: flex-start; }
+.row-between{ display: flex; align-items: center; justify-content: space-between; }
+.col        { display: flex; flex-direction: column; }
+.wrap       { flex-wrap: wrap; }
+.gap-6  { gap: 6px; }
+.gap-8  { gap: 8px; }
+.gap-10 { gap: 10px; }
+.gap-12 { gap: 12px; }
+.gap-14 { gap: 14px; }
+
+/* Typography: the recurring label/caption shapes from the templates. */
+.label-sm {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 6px;
+}
+.label-xs {
+    font-size: 10px;
+    display: block;
+    margin-bottom: 4px;
+}
+.text-sm      { font-size: 13px; color: var(--text-main); }
+.text-mono-sm { font-family: var(--font-mono); font-size: 11px; }
+
+/* Semantic status colours (tokens defined in style.css :root). */
+.text-warn  { color: var(--warn); }
+.text-error { color: var(--error); }
+
 .file-uploader {
     flex-grow: 1;
 }

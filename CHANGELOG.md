@@ -6,6 +6,18 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Inline-style migration: batch 1 (utility layer)
+
+- Added the CSS utility/token layer (REVIEW §2.1 batch 1): `.row/.row-top/
+  .row-between/.col/.wrap`, `.gap-{6,8,10,12,14}`, `.label-sm/.label-xs/
+  .text-sm/.text-mono-sm`, `.text-warn/.text-error` in style_extra.css, and
+  `--warn`/`--error` tokens in style.css :root.
+- Pure addition: no templates reference them yet; `.flex-row` left as-is.
+  Verified via the static-server + preview tools that the rules parse and
+  compute correctly. Per-file template migrations follow in batches 2-5.
+
+---
+
 ## 2026-06-09 — Inline-style migration plan (§2.1)
 
 - Scoped the inline-style → CSS-token migration → `docs/PLANNING_inline_styles.md`.

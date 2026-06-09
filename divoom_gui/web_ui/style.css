@@ -46,6 +46,8 @@
     --secondary: #6e6f76; /* Braun Matte Gray Accent */
     --secondary-glow: rgba(110, 111, 118, 0.2);
     --accent: #00cc66; /* Braun Indicator Green */
+    --warn: #ffcc00;   /* status: warning (amber) */
+    --error: #ff4444;  /* status: error (red) */
 
     --text-main: #e8e9eb;
     --text-muted: #82838a;
