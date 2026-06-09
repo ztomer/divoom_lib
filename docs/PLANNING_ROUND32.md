@@ -82,9 +82,12 @@ Suite **1094 passed / 75 skipped / 0 failed**. All of A–E landed across 6 comm
   (user-confirmed interpretation — no live framebuffer readback exists).
   `setDevicePreview`/`restoreDevicePreview`, persisted in localStorage; wired from
   the gallery + custom-art push sites.
-- **C3** done: dropdown replaced by per-device dots overlaid on the preview
-  (`renderDeviceDots`), color-coded, tooltipped, click-to-switch; `<select>` kept
-  hidden as canonical state.
+- **C3** done: dropdown replaced by per-device dots in their own glass pill
+  **below** the preview (`renderDeviceDots`) — recycles the corner
+  connectivity-dot chrome (`.corner-transports` pill + `.transport-dot`), per-device
+  colors, wraps for >4 devices (no cap), rebuilds on every device add/remove
+  (wired via `updateDeviceSelectorDropdown` + `syncArrangerToPython`). Tooltipped,
+  click-to-switch; `<select>` kept hidden as canonical state.
 
 ### D — Channels → Text fix (divoom_gui/api/lighting.py)
 - Root cause: the 0x87 LPWA "set light phone word attr" sequence does not render

@@ -35,8 +35,10 @@ Claude) should read this on entry and **update it at the end of every round**
   **C — Device selector**: stripped `BLE:`/`LAN:` prefix (§C1); sidebar preview
   mirrors the **last image pushed** per device, persisted in localStorage (§C2 —
   user confirmed no live framebuffer readback); dropdown replaced by per-device
-  **dots** overlaid on the preview, color-coded + tooltipped + click-to-switch,
-  `<select>` kept hidden as state (§C3).
+  **dots** in a glass pill **below** the preview (recycles the corner
+  connectivity-dot chrome, per-device colors, wraps for >4 devices, rebuilds on
+  add/remove), color-coded + tooltipped + click-to-switch, `<select>` kept hidden
+  as state (§C3).
 
   **D — Channels → Text FIXED** ("nothing appeared"): the 0x87 LPWA sequence does
   not render on the Pixoo-class LED matrices. `push_text` now renders the text
