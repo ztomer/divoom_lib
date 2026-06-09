@@ -28,7 +28,7 @@ authoritative reference; divergences are noted and categorized by risk.
 | **0x49 packet index** `PACKET_NUM u8` | ❌ MISMATCH | medium | APK `e3/h.java` `f()` loop starts at **i12=0** (0-based). Our code starts at **1** (1-based). Verified by APK source. |
 | **0x49 total_len + index field sizes** (16px: 2B+1B; 32px: 4B+2B) | ✅ MATCH | none | APK `e3/h.java` lines 164-168: `i9={2,4}`, `i11={1,2}` by screen mode. Our code matches. |
 | **BLE wire framing** | ❌ DIFFERENT | low (transport) | Our: iOS LE `FE EF AA 55 ... CMD ... CK CK 02`. APK: SPP Basic `01 LL LL CMD ... CK CK 02`. Both preserve same cmd+payload. |
-| **0x8B TERMINATE (CW=2)** | ❌ EXTRA | medium | APK does NOT send terminate — relies on `file_size` in START. We send `[0x02]` after 0.5s settle (futpib ref, hardware-tolerated). |
+| **0x8B TERMINATE (CW=2)** | ❌ EXTRA (removed R35d) | resolved | APK does NOT send terminate — verified on 4 hardware devices (Timoo SPP, Ditoo BLE, Tivoo Max BLE, Pixoo BLE). Removed. |
 | **32x32 pre-frames (0x05/0x06)** | ❌ NOT IN APK | **high** | `0x05` and `0x06` only appear as **SPP escape sequences** (`s.java` `l()` method), NOT as pre-frames. Our pre-frames come from **hass-divoom**. No APK code path sends them. |
 | **32x32 frame header RR=0x03, 2-byte NN** | ❌ NOT IN APK | **high** | APK uses same `AA LLLL TTTT RR NN` format via `NDKMain.pixelEncode()` for ALL sizes (`RR=0x00`, 1-byte NN). Our RR=0x03, 2-byte NN come from **hass-divoom**. |
 | **APK BlueHigh encoding (`pixelEncodeBlueHigh`)** | ❌ NOT IMPLEMENTED | medium | APK has a SEPARATE native encoding path for high-res (Pixoo Max): header byte `0x25`/`0x2A` + `rowCnt`/`columnCnt`. We don't use this — our AA format matches the standard `pixelEncode()` path. |
@@ -626,8 +626,9 @@ When testing on real hardware, run through these items in order:
 
 ## 9. Open Questions
 
-1. **TERMINATE packet:** Does any Divoom device REQUIRE the 0x02 terminate
-   packet? The APK doesn't send it. Test by removing it temporarily.
+1. ~~**TERMINATE packet:** Does any Divoom device REQUIRE the 0x02 terminate
+   packet? The APK doesn't send it.~~ **RESOLVED R35d:** Tested on 4 devices
+   (Timoo, Ditoo, Tivoo Max, Pixoo) — none require it. Removed from code.
 2. **32x32 pre-frames:** Are they required for any device? APK doesn't use them.
    Test with and without on 32x32 hardware. Remove from code if unnecessary.
 3. **32x32 RR=0x00 vs RR=0x03:** Does the standard `AA LLLL TTTT 0x00 NN` format
@@ -651,7 +652,7 @@ Test these scenarios on each device and record result:
 | A | 0x8B single GIF 16x16 → sync | Animation plays correctly |
 | B | 0x8B multi-frame GIF 16x16 → sync | All frames cycle |
 | C | 0x8B 5-image batch sync | All images push, no spinner |
-| D | Remove TERMINATE (CW=2) from 0x8B stream | Animation still plays |
+| D | Remove TERMINATE (CW=2) from 0x8B stream | ~~Animation still plays~~ **DONE — all 4 PASS** |
 | E | 32x32 image/gif sync (if device supports it) | Displays correctly |
 | F | 32x32 without pre-frames | Works/doesn't work |
 | G | 32x32 with RR=0x00 (standard format) | Works/doesn't work |

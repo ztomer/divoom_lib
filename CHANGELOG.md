@@ -6,9 +6,10 @@ shipped milestone (per the project planning docs).
 
 ---
 
-## Round 35 — 2026-06-09 (fix 0x8b spinner, upload progress, gallery button alignment)
+## Round 35 — 2026-06-09 (APK encoding parity, terminate removal, UI polish)
 
-**Critical bugfix: 0x8b start-phase notification routing.**
+### Critical bugfix: 0x8b start-phase notification routing.
+
 - Root cause: `_handle_ios_le_notification` drops the device's "[0] → ready" response
   because `_expected_response_command` is `None` — `send_command` doesn't set it.
 - Fix: set `_expected_response_command = 0x8b` on the BLE transport *before* sending
@@ -19,16 +20,64 @@ shipped milestone (per the project planning docs).
   the device's `[0]` response (event-driven). Our fix makes the wait actually work.
 - Reduced `_await_8b_device_ready` timeout from 3s → 2s (device typically responds
   within 200ms).
-- APK comparison documented in `docs/PLANNING_ROUND35.md` outcome section.
 
-**Files changed:**
-- `divoom_gui/gallery_sync.py` — `sync_hot_channel`: `evaluate_js()` progress callback after each file
-- `divoom_gui/web_ui/gallery.js` — `window.onGallerySyncProgress()` handler; double-press guards for batchSyncBtn + syncAllBtn
-- `divoom_gui/web_ui/gallery.css` — `.gallery-select-btn`, `.sync-status-text`, sync-state classes (`.syncing`, `.synced-ok`, `.synced-fail`)
-- `divoom_gui/web_ui/templates_monthly_best.js` — removed `wall-tool-btn` from gallery select buttons; added status spans inside `#batch-sync-btn`
-- `docs/PLANNING_ROUND35.md` — plan + outcome
+### APK comparison doc + encoding parity tests (R35c)
 
-**Test baseline:** 237 passed (core unit: downscaler, encoders, JS syntax, image processing)
+- New `docs/APK_COMPARISON.md` (815 lines): byte-by-byte comparison of 0x8B, 0x49,
+  0x44, frame body format, BLE framing, color palette, pixel packing. 11 MATCH,
+  4 DIFFERENT, 2 UNVERIFIED → now both verified.
+- New `tests/test_apk_encoding_parity.py`: 25 tests covering wire format, frame body,
+  framing layer checksum, pixel data packing, color quantization limit.
+- Verified findings:
+  - 32×32 pre-frames (0x05/0x06): **NOT IN APK** — only appear as SPP escape sequences
+  - 32×32 RR=0x03, 2-byte NN: **NOT IN APK** — APK uses RR=0x00, 1-byte NN for all sizes
+  - 0x49 packet index: **CONFIRMED 0-based** in APK (our code is 1-based)
+  - APK has separate BlueHigh encoding path (0x25 header) we don't implement
+
+### TERMINATE removal (R35d) — hardware-verified
+
+- APK `CmdManager.n()` does NOT send CW=2 (terminate). Tested on 4 devices
+  (Timoo SPP, Ditoo BLE, Tivoo Max BLE, Pixoo BLE) — **all PASS** both with
+  and without terminate. Removed permanently, saving ~0.5s per upload.
+- `stream_animation_8b`: removed `send_terminate` parameter; no longer sends
+  terminate or its 0.5s settle sleep.
+- `display.show_image`: removed `send_terminate` parameter.
+
+### Upload progress indicator (R35b)
+
+- `sync_hot_channel`: `evaluate_js()` progress callback after each file.
+- JS handler: `window.onGallerySyncProgress(index, total, fileId, success, errorStr)`.
+  Shows dimmed "Updating (i/N)", then "✓ Synced N" (green, 3s) or
+  "✗ X ok, Y failed" (red, 5s). Double-press guarded via `_syncInFlight`/`_syncAllInFlight`.
+
+### Device dot pulse in device color
+
+- CSS: `.transport-dot.connecting` uses `var(--dot-pulse-color, #f59e0b)`.
+- JS: sets `--dot-pulse-color` to `window.deviceColor(address)`.
+- Global dot stays amber fallback.
+
+### Gallery button alignment
+
+- Removed `wall-tool-btn` from Select All/Clear buttons (had `background: transparent`
+  → hollow look). Added `.gallery-select-btn` with solid `#2e2f36` background.
+
+### Files changed (R35a-d):
+- `divoom_lib/display/animation.py` — `stream_animation_8b`: notification fix + TERMINATE removal
+- `divoom_lib/display/__init__.py` — `show_image`: removed `send_terminate` parameter
+- `divoom_lib/ble_transport.py` — notification routing fix
+- `divoom_gui/gallery_sync.py` — progress callback
+- `divoom_gui/web_ui/gallery.js` — progress handler + double-press guards
+- `divoom_gui/web_ui/gallery.css` — `.gallery-select-btn`, sync-state classes
+- `divoom_gui/web_ui/templates_monthly_best.js` — button + status spans
+- `divoom_gui/web_ui/app_globals.js` — `--dot-pulse-color` per device
+- `divoom_gui/web_ui/appbar.css` — `.transport-dot.connecting` uses CSS var
+- `docs/APK_COMPARISON.md` — new 815-line comparison doc
+- `tests/test_apk_encoding_parity.py` — 25 new parity tests
+- `tests/test_animation_8b_stream.py` — updated for TERMINATE removal
+- `tests/test_e2e_mock_device.py` — updated for TERMINATE removal
+- `tests/test_hardware_smoke.py` — new HW smoke test
+
+**Test baseline:** 210 passed (31 parity + 8b stream + e2e mock + monthly best daemon)
 
 ---
 

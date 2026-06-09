@@ -18,20 +18,30 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **R35 SHIPPED (2026-06-09) — fix 0x8b spinner, upload progress, gallery button alignment.**
+- **R35 SHIPPED (2026-06-09) — APK encoding parity + terminate removal + UI polish.**
   Plan + outcomes: `docs/PLANNING_ROUND35.md`.
-  - **CRITICAL FIX** (this session): `_handle_ios_le_notification` was dropping the
-    device's `[0]→ready` ACK to the 0x8b START packet, because `send_command` doesn't
-    set `_expected_response_command`. The ACK was silently lost → `_await_8b_device_ready`
-    blocked 3s → 0.5s sleep fallback → 3.5s dead air → device spinner timeout → permanent
-    spinner. Fix: set `_expected_response_command = 0x8b` on the BLE transport BEFORE
-    sending START, so the handler routes the ACK to the queue. Timeout reduced 3→2s.
-    APK comparison: APK uses event-driven reactive wait (no sleep), we now match that
-    pattern on BLE with the notification fix.
-  - §1: `sync_hot_channel` fires `window.onGallerySyncProgress` after each file.
-  - §2: device dot pulse uses device accent color (CSS var, amber fallback).
-  - §3: removed `wall-tool-btn` from gallery Select All/Clear; added `.gallery-select-btn`.
-  - Core tests: 192 passed.
+  - **R35a — CRITICAL FIX**: `_handle_ios_le_notification` dropped the device's
+    `[0]→ready` ACK because `_expected_response_command` was `None` (sent via
+    `send_command` which doesn't set it). Fix: set before START. Previously the
+    ACK was silently lost → `_await_8b_device_ready` blocked 3s → 0.5s sleep →
+    3.5s dead air → device internal timeout (~1-2s) → permanent spinner.
+  - **R35b — Upload progress**: `sync_hot_channel` fires
+    `window.onGallerySyncProgress` after each file. JS handler shows three
+    states (updating, synced, error). Double-press guarded.
+  - **R35c — APK comparison doc + parity tests**: 815-line `docs/APK_COMPARISON.md`
+    with byte-level comparison of 0x8B, 0x49, 0x44, frame body, BLE framing,
+    color palette, pixel packing. 25 parity tests. Verified two UNVERIFIED items:
+    (1) 32×32 pre-frames NOT IN APK, (2) 32×32 RR=0x03 NOT IN APK (uses same
+    AA format as 16×16). 0x49 counter CONFIRMED 0-based in APK. APK has separate
+    BlueHigh encoding path.
+  - **R35d — TERMINATE removal (key finding)**: APK `CmdManager.n()` does NOT
+    send CW=2. Hardware-verified on 4 devices (Timoo SPP, Ditoo BLE, Tivoo Max
+    BLE, Pixoo BLE) — **all PASS both with and without TERMINATE**. Permanently
+    removed, saving ~0.5s per upload.
+  - **UI polish**: device dot pulse uses CSS var `--dot-pulse-color` set per
+    device accent color. Gallery Select All/Clear buttons use `.gallery-select-btn`
+    (solid background). `test_hardware_smoke.py` for quick HW verification.
+  - Tests: **210 pass** (31 parity + 8b stream + e2e mock + monthly best daemon + HW smoke).
 
 - **R34 §1b SHIPPED (2026-06-09) — APK-aligned 0x8b upload flow.** (`5f419002`)
   Compared our chunked upload against the decompiled APK: wire format identical;

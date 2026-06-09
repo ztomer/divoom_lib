@@ -129,8 +129,8 @@ class Animation(AnimationUserDefine):
 
         On top of the wire format we add BLE robustness (not in futpib, which
         targets a stream socket): write-with-response on BLE, 0.5s after start
-        for buffer allocation, 0.5s before terminate, and a brief inter-chunk
-        delay to avoid GATT congestion.
+        for buffer allocation, and a brief inter-chunk delay to avoid GATT
+        congestion.
 
         R34 §1b — APK alignment (the official app is the authoritative protocol
         reference, `references/apk/`): the app's 0x8b flow is DEVICE-DRIVEN —
@@ -141,11 +141,15 @@ class Animation(AnimationUserDefine):
         BLE, degrading gracefully to the legacy fixed sleeps when the device
         doesn't respond (LAN/SPP or older firmware).
 
+        R35 hardware verification (4 devices): the APK does NOT send CW=2
+        (terminate). Neither do we — verified PASS on Timoo, Ditoo, Tivoo Max,
+        and Pixoo with and without the terminate packet.
+
         Args:
             blob: concatenated per-frame bodies (see animation_8b._build_animation_blob).
 
         Returns:
-            True if all three phases were acked, else False.
+            True if all phases succeeded, else False.
         """
         file_size = len(blob)
         if file_size <= 0:
@@ -203,12 +207,9 @@ class Animation(AnimationUserDefine):
             await self._serve_8b_retransmits(blob, file_size, chunk_size,
                                              write_with_response)
 
-        await asyncio.sleep(0.5)  # let the device settle before terminate
-        if not await self.app_new_send_gif_cmd(
-            control_word=ANSGC_CONTROL_TERMINATE_SENDING
-        ):
-            self.logger.error("0x8B terminate phase failed")
-            return False
+        # APK: no terminate packet (CW=2). Verified on 4 hardware devices
+        # (Timoo, Ditoo, Tivoo Max, Pixoo) — animation renders correctly
+        # without it.
         return True
 
     async def _await_8b_device_ready(self, timeout: float = 3.0) -> bool:

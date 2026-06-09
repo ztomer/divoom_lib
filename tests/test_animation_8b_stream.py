@@ -40,15 +40,14 @@ async def test_stream_phases_and_chunk_index_offsets():
 
     calls = [c for c in comm.send_command.await_args_list
              if c.args and c.args[0] == COMMANDS["app new send gif cmd"]]
-    # start + 3 data + terminate
-    assert len(calls) == 5
+    # start + 3 data (APK does NOT send terminate — R35d)
+    assert len(calls) == 4
     control_words = [c.args[1][0] for c in calls]
     assert control_words[0] == ANSGC_CONTROL_START_SENDING
-    assert control_words[-1] == ANSGC_CONTROL_TERMINATE_SENDING
-    assert all(cw == ANSGC_CONTROL_SENDING_DATA for cw in control_words[1:-1])
+    assert all(cw == ANSGC_CONTROL_SENDING_DATA for cw in control_words[1:])
 
     # data phases: args = [CW, fs(4 LE), offset_id(2 LE), *chunk]
-    data_calls = calls[1:-1]
+    data_calls = calls[1:]
     offset_ids = [int.from_bytes(bytes(c.args[1][5:7]), "little") for c in data_calls]
     assert offset_ids == [0, 1, 2], "offset_id must be a sequential chunk index"
     # First two chunks must be the full 256 bytes (chunk N lands at byte N*256).
@@ -126,4 +125,4 @@ async def test_stream_falls_back_when_device_never_acks():
     assert ok is True
     calls = [c for c in comm.send_command.await_args_list
              if c.args and c.args[0] == COMMANDS["app new send gif cmd"]]
-    assert len(calls) == 4  # start + 2 data + terminate, no retransmits
+    assert len(calls) == 3  # start + 2 data, no terminate (R35d), no retransmits

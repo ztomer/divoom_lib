@@ -154,8 +154,8 @@ async def test_show_image_emits_0x8b_3phase():
     control_words = [m["payload"][0] for m in msgs if m["command_id"] == gif_cmd]
     assert control_words, "no 0x8B frames emitted"
     assert control_words[0] == 0x00, "first 0x8B phase must be StartSeeding"
-    assert control_words[-1] == 0x02, "last 0x8B phase must be TerminateSending"
     assert 0x01 in control_words, "expected at least one SendingData phase"
+    assert 0x02 not in control_words, "APK does not send TerminateSending (R35d)"
 
 
 @pytest.mark.asyncio
