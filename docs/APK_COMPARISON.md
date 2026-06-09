@@ -19,23 +19,23 @@ authoritative reference; divergences are noted and categorized by risk.
 
 | Component | Status | Risk | Evidence |
 |-----------|--------|------|----------|
-| **0x8B START payload** `[0x00][size:4 LE]` | ✅ MATCH | none | APK `CmdManager.n()` line 1525, our `_phase_start()` |
-| **0x8B DATA payload** `[0x01][size:4 LE][idx:2 LE][≤256 bytes]` | ✅ MATCH | none | APK `h.f()` with `f30416i=true`, our `_phase_data()` |
-| **0x8B chunk size** 256 bytes | ✅ MATCH | none | APK `hVar.q(256)`, our `SENDING_DATA_CHUNK_SIZE` |
-| **Frame body header:** `AA LLLL TTTT RR NN` | ✅ MATCH | none | APK native `NDKMain.pixelEncode()` output, our `encode_animation_frame()` |
-| **Color palette:** 3-byte RGB, first-seen order | ✅ MATCH | none | APK `W2.c.F()` `bArr.length % 768`, our palette construction |
-| **Pixel data:** LSB-first continuous bit pack | ✅ MATCH | none | RomRider protocol (both derive from same spec) |
-| **0x49 packet index** `PACKET_NUM u8` | ✅ MATCH | resolved R38 | APK `e3/h.java` `f()` loop starts at **i12=0** (0-based). Our code now starts at **0** (Python `packet_num=0`, C `packet_num=0`). |
-| **0x49 total_len + index field sizes** (16px: 2B+1B; 32px: 4B+2B) | ✅ MATCH | none | APK `e3/h.java` lines 164-168: `i9={2,4}`, `i11={1,2}` by screen mode. Our code matches. |
-| **BLE wire framing** | ❌ DIFFERENT | low (transport) | Our: iOS LE `FE EF AA 55 ... CMD ... CK CK 02`. APK: SPP Basic `01 LL LL CMD ... CK CK 02`. Both preserve same cmd+payload. |
-| **0x8B TERMINATE (CW=2)** | ❌ EXTRA (removed R35d) | resolved | APK does NOT send terminate — verified on 4 hardware devices (Timoo SPP, Ditoo BLE, Tivoo Max BLE, Pixoo BLE). Removed. |
-| **32x32 pre-frames (0x05/0x06)** | ❌ NOT IN APK | **high** | `0x05` and `0x06` only appear as **SPP escape sequences** (`s.java` `l()` method), NOT as pre-frames. Our pre-frames come from **hass-divoom**. No APK code path sends them. |
-| **32x32 frame header RR=0x03, 2-byte NN** | ❌ NOT IN APK | **high** | APK uses same `AA LLLL TTTT RR NN` format via `NDKMain.pixelEncode()` for ALL sizes (`RR=0x00`, 1-byte NN). Our RR=0x03, 2-byte NN come from **hass-divoom**. |
-| **APK BlueHigh encoding (`pixelEncodeBlueHigh`)** | ❌ NOT IMPLEMENTED | medium | APK has a SEPARATE native encoding path for high-res (Pixoo Max): header byte `0x25`/`0x2A` + `rowCnt`/`columnCnt`. We don't use this — our AA format matches the standard `pixelEncode()` path. |
-| **Color quantization** (>256 colors) | ❌ MISSING | low | APK native has `colorQuantityV1/V2`. We raise ValueError. OK as long as callers pre-quantize. |
-| **0x8B device-ready wait** | ✅ FIXED (R35) | none | `_expected_response_command` now set before START so iOS LE notification handler routes device's `[0]` ACK. |
-| **0x8B retransmit serving** `[1][idx:2 LE]` | ⚠️ TIMING DIFF | low | Our: post-stream poll loop (1s quiet timeout). APK: event-driven, interleaved with initial send. |
-| **Inter-chunk delay** | ❌ DIFFERENT | low | Our: 10ms BLE + GATT ACK pacing. APK: 40ms SPP sleep. Both effective. |
+| **0x8B START payload** `[0x00][size:4 LE]` | [OK] MATCH | none | APK `CmdManager.n()` line 1525, our `_phase_start()` |
+| **0x8B DATA payload** `[0x01][size:4 LE][idx:2 LE][≤256 bytes]` | [OK] MATCH | none | APK `h.f()` with `f30416i=true`, our `_phase_data()` |
+| **0x8B chunk size** 256 bytes | [OK] MATCH | none | APK `hVar.q(256)`, our `SENDING_DATA_CHUNK_SIZE` |
+| **Frame body header:** `AA LLLL TTTT RR NN` | [OK] MATCH | none | APK native `NDKMain.pixelEncode()` output, our `encode_animation_frame()` |
+| **Color palette:** 3-byte RGB, first-seen order | [OK] MATCH | none | APK `W2.c.F()` `bArr.length % 768`, our palette construction |
+| **Pixel data:** LSB-first continuous bit pack | [OK] MATCH | none | RomRider protocol (both derive from same spec) |
+| **0x49 packet index** `PACKET_NUM u8` | [OK] MATCH | resolved R38 | APK `e3/h.java` `f()` loop starts at **i12=0** (0-based). Our code now starts at **0** (Python `packet_num=0`, C `packet_num=0`). |
+| **0x49 total_len + index field sizes** (16px: 2B+1B; 32px: 4B+2B) | [OK] MATCH | none | APK `e3/h.java` lines 164-168: `i9={2,4}`, `i11={1,2}` by screen mode. Our code matches. |
+| **BLE wire framing** | [NO] DIFFERENT | low (transport) | Our: iOS LE `FE EF AA 55 ... CMD ... CK CK 02`. APK: SPP Basic `01 LL LL CMD ... CK CK 02`. Both preserve same cmd+payload. |
+| **0x8B TERMINATE (CW=2)** | [NO] EXTRA (removed R35d) | resolved | APK does NOT send terminate — verified on 4 hardware devices (Timoo SPP, Ditoo BLE, Tivoo Max BLE, Pixoo BLE). Removed. |
+| **32x32 pre-frames (0x05/0x06)** | [NO] NOT IN APK | **high** | `0x05` and `0x06` only appear as **SPP escape sequences** (`s.java` `l()` method), NOT as pre-frames. Our pre-frames come from **hass-divoom**. No APK code path sends them. |
+| **32x32 frame header RR=0x03, 2-byte NN** | [NO] NOT IN APK | **high** | APK uses same `AA LLLL TTTT RR NN` format via `NDKMain.pixelEncode()` for ALL sizes (`RR=0x00`, 1-byte NN). Our RR=0x03, 2-byte NN come from **hass-divoom**. |
+| **APK BlueHigh encoding (`pixelEncodeBlueHigh`)** | [NO] NOT IMPLEMENTED | medium | APK has a SEPARATE native encoding path for high-res (Pixoo Max): header byte `0x25`/`0x2A` + `rowCnt`/`columnCnt`. We don't use this — our AA format matches the standard `pixelEncode()` path. |
+| **Color quantization** (>256 colors) | [NO] MISSING | low | APK native has `colorQuantityV1/V2`. We raise ValueError. OK as long as callers pre-quantize. |
+| **0x8B device-ready wait** | [OK] FIXED (R35) | none | `_expected_response_command` now set before START so iOS LE notification handler routes device's `[0]` ACK. |
+| **0x8B retransmit serving** `[1][idx:2 LE]` | [WARN] TIMING DIFF | low | Our: post-stream poll loop (1s quiet timeout). APK: event-driven, interleaved with initial send. |
+| **Inter-chunk delay** | [NO] DIFFERENT | low | Our: 10ms BLE + GATT ACK pacing. APK: 40ms SPP sleep. Both effective. |
 
 ---
 
@@ -45,12 +45,12 @@ authoritative reference; divergences are noted and categorized by risk.
 
 | Offset | Size | Field | Our value | APK value | Match |
 |--------|------|-------|-----------|-----------|-------|
-| 0 | 1 | AA | `0xAA` | Native output includes `0xAA` | ✅ |
-| 1-2 | 2 | LLLL | LE u16 = `6 + 3*N + pixel_bytes` | Same | ✅ |
-| 3-5 | 3 | padding | `0x00 0x00 0x00` | Same | ✅ |
-| 6 | 1 | NN | u8 (0=256) | `(byte)n` | ✅ |
-| 7.. | N*3 | COLOR_DATA | R G B, first-seen | Same | ✅ |
-| ... | P | PIXEL_DATA | LSB-first bit pack | Same | ✅ |
+| 0 | 1 | AA | `0xAA` | Native output includes `0xAA` | [OK] |
+| 1-2 | 2 | LLLL | LE u16 = `6 + 3*N + pixel_bytes` | Same | [OK] |
+| 3-5 | 3 | padding | `0x00 0x00 0x00` | Same | [OK] |
+| 6 | 1 | NN | u8 (0=256) | `(byte)n` | [OK] |
+| 7.. | N*3 | COLOR_DATA | R G B, first-seen | Same | [OK] |
+| ... | P | PIXEL_DATA | LSB-first bit pack | Same | [OK] |
 
 Header is 6 bytes (no TTTT, no RR, 3 zero bytes where TTTT+RR would be).
 
@@ -58,13 +58,13 @@ Header is 6 bytes (no TTTT, no RR, 3 zero bytes where TTTT+RR would be).
 
 | Offset | Size | Field | Our value | APK value | Match |
 |--------|------|-------|-----------|-----------|-------|
-| 0 | 1 | AA | `0xAA` | Native output includes `0xAA` | ✅ |
-| 1-2 | 2 | LLLL | LE u16 = `7 + 3*N + pixel_bytes` | Same | ✅ |
-| 3-4 | 2 | TTTT | LE u16, display time in ms | Same (from `speed` param to `pixelEncode`) | ✅ |
-| 5 | 1 | RR | `0x00` (reset palette) | Native handles | ✅ (for 16x16) |
-| 6 | 1 | NN | u8 (0=256) | `(byte)n` | ✅ |
-| 7.. | N*3 | COLOR_DATA | R G B, first-seen | Same | ✅ |
-| ... | P | PIXEL_DATA | LSB-first bit pack | Same | ✅ |
+| 0 | 1 | AA | `0xAA` | Native output includes `0xAA` | [OK] |
+| 1-2 | 2 | LLLL | LE u16 = `7 + 3*N + pixel_bytes` | Same | [OK] |
+| 3-4 | 2 | TTTT | LE u16, display time in ms | Same (from `speed` param to `pixelEncode`) | [OK] |
+| 5 | 1 | RR | `0x00` (reset palette) | Native handles | [OK] (for 16x16) |
+| 6 | 1 | NN | u8 (0=256) | `(byte)n` | [OK] |
+| 7.. | N*3 | COLOR_DATA | R G B, first-seen | Same | [OK] |
+| ... | P | PIXEL_DATA | LSB-first bit pack | Same | [OK] |
 
 Header is 7 bytes.
 
@@ -188,7 +188,7 @@ counter is wrong.** Should be fixed to 0-based.
 
 | Screen size | APK `i9` (total_len) | APK `i11` (index) | Our total_len | Our index |
 |-------------|----------------------|-------------------|---------------|-----------|
-| 16px | 2 bytes LE u16 | 1 byte u8 | 2 bytes LE u16 | 1 byte u8 (1-based ❌) |
+| 16px | 2 bytes LE u16 | 1 byte u8 | 2 bytes LE u16 | 1 byte u8 (1-based [NO]) |
 | 32px+ | 4 bytes LE u32 | 2 bytes LE u16 | 4 bytes LE u32 (via C) | 2 bytes LE u16 |
 
 **Chunk size:**

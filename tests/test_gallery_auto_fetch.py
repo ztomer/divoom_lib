@@ -71,10 +71,14 @@ def test_batch_sync_btn_renamed_to_update_device() -> None:
     assert "Push Selected to Device" not in src, (
         "Old 'Push Selected to Device' label still present — should be 'Update Device'."
     )
+    # R35: the button hosts a label span + a progress-status span, so the
+    # 'Update Device' text lives in #batch-sync-label rather than as the
+    # button's direct text node.
     assert re.search(
-        r'<button\s+id="batch-sync-btn"[^>]*>\s*Update Device\s*</button>',
+        r'<button\s+id="batch-sync-btn"[^>]*>\s*'
+        r'<span\s+id="batch-sync-label"[^>]*>\s*Update Device\s*</span>',
         src,
-    ), "batch-sync-btn button must be renamed to 'Update Device'."
+    ), "batch-sync-btn must carry 'Update Device' in #batch-sync-label."
 
 
 def test_sync_all_btn_moved_to_routines() -> None:

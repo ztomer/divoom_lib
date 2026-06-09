@@ -199,11 +199,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (totalFail === 0) {
                 btn.classList.add("synced-ok");
                 status.textContent = "",
-                label.textContent = `✓ Synced ${total}`;
+                label.textContent = `OK Synced ${total}`;
             } else {
                 btn.classList.add("synced-fail");
                 status.textContent = "";
-                label.textContent = `✗ ${total - totalFail} ok, ${totalFail} failed`;
+                label.textContent = `X ${total - totalFail} ok, ${totalFail} failed`;
             }
             _syncInFlight = false;
             setTimeout(() => {

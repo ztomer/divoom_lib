@@ -47,8 +47,8 @@ shipped milestone (per the project planning docs).
 
 - `sync_hot_channel`: `evaluate_js()` progress callback after each file.
 - JS handler: `window.onGallerySyncProgress(index, total, fileId, success, errorStr)`.
-  Shows dimmed "Updating (i/N)", then "✓ Synced N" (green, 3s) or
-  "✗ X ok, Y failed" (red, 5s). Double-press guarded via `_syncInFlight`/`_syncAllInFlight`.
+  Shows dimmed "Updating (i/N)", then "OK Synced N" (green, 3s) or
+  "X X ok, Y failed" (red, 5s). Double-press guarded via `_syncInFlight`/`_syncAllInFlight`.
 
 ### Device dot pulse in device color
 

@@ -30,9 +30,9 @@ success, errorStr)` after each file, so the JS can update in real time.
 
 1. **Idle** — "Update Device" (full-width glow-btn)
 2. **Syncing** — disabled, label shows "Syncing 3 / 5…", amber tint
-3. **Done (all ok)** — green flash, label switches to "✓ Synced N" for 3s, then
+3. **Done (all ok)** — green flash, label switches to "OK Synced N" for 3s, then
    returns to idle
-4. **Done (with failures)** — red flash, label switches to "✗ N ok, M failed"
+4. **Done (with failures)** — red flash, label switches to "X N ok, M failed"
    for 5s, then returns to idle
 
 ---
@@ -105,14 +105,14 @@ flexbox — or simply set the name column to a fixed width.
 - **JS** (`gallery.js`): Added `window.onGallerySyncProgress` handler that:
   1. First file: switches button to amber `.syncing` state, label → "Updating", status → `(1/N)`
   2. Mid files: updates status counter
-  3. Last file: green `.synced-ok` with "✓ Synced N" (3s) or red `.synced-fail` with "✗ X ok, Y failed" (5s), then resets to idle
+  3. Last file: green `.synced-ok` with "OK Synced N" (3s) or red `.synced-fail` with "X X ok, Y failed" (5s), then resets to idle
   - Added `_syncInFlight` guard to prevent double-press
 - **Routines "Sync devices now"**: same double-press guard via `_syncAllInFlight`, button shows "Syncing N image(s)…" and disables during flight
 
 **§2 — Device dot pulse: verified already shipped (R34 §2)**
 - `app_globals.js:132-134`: adds `.connecting` class to specific device dot before `connectDevice()`
 - `appbar.css:47-52`: `.transport-dot.connecting` with amber `dot-pulse` animation
-- `app_globals.js:152` (success) and `:166` (failure) both call `renderDeviceDots()` which clears the class — ✅ correct
+- `app_globals.js:152` (success) and `:166` (failure) both call `renderDeviceDots()` which clears the class — [OK] correct
 
 ### Test results
 - 237 passed, 0 failed (core unit tests: native downscaler, encoders, JS syntax, image processing)
@@ -146,13 +146,13 @@ flexbox — or simply set the name column to a fixed width.
 
 | Step | APK (canonical) | Our library (after fix) | Match? |
 |------|----------------|------------------------|--------|
-| **1. START cmd** | 0x8b, payload `[0][size:4 LE]` | Same | ✅ |
-| **2. Write mode** | Fire-and-forget (SPP socket) | `write_with_response=False` | ✅ |
+| **1. START cmd** | 0x8b, payload `[0][size:4 LE]` | Same | [OK] |
+| **2. Write mode** | Fire-and-forget (SPP socket) | `write_with_response=False` | [OK] |
 | **3. Wait for data** | Indefinite, device-driven: `s.java` handler fires `startSendAllAni()` on `payload[0]==0` | Bounded wait via `_await_8b_device_ready(2.0)`, fallback 0.5s sleep | ≈ (APK infinite, we have safety timeout) |
-| **4. DATA payload** | `[1][size:4 LE][idx:2 LE][≤256 bytes]` | Same | ✅ |
-| **5. Write mode** | Fire-and-forget SPP, 40ms inter-chunk | `write_with_response=True` GATT, 10ms inter-chunk | ❌ adaptation for BLE |
-| **6. Retransmits** | Event-driven `resendBlueData(idx)` on `payload[0]==1` | Post-stream poll loop (1s quiet timeout) | ⚠️ semantic match, timing differs |
-| **7. TERMINATE** | NOT SENT | Sent after 0.5s settle | ❌ divergence (hardware-tolerated) |
+| **4. DATA payload** | `[1][size:4 LE][idx:2 LE][≤256 bytes]` | Same | [OK] |
+| **5. Write mode** | Fire-and-forget SPP, 40ms inter-chunk | `write_with_response=True` GATT, 10ms inter-chunk | [NO] adaptation for BLE |
+| **6. Retransmits** | Event-driven `resendBlueData(idx)` on `payload[0]==1` | Post-stream poll loop (1s quiet timeout) | [WARN] semantic match, timing differs |
+| **7. TERMINATE** | NOT SENT | Sent after 0.5s settle | [NO] divergence (hardware-tolerated) |
 
 ### Files changed
 | File | Change |
