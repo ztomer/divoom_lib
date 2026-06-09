@@ -22,16 +22,48 @@ class ToolsApi(ApiBase):
 
     # ── Alarms ────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _alarm_cache_path():
+        from pathlib import Path
+        return Path.home() / ".config" / "divoom-control" / "alarms.json"
+
+    def _load_alarm_cache(self) -> list:
+        try:
+            p = self._alarm_cache_path()
+            if p.exists():
+                data = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(data, list):
+                    return data
+        except Exception as e:
+            logger.warning(f"alarm cache read failed: {e}")
+        return []
+
+    def _store_alarm_cache(self, index: int, entry: dict) -> None:
+        """Remember the last alarm state WE wrote (R34 §4): the device-side
+        get_* read-back is flaky on real hardware (task #20), so this cache is
+        the display fallback — without it the table shows empty-by-bug."""
+        try:
+            alarms = self._load_alarm_cache()
+            while len(alarms) <= index:
+                alarms.append({})
+            alarms[index] = entry
+            p = self._alarm_cache_path()
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(json.dumps(alarms, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"alarm cache write failed: {e}")
+
     def get_alarms(self) -> str:
         try:
             target = self._current_divoom
-            if not target:
-                return json.dumps([])
-            alarms = self._run_async(target.alarm.get_alarm_time())
-            return json.dumps(alarms or [])
+            if target:
+                alarms = self._run_async(target.alarm.get_alarm_time())
+                if alarms:
+                    return json.dumps(alarms)
         except Exception as e:
             logger.error(f"get_alarms failed: {e}")
-            return json.dumps([])
+        # Device read empty/failed → last-written cache (see _store_alarm_cache).
+        return json.dumps(self._load_alarm_cache())
 
     def set_alarm(self, index: int, enabled, hour: int, minute: int,
                   week: int = 0, mode: int = 0, trigger_mode: int = 0) -> bool:
@@ -42,9 +74,15 @@ class ToolsApi(ApiBase):
             target = self._current_divoom
             if not target:
                 return False
-            return bool(self._run_async(target.alarm.set_alarm(
+            ok = bool(self._run_async(target.alarm.set_alarm(
                 int(index), status, int(hour), int(minute), int(week),
                 int(mode), int(trigger_mode))))
+            if ok:
+                self._store_alarm_cache(int(index), {
+                    "status": status, "hour": int(hour), "minute": int(minute),
+                    "week": int(week),
+                })
+            return ok
         except Exception as e:
             logger.error(f"set_alarm failed: {e}")
             return False

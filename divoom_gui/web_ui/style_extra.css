@@ -280,3 +280,52 @@ body.theme-light .arranger-node-image {
     overflow-y: auto;
 }
 
+
+/* ── R34 §4: Alarms weekday table ─────────────────────────────────────
+   One header row carries the weekday names; each alarm row is a grid of
+   [enable | time | 7 day-cells | remove]. Day cells are click-toggles. */
+.alarms-table { display: flex; flex-direction: column; }
+.alarms-table-row {
+    display: grid;
+    grid-template-columns: 32px 112px repeat(7, 1fr) 28px;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.alarms-table-head {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.alarms-table-head span:nth-child(-n+2) { text-align: left; }
+.alarms-table-row .alarm-enabled { justify-self: start; margin: 0; }
+.alarm-time { display: flex; align-items: center; gap: 2px; }
+.alarm-time .text-input { width: 44px; text-align: center; padding: 4px 2px; }
+.alarm-day-cell {
+    width: 20px;
+    height: 20px;
+    margin: 0 auto;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+.alarm-day-cell:hover { background: rgba(255, 255, 255, 0.08); }
+.alarm-day-cell.active { background: var(--primary); border-color: var(--primary); }
+.alarm-remove {
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    justify-self: center;
+}
+.alarm-remove:hover { color: var(--error); }
