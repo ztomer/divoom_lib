@@ -221,39 +221,57 @@
     align-items: center;
     justify-content: center;
     margin: 0 auto 8px auto;
-    position: relative; /* R32 §C3: anchor the device-dots overlay */
 }
 
-/* R32 §C3: per-device switch dots, overlaid along the bottom of the preview. */
+/* R32 §C3: device switch dots in their own glass pill below the preview —
+   recycles the corner connectivity-dot chrome (.corner-transports pill +
+   .transport-dot dots), just with per-device colors. Wraps for >4 devices. */
 .device-dots {
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    right: 0;
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: 6px;
-    padding: 3px 0;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    margin: 0 auto 8px auto;
+    max-width: 100%;
+    box-sizing: border-box;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
 }
+.device-dots:empty { display: none; }
 
-.device-dot {
-    width: 9px;
-    height: 9px;
+.device-dots .transport-dot {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     cursor: pointer;
-    border: 1px solid rgba(0, 0, 0, 0.5);
-    opacity: 0.55;
-    transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    transition: opacity 0.2s, box-shadow 0.2s, transform 0.2s;
 }
+.device-dots .transport-dot:hover { transform: scale(1.25); }
+.device-dots .transport-dot.inactive { opacity: 0.35; box-shadow: none; }
+.device-dots .transport-dot.active { opacity: 1; box-shadow: 0 0 6px currentColor; }
 
-.device-dot:hover {
-    opacity: 1;
-    transform: scale(1.25);
-}
-
-.device-dot.active {
-    opacity: 1;
-    transform: scale(1.2);
+/* Tooltip opens upward (matches the corner dots), centered over the dot. */
+.device-dots .transport-dot:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 21, 26, 0.95);
+    color: var(--text-main);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
 }
 
 .sidebar-device-preview img {

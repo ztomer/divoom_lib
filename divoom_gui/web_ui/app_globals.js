@@ -86,13 +86,18 @@ window.renderDeviceDots = function() {
     }
     host.innerHTML = "";
     entries.forEach(e => {
+        const isActive = e.value === activeMac;
         const dot = document.createElement("span");
-        dot.className = "device-dot" + (e.value === activeMac ? " active" : "");
+        // Recycle the connectivity-dot class so the look (size, glow, inactive
+        // dimming) stays identical; color comes from the per-device hue. The
+        // glow uses currentColor, so set both background and color.
+        dot.className = "transport-dot " + (isActive ? "active" : "inactive");
         const color = window.deviceColor(e.value);
         dot.style.background = color;
-        if (e.value === activeMac) dot.style.boxShadow = `0 0 6px ${color}`;
+        dot.style.color = color;
         dot.title = e.name;
         dot.setAttribute("role", "tab");
+        dot.setAttribute("aria-selected", isActive ? "true" : "false");
         dot.addEventListener("click", () => window.connectDevice(e.name, e.value));
         host.appendChild(dot);
     });
@@ -190,6 +195,8 @@ window.syncArrangerToPython = function() {
         window.pywebview.api.update_wall_slots(JSON.stringify(window.DivoomState.assignedSlots));
     }
     if (window.updateSyncTargetList) window.updateSyncTargetList();
+    // R32 §C3: wall slots changed → the MatrixWall dot may appear/disappear.
+    if (window.renderDeviceDots) window.renderDeviceDots();
 };
 
 window.renderArrangerCanvas = function() {

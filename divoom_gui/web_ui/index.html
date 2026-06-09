@@ -134,8 +134,11 @@
             <div class="sidebar-device-panel" id="connected-device-banner">
                 <div class="sidebar-device-preview">
                     <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
-                    <div id="device-dots" class="device-dots" role="tablist" aria-label="Switch device"></div>
                 </div>
+                <!-- R32 §C3: device switch dots sit below the preview in their own
+                     glass pill — the same chrome as the corner connectivity dots,
+                     one dot per device (rebuilt as devices are added/removed). -->
+                <div id="device-dots" class="device-dots" role="tablist" aria-label="Switch device"></div>
                 <select id="sidebar-device-select" class="sidebar-device-select" hidden>
                     <option value="">Select Screen…</option>
                 </select>
