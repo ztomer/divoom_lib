@@ -23,11 +23,6 @@ sys.path.append(str(Path(__file__).parent))
 from divoom_lib import divoom_auth
 from divoom_lib.divoom import Divoom
 from divoom_lib.utils import discovery
-from divoom_lib.models import (
-    ANSGC_CONTROL_START_SENDING,
-    ANSGC_CONTROL_SENDING_DATA,
-    ANSGC_CONTROL_TERMINATE_SENDING
-)
 
 def print_info(message):
     """Prints an informational message."""
@@ -89,65 +84,19 @@ async def stream_raw_bin_payload(divoom: Divoom, file_data: bytes) -> bool:
     """
     Streams a Divoom-native pre-compiled binary payload (magic 9, 18, 26)
     directly to the device using the 0x8b chunked transfer protocol.
+
+    R34 §1b: delegates to ``Animation.stream_animation_8b`` — previously a
+    byte-for-byte duplicate of that streamer; now both paths share the single
+    APK-aligned implementation (start-ACK gating + retransmit serving).
     """
     file_size = len(file_data)
     print_info(f"Initiating chunked BLE transfer for native payload ({file_size} bytes)...")
-    
-    # 1. Start sending (Control Word 0)
-    success = await divoom.animation.app_new_send_gif_cmd(
-        control_word=ANSGC_CONTROL_START_SENDING,
-        file_size=file_size
-    )
-    if not success:
-        print_err("Failed to start chunked transfer command (0x8b, CW=0)")
-        return False
-        
-    await asyncio.sleep(0.5)  # Let the device allocate buffers
-    
-    # Determine transport type
-    is_lan = getattr(divoom, "lan", None) is not None
-    is_spp = getattr(divoom, "use_spp", False)
-    is_ble = not is_lan and not is_spp
-    
-    write_with_response = is_ble
-    delay = 0.01 if is_ble else 0.0
-    
-    # 2. Transmit data in chunks (Control Word 1)
-    # MUST be 256: offset_id is a chunk INDEX and the device places chunk N at
-    # byte N*256 (per futpib reference). A smaller size leaves gaps and the
-    # transfer never completes (R11). The BLE framing layer handles MTU splitting.
-    chunk_size = 256
-    offset_id = 0
-    
-    for i in range(0, file_size, chunk_size):
-        chunk = list(file_data[i:i+chunk_size])
-        print_info(f"Sending chunk {offset_id} (bytes {i} to {i+len(chunk)} / {file_size})...")
-        success = await divoom.animation.app_new_send_gif_cmd(
-            control_word=ANSGC_CONTROL_SENDING_DATA,
-            file_size=file_size,
-            file_offset_id=offset_id,
-            file_data=chunk,
-            write_with_response=write_with_response
-        )
-        if not success:
-            print_err(f"Failed to send chunk {offset_id}")
-            return False
-        offset_id += 1
-        if delay > 0:
-            await asyncio.sleep(delay)  # Brief sleep to avoid GATT congestion
-        
-    # 3. Terminate sending (Control Word 2)
-    print_info("Terminating chunked BLE transfer...")
-    await asyncio.sleep(0.5)
-    success = await divoom.animation.app_new_send_gif_cmd(
-        control_word=ANSGC_CONTROL_TERMINATE_SENDING
-    )
-    if success:
+    ok = await divoom.animation.stream_animation_8b(bytes(file_data))
+    if ok:
         print_ok("Successfully streamed Divoom bin file to device!")
-        return True
     else:
-        print_err("Failed to terminate chunked transfer command (0x8b, CW=2)")
-        return False
+        print_err("Chunked 0x8b transfer failed")
+    return ok
 
 
 async def main_async():

@@ -293,6 +293,48 @@ Our code intentionally deviates from the APK in several places. Each is document
 
 ---
 
+## 0x8b chunked animation upload (SPP_APP_NEW_GIF_CMD2020) — APK comparison (R34 §1b)
+
+Audited 2026-06-09 against the decompiled APK. APK sources:
+`CmdManager.n(PixelBean)` (builds start + chunk packets), `e3/h.java`
+(`f()` = the chunker; configured `l([1])` `i(true)` `q(256)`),
+`bluetooth/s.java` (the 0x8b response handler),
+`DesignSendModel.sendToOneDevice / startSendAllAni / resendBlueData`.
+
+### Wire format — CONFIRMED IDENTICAL
+
+| Packet | Our library (`animation.py` 0x8b handlers) | APK |
+|---|---|---|
+| START (CW=0) | `[0x00][file_size:4 LE]` | `[0][total_len:4 LE]` (`L.d(…, 4)`) |
+| DATA (CW=1) | `[0x01][file_size:4 LE][chunk_idx:2 LE][≤256 bytes]` | `[1][total_len:4 LE][idx:2 LE][≤256]` (`i(true)` → idx 2 bytes; `q(256)`) |
+| Chunk size | 256 (chunk N → byte N×256) | 256 |
+
+One APK extra: when `DeviceFunction.f11419e0` (round-LCD devices, e.g. Times
+Gate), START gains a trailing `isCircle` byte. Not relevant to our targets
+(Pixoo/Tivoo/Ditoo/Timoo); add if such a device is ever supported.
+
+### Flow — APK is DEVICE-DRIVEN (we now match on BLE, R34 §1b)
+
+The APK does **not** sleep-and-blast. After sending START it returns the chunk
+list into a cache and **waits for the device's 0x8b response**:
+
+- response `payload[0] == 0` → "device requests the animation" →
+  `startSendAllAni()` drains all cached chunks through the send queue;
+- response `payload[0] == 1`, `payload[1:3]` = chunk idx (u16 LE) → "device
+  requests retransmit of chunk N" → `resendBlueData(N)`.
+
+Notably the APK sends **no CW=2 terminate** in this flow; futpib does. We keep
+the terminate (hardware-validated, devices tolerate it).
+
+Our `Animation.stream_animation_8b` (shared by `show_image` and
+`stream_raw_bin_payload`, which is now a delegator) implements both APK
+behaviors on BLE: after START it waits up to 3s for the ready ACK (falling back
+to the legacy 0.5s sleep when no reply — older firmware/LAN/SPP), and after the
+chunk loop it serves retransmit requests until the device goes quiet. A lost
+chunk no longer means a permanently failed upload.
+
+---
+
 ## Recommendations for daemon implementation
 
 ### 1. Add channel-switch helpers to the daemon

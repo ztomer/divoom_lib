@@ -132,6 +132,15 @@ class Animation(AnimationUserDefine):
         for buffer allocation, 0.5s before terminate, and a brief inter-chunk
         delay to avoid GATT congestion.
 
+        R34 §1b — APK alignment (the official app is the authoritative protocol
+        reference, `references/apk/`): the app's 0x8b flow is DEVICE-DRIVEN —
+        after the start packet it WAITS for the device's "send the animation"
+        response before streaming, and it serves per-chunk RETRANSMIT requests
+        (`bluetooth/s.java` SPP_APP_NEW_GIF_CMD2020 handler →
+        `DesignSendModel.startSendAllAni` / `resendBlueData`). We do both on
+        BLE, degrading gracefully to the legacy fixed sleeps when the device
+        doesn't respond (LAN/SPP or older firmware).
+
         Args:
             blob: concatenated per-frame bodies (see animation_8b._build_animation_blob).
 
@@ -147,7 +156,6 @@ class Animation(AnimationUserDefine):
         ):
             self.logger.error("0x8B start phase failed")
             return False
-        await asyncio.sleep(0.5)  # let the device allocate buffers
 
         is_lan = getattr(self.communicator, "lan", None) is not None
         is_spp = getattr(self.communicator, "use_spp", False)
@@ -155,7 +163,13 @@ class Animation(AnimationUserDefine):
         write_with_response = is_ble
         delay = 0.01 if is_ble else 0.0
 
-        chunk_size = 256  # MUST match futpib; device positions chunk N at N*256
+        # APK: wait for the device's "ready, send it" reply to the start packet
+        # rather than guessing how long buffer allocation takes. Fall back to
+        # the legacy 0.5s sleep when no reply arrives.
+        if not (is_ble and await self._await_8b_device_ready()):
+            await asyncio.sleep(0.5)  # let the device allocate buffers
+
+        chunk_size = 256  # MUST match futpib/APK (hVar.q(256)); chunk N → byte N*256
         offset_id = 0
         for i in range(0, file_size, chunk_size):
             chunk = list(blob[i:i + chunk_size])
@@ -172,6 +186,12 @@ class Animation(AnimationUserDefine):
             if delay > 0:
                 await asyncio.sleep(delay)
 
+        # APK: the device may ask for dropped chunks to be re-sent; without
+        # this, one lost chunk = a permanently failed upload.
+        if is_ble:
+            await self._serve_8b_retransmits(blob, file_size, chunk_size,
+                                             write_with_response)
+
         await asyncio.sleep(0.5)  # let the device settle before terminate
         if not await self.app_new_send_gif_cmd(
             control_word=ANSGC_CONTROL_TERMINATE_SENDING
@@ -179,6 +199,66 @@ class Animation(AnimationUserDefine):
             self.logger.error("0x8B terminate phase failed")
             return False
         return True
+
+    async def _await_8b_device_ready(self, timeout: float = 3.0) -> bool:
+        """Wait for the device's 0x8b response with ``payload[0] == 0`` —
+        APK semantics: "device requests the animation" (`bluetooth/s.java`,
+        SPP_APP_NEW_GIF_CMD2020 handler, response byte 0 →
+        ``DesignSendModel.startSendAllAni()``). Returns False on timeout or
+        when the transport has no response channel (caller falls back to the
+        legacy fixed sleep)."""
+        wait = getattr(self.communicator, "wait_for_response", None)
+        if wait is None:
+            return False
+        loop = asyncio.get_running_loop()
+        end = loop.time() + timeout
+        while True:
+            remaining = end - loop.time()
+            if remaining <= 0:
+                return False
+            payload = await wait(COMMANDS["app new send gif cmd"], timeout=remaining)
+            if payload is None:
+                return False
+            if len(payload) >= 1 and payload[0] == 0:
+                self.logger.info("0x8B: device requested the animation (start ACK)")
+                return True
+            # Anything else (stale frame, early retransmit) — keep waiting.
+
+    async def _serve_8b_retransmits(self, blob: bytes, file_size: int,
+                                    chunk_size: int, write_with_response: bool,
+                                    quiet_timeout: float = 1.0,
+                                    max_requests: int = 256) -> None:
+        """Serve the device's 0x8b retransmit requests after the chunk stream —
+        APK semantics: response ``[1][chunk_idx:2 LE]`` means "re-send chunk N"
+        (`bluetooth/s.java` → ``DesignSendModel.resendBlueData(N)``). Stops when
+        the device goes quiet for ``quiet_timeout`` (the normal end state) or
+        after ``max_requests`` (safety valve). Best-effort: never raises."""
+        wait = getattr(self.communicator, "wait_for_response", None)
+        if wait is None:
+            return
+        for _ in range(max_requests):
+            try:
+                payload = await wait(COMMANDS["app new send gif cmd"],
+                                     timeout=quiet_timeout)
+            except Exception:
+                return
+            if payload is None:
+                return  # quiet — device has everything
+            if len(payload) >= 3 and payload[0] == 1:
+                idx = int.from_bytes(bytes(payload[1:3]), byteorder="little")
+                start = idx * chunk_size
+                if start >= file_size:
+                    self.logger.warning(f"0x8B retransmit request out of range: {idx}")
+                    continue
+                self.logger.info(f"0x8B: device requested retransmit of chunk {idx}")
+                await self.app_new_send_gif_cmd(
+                    control_word=ANSGC_CONTROL_SENDING_DATA,
+                    file_size=file_size,
+                    file_offset_id=idx,
+                    file_data=list(blob[start:start + chunk_size]),
+                    write_with_response=write_with_response,
+                )
+            # payload[0] == 0 here would be a late start-ACK — ignore.
 
     async def set_rhythm_gif(self, pos: int, total_length: int, gif_id: int, data: list) -> bool:
         """

@@ -40,36 +40,21 @@ class TestMonthlyBestDaemon(unittest.IsolatedAsyncioTestCase):
         result = monthly_best_daemon.extract_gif_from_magic_43(bytes(payload))
         self.assertEqual(result, gif)
 
-    @patch('divoom_lib.monthly_best_daemon.asyncio.sleep', new_callable=AsyncMock)
-    async def test_stream_raw_bin_payload(self, mock_sleep):
-        """Test stream_raw_bin_payload correctly calls app_new_send_gif_cmd for CW 0, 1, 2."""
+    async def test_stream_raw_bin_payload_delegates_to_shared_streamer(self):
+        """R34 §1b: stream_raw_bin_payload is a thin delegator to the single
+        APK-aligned 0x8b streamer (Animation.stream_animation_8b) — the 3-phase
+        wire format itself is covered by tests/test_animation_8b_stream.py."""
         mock_divoom = MagicMock()
-        mock_divoom.animation.app_new_send_gif_cmd = AsyncMock(return_value=True)
-        
-        # 600 bytes payload → 3 chunks at the 256-byte size (256, 256, 88).
-        # (Chunk size MUST be 256 to match futpib; offset_id is a chunk index
-        # and the device positions chunk N at byte N*256 — R11 fix.)
+        mock_divoom.animation.stream_animation_8b = AsyncMock(return_value=True)
         file_data = b"X" * 600
 
         success = await monthly_best_daemon.stream_raw_bin_payload(mock_divoom, file_data)
         self.assertTrue(success)
+        mock_divoom.animation.stream_animation_8b.assert_awaited_once_with(file_data)
 
-        # CW 0 (start) + CW 1 (data) x 3 + CW 2 (terminate) = 5 calls
-        self.assertEqual(mock_divoom.animation.app_new_send_gif_cmd.call_count, 5)
-
-        mock_divoom.animation.app_new_send_gif_cmd.assert_any_call(
-            control_word=0, file_size=600
-        )
-        mock_divoom.animation.app_new_send_gif_cmd.assert_any_call(
-            control_word=2
-        )
-        # Data phases must carry sequential chunk-INDEX offset ids (0,1,2).
-        data_offsets = [
-            c.kwargs.get("file_offset_id")
-            for c in mock_divoom.animation.app_new_send_gif_cmd.call_args_list
-            if c.kwargs.get("control_word") == 1
-        ]
-        self.assertEqual(data_offsets, [0, 1, 2])
+        mock_divoom.animation.stream_animation_8b = AsyncMock(return_value=False)
+        self.assertFalse(
+            await monthly_best_daemon.stream_raw_bin_payload(mock_divoom, file_data))
 
 if __name__ == '__main__':
     unittest.main()

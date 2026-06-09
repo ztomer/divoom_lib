@@ -24,6 +24,9 @@ def _make_anim():
     comm.lan = None
     comm.use_spp = False
     comm.send_command = AsyncMock(return_value=True)
+    # R34 §1b: by default the fake device never replies on 0x8b — the streamer
+    # must fall back to the legacy fixed-sleep flow (APK ACK-gating is optional).
+    comm.wait_for_response = AsyncMock(return_value=None)
     return Animation(comm), comm
 
 
@@ -70,3 +73,57 @@ async def test_stream_aborts_on_chunk_failure():
     with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
         ok = await anim.stream_animation_8b(bytes(300))
     assert ok is False
+
+
+# ── R34 §1b: APK-aligned device-driven flow ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_stream_waits_for_start_ack_before_chunks():
+    """APK: after START, the device replies [0] ('send the animation') and only
+    then does the app stream chunks (bluetooth/s.java → startSendAllAni)."""
+    anim, comm = _make_anim()
+    order = []
+    comm.send_command = AsyncMock(side_effect=lambda *a, **k: order.append(("send", a[1][0])) or True)
+    comm.wait_for_response = AsyncMock(side_effect=lambda *a, **k: order.append(("wait",)) or bytes([0]))
+    with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
+        # quiet retransmit phase: after the ready ACK, subsequent waits go quiet
+        comm.wait_for_response.side_effect = [bytes([0]), None]
+        ok = await anim.stream_animation_8b(bytes(300))
+    assert ok is True
+    assert comm.wait_for_response.await_count >= 1
+    # The ready wait targets the 0x8b command id.
+    assert comm.wait_for_response.await_args_list[0].args[0] == COMMANDS["app new send gif cmd"]
+
+
+@pytest.mark.asyncio
+async def test_stream_serves_retransmit_requests():
+    """APK: the device may reply [1][idx:2 LE] requesting chunk idx again
+    (bluetooth/s.java → resendBlueData). The streamer must re-send that chunk."""
+    anim, comm = _make_anim()
+    blob = bytes(range(256)) * 2 + bytes(50)  # 3 chunks
+    # ready ACK, then one retransmit request for chunk 1, then quiet
+    comm.wait_for_response = AsyncMock(side_effect=[bytes([0]), bytes([1, 1, 0]), None])
+    with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
+        ok = await anim.stream_animation_8b(blob)
+    assert ok is True
+    data_calls = [c for c in comm.send_command.await_args_list
+                  if c.args and c.args[0] == COMMANDS["app new send gif cmd"]
+                  and c.args[1][0] == ANSGC_CONTROL_SENDING_DATA]
+    offset_ids = [int.from_bytes(bytes(c.args[1][5:7]), "little") for c in data_calls]
+    assert offset_ids == [0, 1, 2, 1], "chunk 1 must be re-sent on request"
+    # The retransmitted chunk carries the same bytes as the original.
+    assert data_calls[3].args[1][7:] == data_calls[1].args[1][7:]
+
+
+@pytest.mark.asyncio
+async def test_stream_falls_back_when_device_never_acks():
+    """No 0x8b reply at all (older firmware / LAN): the streamer must still
+    complete via the legacy fixed-sleep flow."""
+    anim, comm = _make_anim()  # wait_for_response → None
+    with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
+        ok = await anim.stream_animation_8b(bytes(300))
+    assert ok is True
+    calls = [c for c in comm.send_command.await_args_list
+             if c.args and c.args[0] == COMMANDS["app new send gif cmd"]]
+    assert len(calls) == 4  # start + 2 data + terminate, no retransmits
