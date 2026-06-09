@@ -24,6 +24,15 @@ Claude) should read this on entry and **update it at the end of every round**
   (4) stretch §1.5 split / §4.2 bus. All 9 review-cleanup commits pushed to
   `origin/main` through `d871c350`. Suite 1158/75.
 
+- **Inline-style batch 2 SHIPPED (2026-06-09).** Migrated `templates_monthly_best.js`:
+  L15→`row gap-8`, L32→`flex gap-10` (added bare `.flex` — `.row` includes
+  align-items:center). L13/L28 inline styles were **redundant** with the
+  ID-scoped `#monthly-best .card.glass-card`/`.card-body` rules → deleted them
+  (a class can't out-specify an ID rule anyway). Left inline per §2.1: tools.js
+  `padding:24px`, L20 `margin:0`, L29 unique. Verified equivalence via preview;
+  suite green. **Lesson: grep ID-scoped rules before migrating — many inline
+  styles are redundant with existing CSS.**
+
 - **Inline-style batch 1 SHIPPED (2026-06-09).** Added the utility/token layer
   to `style_extra.css` (`.row/.col/.row-between/.wrap/.gap-*`,
   `.label-sm/.label-xs/.text-sm/.text-mono-sm`, `.text-warn/.text-error`) + the

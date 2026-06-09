@@ -87,6 +87,7 @@
    (PLANNING_inline_styles.md) migrate the markup. `.flex-row` above predates
    this and stays (gap:15px); the `.row`/`.gap-*` split below is the
    composable replacement for the many ad-hoc `display:flex` strings. */
+.flex       { display: flex; }
 .row        { display: flex; align-items: center; }
 .row-top    { display: flex; align-items: flex-start; }
 .row-between{ display: flex; align-items: center; justify-content: space-between; }

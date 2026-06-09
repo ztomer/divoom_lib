@@ -78,6 +78,19 @@ the component, not sprinkled.
    #ffcc00, error #ff4444, col→column, gap-12→12px). `.flex-row` left untouched.
 2. **`templates_tools.js` (1) + `templates_monthly_best.js` (7)** — smallest
    surface, good shakedown of the new classes.
+   **DONE 2026-06-09:** migrated monthly_best L15→`row gap-8`, L32→`flex gap-10`
+   (added a bare `.flex` utility — `.row` bakes in align-items:center which bare
+   `display:flex` must NOT). L13/L28 turned out to be **redundant** with the
+   ID-scoped `#monthly-best .card.glass-card` / `.card-body` rules (which already
+   set display:flex+column+flex:1+overflow+min-height) → deleted the redundant
+   inline rather than adding a class that couldn't out-specify the ID rule.
+   Left inline (per §2.1 exception): tools.js `padding:24px` (one-off),
+   monthly_best L20 `margin:0` (deferred reset), L29 unique flex composition.
+   Verified utilities compute exact equivalents via preview;
+   `test_monthly_best_button_visible` still green.
+   **Lesson for batches 3-5: always grep for ID-scoped rules on the element's
+   classes first — many inline styles are redundant with existing CSS, and a
+   class utility (0,1,0) loses to an ID rule (1,1,0).**
 3. **`templates_routines.js` (21).**
 4. **`templates_widgets.js` (51).**
 5. **`templates_settings.js` (58).**

@@ -6,6 +6,22 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Inline-style migration: batch 2 (monthly_best)
+
+- Migrated `templates_monthly_best.js`: `.gallery-select-actions` →
+  `row gap-8`, `.gallery-actions` → `flex gap-10`. Added a bare `.flex`
+  utility (`.row` includes align-items:center; bare display:flex must not).
+- L13/L28 inline styles were redundant with the ID-scoped
+  `#monthly-best .card.glass-card` / `.card-body` rules (already set
+  display:flex+column+flex:1+overflow+min-height) — deleted the redundant
+  inline (a class utility can't out-specify an ID rule anyway).
+- Left inline per §2.1's exception: `templates_tools.js` `padding:24px`,
+  monthly_best `margin:0` reset (L20), and the unique L29 composition.
+- Verified the utilities compute exact equivalents via preview;
+  test_monthly_best_button_visible still green. Suite 1158/75.
+
+---
+
 ## 2026-06-09 — Inline-style migration: batch 1 (utility layer)
 
 - Added the CSS utility/token layer (REVIEW §2.1 batch 1): `.row/.row-top/
