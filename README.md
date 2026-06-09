@@ -122,7 +122,7 @@ asyncio.run(main())
 
 ```bash
 make test                              # builds the native lib, then the unit suite
-python3 -m pytest -q                   # ~991 tests, no hardware needed
+python3 -m pytest -q                   # ~1260 tests, no hardware needed
 python3 -m pytest -q --run-hardware    # also BLE integration tests (needs a device)
 ```
 

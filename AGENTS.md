@@ -26,7 +26,7 @@ memory. Treat them as the source of truth; do not rely on conversation context
 surviving. (Claude Code reads `CLAUDE.md` which points here; opencode reads this
 `AGENTS.md` directly.)
 
-**Also read `docs/ENGINEERING_NOTES.md` on entry** — hard-won invariants (image
+**Also read `docs/CHANNEL_ARCHITECTURE.md` on entry** — hard-won invariants (image
 pipeline, 0x8B protocol, dual-impl anti-drift, "ACK ≠ success", when to use C).
 These are lessons paid for in real shipped bugs; don't relearn them.
 
@@ -39,9 +39,10 @@ These are lessons paid for in real shipped bugs; don't relearn them.
   + `references/divoom-refs/` (futpib, hass-divoom, …). Don't invent command
   IDs/enums — cite the source. NOTE: `references/apk/APK_INTELLIGENCE_REPORT.md`
   is a convenience summary and has been **wrong** on details — verify against the
-  decompiled source. See `docs/ENGINEERING_NOTES.md`.
-- **GUI**: PyWebView. Python bridge in `gui/gui_api.py` (+ mixins); web UI in
-  `gui/web_ui/` (modular css/js; large views live in `templates.js`).
+  decompiled source. See `docs/CHANNEL_ARCHITECTURE.md`.
+- **GUI**: PyWebView. Python bridge in `divoom_gui/api/tools.py` (+ mixins); web
+  UI in `divoom_gui/web_ui/` (modular css/js; large views live in templates per
+  domain, e.g. `alarms_editor.js`, `templates_tools.js`).
 - **Hardware**: macOS Bluetooth TCC is per responsible-process; drive real BLE
   by launching via Terminal (`open *.command`). See `docs/DEVICE_VALIDATION_PLAN.md`.
 - **Tests**: hardware tests are gated/skip by default (`tests/conftest.py`);
