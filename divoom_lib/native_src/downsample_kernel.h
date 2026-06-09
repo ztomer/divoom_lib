@@ -5,15 +5,14 @@
 #define DIVOOM_DOWNSAMPLE_KERNEL_H
 #include <stdint.h>
 
-/* PIL fixed-point precision (src/libImaging/Resample.c): 22 fractional bits,
- * half-scale bias for round-to-nearest. Shared by the kernel quantization and
- * the passes' accumulator. */
+/* PIL fixed-point precision: 22 fractional bits for kernel weights. */
 #define PRECISION_BITS   22
 #define PRECISION_SCALE  (1 << PRECISION_BITS)
 #define PRECISION_HALF   (1 << (PRECISION_BITS - 1))
 
 /* Precomputed 1-D kernel for one output coordinate (normalized, quantized to
- * int32 fixed-point). */
+ * int32 fixed-point). The weights sum to approximately PRECISION_SCALE.
+ * kernel1d_init returns the actual sum for the accumulator bias. */
 typedef struct {
     int     left;       /* leftmost input index (clamped to [0, in_size-1]) */
     int     right;      /* rightmost (inclusive) */

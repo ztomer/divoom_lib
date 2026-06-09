@@ -68,41 +68,46 @@ int kernel1d_init(Kernel1D *k, int out_coord, int in_size, int out_size) {
     k->weights = (int32_t*)malloc(sizeof(int32_t) * (size_t)k->n);
     if (!k->weights) return -1;
 
-    /* Step 1: compute un-normalized double weights and their sum. */
+    /* Step 1: compute un-normalized double weights and their quantized sum. */
     double *w_d = (double*)malloc(sizeof(double) * (size_t)k->n);
     if (!w_d) { free(k->weights); k->weights = NULL; return -1; }
-    double sum = 0.0;
+    int32_t *w_q = (int32_t*)malloc(sizeof(int32_t) * (size_t)k->n);
+    if (!w_q) { free(k->weights); k->weights = NULL; free(w_d); return -1; }
+    int64_t sum_q = 0;
     for (int i = 0; i < k->n; i++) {
         int in_idx = xmin + i;
         double w = lanczos3_kernel(
             ((double)in_idx - center + INPUT_PIXEL_CENTER) * ss
         );
         w_d[i] = w;
-        sum += w;
+        int32_t q = (int32_t)(w * (double)PRECISION_SCALE + (w >= 0.0 ? ROUND_HALF_POS : -ROUND_HALF_POS));
+        w_q[i] = q;
+        sum_q += q;
     }
 
-    /* Step 2: normalize by sum, then quantize to int32. PIL's
-     * normalize_coeffs_8bpc uses round-half-away-from-zero (different bias
-     * for positive vs negative values). LANCZOS3 has negative side-lobe
-     * weights, so this matters. The two cases are:
-     *   positive w: (int)(0.5 + w * PRECISION_SCALE)   // round-half-up
-     *   negative w: (int)(-0.5 + w * PRECISION_SCALE)  // round-half-down (away from 0)
-     * The (int) cast truncates toward zero, so the explicit sign of the
-     * bias is what determines the rounding direction. */
-    if (sum != 0.0) {
-        double inv_sum = 1.0 / sum;
+    /* Step 2: normalize quantized weights using PIL's round-half-up
+     * on the integer ratio: (w_q * PRECISION_SCALE + sum_q/2) / sum_q.
+     * For negative: -(((-w_q) * PRECISION_SCALE + sum_q/2) / sum_q).
+     * Return the actual sum of normalized weights for the accumulator bias. */
+    int64_t actual_sum = 0;
+    if (sum_q != 0) {
         for (int i = 0; i < k->n; i++) {
-            double w_norm = w_d[i] * inv_sum;
-            if (w_norm >= 0.0) {
-                k->weights[i] = (int32_t)(w_norm * (double)PRECISION_SCALE + ROUND_HALF_POS);
+            int64_t q = w_q[i];
+            int64_t half = sum_q / 2;
+            if (q >= 0) {
+                k->weights[i] = (int32_t)((q * (int64_t)PRECISION_SCALE + half) / sum_q);
             } else {
-                k->weights[i] = (int32_t)(w_norm * (double)PRECISION_SCALE - ROUND_HALF_POS);
+                k->weights[i] = (int32_t)(-(((-q) * (int64_t)PRECISION_SCALE + half) / sum_q));
             }
+            actual_sum += k->weights[i];
         }
     } else {
         for (int i = 0; i < k->n; i++) k->weights[i] = 0;
+        actual_sum = 0;
     }
+    return (int32_t)actual_sum;
 
+    free(w_q);
     free(w_d);
     return 0;
 }

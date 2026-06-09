@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
 #include "downsample_kernel.h"
 
 #if defined(__ARM_NEON) || defined(__aarch64__)
@@ -87,8 +88,10 @@ static inline uint8_t clip_u8(int v) {
 
 /* Un-premultiply scale factor: recovering R_orig from R_pre = R*A/255
  * means (R_pre * 255) / A (integer division). The scale 255 is the
- * same MULDIV255 denominator. */
+ * same MULDIV255 denominator. PIL's UNPREMULT uses (v * 255 + alpha/2) / alpha
+ * for round-half-up (adding half the divisor before integer division). */
 #define UNPREMULT_SCALE   255u
+#define UNPREMULT_HALF    127u
 
 /* PIL's rgba2rgbA un-premultiply. The full C code is:
  *   if (alpha == 255 || alpha == 0) {
@@ -99,10 +102,11 @@ static inline uint8_t clip_u8(int v) {
  *   }
  * For alpha=0 PIL keeps the pre-multiplied RGB unchanged (it can't
  * safely divide by zero). For alpha=255, the result of (255*x)/255
- * equals x, so the special case is just an optimization. */
+ * equals x, so the special case is just an optimization.
+ * Note: integer division truncates toward zero (no rounding bias). */
 static inline uint8_t unpremult(uint8_t v, uint8_t alpha) {
     if (alpha == ALPHA_TRANSPARENT || alpha == ALPHA_OPAQUE) return v;
-    unsigned r = (UNPREMULT_SCALE * (unsigned)v) / (unsigned)alpha;
+    unsigned r = ((unsigned)v * UNPREMULT_SCALE) / (unsigned)alpha;
     return r > CLIP_MAX ? CLIP_MAX : (uint8_t)r;
 }
 
@@ -192,15 +196,28 @@ static int horizontal_pass(
     int channels
 ) {
     (void)out_h_unused;
+    /* DEBUG: print kernel info for edge case 300x1->2x2 */
+    if (in_w == 300 && in_h == 1 && out_w == 2 && channels == 4) {
+        printf("DEBUG horizontal: in_w=%d in_h=%d out_w=%d channels=%d\n", in_w, in_h, out_w, channels);
+    }
     for (int ox = 0; ox < out_w; ox++) {
         Kernel1D k;
         if (kernel1d_init(&k, ox, in_w, out_w) != 0) return -1;
+        /* DEBUG: print kernel for edge case */
+        if (in_w == 300 && in_h == 1 && out_w == 2 && channels == 4) {
+            printf("DEBUG kernel ox=%d: left=%d right=%d n=%d weights=", ox, k.left, k.right, k.n);
+            for (int i = 0; i < k.n; i++) printf("%d ", k.weights[i]);
+            printf("\n");
+        }
         const int row_bytes = in_w * channels;
         for (int iy = 0; iy < in_h; iy++) {
             const uint8_t *row_base = in + iy * row_bytes;
             const int32_t *wptr = k.weights;
+            int32_t weight_sum = kernel1d_init(&k, ox, in_w, out_w);
+            if (weight_sum < 0) return -1;
+            int32_t weight_half = weight_sum / 2;
 #if DIVOOM_HAS_NEON
-            int32x4_t acc_v = vdupq_n_s32(PRECISION_HALF);
+            int32x4_t acc_v = vdupq_n_s32(weight_half);
             for (int sx = k.left; sx <= k.right; sx++) {
                 const uint8_t *p = row_base + sx * channels;
                 int32_t w = *wptr++;
@@ -225,10 +242,10 @@ static int horizontal_pass(
                 t[2] = clip_u8(a2 >> PRECISION_BITS);
             }
 #else
-            int32_t a0 = PRECISION_HALF;
-            int32_t a1 = PRECISION_HALF;
-            int32_t a2 = PRECISION_HALF;
-            int32_t a3 = PRECISION_HALF;
+            int32_t a0 = weight_half;
+            int32_t a1 = weight_half;
+            int32_t a2 = weight_half;
+            int32_t a3 = weight_half;
             for (int sx = k.left; sx <= k.right; sx++) {
                 const uint8_t *p = row_base + sx * channels;
                 int32_t w = *wptr++;
@@ -271,15 +288,36 @@ static int vertical_pass(
     int channels
 ) {
     const int row_bytes = out_w * channels;
+    /* DEBUG: print vertical kernels for edge case 16x16->8x8 */
+    if (out_w == 8 && in_h == 16 && out_h == 8 && channels == 4) {
+        printf("DEBUG vertical_pass: out_w=%d in_h=%d out_h=%d channels=%d\n", out_w, in_h, out_h, channels);
+        /* Print tmp buffer (horizontal pass output) for alpha channel */
+        printf("DEBUG tmp buffer (alpha channel, column 0):\n");
+        for (int iy = 0; iy < in_h; iy++) {
+            printf("  tmp[%d] = %d\n", iy, tmp[iy * row_bytes + 3]);
+        }
+    }
     for (int oy = 0; oy < out_h; oy++) {
         Kernel1D k;
-        if (kernel1d_init(&k, oy, in_h, out_h) != 0) return -1;
+        int32_t weight_sum = kernel1d_init(&k, oy, in_h, out_h);
+        if (weight_sum < 0) return -1;
+        int32_t weight_half = weight_sum / 2;
+        if (out_w == 8 && in_h == 16 && out_h == 8 && channels == 4) {
+            printf("DEBUG vertical kernel oy=%d: left=%d right=%d n=%d\n", oy, k.left, k.right, k.n);
+            if (k.weights) {
+                int sum = 0;
+                for (int i = 0; i < k.n; i++) sum += k.weights[i];
+                printf("  weights: ");
+                for (int i = 0; i < k.n; i++) printf("%d ", k.weights[i]);
+                printf("\n  sum=%d\n", sum);
+            }
+        }
         const int32_t *wptr_base = k.weights;
         for (int ox = 0; ox < out_w; ox++) {
             const uint8_t *col_base = tmp + ox * channels;
             const int32_t *wptr = wptr_base;
 #if DIVOOM_HAS_NEON
-            int32x4_t acc_v = vdupq_n_s32(PRECISION_HALF);
+            int32x4_t acc_v = vdupq_n_s32(weight_half);
             for (int sy = k.left; sy <= k.right; sy++) {
                 const uint8_t *p = col_base + sy * row_bytes;
                 int32_t w = *wptr++;
@@ -304,10 +342,10 @@ static int vertical_pass(
                 q[2] = clip_u8(a2 >> PRECISION_BITS);
             }
 #else
-            int32_t a0 = PRECISION_HALF;
-            int32_t a1 = PRECISION_HALF;
-            int32_t a2 = PRECISION_HALF;
-            int32_t a3 = PRECISION_HALF;
+            int32_t a0 = weight_half;
+            int32_t a1 = weight_half;
+            int32_t a2 = weight_half;
+            int32_t a3 = weight_half;
             for (int sy = k.left; sy <= k.right; sy++) {
                 const uint8_t *p = col_base + sy * row_bytes;
                 int32_t w = *wptr++;
@@ -321,6 +359,8 @@ static int vertical_pass(
             }
             uint8_t *q = out + (oy * out_w + ox) * channels;
             q[0] = clip_u8(a0 >> PRECISION_BITS);
+            q[1] = clip_u8(a1 >> PRECISION_BITS);
+            q[2] = clip_u8(a2 >> PRECISION_BITS);
             q[1] = clip_u8(a1 >> PRECISION_BITS);
             q[2] = clip_u8(a2 >> PRECISION_BITS);
             if (channels == CHANNELS_RGBA) {
