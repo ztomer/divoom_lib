@@ -62,17 +62,11 @@
   padding: 2px;
   background: rgba(255, 255, 255, 0.04);
   border-radius: 6px;
-  /* No outer border — the active pill's bg is the focus indicator. */
-  /* R18 item b: the pill bar hugs its tabs instead of stretching to the
-     window's right edge. */
   width: fit-content;
-  max-width: 100%;
-  /* R28 r2: LEFT-aligned (was centered via margin auto). Centering made the row
-     (a) not line up with the left-aligned content cards and (b) shift left/right
-     as the panel's vertical scrollbar appeared/disappeared between sub-tabs. A
-     left anchor is stable and aligns with the cards. */
-  margin-left: 0;
-  margin-right: 0;
+  /* Centered; scrollbar-gutter:stable on .tab-content.active prevents
+     horizontal shift when the vertical scrollbar appears/disappears. */
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .tabs-row .tab-btn {

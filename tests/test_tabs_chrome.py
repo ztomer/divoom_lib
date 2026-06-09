@@ -233,13 +233,13 @@ def test_channels_grid_rows_pin_tab_pane() -> None:
     assert "var(--tab-pane-gap)" in joined, "channels grid row-gap must use --tab-pane-gap"
 
 
-def test_tabs_row_is_left_aligned() -> None:
-    """The tab row is left-anchored (not margin auto), so it aligns with the
-    content cards and doesn't shift when the panel scrollbar toggles."""
+def test_tabs_row_is_centered() -> None:
+    """The tab row is centered (margin auto), with scrollbar-gutter:stable
+    on .tab-content.active preventing horizontal shift when scrollbar toggles."""
     src = TABS_CSS.read_text()
     m = re.search(r"\.tabs-row\s*\{([^}]*)\}", src)
-    assert m and "margin-left: auto" not in m.group(1), (
-        ".tabs-row must not be centered with margin auto (R28 r2)"
+    assert m and "margin-left: auto" in m.group(1), (
+        ".tabs-row should be centered with margin auto"
     )
 
 

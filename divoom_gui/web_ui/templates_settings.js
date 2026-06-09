@@ -102,9 +102,18 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                         <div class="card glass-card">
                             <div class="card-header"><h3>Device Settings</h3></div>
                             <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-                                <label class="hc-toggle"><input type="checkbox" id="hour24-toggle"> 24-hour clock</label>
-                                <label class="hc-toggle"><input type="checkbox" id="tempf-toggle"> Fahrenheit (°F)</label>
-                                <label class="hc-toggle"><input type="checkbox" id="lowpower-toggle"> Low-power mode</label>
+                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="font-size:13px; color:var(--text-main);">24-hour clock</span>
+                                    <label class="switch" style="margin:0;"><input type="checkbox" id="hour24-toggle"><span class="slider-round"></span></label>
+                                </div>
+                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="font-size:13px; color:var(--text-main);">Fahrenheit (°F)</span>
+                                    <label class="switch" style="margin:0;"><input type="checkbox" id="tempf-toggle"><span class="slider-round"></span></label>
+                                </div>
+                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="font-size:13px; color:var(--text-main);">Low-power mode</span>
+                                    <label class="switch" style="margin:0;"><input type="checkbox" id="lowpower-toggle"><span class="slider-round"></span></label>
+                                </div>
                                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                                     <span class="form-label" style="font-size:12px; min-width:96px;">Device name</span>
                                     <input type="text" id="device-name-input" class="text-input" maxlength="24" style="flex:1; min-width:140px;" placeholder="Name">
@@ -125,16 +134,19 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                         <div class="card glass-card">
                             <div class="card-header"><h3>Display</h3></div>
                             <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                                    <span class="form-label" style="font-size:12px; min-width:96px;">Orientation</span>
-                                    <select id="screen-dir-select" class="text-input" style="flex:1; min-width:120px;">
-                                        <option value="0">0° (normal)</option>
-                                        <option value="1">90°</option>
-                                        <option value="2">180°</option>
-                                        <option value="3">270°</option>
-                                    </select>
+                                <div style="margin-bottom:4px;">
+                                    <span class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Orientation</span>
+                                    <div class="tabs-row" role="tablist" id="screen-dir-tabs">
+                                        <button class="tab-btn active" data-dir="0">0°</button>
+                                        <button class="tab-btn" data-dir="1">90°</button>
+                                        <button class="tab-btn" data-dir="2">180°</button>
+                                        <button class="tab-btn" data-dir="3">270°</button>
+                                    </div>
                                 </div>
-                                <label class="hc-toggle"><input type="checkbox" id="screen-mirror-toggle"> Mirror / flip display</label>
+                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="font-size:13px; color:var(--text-main);">Mirror / flip display</span>
+                                    <label class="switch" style="margin:0;"><input type="checkbox" id="screen-mirror-toggle"><span class="slider-round"></span></label>
+                                </div>
                                 <p class="panel-hint" style="margin:0;">Orientation support is device-dependent; the exact angle mapping may vary by model.</p>
                             </div>
                         </div>

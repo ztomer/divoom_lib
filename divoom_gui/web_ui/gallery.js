@@ -240,23 +240,44 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         el.innerHTML = "";
+        const styleNames = {18: "Recommend", 3: "Cartoon", 9: "Creative", 6: "Nature"};
+        const styleOptions = [18, 3, 9, 6];
         candidates.forEach(c => {
             const row = document.createElement("div");
-            row.className = "toggle-control-bar";
-            row.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:4px 0;";
+            row.className = "sync-device-row";
+            row.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 0;";
 
             const color = window.deviceColor(c.address);
             const accent = document.createElement("span");
             accent.className = "device-accent-dot";
             accent.style.background = color;
             accent.style.boxShadow = `0 0 6px ${color}`;
-            accent.style.marginRight = "8px";
+            accent.style.marginRight = "4px";
             accent.style.flexShrink = "0";
 
             const name = document.createElement("span");
             name.className = "target-name";
-            name.style.flex = "1";
             name.textContent = c.name;
+            name.style.flex = "0 0 auto";
+
+            // Per-device gallery style tabs.
+            const styleTabs = document.createElement("div");
+            styleTabs.className = "tabs-row";
+            styleTabs.style.cssText = "flex:1; margin:0 8px;";
+            styleTabs.setAttribute("role", "tablist");
+            const currentStyle = c.gallery_style || 18;
+            styleOptions.forEach(s => {
+                const btn = document.createElement("button");
+                btn.className = "tab-btn" + (s === currentStyle ? " active" : "");
+                btn.textContent = styleNames[s];
+                btn.setAttribute("data-style", s);
+                btn.addEventListener("click", () => {
+                    styleTabs.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    persistDeviceGallery(c.address, s);
+                });
+                styleTabs.appendChild(btn);
+            });
 
             const toggle = document.createElement("label");
             toggle.className = "switch";
@@ -270,15 +291,50 @@ document.addEventListener("DOMContentLoaded", () => {
             slider.className = "slider-round";
             toggle.append(cb, slider);
 
-            row.append(accent, name, toggle);
+            row.append(accent, name, styleTabs, toggle);
             el.appendChild(row);
         });
     }
 
+    function persistDeviceGallery(address, style) {
+        // Gather all current gallery overrides and persist.
+        const rows = document.querySelectorAll("#sync-targets-list .sync-device-row");
+        const galleries = {};
+        rows.forEach(row => {
+            const cb = row.querySelector("input[type=checkbox]");
+            if (!cb) return;
+            const addr = cb.value;
+            const active = row.querySelector(".tabs-row .tab-btn.active");
+            if (active) {
+                galleries[addr] = parseInt(active.getAttribute("data-style")) || 18;
+            }
+        });
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_sync_targets) {
+            window.pywebview.api.set_sync_targets(
+                JSON.stringify(Array.from(document.querySelectorAll("#sync-targets-list input:checked")).map(i => i.value)),
+                JSON.stringify(galleries)
+            );
+        }
+    }
+
     function persistSyncTargets() {
         const checked = Array.from(document.querySelectorAll("#sync-targets-list input:checked")).map(i => i.value);
+        const rows = document.querySelectorAll("#sync-targets-list .sync-device-row");
+        const galleries = {};
+        rows.forEach(row => {
+            const cb = row.querySelector("input[type=checkbox]");
+            if (!cb) return;
+            const addr = cb.value;
+            const active = row.querySelector(".tabs-row .tab-btn.active");
+            if (active) {
+                galleries[addr] = parseInt(active.getAttribute("data-style")) || 18;
+            }
+        });
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_sync_targets) {
-            window.pywebview.api.set_sync_targets(JSON.stringify(checked));
+            window.pywebview.api.set_sync_targets(
+                JSON.stringify(checked),
+                JSON.stringify(galleries)
+            );
         }
     }
 

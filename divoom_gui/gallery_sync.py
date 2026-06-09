@@ -327,14 +327,20 @@ class GallerySyncMixin:
     def get_sync_candidates(self) -> str:
         from divoom_lib import hotchannel_config
         selected = set(hotchannel_config.get_targets())
+        cfg = hotchannel_config.load_config()
         seen, candidates = set(), []
 
         def add(address, name):
             if not address or address in seen:
                 return
             seen.add(address)
-            candidates.append({"address": address, "name": name or "Divoom Screen",
-                               "selected": address in selected})
+            candidates.append({
+                "address": address,
+                "name": name or "Divoom Screen",
+                "selected": address in selected,
+                "gallery_style": hotchannel_config.get_device_classify(cfg, address),
+                "device_name": name or "Divoom Screen",
+            })
 
         try:
             cache = Path.home() / ".config" / "divoom-control" / "discovered_devices.json"
@@ -349,11 +355,21 @@ class GallerySyncMixin:
             add(addr, None)
         return json.dumps(candidates)
 
-    def set_sync_targets(self, *addresses, **kwargs) -> bool:
+    def set_sync_targets(self, targets_json=None, galleries_json=None) -> bool:
+        """Accept JSON-string targets list and optional JSON-string galleries dict."""
         from divoom_lib import hotchannel_config
         try:
-            addrs = self._coerce_list(addresses, kwargs, "targets")
-            return hotchannel_config.set_targets([str(a) for a in addrs])
+            addrs = []
+            if targets_json and isinstance(targets_json, str):
+                parsed = json.loads(targets_json)
+                if isinstance(parsed, list):
+                    addrs = [str(a) for a in parsed]
+            ok = hotchannel_config.set_targets(addrs)
+            if galleries_json and isinstance(galleries_json, str):
+                parsed = json.loads(galleries_json)
+                if isinstance(parsed, dict):
+                    hotchannel_config.set_device_galleries(parsed)
+            return ok
         except Exception as e:
             logger.error(f"set_sync_targets failed: {e}")
             return False

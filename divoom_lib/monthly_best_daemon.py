@@ -187,6 +187,12 @@ async def main_async():
         # None => fall back to name-based discovery (existing behavior).
         targets = [args.address] if args.address else [None]
 
+    # Group targets by gallery style so we fetch once per unique classify.
+    targets_per_classify: dict[int, list[str]] = {}
+    for t in targets:
+        dc = hotchannel_config.get_device_classify(hc_cfg, t)
+        targets_per_classify.setdefault(dc, []).append(t)
+
     # Load credentials
     print_info("Loading credentials from divoom_auth...")
     try:
@@ -213,122 +219,107 @@ async def main_async():
     scratch_dir.mkdir(parents=True, exist_ok=True)
 
     while True:
-        print_info("Querying Divoom community gallery API...")
-        body = {
-            "Command": "GetCategoryFileListV2",
-            "Token": creds.token,
-            "UserId": creds.user_id,
-            "DeviceId": device_id,
-            "Classify": classify,
-            "FileSort": 1,   # Popular
-            "FileType": 5,   # All
-            "FileSize": 127, # All sizes
-            "Version": 19,
-            "StartNum": 1,
-            "EndNum": args.limit * 2,  # Fetch slightly more in case some download fail
-            "RefreshIndex": 0
-        }
-        if device_pw:
-            body["DevicePassword"] = device_pw
-
-        url = f"{BASE_URL}/GetCategoryFileListV2"
-        payload = json.dumps(body).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=payload,
-            headers={
-                "Content-Type": "application/json; charset=utf-8",
-                "Connection": "close",
-                "User-Agent": "okhttp/4.12.0",
-            },
-            method="POST"
-        )
-
-        items_to_display = []
-
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-                if resp_data.get("ReturnCode") != 0:
-                    print_err(f"GetCategoryFileListV2 failed: RC={resp_data.get('ReturnCode')} msg={resp_data.get('ReturnMessage')}")
-                    if not args.loop:
-                        sys.exit(1)
-                else:
-                    file_list = resp_data.get("FileList", [])
-                    print_ok(f"Found {len(file_list)} items in the gallery.")
-                    
-                    # Select and download the top popular items up to limit
-                    downloaded_count = 0
-                    for item in file_list:
-                        if downloaded_count >= args.limit:
-                            break
-                        
-                        file_id = item.get("FileId")
-                        file_name = item.get("FileName", "unnamed")
-                        file_type = item.get("FileType")
-                        
-                        if not file_id:
-                            continue
-                            
-                        print_info(f"Downloading {file_name!r} ({file_id})...")
-                        dl_url = f"https://fin.divoom-gz.com/{file_id}"
-                        try:
-                            d_req = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
-                            with urllib.request.urlopen(d_req, timeout=10) as d_resp:
-                                file_bytes = d_resp.read()
-                                if len(file_bytes) < 4:
-                                    continue
-                                    
-                                magic = file_bytes[0]
-                                print_ok(f"Downloaded {len(file_bytes)} bytes. Magic: {magic} (hex: {hex(magic)})")
-                                
-                                # Process magic bytes
-                                extracted_gif = extract_gif_from_magic_43(file_bytes)
-                                if extracted_gif:
-                                    print_ok("Extracted valid GIF from Magic 43 payload.")
-                                    gif_path = scratch_dir / f"extracted_{downloaded_count}.gif"
-                                    gif_path.write_bytes(extracted_gif)
-                                    items_to_display.append({"type": "gif", "path": str(gif_path), "name": file_name})
-                                elif file_bytes.startswith(b"GIF89a") or file_bytes.startswith(b"GIF87a"):
-                                    print_ok("Identified as direct standard GIF.")
-                                    gif_path = scratch_dir / f"direct_{downloaded_count}.gif"
-                                    gif_path.write_bytes(file_bytes)
-                                    items_to_display.append({"type": "gif", "path": str(gif_path), "name": file_name})
-                                else:
-                                    # Native Divoom BIN file
-                                    print_info("Identified as Divoom-native pre-compiled binary format.")
-                                    bin_path = scratch_dir / f"native_{downloaded_count}.bin"
-                                    bin_path.write_bytes(file_bytes)
-                                    items_to_display.append({"type": "bin", "path": str(bin_path), "name": file_name, "bytes": file_bytes})
-                                    
-                                downloaded_count += 1
-                        except Exception as dl_err:
-                            print_wrn(f"Failed to download {file_name!r}: {dl_err}")
-        except Exception as api_err:
-            print_err(f"Gallery query failed: {api_err}")
-            if not args.loop:
-                sys.exit(1)
-
-        print_ok(f"Preparation complete. Downloaded {len(items_to_display)} files successfully.")
-
-        if args.dry_run:
-            print_ok("Dry run enabled. Skipping physical BLE connection.")
-
+        # Push per-classify group — each group fetches and pushes its own set.
+        if args.use_config and targets_per_classify:
+            for classify, group_targets in targets_per_classify.items():
+                print_info(f"Querying Divoom community gallery API (classify={classify})...")
+                _items = await _fetch_and_download(classify, args, creds, device_id, device_pw, scratch_dir, logger)
+                if _items and not args.dry_run:
+                    for target in group_targets:
+                        await _push_items_to_target(target, args.name, _items, logger)
         else:
-            # Physical BLE display execution
-            if len(items_to_display) == 0:
-                print_wrn("No items downloaded to display.")
-            elif not targets:
-                print_wrn("No target devices configured; skipping push this cycle.")
-            else:
-                # Push the monthly-best set to every selected target (4.b/4.d).
+            # Legacy single-classify mode.
+            print_info("Querying Divoom community gallery API...")
+            _items = await _fetch_and_download(classify, args, creds, device_id, device_pw, scratch_dir, logger)
+            if _items and not args.dry_run:
                 for target in targets:
-                    await _push_items_to_target(target, args.name, items_to_display, logger)
+                    await _push_items_to_target(target, args.name, _items, logger)
 
         if not args.loop:
             break
         print_info(f"Sleeping for {interval} seconds until the next cycle...")
         await asyncio.sleep(interval)
+
+
+async def _fetch_and_download(classify, args, creds, device_id, device_pw, scratch_dir, logger) -> list:
+    """Fetch gallery items for a given classify and download them.
+    Returns a list of item dicts (type, path, name, bytes)."""
+    body = {
+        "Command": "GetCategoryFileListV2",
+        "Token": creds.token,
+        "UserId": creds.user_id,
+        "DeviceId": device_id,
+        "Classify": classify,
+        "FileSort": 1,
+        "FileType": 5,
+        "FileSize": 127,
+        "Version": 19,
+        "StartNum": 1,
+        "EndNum": args.limit * 2,
+        "RefreshIndex": 0
+    }
+    if device_pw:
+        body["DevicePassword"] = device_pw
+
+    url = f"{BASE_URL}/GetCategoryFileListV2"
+    payload = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Connection": "close",
+            "User-Agent": "okhttp/4.12.0",
+        },
+        method="POST"
+    )
+
+    items_to_display = []
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            if resp_data.get("ReturnCode") != 0:
+                print_err(f"GetCategoryFileListV2 (classify={classify}) failed: RC={resp_data.get('ReturnCode')} msg={resp_data.get('ReturnMessage')}")
+                return items_to_display
+            file_list = resp_data.get("FileList", [])
+            print_ok(f"Found {len(file_list)} items (classify={classify}).")
+
+            downloaded_count = 0
+            for item in file_list:
+                if downloaded_count >= args.limit:
+                    break
+                file_id = item.get("FileId")
+                file_name = item.get("FileName", "unnamed")
+                if not file_id:
+                    continue
+                print_info(f"Downloading {file_name!r} ({file_id})...")
+                dl_url = f"https://fin.divoom-gz.com/{file_id}"
+                try:
+                    d_req = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
+                    with urllib.request.urlopen(d_req, timeout=10) as d_resp:
+                        file_bytes = d_resp.read()
+                        if len(file_bytes) < 4:
+                            continue
+                        magic = file_bytes[0]
+                        extracted_gif = extract_gif_from_magic_43(file_bytes)
+                        if extracted_gif:
+                            gif_path = scratch_dir / f"extracted_{downloaded_count}.gif"
+                            gif_path.write_bytes(extracted_gif)
+                            items_to_display.append({"type": "gif", "path": str(gif_path), "name": file_name})
+                        elif file_bytes.startswith(b"GIF89a") or file_bytes.startswith(b"GIF87a"):
+                            gif_path = scratch_dir / f"direct_{downloaded_count}.gif"
+                            gif_path.write_bytes(file_bytes)
+                            items_to_display.append({"type": "gif", "path": str(gif_path), "name": file_name})
+                        else:
+                            bin_path = scratch_dir / f"native_{downloaded_count}.bin"
+                            bin_path.write_bytes(file_bytes)
+                            items_to_display.append({"type": "bin", "path": str(bin_path), "name": file_name, "bytes": file_bytes})
+                        downloaded_count += 1
+                except Exception as dl_err:
+                    print_wrn(f"Failed to download {file_name!r}: {dl_err}")
+    except Exception as api_err:
+        print_err(f"Gallery query (classify={classify}) failed: {api_err}")
+    return items_to_display
 
 
 async def _push_items_to_target(target_addr, name_substring, items_to_display, logger):

@@ -10,7 +10,8 @@ Stored at ``~/.config/divoom-control/hotchannel.json``:
       "enabled": false,        # whether the scheduled daemon should run
       "interval": 3600,        # seconds between automatic sync cycles
       "classify": 18,          # Divoom gallery classification id (18 = Recommend)
-      "targets": ["AA:BB:CC:DD:EE:FF", "LAN:192.168.1.50"]  # device addresses
+      "targets": ["AA:BB:CC:DD:EE:FF", "LAN:192.168.1.50"],  # device addresses
+      "device_galleries": {"AA:BB:CC:DD:EE:FF": 9, "LAN:192.168.1.50": 18}  # per-device gallery style
     }
 """
 
@@ -28,6 +29,7 @@ DEFAULTS = {
     "interval": 3600,
     "classify": 18,
     "targets": [],
+    "device_galleries": {},
 }
 
 # Guardrails.
@@ -84,6 +86,22 @@ def get_targets() -> list[str]:
     return load_config()["targets"]
 
 
+def get_device_classify(cfg: dict, address: str) -> int:
+    """Return the per-device gallery style, falling back to global classify."""
+    per_device = cfg.get("device_galleries") or {}
+    if address in per_device:
+        try:
+            return int(per_device[address])
+        except (TypeError, ValueError):
+            pass
+    return cfg.get("classify", DEFAULTS["classify"])
+
+
+def set_device_galleries(galleries: dict) -> bool:
+    """Persist per-device gallery style overrides."""
+    return save_config({"device_galleries": galleries})
+
+
 def _normalize(cfg: dict) -> dict:
     """Coerce/validate fields so callers and the daemon get safe values."""
     out = dict(DEFAULTS)
@@ -108,4 +126,12 @@ def _normalize(cfg: dict) -> dict:
             seen.add(t)
             clean.append(t)
     out["targets"] = clean
+    # Per-device gallery styles.
+    dg = out.get("device_galleries") or {}
+    if not isinstance(dg, dict):
+        dg = {}
+    out["device_galleries"] = {
+        k: int(v) for k, v in dg.items()
+        if isinstance(k, str) and k.strip()
+    }
     return out

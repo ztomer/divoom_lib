@@ -190,9 +190,9 @@ def test_routines_panel_content_exists():
     )
     # The form elements must exist.
     assert 'id="routines-auto-sync-enabled"' in src, "Missing routines-auto-sync-enabled toggle"
-    assert 'id="routines-gallery-tabs"' in src, "Missing routines-gallery-tabs"
     assert 'id="routines-interval-tabs"' in src, "Missing routines-interval-tabs"
     assert 'id="sync-all-btn"' in src, "Missing sync-all-btn"
+    assert 'id="sync-targets-list"' in src, "Missing sync-targets-list"
 
 
 def test_settings_js_wires_routines_form():
@@ -447,7 +447,7 @@ def test_r9_display_card_exists():
     in Settings → Devices (moved there in R12 Phase 7). R15 §4: factory reset
     moved to its own Danger zone card."""
     src = TEMPLATES_JS
-    assert 'id="screen-dir-select"' in src, "Display card missing orientation <select>."
+    assert 'id="screen-dir-tabs"' in src, "Display card missing orientation tabs."
     assert 'id="screen-mirror-toggle"' in src, "Display card missing mirror toggle."
     # R15 §4: factory reset moved out of the Display card into its own
     # Danger zone card — both must still be present, just not nested.

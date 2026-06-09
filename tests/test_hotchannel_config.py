@@ -20,7 +20,7 @@ def cfg_path(tmp_path, monkeypatch):
 
 def test_defaults_when_missing(cfg_path):
     cfg = hc.load_config()
-    assert cfg == {"enabled": False, "interval": 3600, "classify": 18, "targets": []}
+    assert cfg == {"enabled": False, "interval": 3600, "classify": 18, "targets": [], "device_galleries": {}}
 
 
 def test_save_and_reload(cfg_path):

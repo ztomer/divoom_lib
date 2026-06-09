@@ -183,7 +183,8 @@ def main():
         resizable=True,
         frameless=True,  # Integrated custom Appbar
         easy_drag=False,
-        background_color="#0a0b10"
+        background_color="#0a0b10",
+        min_size=(1050, 400),
     )
     api.window = window
     # R24: spawn the daemon EAGERLY, BEFORE webview.start(), so it's ready when

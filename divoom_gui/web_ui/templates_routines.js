@@ -20,16 +20,6 @@ window.DivoomTemplates.routines = `
                     </label>
                 </div>
                 <div class="card-body">
-                    <div style="margin-bottom:14px;">
-                        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;">Gallery style</label>
-                        <div class="tabs-row" role="tablist" id="routines-gallery-tabs">
-                            <button class="tab-btn active" data-style="18">Recommend</button>
-                            <button class="tab-btn" data-style="3">Cartoon</button>
-                            <button class="tab-btn" data-style="9">Creative</button>
-                            <button class="tab-btn" data-style="6">Nature</button>
-                        </div>
-                    </div>
-
                     <div id="sync-targets-list" class="sync-targets-list" style="margin-bottom:14px;"></div>
 
                     <div style="margin-bottom:14px;">

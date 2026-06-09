@@ -42,17 +42,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // Auto-save on any change.
     document.getElementById("routines-auto-sync-enabled")?.addEventListener("change", saveSchedule);
     document.addEventListener("click", (e) => {
-        const btn = e.target.closest("#routines-gallery-tabs .tab-btn");
-        if (!btn) return;
-        document.querySelectorAll("#routines-gallery-tabs .tab-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        const val = parseInt(btn.getAttribute("data-style")) || 18;
-        if (window.pywebview?.api?.set_gallery_style) {
-            window.pywebview.api.set_gallery_style("", val);
-        }
-        saveSchedule();
-    });
-    document.addEventListener("click", (e) => {
         const intervalBtn = e.target.closest("#routines-interval-tabs .tab-btn");
         if (intervalBtn) {
             document.querySelectorAll("#routines-interval-tabs .tab-btn").forEach(b => b.classList.remove("active"));
@@ -213,10 +202,13 @@ document.addEventListener("DOMContentLoaded", () => {
     wireToggle("lowpower-toggle", "set_low_power");
     wireToggle("screen-mirror-toggle", "set_screen_mirror");
 
-    // Display orientation (0-3 = 0/90/180/270°).
-    const dirSel = document.getElementById("screen-dir-select");
-    if (dirSel) dirSel.addEventListener("change", () => {
-        if (dev()) api()?.set_screen_dir?.(parseInt(dirSel.value) || 0)
+    // Display orientation (0-3 = 0/90/180/270°) via tab selector.
+    document.addEventListener("click", (e) => {
+        const dirBtn = e.target.closest("#screen-dir-tabs .tab-btn");
+        if (!dirBtn) return;
+        document.querySelectorAll("#screen-dir-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+        dirBtn.classList.add("active");
+        if (dev()) api()?.set_screen_dir?.(parseInt(dirBtn.getAttribute("data-dir")) || 0)
             .then(r => toast(r, "Orientation set"));
     });
 
