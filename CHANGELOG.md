@@ -16,6 +16,16 @@ shipped milestone (per the project planning docs).
 - `sync_hot_channel` now returns a per-file `errors` map (reason strings)
   alongside `synced`/`failed`, via the shared `_sync_artwork_detailed` core.
 
+### Changed — APK-aligned device-driven 0x8b upload (§1b)
+
+- Audited the chunked animation upload against the decompiled official APK.
+  Wire format confirmed identical; the FLOW diverged: the APK waits for the
+  device's "send the animation" ACK after START and serves per-chunk retransmit
+  requests, while we slept 0.5s and blasted. `stream_animation_8b` now does both
+  on BLE (with graceful fallback to the legacy sleeps when the device doesn't
+  respond), and `stream_raw_bin_payload` delegates to it instead of duplicating
+  the streamer. Full comparison in `docs/CHANNEL_ARCHITECTURE.md` (0x8b section).
+
 ### Added — connect pulse + Routines UI (§2-§4)
 
 - **Device dots pulse while connecting** — the clicked sidebar device dot gets

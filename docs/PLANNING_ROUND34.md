@@ -123,5 +123,17 @@ empty-slot predicate + debounce wiring if feasible in the JS-guard style.
   as get_alarms fallback (task #20 read-back flakiness). Editor split into
   `web_ui/alarms_editor.js` (500-LOC rule). Preview-verified: empty-slot hiding,
   bitmask mapping, add/remove/clear, debounce (3 changes → 1 write).
-- Suite 1182 / 0 / 75. Remaining: hardware re-test of hot-channel sync by the
-  user (daemon log will now show the truth).
+- **§1b SHIPPED** (`5f419002`) — APK comparison done (user: "do it now").
+  Wire format CONFIRMED identical (start `[0][len:4]`, data
+  `[1][len:4][idx:2][≤256]`, 256-byte chunks). Flow DIVERGED: the APK is
+  device-driven — it waits for the device's 0x8b "send the animation" ACK after
+  START and serves `[1][idx]` retransmit requests (`bluetooth/s.java` →
+  `startSendAllAni`/`resendBlueData`); we slept 0.5s and blasted, ignoring
+  retransmits. Now aligned on BLE with graceful fallback to the legacy sleeps;
+  `stream_raw_bin_payload` deduplicated into `stream_animation_8b` so the GIF +
+  raw-bin paths share the one streamer. Full comparison table in
+  `docs/CHANNEL_ARCHITECTURE.md` (new 0x8b section). +3 tests.
+- Suite 1185 / 0 / 75. Remaining: hardware re-test of hot-channel sync by the
+  user — both the read-timeout fix (§1) and the ACK/retransmit alignment (§1b)
+  land together; the daemon log (`/tmp/divoom_daemon.log`) now shows ACK and
+  retransmit activity per upload.

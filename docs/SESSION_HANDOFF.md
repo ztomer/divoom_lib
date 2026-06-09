@@ -18,6 +18,15 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R34 §1b SHIPPED (2026-06-09) — APK-aligned 0x8b upload flow.** (`5f419002`)
+  Compared our chunked upload against the decompiled APK: wire format identical;
+  flow diverged (APK is device-driven). `stream_animation_8b` now waits for the
+  device's "send it" ACK after START (3s, falls back to legacy 0.5s sleep) and
+  serves `[1][idx]` retransmit requests until quiet; `stream_raw_bin_payload`
+  deduplicated into it. Comparison documented in `docs/CHANNEL_ARCHITECTURE.md`
+  (new 0x8b section). Suite **1185/75/0**. Hardware re-test of hot-channel sync
+  still pending (now carries §1 timeout fix + §1b together).
+
 - **R34 SHIPPED (2026-06-09) — hot-channel sync fix + Routines polish.**
   Plan + outcomes: `docs/PLANNING_ROUND34.md`. Suite **1182/75/0**.
   - §1 (`ade3c0cc`): hot-channel "failed to upload" was the client read timeout
