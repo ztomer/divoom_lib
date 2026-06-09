@@ -5,93 +5,63 @@ document.addEventListener("DOMContentLoaded", () => {
     // (get_hot_channel_config / save_hot_channel_config) are unchanged
     // — the config key in `hotchannel_config.json` is also unchanged
     // for backward compat with running daemons.
+    function saveSchedule() {
+        const enabled = document.getElementById("routines-auto-sync-enabled")?.checked || false;
+        const interval = parseInt(document.querySelector("#routines-interval-tabs .tab-btn.active")?.getAttribute("data-interval")) || 3600;
+        if (window.pywebview?.api?.save_hot_channel_config) {
+            window.pywebview.api.save_hot_channel_config(JSON.stringify({ enabled, interval })).then(ok => {
+                const st = document.getElementById("routines-auto-sync-status");
+                if (st) st.textContent = ok ? (enabled ? "Auto-sync on" : "Auto-sync off") : "Failed to save";
+            });
+        }
+    }
+
     window.loadRoutinesAutoSync = function() {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.get_hot_channel_config) {
             window.pywebview.api.get_hot_channel_config().then(json => {
                 try {
                     const cfg = JSON.parse(json);
                     const en = document.getElementById("routines-auto-sync-enabled");
-                    const iv = document.getElementById("routines-auto-sync-interval");
                     if (en) en.checked = !!cfg.enabled;
-                    if (iv) iv.value = String(cfg.interval);
+                    // Activate matching interval tab.
+                    const iv = String(cfg.interval || 3600);
+                    document.querySelectorAll("#routines-interval-tabs .tab-btn").forEach(b => {
+                        b.classList.toggle("active", b.getAttribute("data-interval") === iv);
+                    });
                 } catch (e) { /* ignore */ }
             });
         }
-        // R32 §A1: the devices panel now lives in this card — refresh it.
         if (window.updateSyncTargetList) window.updateSyncTargetList();
-        // R32 §A2+§B: populate the per-device gallery-style selector.
-        populateRoutinesDevices();
-    }
-
-    // R32 §B: the device dropdown is the per-device gallery-style picker.
-    // "All devices" maps to the global default style.
-    function populateRoutinesDevices() {
-        const sel = document.getElementById("routines-device-select");
-        if (!sel) return;
-        const prev = sel.value;
-        sel.innerHTML = '<option value="">All devices</option>';
-        (window.DivoomState.discoveredDevices || []).forEach(d => {
-            const opt = document.createElement("option");
-            opt.value = d.address; opt.textContent = d.name;
-            sel.appendChild(opt);
-        });
-        (window.DivoomState.registeredLanDevices || []).forEach(d => {
-            const opt = document.createElement("option");
-            opt.value = `LAN:${d.ip}`; opt.textContent = d.ip;
-            sel.appendChild(opt);
-        });
-        if (prev) sel.value = prev;
-        loadRoutinesGalleryStyle();
-    }
-
-    function loadRoutinesGalleryStyle() {
-        const addr = document.getElementById("routines-device-select")?.value || "";
-        const style = document.getElementById("routines-gallery-style");
-        if (style && window.pywebview?.api?.get_gallery_style) {
-            window.pywebview.api.get_gallery_style(addr).then(v => {
-                if (v !== null && v !== undefined) style.value = String(v);
+        // Update gallery style selector per current selection.
+        if (window.pywebview?.api?.get_gallery_style) {
+            window.pywebview.api.get_gallery_style("").then(v => {
+                const style = document.getElementById("routines-gallery-style");
+                if (style && v !== null && v !== undefined) style.value = String(v);
             });
         }
     }
 
-    const routinesDeviceSel = document.getElementById("routines-device-select");
-    if (routinesDeviceSel) routinesDeviceSel.addEventListener("change", loadRoutinesGalleryStyle);
-
-    const routinesStyleSel = document.getElementById("routines-gallery-style");
-    if (routinesStyleSel) {
-        routinesStyleSel.addEventListener("change", () => {
-            const addr = document.getElementById("routines-device-select")?.value || "";
-            if (window.pywebview?.api?.set_gallery_style) {
-                window.pywebview.api.set_gallery_style(addr, parseInt(routinesStyleSel.value) || 18);
-                window.showToast("Gallery style saved", "success");
-            }
-        });
-    }
-
-    const routinesSaveBtn = document.getElementById("routines-auto-sync-save");
-    if (routinesSaveBtn) {
-        routinesSaveBtn.addEventListener("click", () => {
-            const enabled = document.getElementById("routines-auto-sync-enabled")?.checked || false;
-            const interval = parseInt(document.getElementById("routines-auto-sync-interval")?.value) || 3600;
-            window.pywebview.api.save_hot_channel_config(JSON.stringify({ enabled, interval })).then(ok => {
-                const st = document.getElementById("routines-auto-sync-status");
-                if (st) st.textContent = ok ? (enabled ? "Saved — auto-sync on" : "Saved — auto-sync off") : "Failed to save";
-                window.showToast(ok ? "Schedule saved" : "Failed to save schedule", ok ? "success" : "error");
-            });
-        });
-    }
-
-    // Load the routines form when the Settings tab is opened OR when
-    // the Routines sub-tab is selected.
-    window.addEventListener("tab-changed", (e) => {
-        if (e.detail && e.detail.tab === "settings") {
-            setTimeout(window.loadRoutinesAutoSync, 0);
+    // Auto-save on any change.
+    document.getElementById("routines-auto-sync-enabled")?.addEventListener("change", saveSchedule);
+    document.getElementById("routines-gallery-style")?.addEventListener("change", () => {
+        const val = parseInt(document.getElementById("routines-gallery-style")?.value) || 18;
+        if (window.pywebview?.api?.set_gallery_style) {
+            window.pywebview.api.set_gallery_style("", val);
         }
+        saveSchedule();
     });
     document.addEventListener("click", (e) => {
-        // R15 §1+§7: `.settings-tab-btn` → `.tab-btn[data-settings-tab]`
-        const btn = e.target.closest(".tab-btn[data-settings-tab]");
-        if (btn && btn.getAttribute("data-settings-tab") === "settings-routines") {
+        const intervalBtn = e.target.closest("#routines-interval-tabs .tab-btn");
+        if (intervalBtn) {
+            document.querySelectorAll("#routines-interval-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+            intervalBtn.classList.add("active");
+            saveSchedule();
+        }
+    });
+
+    // Load the routines form when the Routines tab is opened.
+    window.addEventListener("tab-changed", (e) => {
+        if (e.detail && e.detail.tab === "routines") {
             setTimeout(window.loadRoutinesAutoSync, 0);
         }
     });
@@ -125,10 +95,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function ensureAlarms() { if (!alarmsRendered) renderAlarmRows([]); }
 
-    // Alarms/Sleep/Tools now live in the Tools sidebar tab — render the alarm
-    // rows when that tab is opened.
+    // Alarms/Sleep/Tools now live in the Routines tab — render the alarm
+    // rows when that tab is opened, and auto-fetch from the connected device.
+    function fetchAlarms() {
+        window.pywebview?.api?.get_alarms?.().then(json => {
+            try { renderAlarmRows(JSON.parse(json)); } catch (e) { renderAlarmRows([]); }
+        });
+    }
     window.addEventListener("tab-changed", (e) => {
-        if (e.detail && e.detail.tab === "tools") setTimeout(ensureAlarms, 0);
+        if (e.detail && e.detail.tab === "routines") {
+            setTimeout(ensureAlarms, 0);
+            setTimeout(fetchAlarms, 50);
+        }
     });
     document.addEventListener("click", (e) => {
         const saveBtn = e.target.closest(".alarm-save");
@@ -145,14 +123,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.showToast(res ? `Alarm ${idx + 1} saved` : "Failed to save alarm", res ? "success" : "error", " BLE"));
         }
     });
-    const alarmsRefreshBtn = document.getElementById("alarms-refresh-btn");
-    if (alarmsRefreshBtn) {
-        alarmsRefreshBtn.addEventListener("click", () => {
-            window.pywebview?.api?.get_alarms?.().then(json => {
-                try { renderAlarmRows(JSON.parse(json)); } catch (e) { renderAlarmRows([]); }
-            });
-        });
-    }
+    // Also fetch alarms when the Time sub-tab is clicked within Routines.
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".tab-btn[data-routines-tab]");
+        if (btn && btn.getAttribute("data-routines-tab") === "routines-time") {
+            setTimeout(fetchAlarms, 50);
+        }
+    });
 
     // ── Round 7: Sleep Aid ─────────────────────────────────────────────
     const sleepVol = document.getElementById("sleep-volume");
@@ -206,6 +183,17 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll(".tools-subtab-content").forEach(c => c.classList.remove("active"));
         btn.classList.add("active");
         const target = document.getElementById(btn.getAttribute("data-tools-tab"));
+        if (target) target.classList.add("active");
+    });
+
+    // ── R33: Routines sub-tab nav ──
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".tab-btn[data-routines-tab]");
+        if (!btn) return;
+        document.querySelectorAll(".tab-btn[data-routines-tab]").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".routines-subtab-content").forEach(c => c.classList.remove("active"));
+        btn.classList.add("active");
+        const target = document.getElementById(btn.getAttribute("data-routines-tab"));
         if (target) target.classList.add("active");
     });
 
@@ -397,28 +385,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ── R15 §5: MCP server toggle ────────────────────────────────
-    const mcpStartBtn = document.getElementById("mcp-start-btn");
-    const mcpStopBtn = document.getElementById("mcp-stop-btn");
-    const mcpStatusPill = document.getElementById("mcp-status-pill");
+    const mcpToggle = document.getElementById("mcp-toggle");
     const mcpStatusDetail = document.getElementById("mcp-status-detail");
     const mcpLog = document.getElementById("mcp-log");
 
     function renderMcpStatus(s) {
         if (!s) return;
         const running = !!s.running;
-        if (mcpStatusPill) {
-            mcpStatusPill.textContent = running ? "running" : "stopped";
-            mcpStatusPill.dataset.state = running ? "ok" : "idle";
-        }
+        if (mcpToggle) mcpToggle.checked = running;
         if (mcpStatusDetail) {
-            mcpStatusDetail.textContent = s.pid ? `PID: ${s.pid}  mac: ${s.mac || "--"}` : "PID: --";
+            mcpStatusDetail.textContent = running
+                ? (s.pid ? `PID: ${s.pid}  mac: ${s.mac || "--"}` : "running")
+                : "stopped";
         }
         if (mcpLog) {
             const lines = Array.isArray(s.last_log_lines) ? s.last_log_lines : [];
             mcpLog.textContent = lines.length ? lines.join("\n") : "No log entries yet.";
         }
-        if (mcpStartBtn) mcpStartBtn.disabled = running;
-        if (mcpStopBtn) mcpStopBtn.disabled = !running;
     }
 
     function refreshMcpStatus() {
@@ -426,20 +409,31 @@ document.addEventListener("DOMContentLoaded", () => {
         Promise.resolve(api().mcp_server_status()).then(s => renderMcpStatus(s));
     }
 
-    if (mcpStartBtn) {
-        mcpStartBtn.addEventListener("click", () => {
-            if (!api()?.start_mcp_server) return;
-            mcpStartBtn.disabled = true;
-            Promise.resolve(api().start_mcp_server("")).then(s => renderMcpStatus(s));
+    if (mcpToggle) {
+        mcpToggle.addEventListener("change", () => {
+            if (mcpToggle.checked) {
+                if (!api()?.start_mcp_server) return;
+                mcpToggle.disabled = true;
+                Promise.resolve(api().start_mcp_server("")).then(s => {
+                    mcpToggle.disabled = false;
+                    renderMcpStatus(s);
+                });
+            } else {
+                if (!api()?.stop_mcp_server) return;
+                mcpToggle.disabled = true;
+                Promise.resolve(api().stop_mcp_server()).then(s => {
+                    mcpToggle.disabled = false;
+                    renderMcpStatus(s);
+                });
+            }
         });
     }
-    if (mcpStopBtn) {
-        mcpStopBtn.addEventListener("click", () => {
-            if (!api()?.stop_mcp_server) return;
-            mcpStopBtn.disabled = true;
-            Promise.resolve(api().stop_mcp_server()).then(s => renderMcpStatus(s));
-        });
-    }
+    // Refresh status on tab activation.
+    window.addEventListener("tab-changed", (e) => {
+        if (e.detail && e.detail.tab === "settings") {
+            setTimeout(refreshMcpStatus, 0);
+        }
+    });
     // Refresh on tab activation only — no background polling. The
     // status card shows current state on entry; it updates after
     // Start/Stop click. If the subprocess dies between activations,

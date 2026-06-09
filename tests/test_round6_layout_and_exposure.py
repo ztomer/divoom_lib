@@ -50,7 +50,9 @@ TEMPLATES_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js",
 ])
+ROUTINES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js"
 
 SETTINGS_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "settings_hardware.js",
@@ -74,10 +76,9 @@ CHANNELS_JS = _cat([
 
 
 def test_monthly_best_devices_panel_moved_to_routines():
-    """R32 §A1: the Monthly Best devices panel (sync-targets list) moved to
-    Settings → Routines. Monthly Best is now a single full-width gallery card
-    with no embedded device list, and #sync-targets-list lives in the
-    Routines sub-tab instead."""
+    """R32 §A1 + R33: the Monthly Best devices panel (sync-targets list) moved
+    to Routines (now its own top-level panel). Monthly Best is a single
+    full-width gallery card with no embedded device list."""
     src = TEMPLATES_JS
     mb_match = re.search(
         r'<div class="monthly-best-layout">(.*?)</div>\s*`;',
@@ -87,16 +88,12 @@ def test_monthly_best_devices_panel_moved_to_routines():
     block = mb_match.group(1)
     assert "sync-targets-list" not in block, (
         "Monthly Best still embeds the sync-targets-list — it moved to "
-        "Settings → Routines (R32 §A1)."
+        "Routines (R32 §A1)."
     )
-    # The devices list now lives in the Routines sub-tab.
-    routines = re.search(
-        r'<div class="settings-tab-content" id="settings-routines">(.+?)`;',
-        src, re.DOTALL,
-    )
-    assert routines is not None, "settings-routines block not found"
-    assert 'id="sync-targets-list"' in routines.group(1), (
-        "Routines sub-tab should host the moved sync-targets-list (R32 §A1)."
+    # The devices list now lives in the Routines panel.
+    routines = ROUTINES_JS.read_text()
+    assert 'id="sync-targets-list"' in routines, (
+        "Routines panel should host the moved sync-targets-list (R32 §A1)."
     )
 
 
@@ -174,53 +171,41 @@ def test_target_addr_css_class_removed():
 # ──────────────────────────────────────────────────────────────────
 
 
-def test_settings_has_routines_subtab():
-    """The Settings tab nav must include a 'Routines' sub-tab.
-    (R15 §1+§7: `.settings-tab-btn` is now `.tab-btn`.)"""
-    src = TEMPLATES_JS
-    assert re.search(
-        r'<button class="tab-btn"[^>]*data-settings-tab="settings-routines"[^>]*>'
-        r'(?:\s*<svg.*?</svg>)?\s*Routines\s*</button>',
-        src, re.DOTALL,
-    ), "Settings tab nav is missing the Routines sub-tab button."
 
-
-def test_routines_subtab_content_exists():
-    """The #settings-routines sub-tab content block must exist with
-    the new 'Auto-Sync Gallery' card (renamed from Hot-Channel Schedule)."""
-    src = TEMPLATES_JS
-    assert '<div class="settings-tab-content" id="settings-routines">' in src, (
-        "settings-routines sub-tab content block not found in templates.js"
+def test_routines_panel_content_exists():
+    """R33: the Routines panel (own top-level panel) must exist with
+    the 'Auto-Sync Gallery' card (renamed from Hot-Channel Schedule)."""
+    src = ROUTINES_JS.read_text()
+    assert "DivoomTemplates.routines" in src, (
+        "routines template not found"
     )
-    m = re.search(
-        r'<div class="settings-tab-content" id="settings-routines">(.+?)</div>\s*</div>\s*</div>\s*</div>',
-        src, re.DOTALL,
-    )
-    assert m is not None, "Could not locate Routines sub-tab block"
-    block = m.group(1)
-    assert "Auto-Sync Gallery" in block, (
-        "Routines sub-tab should be titled 'Auto-Sync Gallery' "
+    assert "Auto-Sync Gallery" in src, (
+        "Routines panel should be titled 'Auto-Sync Gallery' "
         "(user picked this over 'Hot-Channel Schedule' in planning doc §8)."
     )
-    # Old terminology must NOT appear in the Routines sub-tab.
-    assert "Hot-Channel" not in block, (
-        "Routines sub-tab still mentions 'Hot-Channel' — should be "
+    # Old terminology must NOT appear.
+    assert "Hot-Channel" not in src, (
+        "Routines panel still mentions 'Hot-Channel' — should be "
         "renamed to 'Auto-Sync Gallery' per user pick."
     )
-    # The form elements must exist with the new ids.
-    assert 'id="routines-auto-sync-enabled"' in block, "Missing routines-auto-sync-enabled checkbox"
-    assert 'id="routines-auto-sync-interval"' in block, "Missing routines-auto-sync-interval select"
-    assert 'id="routines-auto-sync-save"' in block, "Missing routines-auto-sync-save button"
+    # The form elements must exist.
+    assert 'id="routines-auto-sync-enabled"' in src, "Missing routines-auto-sync-enabled toggle"
+    assert 'id="routines-gallery-style"' in src, "Missing routines-gallery-style selector"
+    assert 'id="routines-interval-tabs"' in src, "Missing routines-interval-tabs"
+    assert 'id="sync-all-btn"' in src, "Missing sync-all-btn"
 
 
 def test_settings_js_wires_routines_form():
-    """settings.js must wire the routines form save + load handlers."""
+    """settings.js must wire the routines auto-save handlers."""
     src = SETTINGS_JS
-    assert "routines-auto-sync-save" in src, (
-        "settings.js doesn't reference the routines save button id."
-    )
     assert "routines-auto-sync-enabled" in src, (
-        "settings.js doesn't read the routines enabled checkbox."
+        "settings.js doesn't reference the routines enabled toggle."
+    )
+    assert "routines-interval-tabs" in src, (
+        "settings.js doesn't reference the interval tabs."
+    )
+    assert "saveSchedule" in src, (
+        "settings.js should define saveSchedule() for auto-save."
     )
     assert "loadRoutinesAutoSync" in src, (
         "settings.js should define loadRoutinesAutoSync() to load the config."
@@ -372,7 +357,8 @@ def test_scoreboard_now_switches_channel():
     # Ambient must remain skipped — now alongside Text (Round 7), since each
     # has its own Apply/Push button rather than a channel switch.
     assert ('activeChannel === "ambient"' in src
-            or '["ambient", "text"].includes' in src), (
+            or '["ambient", "text"].includes' in src
+            or '["ambient", "text", "sessions"].includes' in src), (
         "channels.js: ambient must remain in the skip list (it has its own Apply button)."
     )
 
@@ -622,14 +608,19 @@ def test_r11_wall_toolbar_unified():
 
 
 def test_r18_subtabs_have_icons_and_fit_content():
-    """R18 a/b: Tools + Settings sub-tab buttons carry a .tab-icon (consistency
-    with the channel row), and the pill row sizes to its content rather than the
-    full window width."""
+    """R18 a/b + R33: Settings sub-tab buttons carry a .tab-icon (consistency
+    with the channel row), Routines sub-tabs also carry icons, and the pill row
+    sizes to its content rather than the full window width."""
     src = TEMPLATES_JS
-    for did in ("tools-time", "tools-sessions", "settings-devices",
-                "settings-divoom", "settings-routines", "settings-connectivity",
+    for did in ("settings-devices",
+                "settings-divoom", "settings-connectivity",
                 "settings-appearance"):
         m = re.search(rf'data-(?:tools|settings)-tab="{did}"[^>]*>(.*?)</button>', src, re.DOTALL)
+        assert m and "tab-icon" in m.group(1), f"{did} tab button is missing a .tab-icon"
+    # R33: Routines sub-tab icons live in the routines template.
+    routines = ROUTINES_JS.read_text()
+    for did in ("routines-schedule", "routines-time"):
+        m = re.search(rf'data-routines-tab="{did}"[^>]*>(.*?)</button>', routines, re.DOTALL)
         assert m and "tab-icon" in m.group(1), f"{did} tab button is missing a .tab-icon"
     tabs_css = (REPO_ROOT / "divoom_gui" / "web_ui" / "tabs.css").read_text()
     assert "fit-content" in tabs_css, ".tabs-row should size to content (item b)"
@@ -710,39 +701,28 @@ async def test_monthly_best_layout_renders_cleanly():
 SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
 
 
-def test_r12_tools_subtab_uses_sessions_not_tools_inner_collision():
-    """R12 §A Phase 7 (tools regroup): the inner Tools sub-tab is renamed
-    to 'Sessions' to avoid the parent-tab / sub-tab 'Tools' naming
-    collision. Sessions is the device-manual term for the
-    multi-timer/noise/sleep bundle."""
-    src = TEMPLATES_JS
-    # The inner sub-tab button is now 'Sessions' with data-tools-tab=tools-sessions.
-    # (R15 §1+§7: button class is now `.tab-btn` and has additional `data-tab` /
-    # `role` / `aria-selected` attrs — the assertion uses a regex that matches
-    # the new shape without locking in attribute order.)
+def test_r33_tools_content_moved_to_channels_and_routines():
+    """R33: the old Tools tab content is split — Sessions moved to Channels
+    (as a channel tab), Time moved to Routines (as a sub-tab)."""
+    # Sessions tab button exists in Channels (index.html, inline).
+    idx = INDEX_HTML.read_text()
     assert re.search(
-        r'<button[^>]*data-tools-tab="tools-sessions"[^>]*>'
-        r'(?:\s*<svg.*?</svg>)?\s*Sessions\s*</button>',
-        src, re.DOTALL,
-    ), "Tools inner sub-tab is not 'Sessions' — it should be renamed to avoid the parent-tab / sub-tab 'Tools' collision."
-    # The id of the inner sub-tab content block must match.
-    assert 'id="tools-sessions"' in src, (
-        "inner sub-tab content id should be 'tools-sessions'."
-    )
-    # The OLD 'tools-tools' collision id must be GONE.
-    assert 'id="tools-tools"' not in src, (
-        "id 'tools-tools' is still present — it should be renamed to 'tools-sessions'."
-    )
-    # The 'Time' sub-tab is still present (alarms + anniversary).
-    # (R15 §1+§7: button class is now `.tab-btn` and has additional `data-tab` /
-    # `role` / `aria-selected` attrs — the assertion uses a regex that
-    # doesn't lock in attribute order.)
+        r'<button[^>]*data-tab="sessions"[^>]*>'
+        r'(?:\s*<svg.*?</svg>)?\s*<span>\s*Sessions\s*</span>\s*</button>',
+        idx, re.DOTALL,
+    ), "Sessions channel tab missing from index.html."
+    assert 'id="panel-sessions"' in idx, "Sessions panel missing from index.html."
+    # Time sub-tab exists in Routines.
+    routines = ROUTINES_JS.read_text()
     assert re.search(
-        r'<button[^>]*data-tools-tab="tools-time"[^>]*>'
+        r'<button[^>]*data-routines-tab="routines-time"[^>]*>'
         r'(?:\s*<svg.*?</svg>)?\s*Time\s*</button>',
-        src, re.DOTALL,
-    ), "Tools Time sub-tab is missing — it should contain Alarms + Anniversary."
-
+        routines, re.DOTALL,
+    ), "Routines Time sub-tab is missing — it should contain Alarms + Anniversary."
+    # Old Tools tab no longer navigable (no sidebar button).
+    assert 'data-tab="tools"' not in idx.split('<!-- R33')[0], (
+        "Tools nav button still in sidebar."
+    )
 
 def test_r15_unified_segmented_pill_css():
     """R15 §1+§7: tab chrome lives in `tabs.css` as the single source of
@@ -775,37 +755,28 @@ def test_r15_unified_segmented_pill_css():
         "older markup keeps rendering."
     )
     assert re.search(
-        r"\.settings-tab-content\s*,\s*\n\s*\.tools-subtab-content\s*\{",
+        r"\.settings-tab-content\s*,\s*\n\s*\.tools-subtab-content\s*,\s*\n\s*\.routines-subtab-content\s*\{",
         settings_css,
     ), (
-        "settings.css should group .settings-tab-content and "
-        ".tools-subtab-content in a single shared visibility rule."
+        "settings.css should group .settings-tab-content, "
+        ".tools-subtab-content, and .routines-subtab-content "
+        "in a single shared visibility rule."
     )
 
 
-def test_r12_anniversary_moved_into_time_subtab():
-    """The Anniversary/Memorial card lives in the Time sub-tab (not the
-    Sessions or Device sub-tab), per the regroup."""
-    src = TEMPLATES_JS
-    # Find the Time sub-tab content block.
-    m = re.search(
-        r'id="tools-time">(.+?)<!-- R11 item 8: SESSIONS',
-        src, re.DOTALL,
+def test_r33_anniversary_moved_into_routines_time():
+    """R33: the Anniversary/Memorial card moved to the Routines → Time sub-tab."""
+    routines = ROUTINES_JS.read_text()
+    assert 'id="routines-time"' in routines, "Routines Time sub-tab not found"
+    assert 'id="memorial-save"' in routines, (
+        "Anniversary/Memorial card (memorial-save button) is missing from the Routines Time sub-tab."
     )
-    assert m is not None, "Time sub-tab block not found"
-    block = m.group(1)
-    assert 'id="memorial-save"' in block, (
-        "Anniversary/Memorial card (memorial-save button) is missing from the Time sub-tab."
+    # Anniversary MUST NOT be in the Sessions panel (in index.html channels).
+    idx = INDEX_HTML.read_text()
+    assert 'id="panel-sessions"' in idx, "Sessions panel not found"
+    assert 'id="memorial-save"' not in idx.split('id="panel-sessions"')[1].split('</div>\n                            </div>\n                        </div>')[0], (
+        "Anniversary/Memorial must not be in the Sessions panel."
     )
-    # Anniversary MUST NOT be in the Sessions sub-tab.
-    sm = re.search(
-        r'id="tools-sessions">(.+?)</div>\s*</div>\s*</div>',
-        src, re.DOTALL,
-    )
-    if sm:
-        assert 'id="memorial-save"' not in sm.group(1), (
-            "Anniversary/Memorial is in the Sessions sub-tab — should be in Time."
-        )
 
 
 def test_r12_weather_moved_into_live_widgets():

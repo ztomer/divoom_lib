@@ -245,12 +245,14 @@ body.theme-light .theme-mode-btn.active {
 }
 
 .settings-tab-content,
-.tools-subtab-content {
+.tools-subtab-content,
+.routines-subtab-content {
   display: none;
 }
 
 .settings-tab-content.active,
-.tools-subtab-content.active {
+.tools-subtab-content.active,
+.routines-subtab-content.active {
   display: block;
 }
 

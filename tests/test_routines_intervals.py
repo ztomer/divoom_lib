@@ -29,6 +29,7 @@ TEMPLATES_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js",
 ])
 SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
 
@@ -101,35 +102,34 @@ def test_factory_reset_btn_still_present() -> None:
 
 def test_routines_select_has_six_options() -> None:
     src = TEMPLATES_JS
-    select_match = re.search(
-        r'<select\s+id="routines-auto-sync-interval"[^>]*>(.+?)</select>',
+    tabs_match = re.search(
+        r'id="routines-interval-tabs"[^>]*>(.+?)</div>',
         src,
         re.DOTALL,
     )
-    assert select_match, "routines-auto-sync-interval select is missing"
-    body = select_match.group(1)
-    # Extract the option values.
-    values = re.findall(r'<option\s+value="(\d+)"', body)
+    assert tabs_match, "routines-interval-tabs block is missing"
+    body = tabs_match.group(1)
+    values = re.findall(r'data-interval="(\d+)"', body)
     expected = ["3600", "21600", "43200", "86400", "604800", "2592000"]
     assert values == expected, (
-        f"Expected interval options {expected}, got {values}."
+        f"Expected interval tabs {expected}, got {values}."
     )
 
 
 def test_routines_interval_labels_are_human_readable() -> None:
-    """Spot-check that 7d and 30d have human labels (not raw seconds)."""
+    """Spot-check that 7d and 30d have short labels."""
     src = TEMPLATES_JS
-    select_match = re.search(
-        r'<select\s+id="routines-auto-sync-interval"[^>]*>(.+?)</select>',
+    tabs_match = re.search(
+        r'id="routines-interval-tabs"[^>]*>(.+?)</div>',
         src,
         re.DOTALL,
     )
-    body = select_match.group(1)
-    assert re.search(r'<option\s+value="604800">7 days</option>', body), (
-        "7d option should have the human label '7 days'."
+    body = tabs_match.group(1)
+    assert re.search(r'data-interval="604800"[^>]*>7d<', body), (
+        "7d interval tab should have label '7d'."
     )
-    assert re.search(r'<option\s+value="2592000">30 days</option>', body), (
-        "30d option should have the human label '30 days'."
+    assert re.search(r'data-interval="2592000"[^>]*>30d<', body), (
+        "30d interval tab should have label '30d'."
     )
 
 

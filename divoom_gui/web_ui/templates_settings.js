@@ -8,7 +8,6 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                 <div class="tabs-row" role="tablist" aria-label="Settings">
                     <button class="tab-btn active" data-settings-tab="settings-devices" data-tab="settings-devices" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Devices</button>
                     <button class="tab-btn" data-settings-tab="settings-divoom" data-tab="settings-divoom" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 12h6a3 3 0 0 0 .4-6A4 4 0 0 0 4 7a3 3 0 0 0 1 5z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>Divoom</button>
-                    <button class="tab-btn" data-settings-tab="settings-routines" data-tab="settings-routines" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8a4.5 4.5 0 0 1 7.5-3.3M12.5 8a4.5 4.5 0 0 1-7.5 3.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 3v2H9M5 13v-2h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Routines</button>
                     <button class="tab-btn" data-settings-tab="settings-connectivity" data-tab="settings-connectivity" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5a7 7 0 0 1 10 0M5.5 11a3.5 3.5 0 0 1 5 0" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="13" r="1" fill="currentColor"/></svg>Connectivity</button>
                     <button class="tab-btn" data-settings-tab="settings-appearance" data-tab="settings-appearance" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>Appearance</button>
                 </div>
@@ -187,103 +186,36 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                     </div>
                 </div>
 
-                <!-- 3. ROUTINES TAB. R32 §A1+§B: the devices panel (sync
-                     targets) moved here from Monthly Best, and the card gained a
-                     per-device gallery-style selector. Auto-sync is handled by
-                     the daemon (it reads hotchannel_config.json), not the app. -->
-                <div class="settings-tab-content" id="settings-routines">
-                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
-                        <div class="card glass-card">
-                            <div class="card-header">
-                                <h3>Auto-Sync Gallery</h3>
-                            </div>
-                            <div class="card-body">
-                                <p class="panel-hint" style="margin-top: 0;">Pick a gallery style per device, then push the Divoom Cloud gallery on a schedule. Auto-sync runs in the daemon — it keeps working even when this window is closed.</p>
-
-                                <!-- R32 §B: device selector | gallery style selector -->
-                                <div style="display:flex; gap:10px; margin-bottom: 14px;">
-                                    <div style="flex:1;">
-                                        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block;">Device</label>
-                                        <select id="routines-device-select" class="custom-select" style="width:100%;">
-                                            <option value="">All devices</option>
-                                        </select>
-                                    </div>
-                                    <div style="flex:1;">
-                                        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block;">Gallery style</label>
-                                        <select id="routines-gallery-style" class="custom-select" style="width:100%;">
-                                            <option value="18">Recommend</option>
-                                            <option value="3">Cartoon</option>
-                                            <option value="9">Creative</option>
-                                            <option value="6">Nature</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <!-- R32 §B: macOS-style toggle (not a checkbox). -->
-                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
-                                    <span style="font-size:13px; color:var(--text-main);">Enable auto-sync</span>
-                                    <label class="switch">
-                                        <input type="checkbox" id="routines-auto-sync-enabled">
-                                        <span class="slider-round"></span>
-                                    </label>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom: 4px; display:block;">Sync every</label>
-                                    <select id="routines-auto-sync-interval" class="custom-select" style="width:100%;">
-                                        <option value="3600">1 hour</option>
-                                        <option value="21600">6 hours</option>
-                                        <option value="43200">12 hours</option>
-                                        <option value="86400">24 hours</option>
-                                        <option value="604800">7 days</option>
-                                        <option value="2592000">30 days</option>
-                                    </select>
-                                </div>
-
-                                <!-- R32 §A1: devices panel moved here from Monthly Best. -->
-                                <div class="form-group">
-                                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin: 4px 0 6px; display:block;">Sync to devices</label>
-                                    <div id="sync-targets-list" class="sync-targets-list">
-                                        <span class="empty-list">No devices — scan under Settings, or add a Wi-Fi screen.</span>
-                                    </div>
-                                </div>
-
-                                <div style="display:flex; align-items:center; gap:10px; margin-top: 14px;">
-                                    <button id="routines-auto-sync-save" class="glow-btn" style="margin:0;">Save Schedule</button>
-                                    <button id="sync-all-btn" class="glow-btn secondary" style="margin:0;">Sync devices now</button>
-                                </div>
-                                <span id="routines-auto-sync-status" class="panel-hint" style="display:block; margin-top:8px;"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. CONNECTIVITY TAB. R32 §E: the "Connectivity & Privacy"
+                <!-- 3. CONNECTIVITY TAB. R32 §E: the "Connectivity & Privacy"
                      explainer legend was removed — the four corner transport dots
                      already communicate state, and the prose was redundant. -->
                 <div class="settings-tab-content" id="settings-connectivity">
+                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
                     <!-- R15 §5: MCP server (Model Context Protocol) — exposes
                          12 device-control tools over stdio JSON-RPC. Connect
                          Claude Desktop, Cursor, Cline, or Continue to control
                          the device with natural language. See docs/MCP_SERVER.md. -->
-                    <div class="card glass-card" style="margin-top:18px;">
+                    <div class="card glass-card">
                         <div class="card-header flex-header">
                             <h3>MCP Server</h3>
-                            <span class="status-pill" id="mcp-status-pill">stopped</span>
                         </div>
                         <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
-                            <p class="panel-hint" style="margin:0;">Spawns <code>divoom-control mcp-server</code> as a subprocess. Point any MCP-compatible client at this machine's <code>divoom-control</code> binary; see <code>docs/MCP_SERVER.md</code> for setup.</p>
+                            <p class="panel-hint" style="margin:0;">Runs <code>divoom-control mcp-server</code> which routes all device calls through the daemon. Point any MCP-compatible client at this machine's <code>divoom-control</code> binary; see <code>docs/MCP_SERVER.md</code> for setup.</p>
                             <div style="display:flex; gap:10px; align-items:center;">
-                                <button id="mcp-start-btn" class="glow-btn">Start</button>
-                                <button id="mcp-stop-btn" class="glow-btn secondary" disabled>Stop</button>
-                                <span id="mcp-status-detail" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; margin-left:8px;">PID: --</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="mcp-toggle">
+                                    <span class="slider-round"></span>
+                                </label>
+                                <span style="font-size:13px; color:var(--text-main);">MCP Server</span>
+                                <span id="mcp-status-detail" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; margin-left:auto;">PID: --</span>
                             </div>
                             <pre id="mcp-log" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px; margin: 0; white-space: pre-wrap;">No log entries yet.</pre>
                         </div>
                     </div>
+                    </div>
                 </div>
 
-                <!-- 5. APPEARANCE TAB -->
+                <!-- 4. APPEARANCE TAB -->
                 <div class="settings-tab-content" id="settings-appearance">
                     <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
                         <!-- Aesthetic Theme Mode -->

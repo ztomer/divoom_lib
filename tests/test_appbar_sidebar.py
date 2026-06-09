@@ -7,6 +7,8 @@
   the device panel is now the bottom element of the sidebar. The sidebar must NOT
   contain a Settings nav button, and the appbar must carry a #appbar-settings-btn
   with data-tab="settings".
+- R33: device switch dots (#device-dots) are now the bottom element (below the
+  device panel glass card).
 
 Loads the real index.html via file:// in headless Chromium. Skipped if Playwright
 / a browser isn't available (these run when a browser is installed).
@@ -38,13 +40,13 @@ async def test_settings_moved_to_appbar_gear():
                     return {
                         sidebarSettings,
                         hasGear: !!gear,
-                        lastIsDevicePanel: !!(lastChild && lastChild.id === 'connected-device-banner'),
+                        lastId: lastChild ? lastChild.id : null,
                     };
                 }"""
             )
             assert not result["sidebarSettings"], "Settings nav button should be removed from the sidebar (R32)"
             assert result["hasGear"], "appbar must have a Settings gear pill with data-tab='settings'"
-            assert result["lastIsDevicePanel"], "device panel should be the bottom element of the sidebar"
+            assert result["lastId"] == "device-dots", "device-dots should be the bottom element of the sidebar (R33)"
         finally:
             await browser.close()
 

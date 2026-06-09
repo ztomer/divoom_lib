@@ -91,14 +91,6 @@
                         </svg>
                     </span> Channels
                 </button>
-                <button class="nav-btn" data-tab="tools">
-                    <span class="btn-icon">
-                        <svg class="kare-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11,2 a3,3 0 1 0 3,3 L11,8 L8,5 Z"/>
-                            <path d="M8,5 L2,11 L5,14 L11,8"/>
-                        </svg>
-                    </span> Tools
-                </button>
                 <button class="nav-btn" data-tab="data-sources">
                     <span class="btn-icon">
                         <svg class="kare-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
@@ -126,6 +118,15 @@
                         </svg>
                     </span> Virtual Wall
                 </button>
+                <!-- R33: Routines (Schedule + Time) -->
+                <button class="nav-btn" data-tab="routines">
+                    <span class="btn-icon">
+                        <svg class="kare-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="2" width="12" height="12" rx="2"/>
+                            <path d="M5,8 L8,11 L12,5"/>
+                        </svg>
+                    </span> Routines
+                </button>
             </nav>
             
             <!-- Connected Device Panel (Moved from channels).
@@ -138,16 +139,14 @@
                 <div class="sidebar-device-preview">
                     <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
                 </div>
-                <!-- R32 §C3: device switch dots sit below the preview in their own
-                     glass pill — the same chrome as the corner connectivity dots,
-                     one dot per device (rebuilt as devices are added/removed). -->
-                <div id="device-dots" class="device-dots" role="tablist" aria-label="Switch device"></div>
                 <select id="sidebar-device-select" class="sidebar-device-select" hidden>
                     <option value="">Select Screen…</option>
                 </select>
                 <span id="banner-device-name" style="display: none;">No Connected Screen</span>
                 <span id="banner-device-mac" style="display: none;">-</span>
             </div>
+            <!-- R33: device switch dots live outside the glass panel, below it. -->
+            <div id="device-dots" class="device-dots" role="tablist" aria-label="Switch device"></div>
             <!-- R32: the Settings nav button was removed from the sidebar — it
                  now lives as a gear pill in the appbar. The device panel above
                  is pinned to the bottom (margin-top:auto) so it occupies the
@@ -222,6 +221,14 @@
                                         <path d="M5,13 L11,13" stroke="currentColor" stroke-width="2" fill="none"/>
                                     </svg>
                                     <span>Text</span>
+                                </button>
+                                <!-- R33: Sessions moved from Tools -->
+                                <button class="tab-btn" data-tab="sessions" data-channel="sessions" role="tab" aria-selected="false">
+                                    <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                                        <circle cx="8" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                                        <path d="M8 9V6M6.5 2.5h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                    </svg>
+                                    <span>Sessions</span>
                                 </button>
                             </div>
                     </div>
@@ -368,6 +375,76 @@
                                     </div>
                                     <button id="push-text-btn" class="glow-btn" style="margin-top:16px; width:100%;">Push to Device</button>
                                 </div>
+                                <!-- R33: Sessions panel (ex-Tools → Sessions) -->
+                                <div class="channel-panel" id="panel-sessions">
+                                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
+                                        <div class="card glass-card">
+                                            <div class="card-header"><h3>Sleep Aid</h3></div>
+                                            <div class="card-body" id="sleep-aid-body">
+                                                <p class="panel-hint" style="margin-top:0;">Fade the screen to a color over a sleep timer.</p>
+                                                <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+                                                    <div class="form-group" style="margin:0;">
+                                                        <label class="form-label" style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">Minutes</label>
+                                                        <input type="number" id="sleep-minutes" min="0" max="120" value="30" class="text-input" style="width:90px;">
+                                                    </div>
+                                                    <div class="form-group" style="margin:0;">
+                                                        <label class="form-label" style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">Color</label>
+                                                        <input type="color" id="sleep-color" value="#2040ff" style="background:none; border:none; width:44px; height:28px; cursor:pointer; padding:0;">
+                                                    </div>
+                                                    <div class="form-group" style="margin:0; flex:1; min-width:120px;">
+                                                        <label class="form-label" style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">Volume <span id="sleep-vol-val">10</span></label>
+                                                        <input type="range" id="sleep-volume" min="0" max="16" value="10" style="width:100%;">
+                                                    </div>
+                                                </div>
+                                                <div style="display:flex; gap:10px; margin-top:14px;">
+                                                    <button id="sleep-start-btn" class="glow-btn" style="flex:1;">Start Sleep</button>
+                                                    <button id="sleep-stop-btn" class="glow-btn secondary" style="flex:1;">Stop</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card glass-card">
+                                            <div class="card-header"><h3>Tools</h3></div>
+                                            <div class="card-body" id="tools-body" style="display:flex; flex-direction:column; gap:14px;">
+                                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                                    <span class="form-label" style="font-size:12px; font-weight:600; min-width:80px;">Stopwatch</span>
+                                                    <button class="glow-btn compact tool-timer-btn" data-action="start">Start</button>
+                                                    <button class="glow-btn compact secondary tool-timer-btn" data-action="stop">Stop</button>
+                                                    <button class="glow-btn compact secondary tool-timer-btn" data-action="reset">Reset</button>
+                                                </div>
+                                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                                    <span class="form-label" style="font-size:12px; font-weight:600; min-width:80px;">Countdown</span>
+                                                    <input type="number" id="countdown-min" min="0" max="99" value="5" class="text-input" style="width:60px;" title="minutes">
+                                                    <span>:</span>
+                                                    <input type="number" id="countdown-sec" min="0" max="59" value="0" class="text-input" style="width:60px;" title="seconds">
+                                                    <button id="countdown-start-btn" class="glow-btn compact">Start</button>
+                                                    <button id="countdown-stop-btn" class="glow-btn compact secondary">Stop</button>
+                                                </div>
+                                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                                    <span class="form-label" style="font-size:12px; font-weight:600; min-width:80px;">Noise meter</span>
+                                                    <button id="noise-start-btn" class="glow-btn compact">Start</button>
+                                                    <button id="noise-stop-btn" class="glow-btn compact secondary">Stop</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card glass-card" id="fm-radio-card" style="display:none;">
+                                            <div class="card-header"><h3>FM Radio</h3></div>
+                                            <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+                                                <p class="panel-hint" style="margin-top:0;">Tune the device's FM radio (FM-capable models only — Tivoo / Ditoo).</p>
+                                                <div style="display:flex; gap:10px; align-items:center;">
+                                                    <input type="number" id="fm-freq" class="text-input" min="87.5" max="108.0" step="0.1" value="101.5" style="width:100px;">
+                                                    <span style="font-size:12px; color:var(--text-muted);">MHz</span>
+                                                    <button id="fm-tune-btn" class="glow-btn compact">Tune</button>
+                                                </div>
+                                                <div id="fm-presets" style="display:flex; gap:8px; flex-wrap:wrap;">
+                                                    <button class="glow-btn compact secondary fm-preset" data-freq="88.1">88.1</button>
+                                                    <button class="glow-btn compact secondary fm-preset" data-freq="95.5">95.5</button>
+                                                    <button class="glow-btn compact secondary fm-preset" data-freq="101.5">101.5</button>
+                                                    <button class="glow-btn compact secondary fm-preset" data-freq="104.3">104.3</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -430,14 +507,14 @@
                 </div>
             </section>
             
-            <!-- TAB 3: BATCH MONTHLY BEST WITH PREVIEWS -->
+            <!-- TAB 3: ROUTINES (Schedule + Time) -->
+            <section id="routines" class="tab-content"></section>
+
+            <!-- TAB 4: BATCH MONTHLY BEST WITH PREVIEWS -->
             <section id="monthly-best" class="tab-content"></section>
             
-            <!-- TAB 4: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
+            <!-- TAB 5: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
             <section id="data-sources" class="tab-content"></section>
-
-            <!-- TAB 5: TOOLS (alarms, sleep aid, timer/countdown/noise) -->
-            <section id="tools" class="tab-content"></section>
 
             <!-- TAB 6: CREDENTIALS & BLE CONFIG SETTINGS -->
             <section id="settings" class="tab-content"></section>
@@ -449,6 +526,7 @@
     <div id="toast" class="toast"></div>
     
     <script src="templates_tools.js"></script>
+    <script src="templates_routines.js"></script>
     <script src="templates_monthly_best.js"></script>
     <script src="templates_widgets.js"></script>
     <script src="templates_settings.js"></script>

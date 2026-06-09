@@ -225,9 +225,8 @@
     margin: 0 auto 8px auto;
 }
 
-/* R32 §C3: device switch dots in their own glass pill below the preview —
-   the same glass-pill + dot chrome the old corner connectivity indicator used
-   (since removed), just with per-device colors. Wraps for >4 devices. */
+/* R32 §C3: device switch dots — per-device colors, wraps for >4 devices.
+   R33: moved outside the glass panel, sits below it in the sidebar. */
 .device-dots {
     display: flex;
     flex-wrap: wrap;
@@ -235,12 +234,9 @@
     align-items: center;
     gap: 7px;
     padding: 5px 10px;
-    margin: 0 auto 8px auto;
+    margin: 4px auto 8px auto;
     max-width: 100%;
     box-sizing: border-box;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
 }
 .device-dots:empty { display: none; }
 
@@ -256,7 +252,8 @@
 .device-dots .transport-dot.inactive { opacity: 0.35; box-shadow: none; }
 .device-dots .transport-dot.active { opacity: 1; box-shadow: 0 0 6px currentColor; }
 
-/* Tooltip opens upward (matches the corner dots), centered over the dot. */
+/* Tooltip opens upward, centred over the dot. Always light text — the
+   semi-transparent dark background is legible in both light and dark themes. */
 .device-dots .transport-dot:hover::after {
     content: attr(title);
     position: absolute;
@@ -264,7 +261,7 @@
     left: 50%;
     transform: translateX(-50%);
     background: rgba(20, 21, 26, 0.95);
-    color: var(--text-main);
+    color: #e8e9eb;
     font-size: 10px;
     font-weight: 500;
     padding: 6px 10px;

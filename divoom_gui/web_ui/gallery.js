@@ -225,27 +225,36 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         el.innerHTML = "";
         candidates.forEach(c => {
-            const row = document.createElement("label");
-            row.className = "target-row";
-            const cb = document.createElement("input");
-            cb.type = "checkbox";
-            cb.value = c.address;
-            cb.checked = !!c.selected;
-            cb.addEventListener("change", persistSyncTargets);
+            const row = document.createElement("div");
+            row.className = "toggle-control-bar";
+            row.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:4px 0;";
 
             const color = window.deviceColor(c.address);
             const accent = document.createElement("span");
             accent.className = "device-accent-dot";
             accent.style.background = color;
             accent.style.boxShadow = `0 0 6px ${color}`;
-            accent.style.marginRight = "6px";
+            accent.style.marginRight = "8px";
+            accent.style.flexShrink = "0";
 
             const name = document.createElement("span");
             name.className = "target-name";
+            name.style.flex = "1";
             name.textContent = c.name;
-            // Round 6 (docs/PLANNING_ROUND5.md §3.b): drop the BT MAC
-            // address from the target row.
-            row.append(cb, accent, name);
+
+            const toggle = document.createElement("label");
+            toggle.className = "switch";
+            toggle.style.margin = "0";
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.value = c.address;
+            cb.checked = !!c.selected;
+            cb.addEventListener("change", persistSyncTargets);
+            const slider = document.createElement("span");
+            slider.className = "slider-round";
+            toggle.append(cb, slider);
+
+            row.append(accent, name, toggle);
             el.appendChild(row);
         });
     }

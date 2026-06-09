@@ -31,7 +31,9 @@ TEMPLATES_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js",
 ])
+ROUTINES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js"
 GALLERY_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.js"
 GALLERY_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.css"
 
@@ -76,19 +78,15 @@ def test_batch_sync_btn_renamed_to_update_device() -> None:
 
 
 def test_sync_all_btn_moved_to_routines() -> None:
-    """R32 §A1+§B: the multi-device sync button moved from Monthly Best to
-    Settings → Routines and is labelled 'Sync devices now'."""
+    """R32 §A1+§B + R33: the multi-device sync button moved from Monthly Best
+    → Settings → Routines (now its own Routines panel) labelled 'Sync devices now'."""
     src = TEMPLATES_JS
     assert "Sync All" not in src, "Old 'Sync All' label still present."
-    # Must live in the Routines sub-tab now.
-    routines = re.search(
-        r'<div class="settings-tab-content" id="settings-routines">(.+?)`;',
-        src, re.DOTALL,
-    )
-    assert routines is not None, "settings-routines block not found"
+    # R33: Routines is now its own top-level panel, not a Settings sub-tab.
+    routines = _cat([ROUTINES_JS])
     assert re.search(
         r'<button\s+id="sync-all-btn"[^>]*>\s*Sync devices now\s*</button>',
-        routines.group(1),
+        routines,
     ), "Routines must host the 'Sync devices now' (sync-all-btn) button."
 
 

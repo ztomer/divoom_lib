@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Ambient and Text are "non-channel" cards (each has its own
             // Apply/Push button). Every other card — Clock, VJ, EQ, Design,
             // Scoreboard — fires switch_channel.
-            if (["ambient", "text"].includes(window.DivoomState.activeChannel)) return;
+            if (["ambient", "text", "sessions"].includes(window.DivoomState.activeChannel)) return;
             if (!window.requireDevice()) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.switch_channel) {
                 window.pywebview.api.switch_channel(window.DivoomState.activeChannel).then(res => {

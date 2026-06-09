@@ -31,7 +31,9 @@ TEMPLATES_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js",
 ])
+ROUTINES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js"
 
 
 # ── tabs.css basics ───────────────────────────────────────────────────
@@ -143,12 +145,12 @@ def test_settings_subtabs_use_tabs_row() -> None:
     ), "templates.js Settings sub-tab row is missing the new .tabs-row wrapper"
 
 
-def test_tools_subtabs_use_tabs_row() -> None:
-    src = TEMPLATES_JS
+def test_routines_subtabs_use_tabs_row() -> None:
+    src = ROUTINES_JS.read_text()
     assert re.search(
-        r'<div class="tabs-row"[^>]*aria-label="Tools"',
+        r'<div class="tabs-row"[^>]*aria-label="Routines"',
         src,
-    ), "templates.js Tools sub-tab row is missing the new .tabs-row wrapper"
+    ), "Routines sub-tab row is missing the .tabs-row wrapper"
 
 
 def test_theme_buttons_use_tabs_row() -> None:

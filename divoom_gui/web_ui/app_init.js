@@ -38,8 +38,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById('settings') && window.DivoomTemplates?.settings) {
         document.getElementById('settings').innerHTML = window.DivoomTemplates.settings;
     }
-    if (document.getElementById('tools') && window.DivoomTemplates?.tools) {
-        document.getElementById('tools').innerHTML = window.DivoomTemplates.tools;
+    /* R33: Routines replaces Tools in sidebar */
+    if (document.getElementById('routines') && window.DivoomTemplates?.routines) {
+        document.getElementById('routines').innerHTML = window.DivoomTemplates.routines;
     }
 
     // ── 5. CANVAS ARRANGER AND PRESETS BINDINGS ──
