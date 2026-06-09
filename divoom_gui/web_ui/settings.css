@@ -98,41 +98,8 @@
     backdrop-filter: none !important;
 }
 
-/* ── Settings: Connectivity & Privacy legend ────────────────────────── */
-.connectivity-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-  background: var(--legend-bg);
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
-}
-
-.connectivity-legend-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.connectivity-legend-badge {
-  flex-shrink: 0;
-  padding-top: 1px;
-}
-
-.connectivity-legend-text strong {
-  display: block;
-  font-size: 12px;
-  color: var(--text-main);
-  opacity: 0.85;
-  margin-bottom: 2px;
-}
-
-.connectivity-legend-text span {
-  font-size: 11px;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
+/* R32 §E: the Connectivity & Privacy legend styles were removed along with
+   the explainer markup — the corner transport dots convey state on their own. */
 
 /* ── LAN config section ─────────────────────────────────────────────── */
 .lan-config-section {

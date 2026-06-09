@@ -228,52 +228,10 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                     </div>
                 </div>
 
-                <!-- 4. CONNECTIVITY TAB (Connectivity & Privacy legend moved here) -->
+                <!-- 4. CONNECTIVITY TAB. R32 §E: the "Connectivity & Privacy"
+                     explainer legend was removed — the four corner transport dots
+                     already communicate state, and the prose was redundant. -->
                 <div class="settings-tab-content" id="settings-connectivity">
-                    <h3 style="font-size:13px; margin-bottom:12px; color:rgba(255,255,255,0.6);">Connectivity & Privacy</h3>
-                    <div class="connectivity-legend">
-                        <div class="connectivity-legend-row">
-                            <div class="connectivity-legend-badge" style="display:flex; align-items:center; gap:8px; width:120px; flex-shrink:0;">
-                                <div class="transport-dot active" style="background:#3b82f6; color:#3b82f6; box-shadow:0 0 6px #3b82f6; width:8px; height:8px; border-radius:50%;"></div>
-                                <span style="font-size:12px; font-weight:600; color:var(--text-main);">Bluetooth</span>
-                            </div>
-                            <div class="connectivity-legend-text">
-                                <strong>Bluetooth</strong>
-                                <span>100% local. Commands go directly to the device over Bluetooth. Nothing ever leaves your machine.</span>
-                            </div>
-                        </div>
-                        <div class="connectivity-legend-row">
-                            <div class="connectivity-legend-badge" style="display:flex; align-items:center; gap:8px; width:120px; flex-shrink:0;">
-                                <div class="transport-dot active" style="background:#22c55e; color:#22c55e; box-shadow:0 0 6px #22c55e; width:8px; height:8px; border-radius:50%;"></div>
-                                <span style="font-size:12px; font-weight:600; color:var(--text-main);">Local Network</span>
-                            </div>
-                            <div class="connectivity-legend-text">
-                                <strong>Local Network</strong>
-                                <span>100% local. Talks directly to the device's built-in HTTP server. No internet, no account. WiFi-capable devices only.</span>
-                            </div>
-                        </div>
-                        <div class="connectivity-legend-row">
-                            <div class="connectivity-legend-badge" style="display:flex; align-items:center; gap:8px; width:120px; flex-shrink:0;">
-                                <div class="transport-dot active" style="background:#f59e0b; color:#f59e0b; box-shadow:0 0 6px #f59e0b; width:8px; height:8px; border-radius:50%;"></div>
-                                <span style="font-size:12px; font-weight:600; color:var(--text-main);">Divoom Cloud</span>
-                            </div>
-                            <div class="connectivity-legend-text">
-                                <strong>Divoom Cloud</strong>
-                                <span>Sends commands to Divoom's servers. Required for: gallery browsing, clock face store, community features. Requires a Divoom account.</span>
-                            </div>
-                        </div>
-                        <div class="connectivity-legend-row">
-                            <div class="connectivity-legend-badge" style="display:flex; align-items:center; gap:8px; width:120px; flex-shrink:0;">
-                                <div class="transport-dot active" style="background:#ef4444; color:#ef4444; box-shadow:0 0 6px #ef4444; width:8px; height:8px; border-radius:50%;"></div>
-                                <span style="font-size:12px; font-weight:600; color:var(--text-main);">Public Cloud</span>
-                            </div>
-                            <div class="connectivity-legend-text">
-                                <strong>Public Cloud</strong>
-                                <span>Used for weather, stock prices, album art lookups. 3rd-party services — no Divoom account required. Data is anonymous.</span>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- R15 §5: MCP server (Model Context Protocol) — exposes
                          12 device-control tools over stdio JSON-RPC. Connect
                          Claude Desktop, Cursor, Cline, or Continue to control
