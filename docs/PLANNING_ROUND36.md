@@ -197,3 +197,20 @@ success is measurable without eyes.
 5. HW iterate on Ditoo via daemon; success = device requests files, per-file
    done acks, final quiet; then user glances at the hot channel.
 6. GUI wiring (button) after the protocol is hardware-proven.
+
+## §outcome R36b — SHIPPED (`b85004b5`), HW-verified with device confirmations
+
+- `divoom_lib/tools/hot_update.py` implements the full APK flow; daemon
+  `hot_update` RPC; GUI "Update Hot Channel" button (`gallery_hot.js`).
+- **Live Ditoo run**: device requested vendor 40005454 v1099 → 201 packets of
+  the 51KB hot bundle → device CONFIRMED done → requested v1100 (nothing newer
+  = up to date, exactly the APK's `v()` end state) → switched to HOT mode.
+  Second run: clean no-op. 23s end-to-end. This protocol gives REAL
+  device-side acks — success measured without eyes.
+- Transport: `wait_for_any_response` + `_listen_commands` (unsolicited 0xF7
+  frames used to be dropped by the iOS-LE handler).
+- Suite **1223 / 75 / 0** (gallery.js + gallery_sync.py re-split for the
+  500-LOC rule; hot JS lives in `gallery_hot.js`).
+- USER: glance at the Ditoo's Hot channel — it should now rotate the freshly
+  stored curated set. "Update Device" (selection → display) and "Update Hot
+  Channel" (Divoom's curated store) are now separate, correctly-named actions.

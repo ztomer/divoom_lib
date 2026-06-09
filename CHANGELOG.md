@@ -6,6 +6,23 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 36b — 2026-06-09 (the REAL hot-channel update, APK port)
+
+### Added — device hot-channel update (`b85004b5`)
+
+- The previous "hot channel" sync displayed images on the CUSTOM channel
+  (drawing-send). The actual HOT channel update is a device-driven file STORE
+  protocol, reverse-engineered from the APK and implemented end-to-end:
+  HTTP `Hot/GetHotFiles32` manifest → BLE 0x9B/0xF7/0x9D/0x9E session (device
+  requests files, byte-sum checksums, 256B packets, per-packet resends, done
+  acks) → device switches to HOT mode. Raw cloud containers are sent AS-IS for
+  sub-128px devices (firmware decodes hot files itself), matching `C1301b.d()`.
+- New: `divoom_lib/tools/hot_update.py` (facade `.hot_update`), transport
+  `wait_for_any_response` + unsolicited-frame listen set, daemon `hot_update`
+  RPC + `hot_update_timeout` knob, GUI "Update Hot Channel" button.
+- Hardware-verified on the Ditoo with real device-side confirmations (file
+  request → 201 packets → done ack → up-to-date; idempotent 2nd run).
+
 ## Round 36 — 2026-06-09 (hot-channel renders on real hardware)
 
 ### Fixed — hot-channel sync rendered nothing on a real Ditoo

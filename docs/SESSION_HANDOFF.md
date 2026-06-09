@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R36b SHIPPED (2026-06-09) — the REAL hot-channel update.** (`b85004b5`)
+  User feedback after R36: images displayed on the CUSTOM channel, not the hot
+  channel. Correct — `show_image` is drawing-send. Reverse-engineered the APK's
+  `HotUpdateHandle` and implemented the device-driven hot file STORE:
+  HTTP `Hot/GetHotFiles32` → 0x9B manifest → device 0xF7 file requests → 0x9D
+  info (byte-sum checksum) → 0x9E 256B packets + resends → done acks → HOT mode
+  switch. Raw cloud containers sent AS-IS (<128px firmware decodes hot files).
+  New `divoom_lib/tools/hot_update.py`, transport `wait_for_any_response` +
+  `_listen_commands`, daemon `hot_update` RPC, GUI "Update Hot Channel" button
+  (`gallery_hot.js`). **HW-verified on Ditoo with real device acks** (v1099
+  served + confirmed, idempotent re-run). Suite **1223/75/0**. Protocol details
+  in `docs/PLANNING_ROUND36.md` R36b section.
+
 - **R36 SHIPPED (2026-06-09) — hot-channel now renders on the Ditoo.**
   (`4d7aae3d` fix, `6937a468` suite green; plan+runlog
   `docs/PLANNING_ROUND36.md`.) Root cause: magic 9/18/26 cloud files are
