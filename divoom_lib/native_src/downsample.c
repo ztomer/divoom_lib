@@ -24,7 +24,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <stdio.h>
 #include "downsample_kernel.h"
 
 #if defined(__ARM_NEON) || defined(__aarch64__)
@@ -189,6 +188,31 @@ static inline int32x4_t accum_3ch(int32x4_t acc, const uint8_t *p, int32_t w) {
  * The `iy * in_w * channels` term is hoisted out of the `sx` loop so
  * the inner loop is just two pointer-increments and a multiply-add.
  */
+/* DEBUG: exported for Python comparison. Returns the fixed-point accumulator
+ * value for a single pixel at the given output column (horizontal pass — no
+ * rounding bias, matching PIL). */
+int32_t debug_get_accum(
+    const uint8_t *in, int in_w, int in_h,
+    int out_w, int out_h,
+    int ox, int oy,
+    int channels
+) {
+    (void)out_h;
+    Kernel1D k;
+    int32_t weight_sum = kernel1d_init(&k, ox, in_w, out_w);
+    if (weight_sum < 0) return -1;
+    const uint8_t *row_base = in + oy * in_w * channels;
+    const int32_t *wptr = k.weights;
+    int32_t acc = 0;
+    for (int sx = k.left; sx <= k.right; sx++) {
+        int32_t w = *wptr++;
+        if (w == 0) continue;
+        acc += (int32_t)row_base[sx * channels] * w;
+    }
+    kernel1d_free(&k);
+    return acc;
+}
+
 static int horizontal_pass(
     const uint8_t *in,   int in_w, int in_h,
     uint8_t *tmp,        /* size: out_w * in_h * channels */
@@ -196,25 +220,14 @@ static int horizontal_pass(
     int channels
 ) {
     (void)out_h_unused;
-    /* DEBUG: print kernel info for edge case 300x1->2x2 */
-    if (in_w == 300 && in_h == 1 && out_w == 2 && channels == 4) {
-        printf("DEBUG horizontal: in_w=%d in_h=%d out_w=%d channels=%d\n", in_w, in_h, out_w, channels);
-    }
     for (int ox = 0; ox < out_w; ox++) {
         Kernel1D k;
-        if (kernel1d_init(&k, ox, in_w, out_w) != 0) return -1;
-        /* DEBUG: print kernel for edge case */
-        if (in_w == 300 && in_h == 1 && out_w == 2 && channels == 4) {
-            printf("DEBUG kernel ox=%d: left=%d right=%d n=%d weights=", ox, k.left, k.right, k.n);
-            for (int i = 0; i < k.n; i++) printf("%d ", k.weights[i]);
-            printf("\n");
-        }
+        int32_t weight_sum = kernel1d_init(&k, ox, in_w, out_w);
+        if (weight_sum < 0) return -1;
         const int row_bytes = in_w * channels;
         for (int iy = 0; iy < in_h; iy++) {
             const uint8_t *row_base = in + iy * row_bytes;
             const int32_t *wptr = k.weights;
-            int32_t weight_sum = kernel1d_init(&k, ox, in_w, out_w);
-            if (weight_sum < 0) return -1;
             int32_t weight_half = weight_sum / 2;
 #if DIVOOM_HAS_NEON
             int32x4_t acc_v = vdupq_n_s32(weight_half);
@@ -288,30 +301,11 @@ static int vertical_pass(
     int channels
 ) {
     const int row_bytes = out_w * channels;
-    /* DEBUG: print vertical kernels for edge case 16x16->8x8 */
-    if (out_w == 8 && in_h == 16 && out_h == 8 && channels == 4) {
-        printf("DEBUG vertical_pass: out_w=%d in_h=%d out_h=%d channels=%d\n", out_w, in_h, out_h, channels);
-        /* Print tmp buffer (horizontal pass output) for alpha channel */
-        printf("DEBUG tmp buffer (alpha channel, column 0):\n");
-        for (int iy = 0; iy < in_h; iy++) {
-            printf("  tmp[%d] = %d\n", iy, tmp[iy * row_bytes + 3]);
-        }
-    }
     for (int oy = 0; oy < out_h; oy++) {
         Kernel1D k;
         int32_t weight_sum = kernel1d_init(&k, oy, in_h, out_h);
         if (weight_sum < 0) return -1;
         int32_t weight_half = weight_sum / 2;
-        if (out_w == 8 && in_h == 16 && out_h == 8 && channels == 4) {
-            printf("DEBUG vertical kernel oy=%d: left=%d right=%d n=%d\n", oy, k.left, k.right, k.n);
-            if (k.weights) {
-                int sum = 0;
-                for (int i = 0; i < k.n; i++) sum += k.weights[i];
-                printf("  weights: ");
-                for (int i = 0; i < k.n; i++) printf("%d ", k.weights[i]);
-                printf("\n  sum=%d\n", sum);
-            }
-        }
         const int32_t *wptr_base = k.weights;
         for (int ox = 0; ox < out_w; ox++) {
             const uint8_t *col_base = tmp + ox * channels;
@@ -361,8 +355,6 @@ static int vertical_pass(
             q[0] = clip_u8(a0 >> PRECISION_BITS);
             q[1] = clip_u8(a1 >> PRECISION_BITS);
             q[2] = clip_u8(a2 >> PRECISION_BITS);
-            q[1] = clip_u8(a1 >> PRECISION_BITS);
-            q[2] = clip_u8(a2 >> PRECISION_BITS);
             if (channels == CHANNELS_RGBA) {
                 q[3] = clip_u8(a3 >> PRECISION_BITS);
             }
@@ -396,6 +388,11 @@ int downsample_lanczos3(
     if (!in || !out) return -1;
     if (in_w <= 0 || in_h <= 0 || out_w <= 0 || out_h <= 0) return -1;
     if (channels != CHANNELS_RGB && channels != CHANNELS_RGBA) return -1;
+    /* RGBA: fall back to PIL because PIL uses a non-separable single-pass
+     * resize for RGBA images. Our separable two-pass (horizontal then vertical
+     * with 8-bit intermediate) is not byte-identical to PIL for RGBA; RGB is
+     * byte-identical because PIL does use the two-pass approach for RGB. */
+    if (channels == CHANNELS_RGBA) return -1;
     if (in_w == out_w && in_h == out_h) {
         /* Identity: just memcpy (no pre-mult needed since dimensions match). */
         memcpy(out, in, (size_t)in_w * in_h * channels);

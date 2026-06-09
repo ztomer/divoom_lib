@@ -6,6 +6,16 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Downscaler kernel weight normalization: RGB parity bug fixed
+
+- `downsample_kernel.c`: Changed `kernel1d_init` from quantize-then-normalize
+  to normalize-then-quantize (matching PIL's `normalize_coeffs_8bpc` in
+  `libImaging/Resample.c`). Normalize double-precision weights to sum 1.0,
+  then quantize with round-half-up. Removed unused `ROUND_HALF_POS` define.
+- Fixed the remaining 1 LSB failure in `test_stress_random` (32x8→8x11 RGB).
+  **38/38 tests pass** (was 37/38). All RGB parity tests now run native (no PIL
+  fallback) and match PIL byte-for-byte.
+
 ## 2026-06-09 — Inline-style migration: batch 2 (monthly_best)
 
 - Migrated `templates_monthly_best.js`: `.gallery-select-actions` →

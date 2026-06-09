@@ -13,7 +13,6 @@
 #define LANCZOS_A_INV      (1.0 / LANCZOS_A)
 #define CENTER_OFFSET      0.5
 #define INPUT_PIXEL_CENTER 0.5
-#define ROUND_HALF_POS     0.5
 
 /* LANCZOS3 kernel. Returns 0 outside the support, 1 at x=0. */
 static inline double lanczos3_kernel(double x) {
@@ -48,10 +47,14 @@ static inline void compute_filterscale(
 }
 
 /* Kernel1D + PRECISION_* come from downsample_kernel.h. Weights are stored as
- * int32_t in PIL's fixed-point format: w_q = (int)(w * PRECISION_SCALE + 0.5).
+ * int32_t in PIL's fixed-point format. PIL normalizes double-precision weights
+ * to sum to 1.0, then quantizes each to fixed-point via:
+ *   kk[x] = (int)(0.5 + prekk[x] * PRECISION_SCALE)   for positive
+ *   kk[x] = (int)(-0.5 + prekk[x] * PRECISION_SCALE)  for negative
+ * (see PIL's normalize_coeffs_8bpc in libImaging/Resample.c).
  * The un-normalized kernel sums to >1.0 for downscaling (the filterscale
- * stretch), so PIL divides by the sum first; after normalization the quantized
- * weights sum to ~PRECISION_SCALE (= 1.0 in fixed-point). */
+ * stretch), so PIL divides by the double sum first. After normalization +
+ * quantization the weights sum to ~PRECISION_SCALE (= 1.0 in fixed-point). */
 int kernel1d_init(Kernel1D *k, int out_coord, int in_size, int out_size) {
     double center = out_to_in(out_coord, in_size, out_size);
     double filterscale, ss;
@@ -68,48 +71,40 @@ int kernel1d_init(Kernel1D *k, int out_coord, int in_size, int out_size) {
     k->weights = (int32_t*)malloc(sizeof(int32_t) * (size_t)k->n);
     if (!k->weights) return -1;
 
-    /* Step 1: compute un-normalized double weights and their quantized sum. */
+    /* Step 1: compute un-normalized double weights and their sum. */
     double *w_d = (double*)malloc(sizeof(double) * (size_t)k->n);
     if (!w_d) { free(k->weights); k->weights = NULL; return -1; }
-    int32_t *w_q = (int32_t*)malloc(sizeof(int32_t) * (size_t)k->n);
-    if (!w_q) { free(k->weights); k->weights = NULL; free(w_d); return -1; }
-    int64_t sum_q = 0;
+    double sum_d = 0.0;
     for (int i = 0; i < k->n; i++) {
         int in_idx = xmin + i;
         double w = lanczos3_kernel(
             ((double)in_idx - center + INPUT_PIXEL_CENTER) * ss
         );
         w_d[i] = w;
-        int32_t q = (int32_t)(w * (double)PRECISION_SCALE + (w >= 0.0 ? ROUND_HALF_POS : -ROUND_HALF_POS));
-        w_q[i] = q;
-        sum_q += q;
+        sum_d += w;
     }
 
-    /* Step 2: normalize quantized weights using PIL's round-half-up
-     * on the integer ratio: (w_q * PRECISION_SCALE + sum_q/2) / sum_q.
-     * For negative: -(((-w_q) * PRECISION_SCALE + sum_q/2) / sum_q).
-     * Return the actual sum of normalized weights for the accumulator bias. */
+    /* Step 2: normalize double weights to sum to 1.0, then quantize to
+     * fixed-point (matching PIL's normalize_coeffs_8bpc). For negative
+     * weights PIL uses -0.5 (toward negative infinity) to match
+     * round-half-away-from-zero for absolute values. */
     int64_t actual_sum = 0;
-    if (sum_q != 0) {
+    if (sum_d != 0.0) {
+        double inv_sum = 1.0 / sum_d;
         for (int i = 0; i < k->n; i++) {
-            int64_t q = w_q[i];
-            int64_t half = sum_q / 2;
-            if (q >= 0) {
-                k->weights[i] = (int32_t)((q * (int64_t)PRECISION_SCALE + half) / sum_q);
+            double normalized = w_d[i] * inv_sum;
+            if (normalized < 0.0) {
+                k->weights[i] = (int32_t)(normalized * (double)PRECISION_SCALE - 0.5);
             } else {
-                k->weights[i] = (int32_t)(-(((-q) * (int64_t)PRECISION_SCALE + half) / sum_q));
+                k->weights[i] = (int32_t)(normalized * (double)PRECISION_SCALE + 0.5);
             }
             actual_sum += k->weights[i];
         }
     } else {
         for (int i = 0; i < k->n; i++) k->weights[i] = 0;
-        actual_sum = 0;
     }
-    return (int32_t)actual_sum;
-
-    free(w_q);
     free(w_d);
-    return 0;
+    return (int32_t)actual_sum;
 }
 
 void kernel1d_free(Kernel1D *k) {
