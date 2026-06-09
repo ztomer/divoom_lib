@@ -18,6 +18,36 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R32 — Monthly Best reorg + Routines + device selector + Text fix SHIPPED.**
+  Suite **1094 / 75 / 0** (+1). Full write-up: `docs/PLANNING_ROUND32.md`.
+
+  **A — Monthly Best** is now a single full-width multi-select gallery. The
+  devices/sync-targets panel moved to Settings → Routines (§A1). The ghost Fetch
+  button is gone; gallery style is remembered **per device** in `config.ini`
+  `[gallery]` (`get_gallery_style`/`set_gallery_style`) and restored on startup
+  (§A2). Per-tile checkboxes (default all checked) + Select All / Clear; "Update
+  Device" pushes every checked image (§A3).
+
+  **B — Routines card**: device selector | gallery-style selector, macOS-style
+  toggle (`.switch`), interval, the moved devices list, Save Schedule + "Sync
+  devices now". Auto-sync stays daemon-driven via `hotchannel_config.json`.
+
+  **C — Device selector**: stripped `BLE:`/`LAN:` prefix (§C1); sidebar preview
+  mirrors the **last image pushed** per device, persisted in localStorage (§C2 —
+  user confirmed no live framebuffer readback); dropdown replaced by per-device
+  **dots** overlaid on the preview, color-coded + tooltipped + click-to-switch,
+  `<select>` kept hidden as state (§C3).
+
+  **D — Channels → Text FIXED** ("nothing appeared"): the 0x87 LPWA sequence does
+  not render on the Pixoo-class LED matrices. `push_text` now renders the text
+  with our bitmap font to a device-sized image and pushes via
+  `display.show_image()` (matches hass-divoom/futpib). **Static image only**;
+  scrolling + hardware verification are follow-ups.
+
+  **E**: removed the Connectivity & Privacy explainer legend.
+
+  Browser-preview verified the dots, gallery multi-select, and Routines card.
+
 - **R31 — Font improvement + CJK infrastructure + warning fixes SHIPPED.**
   Suite **1093 / 75 / 0** (+3).
 
@@ -466,7 +496,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Open threads / next up
 
-### From R29 (this round)
+### From R32 (this round)
+- **Text is static, not scrolling** — D's fix renders a single centered bitmap;
+  long text on a 16px matrix scales down small. Proper follow-up: futpib-style
+  scrolling-frame animation honouring the card's speed/effect controls. The
+  static fix is **not hardware-verified** — drive it on a real device.
+- **Daemon auto-sync not re-verified** — the Routines toggle/interval/targets
+  persist to `hotchannel_config.json` as before; confirm the daemon actually runs
+  the scheduled gallery sync (no new scheduler was added this round).
+- **C2 preview is partial** — only the gallery + custom-art push sites call
+  `setDevicePreview`; text/wall-split/weather pushes don't update the preview yet.
+
+### From R29 (earlier)
 - **Exclusive mode not hardware-verified** — unit-green only; drive through
   a real multi-step sequence (e.g. animation streaming).
 - **`_run_device` blocks the caller while the item is queued** — if the

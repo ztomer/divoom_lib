@@ -6,6 +6,65 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 32 — 2026-06-08 (Monthly Best reorg + Routines + device selector + Text fix)
+
+### A — Monthly Best → full-width multi-select gallery
+
+- **§A1**: the devices (sync-targets) panel moved out of Monthly Best into
+  Settings → Routines. Monthly Best is now a single full-width gallery card
+  (`.monthly-best-layout` is `grid-template-columns: 1fr`).
+- **§A2**: removed the ghost "Fetch Gallery" button (fetch already auto-fires on
+  style change + tab activation). Gallery style is now remembered **per device**
+  in `config.ini` `[gallery]` via new `get_gallery_style`/`set_gallery_style`
+  API; the active device's preferred style is restored on startup before the
+  cached gallery renders. The style dropdown sits in the old button location.
+- **§A3**: each gallery tile carries a selection checkbox (all checked by
+  default); added "Select All" / "Clear" controls (virtual-wall styling) and
+  dropped the "Gallery" / "Divoom Cloud" header chrome. "Update Device" now
+  pushes **every checked** image.
+
+### B — Settings → Routines card
+
+- New layout: device selector | gallery-style selector, a **macOS-style toggle**
+  (`.switch`/`.slider-round`, not a checkbox) for auto-sync, interval, the moved
+  devices list, "Save Schedule" + "Sync devices now". Auto-sync stays
+  daemon-driven (reads `hotchannel_config.json`).
+
+### C — Device selector
+
+- **§C1**: stripped the `BLE:`/`LAN:` transport prefix from the sidebar device
+  selector — names are clean (the connectivity dots convey transport).
+- **§C2**: the sidebar preview mirrors the **last image this app pushed** to each
+  device (devices can't report their framebuffer). `setDevicePreview()` is called
+  from the gallery push and the custom-art push; the map persists in
+  `localStorage` and `restoreDevicePreview()` runs on connect/switch, falling back
+  to the product icon.
+- **§C3**: replaced the device dropdown with **per-device dots** overlaid on the
+  preview — color-coded via `deviceColor()`, tooltips show names, click switches.
+  The `<select>` is kept hidden as canonical state; `renderDeviceDots()` mirrors
+  it and highlights the active device.
+
+### D — Channels → Text fix ("nothing appeared")
+
+- The Text card pushed via the 0x87 "set light phone word attr" (LPWA) sequence,
+  which the Pixoo-class LED matrices don't render — so nothing showed. The
+  known-working references (hass-divoom, futpib) render text into image frames and
+  push them via the normal image path. `push_text` (GUI `LightingApi`) now renders
+  the text with our no-AA bitmap font onto a device-sized canvas (scaling to fit)
+  and pushes via `display.show_image()`. `speed`/`effect_style` are accepted for
+  call-compat but unused (static image); scrolling frames are a follow-up.
+  **Not hardware-verified** — the render + push-path are unit-tested.
+
+### E — Settings → Connectivity cleanup
+
+- Removed the "Connectivity & Privacy" explainer legend (markup + `.connectivity-legend*`
+  styles); the four corner transport dots already convey state.
+
+Suite **1094 passed / 75 skipped / 0 failed**. Browser-preview verified the dots,
+gallery multi-select, and Routines card. Full write-up: `docs/PLANNING_ROUND32.md`.
+
+---
+
 ## Round 31 — 2026-06-08 (Font improvement + CJK infrastructure + warning fixes)
 
 ### Better half-font downsampling

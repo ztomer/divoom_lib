@@ -52,3 +52,57 @@ Investigate and fix (currently broken — no details yet).
 
 ## E. Settings → Connectivity cleanup
 Remove the connectivity and privacy explainer text.
+
+---
+
+## Outcome — SHIPPED (2026-06-08)
+
+Suite **1094 passed / 75 skipped / 0 failed**. All of A–E landed across 6 commits.
+
+### A — Monthly Best (templates_monthly_best.js, gallery.js, gallery.css, gallery_sync.py)
+- **A1** done: devices/sync-targets panel removed from Monthly Best; it now lives
+  in Settings → Routines. `.monthly-best-layout` is single-column (`1fr`).
+- **A2** done: ghost Fetch button removed entirely; style change auto-fetches (it
+  already did) and now also persists the style **per device** in `config.ini`
+  `[gallery]` (`get_gallery_style`/`set_gallery_style` on `GallerySyncMixin`). On
+  startup `loadPreferredGalleryStyle()` restores the active device's style before
+  the cached gallery renders. Dropdown sits in the old button location.
+- **A3** done: per-tile checkboxes (default all checked), Select All / Clear
+  (virtual-wall buttons), removed "Gallery"/"Divoom Cloud" header chrome, gallery
+  spans full width. "Update Device" pushes every checked image.
+
+### B — Routines card (templates_settings.js, settings_features.js)
+- New card: `[device select | gallery-style select]`, macOS-style toggle
+  (`.switch`), interval select, the moved devices list, "Save Schedule" + "Sync
+  devices now". Auto-sync remains daemon-driven (hotchannel_config.json).
+
+### C — Device selector (index.html, sidebar.css, app_globals.js, app_init.js, gallery.js)
+- **C1** done: stripped `BLE:`/`LAN:` prefix from the sidebar selector.
+- **C2** done: preview shows the **last image pushed** by this app per device
+  (user-confirmed interpretation — no live framebuffer readback exists).
+  `setDevicePreview`/`restoreDevicePreview`, persisted in localStorage; wired from
+  the gallery + custom-art push sites.
+- **C3** done: dropdown replaced by per-device dots overlaid on the preview
+  (`renderDeviceDots`), color-coded, tooltipped, click-to-switch; `<select>` kept
+  hidden as canonical state.
+
+### D — Channels → Text fix (divoom_gui/api/lighting.py)
+- Root cause: the 0x87 LPWA "set light phone word attr" sequence does not render
+  on the Pixoo-class LED matrices (confirmed against hass-divoom + futpib, which
+  both render text to image frames). `push_text` now renders the text with our
+  bitmap font onto a device-sized canvas and pushes via `display.show_image()`.
+  **Static image only** — `speed`/`effect_style` are accepted but unused;
+  scrolling-frame animation is the follow-up. **Needs hardware verification.**
+
+### E — Connectivity cleanup (templates_settings.js, settings.css)
+- Removed the Connectivity & Privacy legend markup + `.connectivity-legend*` CSS.
+
+### Follow-ups / not done
+- **D scrolling text**: current fix is a static centered render; long text on a
+  16px matrix scales down small. A futpib-style scrolling-frame animation that
+  honours speed/effect is the proper follow-up. Hardware-verify the static fix.
+- **Daemon auto-sync schedule**: the Routines toggle/interval/targets persist to
+  `hotchannel_config.json` (daemon-read) as before; no new daemon scheduler was
+  added this round — confirm the daemon acts on it.
+- **C2** only mirrors the gallery + custom-art push sites; other push paths
+  (text, wall split, weather) don't yet update the preview.
