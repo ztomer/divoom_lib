@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Daemon-ownership investigation (2026-06-09).** Scoped REVIEW §1.3/§4.1/§1.2
+  read-only → `docs/PLANNING_daemon_ownership.md`. **Key correction:** the
+  device-access migration is essentially DONE — there is NO direct BLE in
+  `divoom_gui/`; `current_divoom` is a `DaemonDeviceProxy` (scanner_mixin.py:119)
+  and the daemon's `DeviceOwner` is the single connection owner. So §1.3 is a
+  false-positive and §4.1's "biggest risk" is largely resolved. The ONE genuine
+  remaining duplication is notifications (§1.2): the GUI runs its own
+  `MacNotificationMonitor` (gui_api.py:226) alongside the daemon's auto-started
+  `NotificationService` (daemon.py:145) → double-routed notifications. Fix is
+  cheap: GUI should call the daemon's existing `start_notifications` RPC instead
+  of polling locally. Phase 1 of the plan is low-risk; NOT started yet.
+
 - **Housekeeping (2026-06-09).** Removed 3 confirmed-dead CSS classes
   (`.color-picker-grid`, `.channel-grid` in channels.css; `.range-slider`
   +thumb in style.css) — `.color-swatch` was KEPT (still used). Cleaned the

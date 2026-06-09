@@ -6,6 +6,21 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Daemon-ownership investigation + plan
+
+- Read-only investigation of REVIEW §1.3/§4.1/§1.2 → new
+  `docs/PLANNING_daemon_ownership.md`.
+- Correction: the device-access migration is essentially complete — no direct
+  BLE in `divoom_gui/`; `current_divoom` is a `DaemonDeviceProxy` routing through
+  the daemon's single-owner `DeviceOwner`. REVIEW §1.3 re-tagged false-positive
+  (resolved); §0.5 priority #3 collapsed into #4.
+- The one genuine remaining duplication is notification monitoring (§1.2): GUI's
+  `MacNotificationMonitor` runs alongside the daemon's auto-started
+  `NotificationService`. Phased fix documented (Phase 1: GUI delegates to the
+  daemon's existing `start_notifications` RPC). Not yet implemented.
+
+---
+
 ## 2026-06-09 — Housekeeping (dead CSS + asyncio cleanup)
 
 - Removed dead CSS confirmed unused (REVIEW_2026-06 §2.4): `.color-picker-grid`
