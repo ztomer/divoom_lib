@@ -245,7 +245,9 @@ document.addEventListener("DOMContentLoaded", () => {
         candidates.forEach(c => {
             const row = document.createElement("div");
             row.className = "sync-device-row";
-            row.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 0;";
+            // R34 §3: nowrap — the card is wide enough now (760px); long names
+            // truncate (ellipsis below) instead of pushing the style tabs to wrap.
+            row.style.cssText = "display:flex; flex-wrap:nowrap; align-items:center; gap:8px; padding:10px 0;";
 
             const color = window.deviceColor(c.address);
             const accent = document.createElement("span");
@@ -258,12 +260,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const name = document.createElement("span");
             name.className = "target-name";
             name.textContent = c.name;
-            name.style.flex = "0 0 auto";
+            name.title = c.name;
+            name.style.cssText =
+                "flex:0 1 auto; min-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
 
-            // Per-device gallery style tabs.
+            // Per-device gallery style tabs (nowrap — R34 §3).
             const styleTabs = document.createElement("div");
             styleTabs.className = "tabs-row";
-            styleTabs.style.cssText = "flex:1; margin:0 8px;";
+            styleTabs.style.cssText = "flex:1; margin:0 8px; flex-wrap:nowrap;";
             styleTabs.setAttribute("role", "tablist");
             const currentStyle = c.gallery_style || 18;
             styleOptions.forEach(s => {

@@ -10,7 +10,9 @@ window.DivoomTemplates.routines = `
 
         <!-- SCHEDULE sub-tab (ex-Settings → Routines) -->
         <div class="routines-subtab-content active" id="routines-schedule">
-        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
+        <!-- R34 §3: 760px (was 540) so a device row — dot + name + 4 style tabs +
+             toggle — fits on ONE line instead of wrapping. -->
+        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 760px;">
             <div class="card glass-card">
                 <div class="card-header flex-header">
                     <h3>Auto-Sync Gallery</h3>
@@ -47,10 +49,15 @@ window.DivoomTemplates.routines = `
             <div class="card glass-card">
                 <div class="card-header flex-header">
                     <h3>Alarms</h3>
+                    <!-- R34 §4: table model — add/clear here, per-row remove, live writes. -->
+                    <div class="row gap-8">
+                        <button id="alarms-clear-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Clear all</button>
+                        <button id="alarms-add-btn" class="glow-btn compact">+ Add alarm</button>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <p class="panel-hint" style="margin-top:0;">Connect a device, set a time + weekdays, then Save each alarm.</p>
-                    <div id="alarms-list" class="alarms-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    <p class="panel-hint" style="margin-top:0;">Changes are sent to the device immediately. Click a weekday cell to toggle it.</p>
+                    <div id="alarms-list" class="alarms-list"></div>
                 </div>
             </div>
             <div class="card glass-card">
