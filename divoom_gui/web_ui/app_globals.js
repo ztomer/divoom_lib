@@ -95,6 +95,8 @@ window.renderDeviceDots = function() {
         const color = window.deviceColor(e.value);
         dot.style.background = color;
         dot.style.color = color;
+        // R34 §2: lets connectDevice find this dot and pulse it while connecting.
+        dot.dataset.value = e.value;
         dot.title = e.name;
         dot.setAttribute("role", "tab");
         dot.setAttribute("aria-selected", isActive ? "true" : "false");
@@ -124,7 +126,13 @@ window.connectDevice = function(name, address) {
     window.showToast(`Connecting to ${name}...`, "success");
     const statusDot = document.getElementById("global-status-dot");
     if (statusDot) { statusDot.className = "transport-dot connecting"; statusDot.removeAttribute("style"); }
-    
+    // R34 §2: pulse the sidebar device dot being connected (same amber
+    // dot-pulse the appbar dot uses). Cleared by re-render on success or
+    // explicitly on failure.
+    const deviceDot = document.querySelector(
+        `#device-dots .transport-dot[data-value="${(window.CSS && CSS.escape) ? CSS.escape(address) : address}"]`);
+    if (deviceDot) { deviceDot.classList.add("connecting"); deviceDot.removeAttribute("style"); }
+
     if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.connect_single_device(address).then(res => {
             if (res) {
@@ -154,6 +162,8 @@ window.connectDevice = function(name, address) {
                 window.DivoomState.appConnected = false;
                 window.showToast(`Failed to connect to ${name}`, "error");
                 if (statusDot) { statusDot.className = "transport-dot inactive"; statusDot.removeAttribute("style"); }
+                // R34 §2: stop the pulse + restore the per-device hue.
+                if (window.renderDeviceDots) window.renderDeviceDots();
                 document.getElementById("banner-device-name").textContent = "None";
                 document.getElementById("banner-device-mac").textContent = "None";
                 window.updateSidebarSpeakerIcon(false);
