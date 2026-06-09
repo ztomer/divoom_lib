@@ -63,6 +63,11 @@ class BLETransport(DeviceTransport):
         # fully discovered; the first write in that window returns
         # "disconnected" while the cached state is stale.
         self._connection_likely_broken = False
+        # R36b: command ids whose UNSOLICITED inbound frames should be queued
+        # even when no response is expected (device-driven protocols — the hot
+        # update's 0xF7 file requests / 0x9D / 0x9E acks). Set by HotUpdate
+        # for the duration of its session.
+        self._listen_commands: set[int] = set()
 
     @property
     def is_connected(self) -> bool:
@@ -220,7 +225,14 @@ class BLETransport(DeviceTransport):
 
             is_expected_response = expected_cmd is not None and command_identifier == expected_cmd
             is_generic_ack = expected_cmd is not None and command_identifier == models.GENERIC_ACK_COMMAND_ID and expected_cmd in models.GENERIC_ACK_COMMANDS
+            # R36b: device-driven protocols (hot update) receive UNSOLICITED
+            # frames (e.g. 0xF7 file requests) — queue any command in the
+            # listen set without consuming _expected_response_command.
+            is_listened = command_identifier in getattr(self, "_listen_commands", ())
 
+            if is_listened:
+                self.notification_queue.put_nowait(response_payload)
+                return True
             if is_expected_response or is_generic_ack:
                 self.notification_queue.put_nowait(response_payload)
                 self._expected_response_command = None
@@ -242,6 +254,29 @@ class BLETransport(DeviceTransport):
         for response_payload in msgs:
             self.notification_queue.put_nowait(response_payload)
         return True
+
+    async def wait_for_any_response(self, command_ids: list[int],
+                                    timeout: float = 10.0) -> tuple[int, bytes] | None:
+        """Wait for the first inbound frame whose command id is in
+        ``command_ids``; returns ``(command_id, payload)`` or ``None`` on
+        timeout. Unlike :meth:`wait_for_response` this serves DEVICE-DRIVEN
+        protocols (R36b hot update) where several different commands can
+        arrive next (e.g. a 0xF7 file request OR a 0x9E data ack)."""
+        loop = asyncio.get_running_loop()
+        end_time = loop.time() + timeout
+        wanted = set(command_ids)
+        while True:
+            remaining = end_time - loop.time()
+            if remaining <= 0:
+                return None
+            try:
+                response = await asyncio.wait_for(self.notification_queue.get(), timeout=remaining)
+            except asyncio.TimeoutError:
+                return None
+            cmd = response.get('command_id')
+            if cmd in wanted:
+                return cmd, response.get('payload')
+            self.logger.debug(f"wait_for_any: ignoring 0x{cmd:02x}")
 
     async def wait_for_response(self, command_id: int, timeout: float = 10.0) -> bytes | None:
         self.logger.debug(f"Waiting for response to command ID 0x{command_id:02x} for {timeout}s...")

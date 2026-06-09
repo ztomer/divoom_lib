@@ -28,6 +28,7 @@ from .tools.timer import Timer
 from .tools.countdown import Countdown
 from .tools.noise import Noise
 from .tools.notification import Notification
+from .tools.hot_update import HotUpdate
 from .display import Display
 from .display.design import Design
 from .system import System
@@ -117,6 +118,7 @@ class Divoom:
         self.countdown = Countdown(self)
         self.noise = Noise(self)
         self.notification = Notification(self)
+        self.hot_update = HotUpdate(self)
 
         self.display = Display(self)
         self.system = System(self)
@@ -414,6 +416,9 @@ class Divoom:
 
     async def wait_for_response(self, command_id: int, timeout: float = 3.0) -> bytes | None:
         return await self._conn.wait_for_response(command_id, timeout)
+
+    async def wait_for_any_response(self, command_ids: list, timeout: float = 10.0):
+        return await self._conn.wait_for_any_response(command_ids, timeout)
 
     async def send_command_and_wait_for_response(self, command: int | str, args: list | None = None, timeout: float = 10.0) -> bytes | None:
         return await self._conn.send_command_and_wait_for_response(command, args, timeout=timeout)

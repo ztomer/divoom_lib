@@ -32,6 +32,7 @@ DEFAULT_CLIENT_TIMEOUT = 2.0         # socket read timeout for quick, non-scan c
 DEFAULT_RECONNECT_SCAN_TIMEOUT = 3.0  # short scan used during auto-reconnect
 DEFAULT_CONNECT_TIMEOUT = 20.0       # client read timeout for connect/disconnect (BLE is slow)
 DEFAULT_SYNC_READ_TIMEOUT = 120.0    # client read timeout for sync_artwork (download + BLE stream)
+DEFAULT_HOT_UPDATE_TIMEOUT = 600.0   # client read timeout for hot_update (manifest of ~30 files)
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class DaemonConfig:
     reconnect_scan_timeout: float = DEFAULT_RECONNECT_SCAN_TIMEOUT
     connect_timeout: float = DEFAULT_CONNECT_TIMEOUT
     sync_read_timeout: float = DEFAULT_SYNC_READ_TIMEOUT
+    hot_update_timeout: float = DEFAULT_HOT_UPDATE_TIMEOUT
 
     def scan_read_timeout(self, scan_timeout: float) -> float:
         """How long a client should wait for a scan reply: the daemon only
@@ -86,6 +88,10 @@ connect_timeout = {connect_timeout}
 # daemon downloads the asset and streams it to the device over BLE, which can
 # take a minute or more per image — a short read here falsely reports failure.
 sync_read_timeout = {sync_read_timeout}
+
+# Client read timeout for the hot-channel update (downloads + serves the
+# device's file requests for Divoom's full curated set — can take minutes).
+hot_update_timeout = {hot_update_timeout}
 """
 
 _cache: DaemonConfig | None = None

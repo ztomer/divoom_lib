@@ -442,6 +442,27 @@ class DeviceOwner:
             logger.warning(f"sync_artwork failed: {e}")
             return {"success": False, "error": str(e)}
 
+    def hot_update(self, args: dict) -> dict:
+        """R36b: run the APK-equivalent HOT channel update against the owned
+        device — downloads Divoom's curated hot files and serves the device's
+        file requests (155/247/157/158). Then optionally switches the device
+        to the HOT channel so the result is visible."""
+        device_size = int(args.get("device_size", 16) or 16)
+        show = bool(args.get("show", True))
+
+        async def _do():
+            device = await self._ensure_device_async(args.get("mac"))
+            result = await device.hot_update.update(device_size=device_size)
+            if result.get("success") and show:
+                await device.hot_update.show_hot_channel()
+            return result
+
+        try:
+            return _json_safe(self._run_device(_do()))
+        except Exception as e:
+            logger.warning(f"hot_update failed: {e}")
+            return {"success": False, "error": str(e)}
+
     def probe_lan(self) -> dict:
         d = self._device
         lan = getattr(d, "lan", None) if d is not None else None

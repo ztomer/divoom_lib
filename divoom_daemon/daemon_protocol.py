@@ -280,6 +280,16 @@ class DaemonClient:
             "file_id": file_id, "default_size": default_size, "target": target,
         }, read_timeout=load_daemon_config().sync_read_timeout)
 
+    def hot_update(self, *, device_size: int = 16, show: bool = True) -> dict:
+        """R36b: run the APK-equivalent HOT channel update on the owned device
+        (download Divoom's curated hot files, serve the device's file requests,
+        then switch to the HOT channel). Long-running — uses the generous
+        ``hot_update_timeout`` (a full set is ~30 files over BLE)."""
+        from divoom_daemon.daemon_config import load_daemon_config
+        return self.send_command(
+            "hot_update", {"device_size": device_size, "show": show},
+            read_timeout=load_daemon_config().hot_update_timeout)
+
     def subscribe(
         self,
         on_event: Callable[[dict], None],

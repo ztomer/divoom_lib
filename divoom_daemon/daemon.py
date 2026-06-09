@@ -87,6 +87,7 @@ class DivoomDaemon:
         r["wall_configure"] = self._device_owner.wall_configure
         r["probe_lan"] = lambda _: self._device_owner.probe_lan()
         r["sync_artwork"] = self._device_owner.sync_artwork
+        r["hot_update"] = self._device_owner.hot_update
         r["shutdown"] = self._cmd_shutdown
         self._registry = r
 

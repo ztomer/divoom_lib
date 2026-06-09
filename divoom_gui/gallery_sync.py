@@ -475,6 +475,15 @@ class GallerySyncMixin:
         return json.dumps({"ok": len(failed) == 0, "synced": synced,
                            "failed": failed, "errors": errors})
 
+    def hot_channel_update(self) -> str:
+        """R36b: device HOT channel update (APK-equivalent store). JSON summary."""
+        logger.info("GUI Action: Hot channel update (device-driven store)...")
+        client = self._client()
+        if client is None:
+            return json.dumps({"success": False, "error": "no daemon available"})
+        size = self._active_device_size() if hasattr(self, "_active_device_size") else 16
+        return json.dumps(client.hot_update(device_size=int(size), show=True))
+
     def get_animated_preview(self, file_id: str) -> str:
         """Helper to retrieve base64 encoded animated GIF for progressive loading."""
         logger.info(f"GUI Action: Fetching animated preview for {file_id}")

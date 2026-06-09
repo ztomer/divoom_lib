@@ -34,6 +34,13 @@ window.DivoomTemplates.monthlyBest = `                <div class="monthly-best-l
                                     <span id="batch-sync-label">Update Device</span>
                                     <span id="batch-sync-status" class="sync-status-text"></span>
                                 </button>
+                                <!-- R36b: the REAL hot-channel update — stores Divoom's curated
+                                     set into the device's HOT rotation (APK "Update" equivalent),
+                                     unlike Update Device which displays the selection. -->
+                                <button id="hot-update-btn" class="glow-btn" style="flex:1; margin:0;"
+                                        title="Store Divoom's curated hot files into the device's Hot channel rotation">
+                                    <span id="hot-update-label">Update Hot Channel</span>
+                                </button>
                             </div>
                         </div>
                     </div>

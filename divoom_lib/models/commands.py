@@ -10,6 +10,14 @@ COMMANDS = {
     "set game ctrl key up info": 0x21,
     "set keyboard": 0x23,
     "set hot": 0x26,
+    # ── Hot-channel update family (R36b, APK SPP_* names) ──
+    # Device-driven file store for the device's HOT channel rotation.
+    "send hotctrl": 0x85,            # SPP_SEND_HOTCTRL (133): [1, page] select hot page
+    "send hot file list": 0x9b,      # SPP_SEND_HOT_FILE_LIST (155): version manifest
+    "hot update file info": 0x9d,    # SPP_HOT_UPDATE_FILE_INFO (157): file metadata
+    "hot send file data": 0x9e,      # SPP_HOT_SEND_FILE_DATA (158): [idx:2 LE][256B chunk]
+    "hot pause file send": 0x9f,     # SPP_HOT_PAUSE_FILE_SEND (159): cancel/pause
+    "request new file info": 0xf7,   # SPP_REQUEST_NEW_FILE_INFO (247): device asks for a file
     "set blue password": 0x27,
     "sand paint ctrl": 0x34,
     "pic scan ctrl": 0x35,

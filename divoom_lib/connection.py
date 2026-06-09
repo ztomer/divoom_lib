@@ -148,6 +148,19 @@ class DivoomConnection(DeviceTransport):
     async def wait_for_response(self, command_id: int, timeout: float = 10.0) -> Optional[bytes]:
         return await self._active_transport.wait_for_response(command_id, timeout)
 
+    async def wait_for_any_response(self, command_ids: list, timeout: float = 10.0):
+        """R36b: multi-command wait for device-driven protocols (hot update).
+        Only transports that implement it participate; returns None elsewhere."""
+        wait = getattr(self._active_transport, "wait_for_any_response", None)
+        if wait is None:
+            return None
+        return await wait(command_ids, timeout)
+
+    @property
+    def _listen_commands(self):
+        """R36b: the active transport's unsolicited-frame listen set (or None)."""
+        return getattr(self._active_transport, "_listen_commands", None)
+
     @property
     def _spp_client(self) -> Any:
         return self._active_transport if self._use_spp else None
