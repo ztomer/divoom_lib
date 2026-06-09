@@ -108,8 +108,11 @@ window.updateDeviceSelectorDropdown = function() {
         sel.appendChild(opt);
     };
     
-    window.DivoomState.discoveredDevices.forEach(d => addOpt(d.address, ` BLE: ${d.name}`));
-    window.DivoomState.registeredLanDevices.forEach(d => addOpt(`LAN:${d.ip}`, ` LAN: ${d.ip}`));
+    // R32 §C1: user-facing names are clean — no "BLE:" transport prefix.
+    // The transport is already conveyed by the connectivity dots; the name
+    // alone (e.g. "Pixoo64") reads better in the selector.
+    window.DivoomState.discoveredDevices.forEach(d => addOpt(d.address, d.name));
+    window.DivoomState.registeredLanDevices.forEach(d => addOpt(`LAN:${d.ip}`, d.ip));
     if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) addOpt("MatrixWall", " Matrix Wall Grid");
 };
 
