@@ -24,8 +24,8 @@
  *   Animation packets (0x49 wire command):
  *     All frame bodies are concatenated, then split into 200-byte
  *     chunks. Each chunk is prefixed with:
- *       TOTAL_LEN  (BE u16) total length of all concatenated frame data
- *       PACKET_NUM (BE u16) 1-based packet index
+ *       TOTAL_LEN  (LE u16) total length of all concatenated frame data
+ *       PACKET_NUM (u8)      0-based packet index
  *       200 bytes  the chunk (last may be <200)
  *
  * Byte-for-byte equivalence with the Python encoder is the design
@@ -250,7 +250,7 @@ int divoom_encode_animation_frame(
  *     plus 200 bytes of data).
  *   - Packet header (3 bytes):
  *       TOTAL_LEN  (LE u16)  total bytes of the concatenated frame data
- *       PACKET_NUM (u8)      1-based packet index (1 byte, not 2)
+ *       PACKET_NUM (u8)      0-based packet index (1 byte, not 2)
  *   - Followed by 200 bytes of chunk data (last chunk may be shorter).
  *
  * Note: this is DIFFERENT from a basic-headers layout. The counter
@@ -296,7 +296,7 @@ int divoom_encode_animation_packets(
     if (out_buf == NULL || out_buf_size < DIVOOM_PACKET_HEADER_SIZE) return -1;
 
     uint16_t total_len_u16 = (uint16_t)total_len;  /* protocol uses u16 */
-    uint16_t packet_num = 1;
+    uint16_t packet_num = 0;
     int packets_written = 0;
     int offset = 0;
 

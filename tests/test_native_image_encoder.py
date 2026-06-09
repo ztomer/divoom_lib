@@ -221,7 +221,7 @@ def test_packets_have_correct_header_layout():
     # Each packet is 3 (header) + chunk_size_i bytes.
     total_len_le = int.from_bytes(packets[0][:2], "little")
     assert total_len_le == sum(len(p) - 3 for p in packets)
-    for i, pkt in enumerate(packets, start=1):
+    for i, pkt in enumerate(packets):
         total = int.from_bytes(pkt[:2], "little")
         num = pkt[2]
         assert total == total_len_le

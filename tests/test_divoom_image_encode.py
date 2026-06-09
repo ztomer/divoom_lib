@@ -364,7 +364,7 @@ def test_encode_animation_3_frames_fits_in_1_packet():
         b"\xAA\x0B\x00\x2C\x01\x00\x01\x00\x00\xFF\x00"  # blue, 300ms
     )
     # Per RomRider: [TOTAL_LEN LE u16][PACKET_NUM u8][chunk]
-    assert packet == _u16_le(len(blob)) + bytes([1]) + blob
+    assert packet == _u16_le(len(blob)) + bytes([0]) + blob
 
 
 def test_encode_animation_large_image_splits_into_packets():
@@ -382,9 +382,9 @@ def test_encode_animation_large_image_splits_into_packets():
     for i, pkt in enumerate(packets):
         # Packet is 3-byte header (LE u16 + u8) + chunk
         assert len(pkt) <= 3 + 200
-        # PACKET_NUM is 1-based, u8 (not u16)
+        # PACKET_NUM is 0-based, u8 (not u16)
         packet_num = pkt[2]
-        assert packet_num == i + 1
+        assert packet_num == i
         # TOTAL_LEN is the same in every packet, LE u16
         total_len = int.from_bytes(pkt[0:2], byteorder="little")
         assert total_len > 200

@@ -25,7 +25,7 @@ authoritative reference; divergences are noted and categorized by risk.
 | **Frame body header:** `AA LLLL TTTT RR NN` | ✅ MATCH | none | APK native `NDKMain.pixelEncode()` output, our `encode_animation_frame()` |
 | **Color palette:** 3-byte RGB, first-seen order | ✅ MATCH | none | APK `W2.c.F()` `bArr.length % 768`, our palette construction |
 | **Pixel data:** LSB-first continuous bit pack | ✅ MATCH | none | RomRider protocol (both derive from same spec) |
-| **0x49 packet index** `PACKET_NUM u8` | ❌ MISMATCH | medium | APK `e3/h.java` `f()` loop starts at **i12=0** (0-based). Our code starts at **1** (1-based). Verified by APK source. |
+| **0x49 packet index** `PACKET_NUM u8` | ✅ MATCH | resolved R38 | APK `e3/h.java` `f()` loop starts at **i12=0** (0-based). Our code now starts at **0** (Python `packet_num=0`, C `packet_num=0`). |
 | **0x49 total_len + index field sizes** (16px: 2B+1B; 32px: 4B+2B) | ✅ MATCH | none | APK `e3/h.java` lines 164-168: `i9={2,4}`, `i11={1,2}` by screen mode. Our code matches. |
 | **BLE wire framing** | ❌ DIFFERENT | low (transport) | Our: iOS LE `FE EF AA 55 ... CMD ... CK CK 02`. APK: SPP Basic `01 LL LL CMD ... CK CK 02`. Both preserve same cmd+payload. |
 | **0x8B TERMINATE (CW=2)** | ❌ EXTRA (removed R35d) | resolved | APK does NOT send terminate — verified on 4 hardware devices (Timoo SPP, Ditoo BLE, Tivoo Max BLE, Pixoo BLE). Removed. |

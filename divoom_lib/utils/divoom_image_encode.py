@@ -269,8 +269,8 @@ def encode_animation(frames: List[Frame]) -> List[bytes]:
     frames are concatenated. The concatenation is split into
     200-byte chunks; each chunk is wrapped in a 0x49 packet:
 
-        TOTAL_LEN  (BE u16: total length of all concatenated frame data)
-        PACKET_NUM (BE u16: 1-based packet index)
+        TOTAL_LEN  (LE u16: total length of all concatenated frame data)
+        PACKET_NUM (u8: 0-based packet index)
         200 bytes  (the chunk; the last chunk may be shorter)
 
     Routes through the C dylib (divoom_lib.native.image_encoder) when
@@ -318,7 +318,7 @@ def _py_encode_animation(frames: List[Frame]) -> List[bytes]:
     blob = b"".join(encoded_frames)
     total_len = len(blob) & 0xFFFF  # protocol u16 limit
     packets: List[bytes] = []
-    packet_num = 1
+    packet_num = 0
     for offset in range(0, len(blob), _ANIMATION_PACKET_PAYLOAD_SIZE):
         chunk = blob[offset : offset + _ANIMATION_PACKET_PAYLOAD_SIZE]
         packet = _u16_le(total_len) + bytes([packet_num & 0xFF]) + chunk
