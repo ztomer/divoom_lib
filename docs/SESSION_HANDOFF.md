@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Housekeeping (2026-06-09).** Removed 3 confirmed-dead CSS classes
+  (`.color-picker-grid`, `.channel-grid` in channels.css; `.range-slider`
+  +thumb in style.css) — `.color-swatch` was KEPT (still used). Cleaned the
+  `mcp_server.run_stdio` asyncio usage: dropped the deprecated `StreamReader(loop=)`
+  kwarg, documented why `FlowControlMixin` stays (no public equivalent, stable on
+  3.14). Verified: neither symbol emits a DeprecationWarning on 3.14, so REVIEW
+  §1.8's "will break on 3.14" is overstated. Remaining in §0.5 #6: the 7
+  `!important` flags in `appbar.css` (left — needs the specificity chain reworked,
+  which is browser-observable and riskier than a grep-delete).
+
 - **tool.py + drawing.py coverage (2026-06-09).** Extended `tests/test_drawing.py`
   (+19 tests, all 14 Drawing builders incl. sand_paint/pic_scan dispatch) and
   added `tests/test_tool_mock.py` (18 tests, timer/score/noise/countdown). Both

@@ -1,12 +1,5 @@
 /* channels.css — Control Center channels layout and swatch elements */
 
-.color-picker-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 10px;
-}
-
 .color-swatch {
     width: 32px;
     height: 32px;
@@ -52,12 +45,6 @@
     border: none;
     background: transparent;
     cursor: pointer;
-}
-
-.channel-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
 }
 
 /* R15 §1+§7: tab chrome (`.tabs-row` + `.tab-btn`) is owned by tabs.css.

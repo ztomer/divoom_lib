@@ -6,6 +6,20 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## 2026-06-09 — Housekeeping (dead CSS + asyncio cleanup)
+
+- Removed dead CSS confirmed unused (REVIEW_2026-06 §2.4): `.color-picker-grid`
+  and `.channel-grid` (channels.css), `.range-slider` + `::-webkit-slider-thumb`
+  (style.css). `.color-swatch` retained — it is still referenced.
+- `mcp_server.run_stdio`: dropped the deprecated `asyncio.StreamReader(loop=)`
+  kwarg (binds to the running loop on its own); documented that
+  `asyncio.streams.FlowControlMixin` is intentionally retained (no public
+  equivalent for `connect_write_pipe`, stable on 3.14). Confirmed neither emits
+  a DeprecationWarning on 3.14.
+- No behavioural change; suite unchanged.
+
+---
+
 ## 2026-06-09 — tool.py + drawing.py coverage (mock-device tests)
 
 - Extended `tests/test_drawing.py` (+19) to cover all 14 Drawing command

@@ -280,10 +280,15 @@ class MCPServer:
         one response. The loop exits cleanly on EOF (stdin closed —
         what the parent process does when it wants to stop us)."""
         loop = asyncio.get_running_loop()
-        reader = asyncio.StreamReader(loop=loop)
+        # No `loop=` kwarg: StreamReader binds to the running loop on its own
+        # (the explicit param has been deprecated since 3.8). Verified no
+        # DeprecationWarning on 3.14. See REVIEW_2026-06 §0.1 (1.8).
+        reader = asyncio.StreamReader()
         protocol = asyncio.StreamReaderProtocol(reader)
         await loop.connect_read_pipe(lambda: protocol, sys.stdin)
         # stdout is line-buffered for write; use a small writer.
+        # `FlowControlMixin` is a private symbol but has no public equivalent
+        # for `connect_write_pipe`; it is stable (not deprecated) on 3.14.
         writer_transport, writer_protocol = await loop.connect_write_pipe(
             asyncio.streams.FlowControlMixin, sys.stdout
         )
