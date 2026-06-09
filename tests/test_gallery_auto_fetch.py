@@ -39,38 +39,25 @@ GALLERY_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.css"
 # ── 1. No visible "Fetch Gallery" button ──────────────────────────────
 
 
-def test_no_visible_fetch_gallery_button() -> None:
-    """The button must still exist in the DOM (ghost), but be hidden
-    via the HTML `hidden` attribute so it's not clickable in the UI."""
+def test_fetch_gallery_button_fully_removed() -> None:
+    """R32 §A2: the ghost 'Fetch Gallery' button is gone entirely. Fetch
+    auto-fires on style change and tab activation, so there's no button —
+    not even a hidden one — and the JS no longer references its id."""
     src = TEMPLATES_JS
-    m = re.search(
-        r'<button\s+id="load-gallery-btn"[^>]*>',
-        src,
+    assert "load-gallery-btn" not in src, (
+        "load-gallery-btn should be removed entirely (R32 §A2)."
     )
-    assert m, "load-gallery-btn button removed entirely — keep it as a hidden ghost."
-    attrs = m.group(0)
-    assert "hidden" in attrs, (
-        f"load-gallery-btn is not hidden — should have the HTML `hidden` "
-        f"attribute. Got: {attrs!r}"
+    js = GALLERY_JS.read_text()
+    assert "load-gallery-btn" not in js, (
+        "gallery.js still references the removed load-gallery-btn id."
     )
 
 
-def test_button_text_not_in_visible_html() -> None:
-    """The literal 'Fetch Gallery' string must not appear as visible UI
-    text in templates.js (the hidden ghost button is acceptable, plus
-    any comments explaining why the button is hidden)."""
+def test_fetch_gallery_label_not_in_html() -> None:
+    """R32 §A2: the 'Fetch Gallery' label should not appear in the markup."""
     src = TEMPLATES_JS
-    # The hidden button still uses the old label as its textContent —
-    # that's fine, it just isn't visible. We only need to assert that
-    # there's no *visible* Fetch Gallery UI. The button is the only
-    # allowed occurrence outside comments.
-    button_uses_label = bool(re.search(
-        r'<button\s+id="load-gallery-btn"[^>]*>\s*Fetch Gallery\s*</button>',
-        src,
-    ))
-    assert button_uses_label, (
-        "The hidden ghost button must still have 'Fetch Gallery' as its "
-        "textContent so the auto-fetch flow can identify it."
+    assert "Fetch Gallery" not in src, (
+        "'Fetch Gallery' label still present — the button was removed (R32 §A2)."
     )
 
 
@@ -88,15 +75,21 @@ def test_batch_sync_btn_renamed_to_update_device() -> None:
     ), "batch-sync-btn button must be renamed to 'Update Device'."
 
 
-def test_sync_all_btn_renamed_to_update_devices() -> None:
+def test_sync_all_btn_moved_to_routines() -> None:
+    """R32 §A1+§B: the multi-device sync button moved from Monthly Best to
+    Settings → Routines and is labelled 'Sync devices now'."""
     src = TEMPLATES_JS
-    assert "Sync All" not in src, (
-        "Old 'Sync All → Devices' label still present — should be 'Update Devices'."
+    assert "Sync All" not in src, "Old 'Sync All' label still present."
+    # Must live in the Routines sub-tab now.
+    routines = re.search(
+        r'<div class="settings-tab-content" id="settings-routines">(.+?)`;',
+        src, re.DOTALL,
     )
+    assert routines is not None, "settings-routines block not found"
     assert re.search(
-        r'<button\s+id="sync-all-btn"[^>]*>\s*Update Devices\s*</button>',
-        src,
-    ), "sync-all-btn button must be renamed to 'Update Devices'."
+        r'<button\s+id="sync-all-btn"[^>]*>\s*Sync devices now\s*</button>',
+        routines.group(1),
+    ), "Routines must host the 'Sync devices now' (sync-all-btn) button."
 
 
 def test_refresh_targets_btn_removed() -> None:
@@ -130,9 +123,11 @@ def test_load_gallery_exposed_on_window() -> None:
 
 def test_classify_change_auto_fetches() -> None:
     js = GALLERY_JS.read_text()
+    # R32 §A2: the change handler calls loadGallery() and persists the style
+    # per device, so it's now an arrow wrapper rather than a bare reference.
     assert re.search(
         r"document\.getElementById\(\"gallery-classify\"\)"
-        r"[\s\S]*?addEventListener\(\"change\",\s*loadGallery\)",
+        r"[\s\S]*?addEventListener\(\"change\",[\s\S]*?loadGallery\(\)",
         js,
     ), "classify <select> is missing a 'change' → loadGallery() hook."
 

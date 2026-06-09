@@ -17,6 +17,55 @@ document.addEventListener("DOMContentLoaded", () => {
                 } catch (e) { /* ignore */ }
             });
         }
+        // R32 §A1: the devices panel now lives in this card — refresh it.
+        if (window.updateSyncTargetList) window.updateSyncTargetList();
+        // R32 §A2+§B: populate the per-device gallery-style selector.
+        populateRoutinesDevices();
+    }
+
+    // R32 §B: the device dropdown is the per-device gallery-style picker.
+    // "All devices" maps to the global default style.
+    function populateRoutinesDevices() {
+        const sel = document.getElementById("routines-device-select");
+        if (!sel) return;
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">All devices</option>';
+        (window.DivoomState.discoveredDevices || []).forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = d.address; opt.textContent = d.name;
+            sel.appendChild(opt);
+        });
+        (window.DivoomState.registeredLanDevices || []).forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = `LAN:${d.ip}`; opt.textContent = d.ip;
+            sel.appendChild(opt);
+        });
+        if (prev) sel.value = prev;
+        loadRoutinesGalleryStyle();
+    }
+
+    function loadRoutinesGalleryStyle() {
+        const addr = document.getElementById("routines-device-select")?.value || "";
+        const style = document.getElementById("routines-gallery-style");
+        if (style && window.pywebview?.api?.get_gallery_style) {
+            window.pywebview.api.get_gallery_style(addr).then(v => {
+                if (v !== null && v !== undefined) style.value = String(v);
+            });
+        }
+    }
+
+    const routinesDeviceSel = document.getElementById("routines-device-select");
+    if (routinesDeviceSel) routinesDeviceSel.addEventListener("change", loadRoutinesGalleryStyle);
+
+    const routinesStyleSel = document.getElementById("routines-gallery-style");
+    if (routinesStyleSel) {
+        routinesStyleSel.addEventListener("change", () => {
+            const addr = document.getElementById("routines-device-select")?.value || "";
+            if (window.pywebview?.api?.set_gallery_style) {
+                window.pywebview.api.set_gallery_style(addr, parseInt(routinesStyleSel.value) || 18);
+                window.showToast("Gallery style saved", "success");
+            }
+        });
     }
 
     const routinesSaveBtn = document.getElementById("routines-auto-sync-save");

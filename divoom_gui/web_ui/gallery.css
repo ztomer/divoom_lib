@@ -32,7 +32,8 @@
     background: rgba(157, 78, 221, 0.02);
 }
 
-.gallery-item.active {
+.gallery-item.active,
+.gallery-item.selected {
     border-color: var(--primary);
     background: rgba(255, 90, 31, 0.06);
 }
@@ -230,19 +231,52 @@
     gap: 6px;
 }
 
-/* ── Monthly Best 2-Column Layout ──────────────────────────────────── */
-/* Round 6 (Kare/Rams, docs/PLANNING_ROUND5.md §3 Option B): schedule
- * moved to Settings → Routines, so the right card is just the device
- * targets list. True halve (1.6fr 0.6fr = 73/27) gives the gallery the
- * dominant real estate (Rams #10). The devices card stays narrow but
- * fits [] [color-dot] DeviceName comfortably. */
+/* ── Monthly Best single-column layout ─────────────────────────────── */
+/* R32 §A1+§A3: the devices card moved to Settings → Routines, so the
+ * gallery now spans the full panel width (Rams #10 — give the content the
+ * real estate). Was a 1.6fr 0.6fr two-column grid in Round 6. */
 .monthly-best-layout {
     display: grid;
-    grid-template-columns: 1.6fr 0.6fr;
+    grid-template-columns: 1fr;
     gap: 20px;
     flex: 1;
     min-height: 0;
     align-items: stretch;
+}
+
+/* R32 §A3: per-tile selection checkbox, pinned top-right of each preview. */
+.gallery-item-check {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    width: 18px;
+    height: 18px;
+    -webkit-appearance: none;
+    appearance: none;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.55);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    margin: 0;
+    flex-shrink: 0;
+}
+.gallery-item-check:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+.gallery-item-check:checked::after {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 8 8'%3E%3Cpath d='M1 3h1v1H1zm1 1h1v1H2zm1 1h1v1H3zm1-1h1v1H4zm1-1h1v1H5zm1-1h1v1H6zm1-1h1v1H7z' fill='%23ffffff'/%3E%3C/svg%3E");
+    background-size: 10px 10px;
+    background-repeat: no-repeat;
+    display: block;
 }
 
 .device-accent-dot {

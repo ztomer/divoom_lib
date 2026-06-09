@@ -371,6 +371,55 @@ class GallerySyncMixin:
             logger.error(f"save_hot_channel_config failed: {e}")
             return False
 
+    # ── R32 §A2: per-device preferred gallery style ───────────────────────
+    # Stored in config.ini under a [gallery] section, keyed by device address
+    # (or "default" when no device is given). The Monthly Best gallery loads
+    # the active device's preferred style on startup, and the Routines card
+    # lets the user set a style per device.
+    @staticmethod
+    def _gallery_config_path() -> Path:
+        return Path.home() / ".config" / "divoom-control" / "config.ini"
+
+    @staticmethod
+    def _gallery_style_key(address: str) -> str:
+        return (str(address or "").strip() or "default")
+
+    def get_gallery_style(self, address: str = "") -> int:
+        import configparser
+        key = self._gallery_style_key(address)
+        try:
+            path = self._gallery_config_path()
+            if path.exists():
+                cfg = configparser.ConfigParser()
+                cfg.read(path)
+                if cfg.has_option("gallery", key):
+                    return int(cfg.get("gallery", key))
+                # Fall back to the global default style if the device has none.
+                if key != "default" and cfg.has_option("gallery", "default"):
+                    return int(cfg.get("gallery", "default"))
+        except Exception as e:
+            logger.warning(f"get_gallery_style failed: {e}")
+        return 18  # "Recommend"
+
+    def set_gallery_style(self, address: str = "", classify: int = 18) -> bool:
+        import configparser
+        key = self._gallery_style_key(address)
+        try:
+            path = self._gallery_config_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            cfg = configparser.ConfigParser()
+            if path.exists():
+                cfg.read(path)
+            if "gallery" not in cfg:
+                cfg["gallery"] = {}
+            cfg["gallery"][key] = str(int(classify))
+            with open(path, "w") as f:
+                cfg.write(f)
+            return True
+        except Exception as e:
+            logger.warning(f"set_gallery_style failed: {e}")
+            return False
+
     def sync_hot_channel(self, *file_ids_arg, **kwargs) -> str:
         file_ids = self._coerce_list(file_ids_arg, kwargs, "file_ids")
         synced, failed = [], []

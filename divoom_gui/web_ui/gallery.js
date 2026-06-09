@@ -15,13 +15,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }, 50 * index);
         }
     }
-    
+
     // ── 1. CLOUD GALLERY FETCH AND SYNC ──
-    // R15 §2: the gallery now auto-loads on tab activation + on classify
-    // change. The "Fetch Gallery" button is hidden (kept in the DOM as
-    // a ghost for backwards compat) so the auto-fetch flow can still
-    // .click() it from a single place. `loadGallery()` is the canonical
-    // entry point and is also exposed on `window` for tests.
+    // The gallery auto-loads on tab activation + on classify change. There is
+    // no "Fetch Gallery" button (removed in R32 §A2). `loadGallery()` is the
+    // canonical entry point and is exposed on `window` for tests + hooks.
     function readTargetSize() {
         const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
         if (bannerResText.includes("64")) return 64;
@@ -57,30 +55,46 @@ document.addEventListener("DOMContentLoaded", () => {
     // Expose for tests + the auto-fetch hooks below.
     window.loadGallery = loadGallery;
 
-    // The button is hidden in the UI (R15 §2) but is still in the DOM as
-    // a ghost so existing click-style call sites in dev tools still work.
-    const loadGalleryBtn = document.getElementById("load-gallery-btn");
-    if (loadGalleryBtn) loadGalleryBtn.addEventListener("click", loadGallery);
-
-    // R15 §2: auto-fetch on classify change.
-    const classifySelect = document.getElementById("gallery-classify");
-    if (classifySelect) classifySelect.addEventListener("change", loadGallery);
-
-    function renderGallery(artworks) {
-        if (galleryContainer) galleryContainer.innerHTML = "";
-        
-        if (!artworks || artworks.length === 0) {
-            if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">No gallery items found for classification.</div>`;
-            return;
+    // R32 §A2: the gallery style is remembered per device in config.ini.
+    function activeDeviceAddr() {
+        return (document.getElementById("banner-device-mac")?.textContent || "").trim();
+    }
+    window.persistGalleryStyle = function(classify) {
+        if (window.pywebview?.api?.set_gallery_style) {
+            window.pywebview.api.set_gallery_style(activeDeviceAddr(), parseInt(classify) || 18);
         }
-        
-        artworks.forEach((art, idx) => {
-            const item = document.createElement("div");
-            item.className = "gallery-item";
-            
-            const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
-            
-            item.innerHTML = `
+    };
+    // Load the active device's preferred style into the dropdown. Returns a
+    // promise so callers can fetch with the restored style applied.
+    window.loadPreferredGalleryStyle = function() {
+        if (window.pywebview?.api?.get_gallery_style) {
+            return window.pywebview.api.get_gallery_style(activeDeviceAddr()).then(style => {
+                const sel = document.getElementById("gallery-classify");
+                if (sel && style !== null && style !== undefined) sel.value = String(style);
+                return style;
+            });
+        }
+        return Promise.resolve(18);
+    };
+
+    // R32 §A2: auto-fetch on classify (gallery style) change. Also persist
+    // the chosen style as the preferred style for the active device, so a
+    // restart restores the device's last-fetched gallery.
+    const classifySelect = document.getElementById("gallery-classify");
+    if (classifySelect) classifySelect.addEventListener("change", () => {
+        loadGallery();
+        if (window.persistGalleryStyle) window.persistGalleryStyle(classifySelect.value);
+    });
+
+    // R32 §A3: each tile carries a selection checkbox (checked by default).
+    // `buildGalleryItem` is the single source of tile markup for both the
+    // bulk renderGallery() and the progressive onGalleryItemLoaded() paths.
+    function buildGalleryItem(art, idx) {
+        const item = document.createElement("div");
+        item.className = "gallery-item";
+        const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
+        item.innerHTML = `
+                <input type="checkbox" class="gallery-item-check" checked title="Include this image">
                 <div class="gallery-item-preview-box">
                     <img src="${previewSrc}" class="gallery-item-preview" alt="${art.name}">
                 </div>
@@ -89,14 +103,58 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span>️ ${art.likes}</span>
                 </div>
             `;
-            
-            item.addEventListener("click", () => {
-                const items = galleryContainer.querySelectorAll(".gallery-item");
-                items.forEach(it => it.classList.remove("active"));
-                item.classList.add("active");
-                window.DivoomState.selectedArtworkIndex = idx;
-            });
-            
+        const check = item.querySelector(".gallery-item-check");
+        // The checkbox carries the selection; clicking the tile toggles it.
+        item.addEventListener("click", (e) => {
+            if (e.target === check) return;
+            check.checked = !check.checked;
+            item.classList.toggle("selected", check.checked);
+        });
+        check.addEventListener("change", () => {
+            item.classList.toggle("selected", check.checked);
+        });
+        item.classList.add("selected");
+        item.dataset.idx = String(idx);
+        return item;
+    }
+
+    // Checked artworks, in display order. Falls back to ALL loaded artworks
+    // when the gallery has no checkbox DOM yet (e.g. before first render).
+    window.getCheckedGalleryArtworks = function() {
+        const arts = window.DivoomState.loadedArtworks || [];
+        const checks = galleryContainer
+            ? galleryContainer.querySelectorAll(".gallery-item-check")
+            : [];
+        if (!checks.length) return arts.slice();
+        const out = [];
+        checks.forEach((cb, i) => { if (cb.checked && arts[i]) out.push(arts[i]); });
+        return out;
+    };
+
+    function setAllChecks(state) {
+        if (!galleryContainer) return;
+        galleryContainer.querySelectorAll(".gallery-item").forEach(item => {
+            const cb = item.querySelector(".gallery-item-check");
+            if (cb) cb.checked = state;
+            item.classList.toggle("selected", state);
+        });
+    }
+
+    const selectAllBtn = document.getElementById("gallery-select-all-btn");
+    if (selectAllBtn) selectAllBtn.addEventListener("click", () => setAllChecks(true));
+    const clearBtn = document.getElementById("gallery-clear-btn");
+    if (clearBtn) clearBtn.addEventListener("click", () => setAllChecks(false));
+
+    function renderGallery(artworks) {
+        if (galleryContainer) galleryContainer.innerHTML = "";
+
+        if (!artworks || artworks.length === 0) {
+            if (galleryContainer) galleryContainer.innerHTML = `<div class="empty-list">No gallery items found for classification.</div>`;
+            return;
+        }
+
+        artworks.forEach((art, idx) => {
+            const item = buildGalleryItem(art, idx);
             if (galleryContainer) {
                 galleryContainer.appendChild(item);
                 lazyLoadAnimatedPreview(item, art.file_id, idx);
@@ -104,48 +162,54 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // R32 §A3: "Update Device" pushes every CHECKED gallery image to the
+    // currently-connected device (was: a single click-selected artwork).
     const batchSyncBtn = document.getElementById("batch-sync-btn");
     if (batchSyncBtn) {
         batchSyncBtn.addEventListener("click", () => {
-            if (window.DivoomState.selectedArtworkIndex === null) {
-                window.showToast("Please select an artwork from the gallery list first!", "error");
+            const checked = window.getCheckedGalleryArtworks();
+            if (!checked.length) {
+                window.showToast("Select at least one image first.", "error");
                 return;
             }
-            
-            const artwork = window.DivoomState.loadedArtworks[window.DivoomState.selectedArtworkIndex];
-            window.showToast(`Downloading and syncing '${artwork.name}'...`, "success");
-            
+            const fileIds = checked.map(a => a.file_id).filter(Boolean);
+            window.showToast(`Pushing ${fileIds.length} image(s) to the device…`, "success");
             if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.batch_sync_artwork(JSON.stringify(artwork))
-                    .then(res => {
-                        if (res) window.showToast(`'${artwork.name}' synced`, "success", " BLE");
-                        else window.showToast("Failed to batch sync artwork", "error");
-                    });
+                window.pywebview.api.sync_hot_channel(JSON.stringify(fileIds)).then(json => {
+                    try {
+                        const r = JSON.parse(json);
+                        if (r.ok) window.showToast(`Pushed ${r.synced.length} image(s)`, "success", " BLE");
+                        else window.showToast(`Pushed ${r.synced.length}, ${r.failed.length} failed`, "error");
+                    } catch (e) { window.showToast("Push failed", "error"); }
+                });
             }
         });
     }
 
-    // ── 2. MULTI-TARGET MONTHLY BEST SYNC ALL ──
+    // ── 2. MULTI-TARGET SYNC (Routines → "Sync devices now") ──
+    // The button now lives in Settings → Routines (R32 §B); the handler stays
+    // here so it shares the gallery selection state.
     const syncAllBtn = document.getElementById("sync-all-btn");
     if (syncAllBtn) {
         syncAllBtn.addEventListener("click", () => {
-            if (!window.DivoomState.loadedArtworks || window.DivoomState.loadedArtworks.length === 0) {
-                window.showToast("Fetch the gallery first.", "error");
+            const checked = window.getCheckedGalleryArtworks();
+            if (!checked.length) {
+                window.showToast("Open Monthly Best and select images first.", "error");
                 return;
             }
-            const fileIds = window.DivoomState.loadedArtworks.map(a => a.file_id).filter(Boolean);
-            window.showToast(`Syncing ${fileIds.length} artworks to targets…`, "success");
+            const fileIds = checked.map(a => a.file_id).filter(Boolean);
+            window.showToast(`Syncing ${fileIds.length} image(s) to targets…`, "success");
             window.pywebview.api.sync_hot_channel(JSON.stringify(fileIds)).then(json => {
                 try {
                     const r = JSON.parse(json);
-                    if (r.ok) window.showToast(`Synced ${r.synced.length} artworks`, "success", " BLE");
+                    if (r.ok) window.showToast(`Synced ${r.synced.length} image(s)`, "success", " BLE");
                     else window.showToast(`Synced ${r.synced.length}, ${r.failed.length} failed`, "error");
                 } catch (e) { window.showToast("Sync failed", "error"); }
             });
         });
     }
 
-    // ── 3. AUTOMATED HOT-CHANNEL SCHEDULE ──
+    // ── 3. ROUTINE SYNC TARGETS (Settings → Routines device list) ──
     window.renderSyncTargets = function(candidates) {
         const el = document.getElementById("sync-targets-list");
         if (!el) return;
@@ -162,21 +226,19 @@ document.addEventListener("DOMContentLoaded", () => {
             cb.value = c.address;
             cb.checked = !!c.selected;
             cb.addEventListener("change", persistSyncTargets);
-            
+
             const color = window.deviceColor(c.address);
             const accent = document.createElement("span");
             accent.className = "device-accent-dot";
             accent.style.background = color;
             accent.style.boxShadow = `0 0 6px ${color}`;
             accent.style.marginRight = "6px";
-            
+
             const name = document.createElement("span");
             name.className = "target-name";
             name.textContent = c.name;
             // Round 6 (docs/PLANNING_ROUND5.md §3.b): drop the BT MAC
-            // address from the target row. The address is already shown
-            // in Settings → Bluetooth Scanner, and at 23% column width
-            // the 17-char monospace string crowded the device name.
+            // address from the target row.
             row.append(cb, accent, name);
             el.appendChild(row);
         });
@@ -197,49 +259,24 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // R15 §2: the "Refresh" button on the Devices card was removed; the
-    // list auto-refreshes on a 30s timer + on tab activation.
-    // `updateSyncTargetList` is still exposed for callers that need a
-    // manual refresh (e.g. settings.js).
-
     window.onGalleryItemLoaded = function(classify, targetSize, index, total, itemB64) {
         try {
             const currentClassify = parseInt(document.getElementById("gallery-classify")?.value || "18");
             const currentTargetSize = readTargetSize();
             if (currentClassify !== classify || currentTargetSize !== targetSize) return;
-            
+
             const rawJson = atob(itemB64);
             const art = JSON.parse(rawJson);
-            
+
             if (index === 0) {
                 if (galleryContainer) galleryContainer.innerHTML = "";
                 window.DivoomState.loadedArtworks = [];
             }
-            
+
             window.DivoomState.loadedArtworks.push(art);
-            
-            const item = document.createElement("div");
-            item.className = "gallery-item";
-            const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
-            
-            item.innerHTML = `
-                <div class="gallery-item-preview-box">
-                    <img src="${previewSrc}" class="gallery-item-preview" alt="${art.name}">
-                </div>
-                <div class="gallery-item-info">
-                    <h5>${art.name}</h5>
-                    <span>️ ${art.likes}</span>
-                </div>
-            `;
-            
             const currentIdx = window.DivoomState.loadedArtworks.length - 1;
-            item.addEventListener("click", () => {
-                const items = galleryContainer.querySelectorAll(".gallery-item");
-                items.forEach(it => it.classList.remove("active"));
-                item.classList.add("active");
-                window.DivoomState.selectedArtworkIndex = currentIdx;
-            });
-            
+            const item = buildGalleryItem(art, currentIdx);
+
             if (galleryContainer) {
                 galleryContainer.appendChild(item);
                 lazyLoadAnimatedPreview(item, art.file_id, currentIdx);
@@ -283,20 +320,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // R15 §2: Auto-fetch Monthly Best on tab activation.
-    // `loadGallery()` is idempotent — if a fetch is already in flight
-    // (or the list is non-empty), the fetch is still a no-op refresh,
-    // which is the desired behavior on tab re-entry.
+    // Auto-fetch Monthly Best on tab activation. `loadGallery()` is
+    // idempotent — a re-entry just refreshes from cache.
     window.addEventListener("tab-changed", (e) => {
         if (e.detail.tab === "monthly-best") loadGallery();
     });
 
-    // Mount initializers
-    // Note: loadHotChannelSchedule was renamed to loadRoutinesAutoSync and
-    // moved to settings.js. It loads on tab change / Routines sub-tab
-    // click, so we don't pre-emptively call it here.
+    // Mount initializers. R32 §A2: restore the active device's preferred
+    // gallery style before rendering the cached gallery on startup.
     setTimeout(() => {
         window.updateSyncTargetList();
-        window.loadCachedGalleryOnStartup();
+        window.loadPreferredGalleryStyle().finally(() => window.loadCachedGalleryOnStartup());
     }, 1500);
 });

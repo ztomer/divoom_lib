@@ -73,26 +73,30 @@ CHANNELS_JS = _cat([
 # ──────────────────────────────────────────────────────────────────
 
 
-def test_monthly_best_header_is_devices_not_sync_targets():
-    """The right card header in Monthly Best is now 'Devices' — the
-    schedule was moved to Settings → Routines, so the header is no
-    longer 'Sync Targets & Schedule'."""
+def test_monthly_best_devices_panel_moved_to_routines():
+    """R32 §A1: the Monthly Best devices panel (sync-targets list) moved to
+    Settings → Routines. Monthly Best is now a single full-width gallery card
+    with no embedded device list, and #sync-targets-list lives in the
+    Routines sub-tab instead."""
     src = TEMPLATES_JS
-    # Find the right-card header (the one inside the .monthly-best-layout
-    # block, not the Gallery card on the left).
     mb_match = re.search(
         r'<div class="monthly-best-layout">(.*?)</div>\s*`;',
         src, re.DOTALL,
     )
     assert mb_match is not None, "monthly-best-layout block not found in templates"
     block = mb_match.group(1)
-    assert "Sync Targets &amp; Schedule" not in block, (
-        "Monthly Best right card still has 'Sync Targets & Schedule' — "
-        "the schedule was supposed to move to Settings → Routines "
-        "(docs/PLANNING_ROUND5.md §3 Option B). Drop the old header."
+    assert "sync-targets-list" not in block, (
+        "Monthly Best still embeds the sync-targets-list — it moved to "
+        "Settings → Routines (R32 §A1)."
     )
-    assert re.search(r'<h3>\s*Devices\s*</h3>', block), (
-        "Monthly Best right card should have <h3>Devices</h3> as its header."
+    # The devices list now lives in the Routines sub-tab.
+    routines = re.search(
+        r'<div class="settings-tab-content" id="settings-routines">(.+?)`;',
+        src, re.DOTALL,
+    )
+    assert routines is not None, "settings-routines block not found"
+    assert 'id="sync-targets-list"' in routines.group(1), (
+        "Routines sub-tab should host the moved sync-targets-list (R32 §A1)."
     )
 
 
@@ -122,18 +126,15 @@ def test_monthly_best_schedule_block_removed():
     )
 
 
-def test_monthly_best_grid_is_true_halve():
-    """The Monthly Best grid is now 1.6fr 0.6fr (true halve: gallery 73%
-    / devices 27%). Old value 1.4fr 1fr means the right card is still
-    too wide and the gallery hasn't been given the dominant real estate."""
+def test_monthly_best_grid_is_full_width():
+    """R32 §A1+§A3: with the devices card moved to Routines, the gallery
+    spans the full panel width (single column)."""
     css = GALLERY_CSS.read_text()
-    # Locate the .monthly-best-layout grid-template-columns value.
     m = re.search(r"\.monthly-best-layout\s*\{[^}]*grid-template-columns:\s*([^;]+);", css)
     assert m is not None, ".monthly-best-layout grid-template-columns not found"
     cols = m.group(1).strip()
-    assert cols == "1.6fr 0.6fr", (
-        f"Expected '1.6fr 0.6fr' (true halve per docs/PLANNING_ROUND5.md §3), "
-        f"got {cols!r}."
+    assert cols == "1fr", (
+        f"Expected single-column '1fr' (gallery full width, R32 §A1), got {cols!r}."
     )
 
 
@@ -660,17 +661,21 @@ async def test_monthly_best_layout_renders_cleanly():
         await page.click('[data-tab="monthly-best"]', timeout=2000)
         await page.wait_for_selector("#monthly-best.active", timeout=2000)
 
-        # The right card header should be 'Devices', not 'Sync Targets & Schedule'.
-        devices_header = await page.locator("#monthly-best h3:has-text('Devices')").count()
-        sync_header = await page.locator(
-            "#monthly-best h3:has-text('Sync Targets')"
-        ).count()
-        assert devices_header == 1, (
-            f"Expected exactly 1 'Devices' header in Monthly Best, found {devices_header}"
+        # R32 §A1+§A3: the devices panel moved to Routines; Monthly Best is
+        # now a single full-width gallery with multi-select. There should be
+        # no embedded 'Devices' or 'Sync Targets' header, and the gallery's
+        # Select All / Clear controls should be present.
+        assert await page.locator("#monthly-best h3:has-text('Devices')").count() == 0, (
+            "Monthly Best should no longer embed a Devices header (moved to Routines)."
         )
-        assert sync_header == 0, (
-            f"Monthly Best still has the old 'Sync Targets & Schedule' header "
-            f"({sync_header} found) — should be 'Devices'."
+        assert await page.locator("#monthly-best h3:has-text('Sync Targets')").count() == 0, (
+            "Monthly Best still has the old 'Sync Targets & Schedule' header."
+        )
+        assert await page.locator("#gallery-select-all-btn").count() == 1, (
+            "Monthly Best gallery is missing the Select All control (R32 §A3)."
+        )
+        assert await page.locator("#gallery-clear-btn").count() == 1, (
+            "Monthly Best gallery is missing the Clear control (R32 §A3)."
         )
 
         # The schedule UI must be GONE from Monthly Best.

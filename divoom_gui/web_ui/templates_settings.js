@@ -187,10 +187,10 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                     </div>
                 </div>
 
-                <!-- 3. ROUTINES TAB (Round 6 — moved from Monthly Best, see
-                     docs/PLANNING_ROUND5.md §3 Option B. Set-and-forget automation
-                     lives here, not with the live channels. Naming: "Auto-Sync
-                     Gallery" instead of "Hot-Channel Schedule" per user pick.) -->
+                <!-- 3. ROUTINES TAB. R32 §A1+§B: the devices panel (sync
+                     targets) moved here from Monthly Best, and the card gained a
+                     per-device gallery-style selector. Auto-sync is handled by
+                     the daemon (it reads hotchannel_config.json), not the app. -->
                 <div class="settings-tab-content" id="settings-routines">
                     <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
                         <div class="card glass-card">
@@ -198,13 +198,36 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                 <h3>Auto-Sync Gallery</h3>
                             </div>
                             <div class="card-body">
-                                <p class="panel-hint" style="margin-top: 0;">Automatically re-fetch and push the Divoom Cloud gallery to your devices on a schedule. Runs in the background while the app is open.</p>
-                                <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom: 14px;">
-                                    <label class="hc-toggle" style="margin:0;">
+                                <p class="panel-hint" style="margin-top: 0;">Pick a gallery style per device, then push the Divoom Cloud gallery on a schedule. Auto-sync runs in the daemon — it keeps working even when this window is closed.</p>
+
+                                <!-- R32 §B: device selector | gallery style selector -->
+                                <div style="display:flex; gap:10px; margin-bottom: 14px;">
+                                    <div style="flex:1;">
+                                        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block;">Device</label>
+                                        <select id="routines-device-select" class="custom-select" style="width:100%;">
+                                            <option value="">All devices</option>
+                                        </select>
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block;">Gallery style</label>
+                                        <select id="routines-gallery-style" class="custom-select" style="width:100%;">
+                                            <option value="18">Recommend</option>
+                                            <option value="3">Cartoon</option>
+                                            <option value="9">Creative</option>
+                                            <option value="6">Nature</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- R32 §B: macOS-style toggle (not a checkbox). -->
+                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
+                                    <span style="font-size:13px; color:var(--text-main);">Enable auto-sync</span>
+                                    <label class="switch">
                                         <input type="checkbox" id="routines-auto-sync-enabled">
-                                        <span>Enable auto-sync</span>
+                                        <span class="slider-round"></span>
                                     </label>
                                 </div>
+
                                 <div class="form-group">
                                     <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom: 4px; display:block;">Sync every</label>
                                     <select id="routines-auto-sync-interval" class="custom-select" style="width:100%;">
@@ -212,17 +235,24 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                         <option value="21600">6 hours</option>
                                         <option value="43200">12 hours</option>
                                         <option value="86400">24 hours</option>
-                                        <!-- R15 §4: long-interval options for users who
-                                             only want a weekly / monthly refresh of the
-                                             Monthly Best gallery. -->
                                         <option value="604800">7 days</option>
                                         <option value="2592000">30 days</option>
                                     </select>
                                 </div>
+
+                                <!-- R32 §A1: devices panel moved here from Monthly Best. -->
+                                <div class="form-group">
+                                    <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin: 4px 0 6px; display:block;">Sync to devices</label>
+                                    <div id="sync-targets-list" class="sync-targets-list">
+                                        <span class="empty-list">No devices — scan under Settings, or add a Wi-Fi screen.</span>
+                                    </div>
+                                </div>
+
                                 <div style="display:flex; align-items:center; gap:10px; margin-top: 14px;">
                                     <button id="routines-auto-sync-save" class="glow-btn" style="margin:0;">Save Schedule</button>
-                                    <span id="routines-auto-sync-status" class="panel-hint"></span>
+                                    <button id="sync-all-btn" class="glow-btn secondary" style="margin:0;">Sync devices now</button>
                                 </div>
+                                <span id="routines-auto-sync-status" class="panel-hint" style="display:block; margin-top:8px;"></span>
                             </div>
                         </div>
                     </div>
