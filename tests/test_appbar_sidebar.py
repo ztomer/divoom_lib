@@ -1,9 +1,8 @@
-"""Playwright regression tests for two backlog items (docs/BACKLOG.md):
+"""Playwright regression tests for sidebar/appbar layout:
 
-- #57 Appbar connection tooltips: the transport dots live in `.corner-transports`
-  (position:fixed; bottom:10px), so the :hover tooltip must open UPWARD. It was
-  anchored `top: calc(100% + 8px)` → rendered past the window's bottom edge
-  (invisible). This asserts the ::after tooltip anchors above the dot.
+- R32: the bottom-right connectivity indicator pill (`.corner-transports`) was
+  removed — the per-device sidebar dots convey state now. (Was #57: the
+  transport-dot tooltip opening upward.)
 - #58 (R32 revision): Settings moved out of the sidebar into an appbar gear pill;
   the device panel is now the bottom element of the sidebar. The sidebar must NOT
   contain a Settings nav button, and the appbar must carry a #appbar-settings-btn
@@ -51,7 +50,10 @@ async def test_settings_moved_to_appbar_gear():
 
 
 @pytest.mark.asyncio
-async def test_transport_tooltip_opens_upward():
+async def test_corner_transport_indicator_removed():
+    """R32: the bottom-right connectivity indicator pill (.corner-transports
+    with the four #tr-*-dot dots) was removed — the per-device sidebar dots
+    convey state now. Assert none of it survives in the rendered DOM."""
     pytest.importorskip("playwright.async_api")
     from playwright.async_api import async_playwright
 
@@ -61,23 +63,14 @@ async def test_transport_tooltip_opens_upward():
             page = await browser.new_page(viewport={"width": 1100, "height": 720})
             await page.goto(f"file://{INDEX_HTML}")
             await page.wait_for_load_state("domcontentloaded")
-            await page.hover("#tr-ble-dot")
-            # Under :hover the ::after tooltip exists; it must anchor via `bottom`
-            # (opens upward), not `top` (which pushed it off the bottom edge).
-            style = await page.evaluate(
-                """() => {
-                    const el = document.querySelector('#tr-ble-dot');
-                    const cs = getComputedStyle(el, '::after');
-                    return { content: cs.content, top: cs.top, bottom: cs.bottom };
-                }"""
+            counts = await page.evaluate(
+                """() => ({
+                    pill: document.querySelectorAll('.corner-transports, .appbar-transports').length,
+                    dots: ['tr-ble-dot','tr-lan-dot','tr-cloud-dot','tr-ext-dot']
+                        .filter(id => document.getElementById(id)).length,
+                })"""
             )
-            # Tooltip content is present (has a title to show)...
-            assert style["content"] not in ("none", "normal", ""), style
-            # ...and it renders ABOVE the dot: anchored via `bottom`, the browser
-            # resolves the tooltip's `top` to a negative offset (its top edge sits
-            # above the dot's box). A positive/zero top would mean it opened
-            # downward — off the window's bottom edge, the original bug.
-            top_px = float(style["top"].rstrip("px"))
-            assert top_px < 0, f"tooltip should open upward (negative top), got {style}"
+            assert counts["pill"] == 0, "the corner connectivity pill should be gone"
+            assert counts["dots"] == 0, "the corner transport dots should be gone"
         finally:
             await browser.close()

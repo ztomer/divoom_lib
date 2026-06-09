@@ -277,40 +277,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ── 5. TRANSPORT POLLING STATUS PANEL ──
-    function updateTransportPanel(status) {
-        const transports = [
-            { name: 'Bluetooth (BLE)', key: 'ble',      dotId: 'tr-ble-dot',   detailId: 'tr-ble-detail' },
-            { name: 'Local Network (LAN)', key: 'lan',      dotId: 'tr-lan-dot',   detailId: 'tr-lan-detail' },
-            { name: 'Divoom Cloud', key: 'cloud',    dotId: 'tr-cloud-dot', detailId: 'tr-cloud-detail' },
-            { name: 'Public Cloud', key: 'external', dotId: 'tr-ext-dot',   detailId: 'tr-ext-detail' },
-        ];
-        transports.forEach(({ name, key, dotId, detailId }) => {
-            const t = status[key];
-            if (!t) return;
-            const dot    = document.getElementById(dotId);
-            const detail = document.getElementById(detailId);
-            if (dot) {
-                dot.className = `transport-dot ${t.available ? 'active' : 'inactive'}`;
-                if (t.detail) {
-                    dot.setAttribute("title", `${name}: ${t.detail}`);
-                }
-            }
-            if (detail && t.detail) {
-                detail.textContent = t.detail;
-            }
-        });
-    }
-
-    function refreshTransportStatus() {
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.get_transport_status()
-                .then(json => {
-                    try { updateTransportPanel(JSON.parse(json)); } catch(e) {}
-                })
-                .catch(() => {});
-        }
-    }
+    // R32: the transport-status polling panel was removed along with the
+    // bottom-right corner indicator pill (its only consumer). The per-device
+    // dots below the sidebar preview convey device/transport state now.
 
     // ── 6. CLOUD CREDENTIALS ──
     const saveCredsBtn = document.getElementById("save-creds-btn");
@@ -354,10 +323,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Poll every 5 seconds
-    setInterval(refreshTransportStatus, 5000);
-
     // Initializers on mount after small delays
-    setTimeout(refreshTransportStatus, 1500);
     setTimeout(window.loadLanDevices, 1200);
 });

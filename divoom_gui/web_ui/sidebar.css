@@ -226,8 +226,8 @@
 }
 
 /* R32 §C3: device switch dots in their own glass pill below the preview —
-   recycles the corner connectivity-dot chrome (.corner-transports pill +
-   .transport-dot dots), just with per-device colors. Wraps for >4 devices. */
+   the same glass-pill + dot chrome the old corner connectivity indicator used
+   (since removed), just with per-device colors. Wraps for >4 devices. */
 .device-dots {
     display: flex;
     flex-wrap: wrap;

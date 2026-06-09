@@ -106,58 +106,9 @@
 .win-btn.min:hover { background-color: #ffaa14; }
 .win-btn.max:hover { background-color: #1cc033; }
 
-/* Appbar Transports Indicator block */
-.appbar-transports {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-right: 15px;
-    -webkit-app-region: no-drag;
-}
-
-.appbar-transports .transport-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    transition: opacity 0.2s, box-shadow 0.2s;
-    cursor: help;
-    position: relative;
-}
-
-.appbar-transports .transport-dot.inactive {
-    opacity: 0.2;
-    box-shadow: none !important;
-}
-
-.appbar-transports .transport-dot.active {
-    opacity: 1;
-    box-shadow: 0 0 6px currentColor;
-}
-
-/* Custom Styled Tooltips using title attribute. The dots are pinned to the
-   bottom-right corner (.corner-transports), so the tooltip must open UPWARD —
-   anchoring below the dot rendered it past the window's bottom edge (invisible). */
-.appbar-transports .transport-dot:hover::after {
-    content: attr(title);
-    position: absolute;
-    bottom: calc(100% + 8px);
-    right: 0;
-    background: rgba(20, 21, 26, 0.95);
-    color: var(--text-main);
-    font-size: 10px;
-    font-weight: 500;
-    padding: 6px 10px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
-    white-space: nowrap;
-    z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    pointer-events: none;
-    font-family: var(--font-sans);
-    letter-spacing: 0;
-    text-transform: none;
-    opacity: 0.95;
-}
+/* R32: the bottom-right connectivity indicator pill + its dot and tooltip
+   styles were removed. The sidebar device dots have their own styles (in
+   sidebar.css). */
 
 /* Appbar Global Brightness Slider styling */
 .appbar-brightness {
@@ -259,18 +210,4 @@
 }
 body.theme-light #global-brightness-slider::-webkit-slider-thumb {
     border-color: rgba(0, 0, 0, 0.85);
-}
-
-/* R11 4b: connection indicators pinned to the bottom-right corner. */
-.corner-transports {
-    position: fixed;
-    bottom: 10px;
-    right: 12px;
-    display: flex;
-    gap: 7px;
-    padding: 5px 8px;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
-    z-index: 50;
 }

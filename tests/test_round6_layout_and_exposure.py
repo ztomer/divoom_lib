@@ -572,20 +572,20 @@ APPBAR_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "appbar.css"
 
 
 def test_r11_appbar_phase3():
-    """Phase 3: transports in a bottom-right corner (4b), sliders pushed right via
-    a leading spacer (4c), unified value font (4a), brightness-mapped thumb (4e),
-    and the slider drag-fix (4d)."""
+    """Phase 3: sliders pushed right via a leading spacer (4c), unified value
+    font (4a), brightness-mapped thumb (4e), and the slider drag-fix (4d).
+    R32: the bottom-right corner transport indicator (4b) was removed."""
     html = INDEX_HTML.read_text()
-    # 4b: transports moved out of the header into a fixed corner element
-    assert 'class="appbar-transports corner-transports"' in html
-    header = re.search(r'<header class="integrated-appbar.+?</header>', html, re.DOTALL).group(0)
-    assert "appbar-transports" not in header, "transports must leave the appbar"
+    # R32: the corner connectivity indicator pill is gone.
+    assert 'class="appbar-transports corner-transports"' not in html
+    assert 'corner-transports' not in html, "the corner indicator markup should be removed (R32)"
     # 4c: a drag-spacer appears before the brightness blocks (pushes sliders right)
+    header = re.search(r'<header class="integrated-appbar.+?</header>', html, re.DOTALL).group(0)
     assert header.index("appbar-drag-spacer") < header.index("appbar-brightness")
 
     css = APPBAR_CSS.read_text()
     assert "#appbar-volume-value" in css, "4a: volume value must share the value type rule"
-    assert ".corner-transports" in css and "position: fixed" in css, "4b corner styles"
+    assert ".corner-transports" not in css, "corner indicator styles should be removed (R32)"
     assert "--thumb-color" in css, "4e: brightness thumb tracks value"
 
     app_js = APP_JS
