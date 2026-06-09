@@ -275,6 +275,159 @@ class TestNativeParity:
                                        TARGET_2, TARGET_2, CHANNELS_RGB)
         assert out_bytes == bytes([UINT8_MAX]) * (TARGET_2 * TARGET_2 * CHANNELS_RGB)
 
+    # ── Extended edge cases ─────────────────────────────────────────
+    #
+    # These target degenerate and boundary inputs that are known to
+    # expose kernel-bounds or fixed-point edge conditions: extreme
+    # aspect ratios, pure 1D transforms, non-square identity, small
+    # up/down scales, asymmetric output sizes, and programmed patterns
+    # (checkerboard, gradients, impulse).
+
+    @pytest.mark.parametrize("in_h,in_w,out_h,out_w", [
+        (300, 1, 2, 2),      # single row — extreme horizontal stretch
+        (1, 300, 2, 2),      # single column — extreme vertical stretch
+        (1, 16, 1, 8),       # pure horizontal downscale (1D)
+        (16, 1, 8, 1),       # pure vertical downscale (1D)
+        (1, 8, 1, 16),       # pure horizontal upscale (1D)
+        (8, 1, 16, 1),       # pure vertical upscale (1D)
+        (1, 1, 2, 2),        # single pixel → 2×2 upscale
+        (2, 2, 1, 1),        # 2×2 → single pixel downscale
+    ])
+    def test_rgb_degenerate_dims(self, in_h, in_w, out_h, out_w):
+        arr = _new_arr(in_h, in_w, CHANNELS_RGB, SEED_PARITY)
+        pil_out = _pil_resize(arr, out_w, out_h)
+        native_bytes = downsample_lanczos(arr.tobytes(), in_w, in_h,
+                                          out_w, out_h, CHANNELS_RGB)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            out_h, out_w, CHANNELS_RGB)
+        _assert_byte_exact(pil_out, native_out,
+                           f"RGB deg {in_h}x{in_w}->{out_h}x{out_w}")
+
+    @pytest.mark.parametrize("in_h,in_w,out_h,out_w", [
+        (100, 4, 2, 2),      # extreme horizontal downscale
+        (4, 100, 2, 2),      # extreme vertical downscale
+        (2, 100, 2, 3),      # extreme ratio, non-square output
+    ])
+    def test_rgb_extreme_ratio(self, in_h, in_w, out_h, out_w):
+        arr = _new_arr(in_h, in_w, CHANNELS_RGB, SEED_PARITY)
+        pil_out = _pil_resize(arr, out_w, out_h)
+        native_bytes = downsample_lanczos(arr.tobytes(), in_w, in_h,
+                                          out_w, out_h, CHANNELS_RGB)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            out_h, out_w, CHANNELS_RGB)
+        _assert_byte_exact(pil_out, native_out,
+                           f"RGB ratio {in_h}x{in_w}->{out_h}x{out_w}")
+
+    def test_rgb_non_square_identity(self):
+        """Non-square identity: 32×16 → 32×16 must memcpy unchanged."""
+        in_h, in_w, c = 32, 16, CHANNELS_RGB
+        arr = _new_arr(in_h, in_w, c, SEED_PARITY)
+        out_bytes = downsample_lanczos(arr.tobytes(), in_w, in_h,
+                                       in_w, in_h, c)
+        assert out_bytes == arr.tobytes(), "non-square identity must memcpy"
+
+    @pytest.mark.parametrize("in_h,in_w,out_h,out_w", [
+        (13, 17, 5, 7),      # odd primes
+        (7, 11, 3, 5),       # small primes
+        (31, 37, 8, 12),     # larger primes
+    ])
+    def test_rgb_odd_prime_dims(self, in_h, in_w, out_h, out_w):
+        arr = _new_arr(in_h, in_w, CHANNELS_RGB, SEED_PARITY)
+        pil_out = _pil_resize(arr, out_w, out_h)
+        native_bytes = downsample_lanczos(arr.tobytes(), in_w, in_h,
+                                          out_w, out_h, CHANNELS_RGB)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            out_h, out_w, CHANNELS_RGB)
+        _assert_byte_exact(pil_out, native_out,
+                           f"RGB primes {in_h}x{in_w}->{out_h}x{out_w}")
+
+    @pytest.mark.parametrize("in_h,in_w,out_h,out_w", [
+        (16, 16, 4, 12),     # unequal output axes
+        (16, 16, 15, 4),     # extreme axis mismatch
+    ])
+    def test_rgb_asymmetric(self, in_h, in_w, out_h, out_w):
+        arr = _new_arr(in_h, in_w, CHANNELS_RGB, SEED_PARITY)
+        pil_out = _pil_resize(arr, out_w, out_h)
+        native_bytes = downsample_lanczos(arr.tobytes(), in_w, in_h,
+                                          out_w, out_h, CHANNELS_RGB)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            out_h, out_w, CHANNELS_RGB)
+        _assert_byte_exact(pil_out, native_out,
+                           f"RGB asym {in_h}x{in_w}->{out_h}x{out_w}")
+
+    def test_rgb_checkerboard(self):
+        """Checkerboard 8×8 → 4×4 — high-frequency pattern."""
+        c = CHANNELS_RGB
+        arr = np.zeros((SIDE_EIGHT, SIDE_EIGHT, c), dtype=np.uint8)
+        arr[::2, ::2, :] = UINT8_MAX   # every other cell white
+        arr[1::2, 1::2, :] = UINT8_MAX
+        pil_out = _pil_resize(arr, SIDE_SMALL, SIDE_SMALL)
+        native_bytes = downsample_lanczos(arr.tobytes(),
+                                          SIDE_EIGHT, SIDE_EIGHT,
+                                          SIDE_SMALL, SIDE_SMALL, c)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            SIDE_SMALL, SIDE_SMALL, c)
+        _assert_byte_exact(pil_out, native_out, "RGB checkerboard")
+
+    def test_rgb_gradient_h(self):
+        """Horizontal gradient — smooth ramp across columns."""
+        c = CHANNELS_RGB
+        w, h = SIDE_SIXTEEN, SIDE_SIXTEEN
+        arr = np.zeros((h, w, c), dtype=np.uint8)
+        for x in range(w):
+            v = int(round(x * (UINT8_MAX / (w - 1))))
+            arr[:, x, :] = v
+        pil_out = _pil_resize(arr, SIDE_EIGHT, SIDE_EIGHT)
+        native_bytes = downsample_lanczos(arr.tobytes(), w, h,
+                                          SIDE_EIGHT, SIDE_EIGHT, c)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            SIDE_EIGHT, SIDE_EIGHT, c)
+        _assert_byte_exact(pil_out, native_out, "RGB gradient horizontal")
+
+    def test_rgb_gradient_v(self):
+        """Vertical gradient — smooth ramp across rows."""
+        c = CHANNELS_RGB
+        w, h = SIDE_SIXTEEN, SIDE_SIXTEEN
+        arr = np.zeros((h, w, c), dtype=np.uint8)
+        for y in range(h):
+            v = int(round(y * (UINT8_MAX / (h - 1))))
+            arr[y, :, :] = v
+        pil_out = _pil_resize(arr, SIDE_EIGHT, SIDE_EIGHT)
+        native_bytes = downsample_lanczos(arr.tobytes(), w, h,
+                                          SIDE_EIGHT, SIDE_EIGHT, c)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            SIDE_EIGHT, SIDE_EIGHT, c)
+        _assert_byte_exact(pil_out, native_out, "RGB gradient vertical")
+
+    def test_rgb_impulse(self):
+        """Single non-zero pixel on black — impulse response."""
+        c = CHANNELS_RGB
+        h, w = SIDE_SIXTEEN, SIDE_SIXTEEN
+        arr = np.zeros((h, w, c), dtype=np.uint8)
+        arr[h // 2, w // 2, :] = UINT8_MAX  # one white pixel at center
+        pil_out = _pil_resize(arr, SIDE_EIGHT, SIDE_EIGHT)
+        native_bytes = downsample_lanczos(arr.tobytes(), w, h,
+                                          SIDE_EIGHT, SIDE_EIGHT, c)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            SIDE_EIGHT, SIDE_EIGHT, c)
+        _assert_byte_exact(pil_out, native_out, "RGB impulse")
+
+    def test_rgb_constant_channels(self):
+        """All three channels set to different constant values — verifies
+        channel isolation in the fixed-point math."""
+        c = CHANNELS_RGB
+        h, w = SIDE_EIGHT, SIDE_EIGHT
+        arr = np.zeros((h, w, c), dtype=np.uint8)
+        arr[:, :, CHANNEL_RED]   = UINT8_MAX
+        arr[:, :, CHANNEL_GREEN] = UINT8_MAX // 2   # 128
+        arr[:, :, CHANNEL_BLUE]  = UINT8_MIN
+        pil_out = _pil_resize(arr, TARGET_2, TARGET_2)
+        native_bytes = downsample_lanczos(arr.tobytes(), w, h,
+                                          TARGET_2, TARGET_2, c)
+        native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
+            TARGET_2, TARGET_2, c)
+        _assert_byte_exact(pil_out, native_out, "RGB constant channels")
+
     def test_stress_random(self):
         """Many random shape/config combinations — final correctness gate."""
         rng = np.random.default_rng(SEED_STRESS)

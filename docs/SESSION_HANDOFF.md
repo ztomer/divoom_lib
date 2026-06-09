@@ -18,13 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **Downscaler kernel normalization fix SHIPPED (2026-06-09).** Fixed root
-  cause of the 1 LSB RGB parity bug: `kernel1d_init` used quantize-then-normalize
-  while PIL uses normalize-then-quantize. Changed to match PIL's
-  `normalize_coeffs_8bpc` (Resample.c): normalize double weights to sum 1.0,
-  then quantize with round-half-up. Also removed unused `ROUND_HALF_POS` define.
-  The `!= 0` → `< 0` check and RGBA fallback from the prior session remain.
-  **38/38 tests pass** (was 37/38). Suite 1140/75 (estimate).
+- **Downscaler kernel normalization + 22 edge case tests SHIPPED (2026-06-09).**
+  Fixed root cause of the 1 LSB RGB parity bug: `kernel1d_init` used
+  quantize-then-normalize while PIL uses normalize-then-quantize. Changed to
+  match PIL's `normalize_coeffs_8bpc` (Resample.c): normalize double weights to
+  sum 1.0, then quantize with round-half-up. Also removed unused `ROUND_HALF_POS`
+  define and cleaned leftover debug printf. The `!= 0` → `< 0` check and RGBA
+  fallback from the prior session remain.
+  **Added 22 new tests**: degenerate dims (1×N, N×1, 1×1), extreme aspect
+  ratios (300×1→2×2, 100×4→2×2), non-square identity, odd primes (13×17→5×7),
+  asymmetric output (16×16→4×12), checkerboard, gradients, impulse, constant
+  channels. **60/60 tests pass** (was 38). Suite ~1170/75 (estimate).
 
 - **Inline-style batch 2 SHIPPED (2026-06-09).** Migrated `templates_monthly_best.js`:
   L15→`row gap-8`, L32→`flex gap-10` (added bare `.flex` — `.row` includes

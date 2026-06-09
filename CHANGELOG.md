@@ -15,6 +15,12 @@ shipped milestone (per the project planning docs).
 - Fixed the remaining 1 LSB failure in `test_stress_random` (32x8→8x11 RGB).
   **38/38 tests pass** (was 37/38). All RGB parity tests now run native (no PIL
   fallback) and match PIL byte-for-byte.
+- **Added 22 edge case tests** to `test_native_downscaler.py`: degenerate
+  dimensions (1×N, N×1, single pixel), extreme aspect ratios (300×1→2×2,
+  1×300→2×2, 100×4→2×2), non-square identity (32×16), odd prime sizes
+  (13×17→5×7), asymmetric output (16×16→4×12, 16×16→15×4), checkerboard,
+  horizontal/vertical gradient, impulse response, and constant-channel values.
+  All pass byte-identical. **60/60 tests**.
 
 ## 2026-06-09 — Inline-style migration: batch 2 (monthly_best)
 
