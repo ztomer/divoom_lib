@@ -135,3 +135,12 @@
     height: 100%;
     min-height: 0;
 }
+
+/* Single-column fill layout for Custom Art */
+.custom-art-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+}

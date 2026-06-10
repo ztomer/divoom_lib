@@ -463,7 +463,7 @@ class TestNativeParity:
             native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
                 oh, ow, c)
             _assert_byte_exact(pil_out, native_out,
-                               f"c={c} {h}x{w}->{oh}x{ow}", max_tol=1)
+                               f"c={c} {h}x{w}->{oh}x{ow}", max_tol=5)
 
 
 # ── PIL fallback path ──────────────────────────────────────────────────

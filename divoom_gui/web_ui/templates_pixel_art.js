@@ -33,7 +33,7 @@ window.DivoomTemplates.pixelArt = `                <div class="tabs-section" sty
 
                 <!-- CUSTOM ART sub-tab -->
                 <div class="pixel-subtab-content active" id="pixel-custom-art">
-                    <div class="grid-layout" style="grid-template-columns:1fr; flex:1; min-height:0;">
+                    <div class="custom-art-layout">
                         <div class="card glass-card" style="flex:1; min-height:0; display:flex; flex-direction:column;">
                             <div class="card-body" style="flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
                                 <div class="channel-panel active" id="panel-design">
