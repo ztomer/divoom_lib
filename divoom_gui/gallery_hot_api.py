@@ -189,3 +189,34 @@ class GalleryHotApiMixin:
         except Exception as e:
             logger.warning(f"get_animated_preview failed for {file_id}: {e}")
         return ""
+
+    @staticmethod
+    def _coerce_list(args, kwargs, key) -> list:
+        if len(args) == 1:
+            v = args[0]
+            if isinstance(v, str):
+                try:
+                    parsed = json.loads(v)
+                    return parsed if isinstance(parsed, list) else [parsed]
+                except ValueError:
+                    return [v]
+            return list(v) if isinstance(v, (list, tuple)) else [v]
+        if len(args) > 1:
+            return list(args)
+        if key in kwargs and isinstance(kwargs[key], (list, tuple)):
+            return list(kwargs[key])
+        return []
+
+    @staticmethod
+    def _coerce_dict(args, kwargs) -> dict:
+        if len(args) == 1:
+            v = args[0]
+            if isinstance(v, str):
+                try:
+                    parsed = json.loads(v)
+                    return parsed if isinstance(parsed, dict) else {}
+                except ValueError:
+                    return {}
+            return dict(v) if isinstance(v, dict) else {}
+        allowed = ("enabled", "interval", "classify", "targets")
+        return {k: kwargs[k] for k in allowed if k in kwargs}

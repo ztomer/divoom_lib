@@ -27,7 +27,7 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                 <div style="display:flex; gap:10px; margin-bottom:15px;">
                                     <div style="flex:1;">
                                         <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Timeout (s)</label>
-                                        <input type="number" id="scan-timeout" min="3" max="60" value="15" class="text-input">
+                                        <input type="number" id="scan-timeout" min="3" max="120" value="60" class="text-input">
                                     </div>
                                     <div style="flex:1;">
                                         <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Devices</label>

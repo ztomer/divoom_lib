@@ -132,6 +132,8 @@ class MenubarClient:
             if etype == EVENT_STATUS:
                 state = derive_state(ev)
                 self._status = {"state": state, "counters": ev.get("counters", {})}
+                if "error" in ev:
+                    self._status["error"] = ev["error"]
                 if self._on_status_change:
                     self._on_status_change(self._status)
             elif etype == EVENT_SHUTDOWN:

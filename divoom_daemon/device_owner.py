@@ -340,12 +340,18 @@ class DeviceOwner(OwnerArtMixin):
 
         async def _build():
             from divoom_lib.wall import DivoomWall
-            configs = [{
-                "mac": mac,
-                "x": int(s.get("x", 0)), "y": int(s.get("y", 0)),
-                "size": int(s.get("size", cell)),
-                "width": int(s.get("width", 120)), "height": int(s.get("height", 120)),
-            } for mac, s in slots.items()]
+            configs = []
+            for mac, s in slots.items():
+                cfg = {
+                    "mac": mac,
+                    "x": int(s.get("x", 0)), "y": int(s.get("y", 0)),
+                    "size": int(s.get("size", cell)),
+                }
+                if "width" in s:
+                    cfg["width"] = int(s["width"])
+                if "height" in s:
+                    cfg["height"] = int(s["height"])
+                configs.append(cfg)
             wall = DivoomWall(configs, custom_logger=logger)
             await wall.connect()
             return wall

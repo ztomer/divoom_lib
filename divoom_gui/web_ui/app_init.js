@@ -195,7 +195,18 @@ document.addEventListener("DOMContentLoaded", () => {
             window.showToast("Splitting image and syncing wall...", "success");
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.display_wall_image(path, 16).then(res => {
-                    if (res) window.showToast("Synchronized display wall", "success", " BLE");
+                    const success = typeof res === "object" ? res.success : !!res;
+                    if (success) {
+                        window.showToast("Synchronized display wall", "success", " BLE");
+                        const previews = res.previews || {};
+                        Object.keys(previews).forEach(mac => {
+                            if (window.DivoomState.assignedSlots[mac]) {
+                                window.DivoomState.assignedSlots[mac].preview = previews[mac];
+                            }
+                        });
+                        window.renderArrangerCanvas();
+                        window.syncArrangerToPython();
+                    }
                 });
             }
         });
@@ -297,7 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const addr = e.target.value;
             if (!addr) return;
             if (addr === "MatrixWall") {
-                window.connectDevice("Matrix Wall Grid", "MatrixWall");
+                window.connectDevice("Virtual Wall", "MatrixWall");
             } else if (addr.startsWith("LAN:")) {
                 const ip = addr.split("LAN:")[1];
                 window.connectDevice(`Wi-Fi Screen: ${ip}`, addr);
@@ -321,12 +332,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (conf.limit != null && getEl("scan-limit")) getEl("scan-limit").value = conf.limit;
                     
                     if (conf.slots) { window.DivoomState.assignedSlots = conf.slots; window.renderArrangerCanvas(); }
-                    if (conf.devices && conf.devices.length > 0) { window.DivoomState.discoveredDevices = conf.devices; window.renderArrangerCanvas(); }
+                    if (conf.devices && conf.devices.length > 0) {
+                        window.DivoomState.discoveredDevices = conf.devices;
+                        if (window.populateDeviceSelectors) window.populateDeviceSelectors(conf.devices);
+                        window.renderArrangerCanvas();
+                    }
                     
                     if (conf.last_connected_device) {
                         const addr = conf.last_connected_device;
                         let name = "Divoom Screen";
-                        if (addr === "MatrixWall") name = "Matrix Wall Grid";
+                        if (addr === "MatrixWall") name = "Virtual Wall";
                         else if (addr.startsWith("LAN:")) name = `Wi-Fi: ${addr.split("LAN:")[1]}`;
                         else {
                             const dev = window.DivoomState.discoveredDevices.find(d => d.address === addr);
@@ -335,8 +350,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         setTimeout(() => window.connectDevice(name, addr), 500);
                     }
 
-                    if (conf.last_detected_count && conf.last_detected_count > 0 && window.runBleScan) {
-                        setTimeout(() => { window.showToast("Resuming session: Auto-scanning screens...", "success"); window.runBleScan(); }, 1000);
+                    if (window.runBleScan) {
+                        setTimeout(() => {
+                            window.showToast("Startup: Auto-scanning screens...", "success");
+                            window.runBleScan();
+                        }, 1000);
                     }
                     
                     const statusBox = getEl("divoom-cloud-status-box");

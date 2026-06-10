@@ -155,13 +155,20 @@ class LightingApi(ApiBase):
             logger.error(f"Volume setting failed: {e}")
             return False
 
-    def display_wall_image(self, file_path: str, cell_size: int) -> bool:
+    def display_wall_image(self, file_path: str, cell_size: int) -> dict:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:
-            return self._dispatch(lambda t: t.show_image(file_path))
+            ok = self._dispatch(lambda t: t.show_image(file_path))
+            previews = {}
+            if ok and self._wall_instance:
+                try:
+                    previews = self._wall_instance.get_last_previews()
+                except Exception as ex:
+                    logger.warning(f"Failed to get wall previews: {ex}")
+            return {"success": bool(ok), "previews": previews}
         except Exception as e:
             logger.error(f"Wall display failed: {e}")
-            return False
+            return {"success": False, "error": str(e), "previews": {}}
 
     def set_temperature_channel(self, celsius: bool = True, color: str = "#ffffff") -> bool:
         logger.info(f"GUI Action: Setting temperature channel (celsius={celsius}, color={color})...")

@@ -72,8 +72,11 @@ def make_request(command: str, args: dict | None = None,
     return req
 
 
-def make_status_event(state: str, counters: dict | None = None) -> dict:
-    return {"type": EVENT_STATUS, "state": state, "counters": counters or {}}
+def make_status_event(state: str, counters: dict | None = None, error: str | None = None) -> dict:
+    ev = {"type": EVENT_STATUS, "state": state, "counters": counters or {}}
+    if error:
+        ev["error"] = error
+    return ev
 
 
 def make_notification_event(app_type: int, title: str, body: str, routed: bool) -> dict:

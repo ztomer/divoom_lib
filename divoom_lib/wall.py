@@ -72,6 +72,7 @@ class DivoomWall:
         self.logger = custom_logger or logger
         self.device_configs = device_configs
         self.devices: List[DeviceSlot] = []
+        self.last_previews: Dict[str, bytes] = {}
         
         # Calculate composite bounding box
         self.is_free_form = any("width" in config for config in self.device_configs)
@@ -221,6 +222,11 @@ class DivoomWall:
                     cropped_img.save(cropped_img_path)
                     temp_path_str = str(cropped_img_path)
                 
+                try:
+                    self.last_previews[slot.device.mac] = Path(temp_path_str).read_bytes()
+                except Exception as ex:
+                    self.logger.warning(f"Failed to cache preview bytes for {slot.device.mac}: {ex}")
+
                 # We need to preserve the files until the async BLE show_image call completes
                 # So we save a copy of the bytes out of the temp dir lifecycle if needed,
                 # or we just read the bytes immediately into memory to avoid cleanup issues.
@@ -342,3 +348,14 @@ class DivoomWall:
             sz = slot.size
             results.append(await _push(divoom, int(sz)))
         return all(results)
+
+    def get_last_previews(self) -> dict:
+        """Return base64 Data URLs of the last images/GIFs pushed to the slots."""
+        import base64
+        res = {}
+        for mac, data in self.last_previews.items():
+            if not data:
+                continue
+            mime = "image/gif" if data.startswith(b"GIF8") else "image/png"
+            res[mac] = f"data:{mime};base64,{base64.b64encode(data).decode('utf-8')}"
+        return res

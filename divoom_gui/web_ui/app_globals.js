@@ -82,7 +82,7 @@ window.renderDeviceDots = function() {
         if (d.ip) entries.push({ value: `LAN:${d.ip}`, name: `Wi-Fi: ${d.ip}` });
     });
     if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) {
-        entries.push({ value: "MatrixWall", name: "Matrix Wall Grid" });
+        entries.push({ value: "MatrixWall", name: "Virtual Wall" });
     }
     host.innerHTML = "";
     entries.forEach(e => {
@@ -156,7 +156,7 @@ window.connectDevice = function(name, address) {
                 if (window.renderDeviceDots) window.renderDeviceDots();
                 // banner-device-res and banner-device-speaker moved to Settings → Devices.
                 // Their textContent assignments are intentionally skipped here.
-                const isSpk = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo");
+                const isSpk = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo") || name.toLowerCase().includes("tivoo");
                 window.updateSidebarSpeakerIcon(isSpk);
                 const sidebarSelect = document.getElementById("sidebar-device-select");
                 if (sidebarSelect) sidebarSelect.value = address;
@@ -196,7 +196,7 @@ window.updateDeviceSelectorDropdown = function() {
     // alone (e.g. "Pixoo64") reads better in the selector.
     window.DivoomState.discoveredDevices.forEach(d => addOpt(d.address, d.name));
     window.DivoomState.registeredLanDevices.forEach(d => addOpt(`LAN:${d.ip}`, d.ip));
-    if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) addOpt("MatrixWall", " Matrix Wall Grid");
+    if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) addOpt("MatrixWall", " Virtual Wall");
     // R32 §C3: the dots mirror the (now hidden) select's options.
     if (window.renderDeviceDots) window.renderDeviceDots();
 };

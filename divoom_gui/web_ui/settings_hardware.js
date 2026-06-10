@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener("change", () => {
-                const t = parseInt(document.getElementById("scan-timeout")?.value) || 15;
+                const t = parseInt(document.getElementById("scan-timeout")?.value) || 60;
                 const l = parseInt(document.getElementById("scan-limit")?.value);
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.save_scan_settings) {
                     window.pywebview.api.save_scan_settings(t, isNaN(l) ? 0 : l);
@@ -119,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.runBleScan = function() {
-        const timeout = parseInt(document.getElementById("scan-timeout")?.value) || 15;
+        const timeout = parseInt(document.getElementById("scan-timeout")?.value) || 60;
         const limit = parseInt(document.getElementById("scan-limit")?.value) || 0;
 
         if (scanSpinner) scanSpinner.style.display = "inline-block";
@@ -168,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     tr.style.cursor = "pointer";
                     const color = window.deviceColor(d.address);
                     const dims = window.getDeviceDimensions ? window.getDeviceDimensions(d.name) : { size: 16 };
-                    const isSpk = /timoo|ditoo/i.test(d.name || "");
+                    const isSpk = /timoo|ditoo|tivoo/i.test(d.name || "");
                     tr.innerHTML = `
                         <td>
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -189,6 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         window.updateDeviceSelectorDropdown();
     }
+    window.populateDeviceSelectors = populateDeviceSelectors;
 
     // ── 4. Wi-Fi (LAN) DEVICES MANAGER ──
     window.loadLanDevices = function() {

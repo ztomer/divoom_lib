@@ -109,7 +109,13 @@ async def test_gallery_scrolls_internally_not_whole_card():
                 }
             }
         """)
-        await page.wait_for_timeout(200)
+        # Wait for layout to settle and scroll height to exceed client height
+        await page.wait_for_function("""
+            () => {
+                const g = document.getElementById('gallery-container');
+                return g && g.scrollHeight > g.clientHeight;
+            }
+        """, timeout=5000)
 
         gallery_scroll = await page.evaluate("""
             () => {
@@ -117,16 +123,5 @@ async def test_gallery_scrolls_internally_not_whole_card():
                 return { scrollHeight: g.scrollHeight, clientHeight: g.clientHeight };
             }
         """)
-        card_scroll = await page.evaluate("""
-            () => {
-                const c = document.querySelector('#pixel-gallery .card.glass-card');
-                return { scrollHeight: c.scrollHeight, clientHeight: c.clientHeight };
-            }
-        """)
-
-        assert gallery_scroll["scrollHeight"] > gallery_scroll["clientHeight"], (
-            "Gallery should be scrollable (100 items), but scrollHeight <= clientHeight. "
-            f"scrollHeight={gallery_scroll['scrollHeight']}, clientHeight={gallery_scroll['clientHeight']}"
-        )
 
         await browser.close()

@@ -209,7 +209,7 @@
 .sync-targets-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
     max-height: 160px;
     overflow-y: auto;
 }
@@ -280,11 +280,20 @@
 }
 
 /* ── Gallery side-by-side layout ──────────────────────────────────────── */
-.gallery-split-card { overflow: hidden; }
+.gallery-split-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
 .gallery-split-layout {
     display: grid;
     grid-template-columns: 112px 1fr;
-    gap: 0; flex: 1; min-height: 0;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
 }
 .gallery-sidebar {
     display: flex; flex-direction: column;

@@ -14,6 +14,7 @@ Coverage:
   - PIL fallback path (when dylib can't be loaded)
   - Error handling (bad channels, bad dimensions, mismatched length)
 """
+import os
 import struct
 from pathlib import Path
 
@@ -40,7 +41,19 @@ CHANNEL_ALPHA = 3
 
 # Deterministic PRNG seeds.
 SEED_PARITY   = 42       # small/medium parity cases
-SEED_STRESS   = 20260605 # 500-case random stress run
+
+_env_seed = os.environ.get("DIVOOM_TEST_SEED")
+if _env_seed:
+    if _env_seed.lower() == "random":
+        import random
+        SEED_STRESS = random.randint(1, 100000000)
+    else:
+        try:
+            SEED_STRESS = int(_env_seed)
+        except ValueError:
+            SEED_STRESS = 20260605
+else:
+    SEED_STRESS = 20260605
 
 # Test image dimensions.
 SIDE_TINY     = 2
@@ -105,7 +118,7 @@ def _assert_byte_exact(pil_out: np.ndarray, native_out: np.ndarray, ctx: str) ->
     n_diff = int(np.sum(diff > 0))
     max_diff = int(diff.max()) if diff.size > 0 else 0
     assert n_diff == 0, (
-        f"{ctx}: {n_diff}/{diff.size} pixels differ, max={max_diff} LSB. "
+        f"{ctx} (seed={SEED_STRESS}): {n_diff}/{diff.size} pixels differ, max={max_diff} LSB. "
         f"First diff at {np.argwhere(diff > 0)[0] if n_diff else 'n/a'}: "
         f"PIL={pil_out.flat[0]} vs native={native_out.flat[0]}"
     )
@@ -430,6 +443,7 @@ class TestNativeParity:
 
     def test_stress_random(self):
         """Many random shape/config combinations — final correctness gate."""
+        print(f"\nRunning test_stress_random with SEED_STRESS={SEED_STRESS}")
         rng = np.random.default_rng(SEED_STRESS)
         shape_pool = (SIDE_TINY, SIDE_SMALL, SIDE_EIGHT, SIDE_SIXTEEN,
                       SIDE_32, SIDE_64, SIDE_100, SIDE_128, SIDE_200,

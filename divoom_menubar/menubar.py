@@ -47,6 +47,7 @@ class DivoomMenuBarAgent(NSObject):
         self = objc.super(DivoomMenuBarAgent, self).init()
         if self:
             self.status_item = None
+            self.menu = None
             self.client = MenubarClient()
             self.client.set_status_callback(self._on_status_change)
             self.client.set_shutdown_callback(self._on_daemon_shutdown)
@@ -65,8 +66,41 @@ class DivoomMenuBarAgent(NSObject):
         on the main thread (Cocoa UI)."""
         if self.status_item is None:
             return
-        state = self.client.status.get("state", STATE_IDLE)
+        status = self.client.status
+        state = status.get("state", STATE_IDLE)
+        error = status.get("error")
         title = format_status_title(state)
+
+        # Tooltip updates dynamically
+        tooltip = "Divoom Coordinator Agent"
+        if error:
+            tooltip += f"\nError: {error}"
+        self.status_item.button().setToolTip_(tooltip)
+
+        # Dynamically manage error menu item if self.menu is available
+        if self.menu is not None:
+            first_item = self.menu.itemAtIndex_(0) if self.menu.numberOfItems() > 0 else None
+            is_error_item = first_item and first_item.title().startswith("Error: ")
+
+            if error:
+                err_title = f"Error: {error}"
+                if is_error_item:
+                    first_item.setTitle_(err_title)
+                else:
+                    err_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                        err_title, "", ""
+                    )
+                    err_item.setEnabled_(False)
+                    self.menu.insertItem_atIndex_(err_item, 0)
+                    sep = NSMenuItem.separatorItem()
+                    self.menu.insertItem_atIndex_(sep, 1)
+            else:
+                if is_error_item:
+                    self.menu.removeItemAtIndex_(0)
+                    next_item = self.menu.itemAtIndex_(0) if self.menu.numberOfItems() > 0 else None
+                    if next_item and next_item.isSeparatorItem():
+                        self.menu.removeItemAtIndex_(0)
+
         try:
             # App-consistent look: orange background + white text (matches the
             # app's active controls). Leading/trailing spaces give the orange
@@ -180,6 +214,7 @@ def main():
 
     # Create the popup menu
     menu = NSMenu.alloc().init()
+    agent.menu = menu
 
     # 1. Launch Dashboard option
     launch_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(

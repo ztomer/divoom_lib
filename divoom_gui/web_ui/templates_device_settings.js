@@ -8,8 +8,7 @@
    unchanged except the new pills. */
 window.DivoomTemplates = window.DivoomTemplates || {};
 window.DivoomTemplates.deviceSettings = `
-        <div class="card glass-card" style="max-width:640px;">
-            <div class="card-header"><h3>Device Settings</h3></div>
+        <div class="card glass-card" style="max-width:448px;">
             <div class="card-body" style="display:flex; flex-direction:column; gap:16px;">
 
                 <!-- 1. Device name -->

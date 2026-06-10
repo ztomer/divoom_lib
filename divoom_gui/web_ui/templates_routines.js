@@ -11,8 +11,8 @@ window.DivoomTemplates.routines = `
         <!-- SCHEDULE sub-tab (ex-Settings → Routines) -->
         <div class="routines-subtab-content active" id="routines-schedule">
         <!-- Device rows are now just dot + name + toggle, so the card no longer
-             needs the R34 760px width — 560px kills the dead middle space. -->
-        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 560px;">
+             needs the R34 760px width — 336px (40% less than 560px) fits perfectly. -->
+        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 336px;">
             <div class="card glass-card">
                 <div class="card-header flex-header">
                     <h3>Auto-Sync Gallery</h3>
@@ -22,9 +22,9 @@ window.DivoomTemplates.routines = `
                     </label>
                 </div>
                 <div class="card-body">
-                    <div id="sync-targets-list" class="sync-targets-list" style="margin-bottom:14px;"></div>
+                    <div id="sync-targets-list" class="sync-targets-list" style="margin-bottom:18px;"></div>
 
-                    <div style="margin-bottom:14px;">
+                    <div style="margin-bottom:18px;">
                         <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;">Sync every</label>
                         <div class="tabs-row" role="tablist" id="routines-interval-tabs">
                             <button class="tab-btn active" data-interval="3600">1h</button>
@@ -47,20 +47,6 @@ window.DivoomTemplates.routines = `
         <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
             <div class="card glass-card">
                 <div class="card-header flex-header">
-                    <h3>Alarms</h3>
-                    <!-- R34 §4: table model — add/clear here, per-row remove, live writes. -->
-                    <div class="row gap-8">
-                        <button id="alarms-clear-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Clear all</button>
-                        <button id="alarms-add-btn" class="glow-btn compact">+ Add alarm</button>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <p class="panel-hint" style="margin-top:0;">Changes are sent to the device immediately. Click a weekday cell to toggle it.</p>
-                    <div id="alarms-list" class="alarms-list"></div>
-                </div>
-            </div>
-            <div class="card glass-card">
-                <div class="card-header flex-header">
                     <h3>Anniversary / Memorial</h3>
                     <!-- R40 §4: Enabled is a header-right toggle. -->
                     <label class="switch" title="Enable anniversary display" style="margin:0;"><input type="checkbox" id="memorial-enabled" checked><span class="slider-round"></span></label>
@@ -80,6 +66,20 @@ window.DivoomTemplates.routines = `
                         <input type="number" id="memorial-min" class="text-input" min="0" max="59" value="0" style="width:60px;" title="minute">
                         <button id="memorial-save" class="glow-btn compact" style="margin-left:auto;">Save</button>
                     </div>
+                </div>
+            </div>
+            <div class="card glass-card">
+                <div class="card-header flex-header">
+                    <h3>Alarms</h3>
+                    <!-- R34 §4: table model — add/clear here, per-row remove, live writes. -->
+                    <div class="row gap-8">
+                        <button id="alarms-clear-btn" class="glow-btn compact" style="background:transparent; border:1px solid var(--secondary); color:var(--text-main); box-shadow:none;">Clear all</button>
+                        <button id="alarms-add-btn" class="glow-btn compact">+ Add alarm</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="panel-hint" style="margin-top:0;">Changes are sent to the device immediately. Click a weekday cell to toggle it.</p>
+                    <div id="alarms-list" class="alarms-list"></div>
                 </div>
             </div>
         </div>

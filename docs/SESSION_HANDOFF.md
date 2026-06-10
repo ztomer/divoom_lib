@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R41 SHIPPED (2026-06-10) — UI, Startup, Reconnect, Virtual Wall & CI Fixes.** Plan+outcome `docs/PLANNING_ROUND41.md`. Local suite **1321/75** passed cleanly. Key changes:
+  - Fixed duplicate `#panel-design` and custom art layout height constraints.
+  - Constrained `.gallery-split-card` and `.gallery-split-layout` to support internal grid scrolling.
+  - Spaced and aligned targets list, Routines schedule layout, and Anniversary/Alarms order.
+  - Shrunk Device Settings card and removed card-header.
+  - Configured startup auto-scan and auto-connect with 60s BLE scan timeout fallback.
+  - Handled cloud credentials expiry automatically (re-login + retry once) and fixed gallery.js syntax error.
+  - Recognized Tivoo Max speaker capability in regex checks.
+  - Propagated listener errors to menu bar disabled item and tooltips.
+  - Adjusted `is_free_form` calculation on Virtual Wall, captured crops, and rendered previews on Arranger Canvas.
+  - Respects custom `DIVOOM_TEST_SEED` env var for downscaler stress test replication.
+
 - **R40 SHIPPED (2026-06-10) — UI batch items 2-9.** Plan+outcome
   `docs/PLANNING_ROUND40.md`. Local suite **1319/75** (2 playwright tests need a
   viewport-height chain → skip in CI). Custom-art 0xAA push crash fixed

@@ -55,7 +55,7 @@ class NotificationService:
         }
 
     def status_event(self) -> dict:
-        return make_status_event(self._state(), self._counters())
+        return make_status_event(self._state(), self._counters(), self._error)
 
     # ── notification sink (monitor -> device + broadcast) ────────────────
     def _sink(self, app_type: int, title: str, body: str) -> None:

@@ -186,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
         candidates.forEach(c => {
             const row = document.createElement("div");
             row.className = "sync-device-row";
-            row.style.cssText = "display:flex; flex-wrap:nowrap; align-items:center; gap:8px; padding:10px 0;";
+            row.style.cssText = "display:flex; flex-wrap:nowrap; align-items:center; gap:8px; padding:13px 0;";
 
             const color = window.deviceColor(c.address);
             const accent = document.createElement("span");
@@ -200,8 +200,6 @@ document.addEventListener("DOMContentLoaded", () => {
             name.className = "target-name";
             name.textContent = c.name;
             name.title = c.name;
-            // R40 §6: don't stretch the name (flex:1 stranded the toggle at the
-            // far edge with a big gap). Shrink-only, with the toggle right after.
             name.style.cssText =
                 "flex:0 1 auto; min-width:0; max-width:240px; overflow:hidden; "
                 + "text-overflow:ellipsis; white-space:nowrap;";
@@ -209,6 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const toggle = document.createElement("label");
             toggle.className = "switch";
             toggle.style.margin = "0";
+            toggle.style.marginLeft = "auto";
             const cb = document.createElement("input");
             cb.type = "checkbox";
             cb.value = c.address;
@@ -308,6 +307,29 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } catch (e) {
             console.error("Failed to process background gallery fetch:", e);
+        }
+    };
+
+    window.onGalleryFetchError = function(classify, targetSize, isExpired, errMsg) {
+        try {
+            const classifyTabs = document.getElementById("gallery-classify-tabs");
+            const currentClassify = parseInt(classifyTabs?.querySelector(".cat-btn.active")?.getAttribute("data-style")) || 18;
+            const currentTargetSize = readTargetSize();
+            if (currentClassify !== classify || currentTargetSize !== targetSize) return;
+
+            if (isExpired) {
+                window.showToast("Credentials expired. Reconnect in Settings -> Divoom.", "error");
+                if (galleryContainer) {
+                    galleryContainer.innerHTML = `<div class="empty-list" style="color:#ef4444; padding:20px; font-weight:600; text-align:center;">Credentials expired. Please reconnect under Settings.</div>`;
+                }
+            } else {
+                window.showToast(`Fetch failed: ${errMsg}`, "error");
+                if (galleryContainer) {
+                    galleryContainer.innerHTML = `<div class="empty-list" style="color:#ef4444; padding:20px; font-weight:600; text-align:center;">Fetch failed: ${errMsg}</div>`;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to process gallery fetch error:", e);
         }
     };
 

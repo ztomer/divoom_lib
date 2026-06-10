@@ -110,163 +110,190 @@ class GallerySyncMixin(GalleryHotApiMixin):
 
         def background_fetch_worker():
             try:
-                if not self.cached_creds:
-                    import configparser
-                    config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
-                    email, password = "", ""
-                    if config_file.exists():
-                        cfg = configparser.ConfigParser()
-                        cfg.read(config_file)
-                        email = cfg.get("divoom", "email", fallback="")
-                        password = cfg.get("divoom", "password", fallback="")
-                    
-                    if not email or not password:
-                        logger.warning("Background fetch: credentials not configured.")
-                        return
+                retries = 1
+                file_list = []
+                while retries >= 0:
+                    try:
+                        if not self.cached_creds:
+                            import configparser
+                            config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
+                            email, password = "", ""
+                            if config_file.exists():
+                                cfg = configparser.ConfigParser()
+                                cfg.read(config_file)
+                                email = cfg.get("divoom", "email", fallback="")
+                                password = cfg.get("divoom", "password", fallback="")
+                            
+                            if not email or not password:
+                                logger.warning("Background fetch: credentials not configured.")
+                                raise RuntimeError("Credentials not configured in config.ini")
 
-                    self.cached_creds = divoom_auth.get_credentials()
-                    
-                if file_size > 0:
-                    file_size_bitmask = file_size
-                else:
-                    file_size_bitmask = self.FILE_SIZE_BITMASK.get(target_size, 1)
-                    
-                body = {
-                    "Command": "GetCategoryFileListV2",
-                    "Token": self.cached_creds.token,
-                    "UserId": self.cached_creds.user_id,
-                    "DeviceId": self.device_id,
-                    "Classify": classify,
-                    "FileSort": file_sort,
-                    "FileType": 5,
-                    "FileSize": file_size_bitmask,
-                    "Version": 19,
-                    "StartNum": 1,
-                    "EndNum": 30,
-                    "RefreshIndex": 0
-                }
-                if self.device_pw:
-                    body["DevicePassword"] = self.device_pw
+                            force_refresh = (retries < 1)
+                            self.cached_creds = divoom_auth.get_credentials(force_refresh=force_refresh)
+                            
+                        if file_size > 0:
+                            file_size_bitmask = file_size
+                        else:
+                            file_size_bitmask = self.FILE_SIZE_BITMASK.get(target_size, 1)
+                            
+                        body = {
+                            "Command": "GetCategoryFileListV2",
+                            "Token": self.cached_creds.token,
+                            "UserId": self.cached_creds.user_id,
+                            "DeviceId": self.device_id,
+                            "Classify": classify,
+                            "FileSort": file_sort,
+                            "FileType": 5,
+                            "FileSize": file_size_bitmask,
+                            "Version": 19,
+                            "StartNum": 1,
+                            "EndNum": 30,
+                            "RefreshIndex": 0
+                        }
+                        if self.device_pw:
+                            body["DevicePassword"] = self.device_pw
 
-                url = "https://appin.divoom-gz.com/GetCategoryFileListV2"
-                payload = json.dumps(body).encode("utf-8")
-                req = urllib.request.Request(
-                    url,
-                    data=payload,
-                    headers={
-                        "Content-Type": "application/json; charset=utf-8",
-                        "User-Agent": "okhttp/4.12.0",
-                    },
-                    method="POST"
-                )
+                        url = "https://appin.divoom-gz.com/GetCategoryFileListV2"
+                        payload = json.dumps(body).encode("utf-8")
+                        req = urllib.request.Request(
+                            url,
+                            data=payload,
+                            headers={
+                                "Content-Type": "application/json; charset=utf-8",
+                                "User-Agent": "okhttp/4.12.0",
+                            },
+                            method="POST"
+                        )
+                        
+                        with urllib.request.urlopen(req, timeout=10) as resp:
+                            data = json.loads(resp.read().decode("utf-8"))
+                            rc = data.get("ReturnCode", -1)
+                            if rc in [9, 10, 11]:
+                                raise RuntimeError(f"Token expired or mismatch (ReturnCode={rc})")
+                            elif rc != 0:
+                                raise RuntimeError(f"API Error (ReturnCode={rc}): {data.get('ReturnMessage')}")
+                            
+                            file_list = data.get("FileList", [])
+                            break # success, break out of retry loop
+                    except Exception as e:
+                        logger.warning(f"Fetch attempt failed (retries left={retries}): {e}")
+                        self.cached_creds = None
+                        retries -= 1
+                        if retries < 0:
+                            raise # propagate to outer try-except
+
+                cache_dir = Path.home() / ".config" / "divoom-control" / "cache_gallery"
+                cache_dir.mkdir(parents=True, exist_ok=True)
                 
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    file_list = data.get("FileList", [])
+                # ── Parallel download and decode of missing .bin assets ──
+                from concurrent.futures import ThreadPoolExecutor
+                
+                def download_item(item):
+                    file_id = item.get("FileId")
+                    if not file_id:
+                        return
+                    safe_filename = file_id.replace("/", "_")
+                    cache_file_item = cache_dir / safe_filename
                     
-                    cache_dir = Path.home() / ".config" / "divoom-control" / "cache_gallery"
-                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    cache_file_bin = cache_file_item.with_suffix(".bin")
+                    has_preview = any(cache_file_item.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg"])
+                    if not has_preview and not cache_file_bin.exists():
+                        try:
+                            dl_url = f"https://fin.divoom-gz.com/{file_id}"
+                            req_dl = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
+                            with urllib.request.urlopen(req_dl, timeout=5) as dl_resp:
+                                raw_bytes = dl_resp.read()
+                                cache_file_bin.write_bytes(raw_bytes)
+                        except Exception as dl_err:
+                            logger.warning(f"Parallel download failed for {file_id}: {dl_err}")
+                            
+                    # Decode in parallel if preview doesn't exist
+                    has_preview = any(cache_file_item.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg"])
+                    if not has_preview and cache_file_bin.exists():
+                        try:
+                            raw_bytes = cache_file_bin.read_bytes()
+                            extracted = media_decoder.extract_image_from_magic_43(raw_bytes)
+                            if extracted:
+                                img_bytes, ext = extracted
+                                cache_file_item.with_suffix(ext).write_bytes(img_bytes)
+                            elif raw_bytes.startswith(b"GIF89a") or raw_bytes.startswith(b"GIF87a"):
+                                cache_file_item.with_suffix(".gif").write_bytes(raw_bytes)
+                            elif raw_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+                                cache_file_item.with_suffix(".png").write_bytes(raw_bytes)
+                            elif raw_bytes.startswith(b"\xff\xd8"):
+                                cache_file_item.with_suffix(".jpg").write_bytes(raw_bytes)
+                            else:
+                                media_decoder.decode_and_save_preview(raw_bytes, cache_file_item.with_suffix(".png"))
+                        except Exception as dec_err:
+                            logger.warning(f"Parallel decode failed for {file_id}: {dec_err}")
+
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    list(executor.map(download_item, file_list))
+                
+                # ── Sequential base64 encoding and progressive streaming ──
+                results = []
+                for idx, item in enumerate(file_list):
+                    file_id = item.get("FileId")
+                    preview_url = ""
                     
-                    # ── Parallel download and decode of missing .bin assets ──
-                    from concurrent.futures import ThreadPoolExecutor
-                    
-                    def download_item(item):
-                        file_id = item.get("FileId")
-                        if not file_id:
-                            return
+                    if file_id:
                         safe_filename = file_id.replace("/", "_")
                         cache_file_item = cache_dir / safe_filename
                         
-                        cache_file_bin = cache_file_item.with_suffix(".bin")
-                        has_preview = any(cache_file_item.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg"])
-                        if not has_preview and not cache_file_bin.exists():
-                            try:
-                                dl_url = f"https://fin.divoom-gz.com/{file_id}"
-                                req_dl = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
-                                with urllib.request.urlopen(req_dl, timeout=5) as dl_resp:
-                                    raw_bytes = dl_resp.read()
-                                    cache_file_bin.write_bytes(raw_bytes)
-                            except Exception as dl_err:
-                                logger.warning(f"Parallel download failed for {file_id}: {dl_err}")
-                                
-                        # Decode in parallel if preview doesn't exist
-                        has_preview = any(cache_file_item.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg"])
-                        if not has_preview and cache_file_bin.exists():
-                            try:
-                                raw_bytes = cache_file_bin.read_bytes()
-                                extracted = media_decoder.extract_image_from_magic_43(raw_bytes)
-                                if extracted:
-                                    img_bytes, ext = extracted
-                                    cache_file_item.with_suffix(ext).write_bytes(img_bytes)
-                                elif raw_bytes.startswith(b"GIF89a") or raw_bytes.startswith(b"GIF87a"):
-                                    cache_file_item.with_suffix(".gif").write_bytes(raw_bytes)
-                                elif raw_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
-                                    cache_file_item.with_suffix(".png").write_bytes(raw_bytes)
-                                elif raw_bytes.startswith(b"\xff\xd8"):
-                                    cache_file_item.with_suffix(".jpg").write_bytes(raw_bytes)
-                                else:
-                                    media_decoder.decode_and_save_preview(raw_bytes, cache_file_item.with_suffix(".png"))
-                            except Exception as dec_err:
-                                logger.warning(f"Parallel decode failed for {file_id}: {dec_err}")
-
-                    with ThreadPoolExecutor(max_workers=10) as executor:
-                        list(executor.map(download_item, file_list))
+                        for ext in [".gif", ".png", ".jpg", ".jpeg"]:
+                            possible_file = cache_file_item.with_suffix(ext)
+                            if possible_file.exists():
+                                try:
+                                    mime_type = "image/gif" if ext == ".gif" else ("image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png")
+                                    img_data = possible_file.read_bytes()
+                                    b64_str = base64.b64encode(img_data).decode("utf-8")
+                                    preview_url = f"data:{mime_type};base64,{b64_str}"
+                                except Exception as b64_err:
+                                    logger.warning(f"Failed to base64 encode {possible_file.name}: {b64_err}")
+                                break
                     
-                    # ── Sequential base64 encoding and progressive streaming ──
-                    results = []
-                    for idx, item in enumerate(file_list):
-                        file_id = item.get("FileId")
-                        preview_url = ""
-                        
-                        if file_id:
-                            safe_filename = file_id.replace("/", "_")
-                            cache_file_item = cache_dir / safe_filename
-                            
-                            for ext in [".gif", ".png", ".jpg", ".jpeg"]:
-                                possible_file = cache_file_item.with_suffix(ext)
-                                if possible_file.exists():
-                                    try:
-                                        mime_type = "image/gif" if ext == ".gif" else ("image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png")
-                                        img_data = possible_file.read_bytes()
-                                        b64_str = base64.b64encode(img_data).decode("utf-8")
-                                        preview_url = f"data:{mime_type};base64,{b64_str}"
-                                    except Exception as b64_err:
-                                        logger.warning(f"Failed to base64 encode {possible_file.name}: {b64_err}")
-                                    break
-                        
-                        art_item = {
-                            "name": item.get("FileName", "unnamed"),
-                            "file_id": file_id,
-                            "likes": item.get("LikeCnt", 0),
-                            "magic": item.get("FileType", 3),
-                            "preview_url": preview_url
-                        }
-                        results.append(art_item)
-                        
-                        if self.window:
-                            try:
-                                item_json = json.dumps(art_item)
-                                b64_item_data = base64.b64encode(item_json.encode("utf-8")).decode("utf-8")
-                                js_code = f"if (window.onGalleryItemLoaded) {{ window.onGalleryItemLoaded({classify}, {target_size}, {idx}, {len(file_list)}, '{b64_item_data}', {file_sort}, {file_size}); }}"
-                                self.window.evaluate_js(js_code)
-                            except Exception as js_err:
-                                logger.warning(f"Failed to send progressive gallery item: {js_err}")
+                    art_item = {
+                        "name": item.get("FileName", "unnamed"),
+                        "file_id": file_id,
+                        "likes": item.get("LikeCnt", 0),
+                        "magic": item.get("FileType", 3),
+                        "preview_url": preview_url
+                    }
+                    results.append(art_item)
                     
-                    cache_file = Path.home() / ".config" / "divoom-control" / "gallery_cache.json"
-                    try:
-                        cache_file.parent.mkdir(parents=True, exist_ok=True)
-                        cache_file.write_text(json.dumps(results, indent=2), encoding="utf-8")
-                        logger.info(f"Gallery Cache: Successfully saved {len(results)} gallery items offline.")
-                    except Exception as cache_err:
-                        logger.warning(f"Failed to save gallery cache: {cache_err}")
-                        
                     if self.window:
-                        js_data = json.dumps(results)
-                        b64_js_data = base64.b64encode(js_data.encode("utf-8")).decode("utf-8")
-                        js_code = f"if (window.onGalleryBackgroundFetched) {{ window.onGalleryBackgroundFetched({classify}, {target_size}, '{b64_js_data}', {file_sort}, {file_size}); }}"
-                        self.window.evaluate_js(js_code)
+                        try:
+                            item_json = json.dumps(art_item)
+                            b64_item_data = base64.b64encode(item_json.encode("utf-8")).decode("utf-8")
+                            js_code = f"if (window.onGalleryItemLoaded) {{ window.onGalleryItemLoaded({classify}, {target_size}, {idx}, {len(file_list)}, '{b64_item_data}', {file_sort}, {file_size}); }}"
+                            self.window.evaluate_js(js_code)
+                        except Exception as js_err:
+                            logger.warning(f"Failed to send progressive gallery item: {js_err}")
+                
+                cache_file = Path.home() / ".config" / "divoom-control" / "gallery_cache.json"
+                try:
+                    cache_file.parent.mkdir(parents=True, exist_ok=True)
+                    cache_file.write_text(json.dumps(results, indent=2), encoding="utf-8")
+                    logger.info(f"Gallery Cache: Successfully saved {len(results)} gallery items offline.")
+                except Exception as cache_err:
+                    logger.warning(f"Failed to save gallery cache: {cache_err}")
+                    
+                if self.window:
+                    js_data = json.dumps(results)
+                    b64_js_data = base64.b64encode(js_data.encode("utf-8")).decode("utf-8")
+                    js_code = f"if (window.onGalleryBackgroundFetched) {{ window.onGalleryBackgroundFetched({classify}, {target_size}, '{b64_js_data}', {file_sort}, {file_size}); }}"
+                    self.window.evaluate_js(js_code)
             except Exception as e:
-                logger.error(f"Background gallery fetch failed: {e}")
+                err_msg = str(e)
+                is_expired = "expired" in err_msg.lower() or "token" in err_msg.lower() or "credentials not configured" in err_msg.lower()
+                logger.error(f"Background gallery fetch failed permanently: {e}")
+                if self.window:
+                    try:
+                        is_expired_val = "true" if is_expired else "false"
+                        js_code = f"if (window.onGalleryFetchError) {{ window.onGalleryFetchError({classify}, {target_size}, {is_expired_val}, {json.dumps(err_msg)}); }}"
+                        self.window.evaluate_js(js_code)
+                    except Exception as js_err:
+                        logger.warning(f"Failed to send gallery fetch error: {js_err}")
 
         threading.Thread(target=background_fetch_worker, name="DivoomGalleryFetch", daemon=True).start()
         return cached_data
@@ -310,36 +337,6 @@ class GallerySyncMixin(GalleryHotApiMixin):
             logger.error(f"Batch sync failed: {e}")
             return False, str(e)
 
-    @staticmethod
-    def _coerce_list(args, kwargs, key) -> list:
-        if len(args) == 1:
-            v = args[0]
-            if isinstance(v, str):
-                try:
-                    parsed = json.loads(v)
-                    return parsed if isinstance(parsed, list) else [parsed]
-                except ValueError:
-                    return [v]
-            return list(v) if isinstance(v, (list, tuple)) else [v]
-        if len(args) > 1:
-            return list(args)
-        if key in kwargs and isinstance(kwargs[key], (list, tuple)):
-            return list(kwargs[key])
-        return []
-
-    @staticmethod
-    def _coerce_dict(args, kwargs) -> dict:
-        if len(args) == 1:
-            v = args[0]
-            if isinstance(v, str):
-                try:
-                    parsed = json.loads(v)
-                    return parsed if isinstance(parsed, dict) else {}
-                except ValueError:
-                    return {}
-            return dict(v) if isinstance(v, dict) else {}
-        allowed = ("enabled", "interval", "classify", "targets")
-        return {k: kwargs[k] for k in allowed if k in kwargs}
 
     def get_sync_candidates(self) -> str:
         from divoom_lib import hotchannel_config

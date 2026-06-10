@@ -131,3 +131,7 @@
     flex: 1;
     min-height: 0;
 }
+#pixel-art.tab-content.active {
+    height: 100%;
+    min-height: 0;
+}
