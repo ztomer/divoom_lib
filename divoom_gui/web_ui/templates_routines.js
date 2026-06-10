@@ -10,9 +10,8 @@ window.DivoomTemplates.routines = `
 
         <!-- SCHEDULE sub-tab (ex-Settings → Routines) -->
         <div class="routines-subtab-content active" id="routines-schedule">
-        <!-- Device rows are now just dot + name + toggle, so the card no longer
-             needs the R34 760px width — 336px (40% less than 560px) fits perfectly. -->
-        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 336px;">
+        <!-- R42 §7: +15% over the R41 336px (names were getting clipped). -->
+        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 386px;">
             <div class="card glass-card">
                 <div class="card-header flex-header">
                     <h3>Auto-Sync Gallery</h3>

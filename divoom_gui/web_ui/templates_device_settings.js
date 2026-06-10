@@ -11,10 +11,10 @@ window.DivoomTemplates.deviceSettings = `
         <div class="card glass-card" style="max-width:448px;">
             <div class="card-body" style="display:flex; flex-direction:column; gap:16px;">
 
-                <!-- 1. Device name -->
-                <div class="ds-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                    <span class="form-label" style="font-size:12px; min-width:120px;">Device name</span>
-                    <input type="text" id="device-name-input" class="text-input" maxlength="24" style="flex:1; min-width:140px;" placeholder="Read from device…">
+                <!-- 1. Device name (R42 §8: controls right-aligned like the pills) -->
+                <div class="ds-row" style="display:flex; gap:10px; align-items:center;">
+                    <span class="form-label" style="font-size:12px;">Device name</span>
+                    <input type="text" id="device-name-input" class="text-input" maxlength="24" style="width:150px; margin-left:auto;" placeholder="Read from device…">
                     <button id="device-name-save" class="glow-btn compact">Save</button>
                 </div>
 
@@ -45,12 +45,12 @@ window.DivoomTemplates.deviceSettings = `
                     </div>
                 </div>
 
-                <!-- 5. Auto power-off -->
-                <div class="ds-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                    <span class="form-label" style="font-size:12px; min-width:120px;">Auto power-off</span>
-                    <input type="number" id="auto-off-min" class="text-input" min="0" max="240" value="0" style="width:80px;" title="minutes (0 = off)">
+                <!-- 5. Auto power-off (R42 §8: input+min+Save cluster right-aligned) -->
+                <div class="ds-row" style="display:flex; gap:10px; align-items:center;">
+                    <span class="form-label" style="font-size:12px;">Auto power-off</span>
+                    <input type="number" id="auto-off-min" class="text-input" min="0" max="240" value="0" style="width:80px; margin-left:auto;" title="minutes (0 = off)">
                     <span style="font-size:12px; color:var(--text-muted);">min</span>
-                    <button id="auto-off-save" class="glow-btn compact" style="margin-left:auto;">Save</button>
+                    <button id="auto-off-save" class="glow-btn compact">Save</button>
                 </div>
 
                 <!-- 6. Orientation -->

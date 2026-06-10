@@ -161,15 +161,15 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                     <div class="card glass-card">
                         <div class="card-header flex-header">
                             <h3>MCP Server</h3>
+                            <!-- R42 §9: toggle lives header-right, like Background agent. -->
+                            <label class="switch" title="Run the MCP server" style="margin:0;">
+                                <input type="checkbox" id="mcp-toggle">
+                                <span class="slider-round"></span>
+                            </label>
                         </div>
                         <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
                             <p class="panel-hint" style="margin:0;">Runs <code>divoom-control mcp-server</code> which routes all device calls through the daemon. Point any MCP-compatible client at this machine's <code>divoom-control</code> binary; see <code>docs/MCP_SERVER.md</code> for setup.</p>
                             <div style="display:flex; gap:10px; align-items:center;">
-                                <label class="switch">
-                                    <input type="checkbox" id="mcp-toggle">
-                                    <span class="slider-round"></span>
-                                </label>
-                                <span style="font-size:13px; color:var(--text-main);">MCP Server</span>
                                 <span id="mcp-status-detail" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; margin-left:auto;">PID: --</span>
                             </div>
                             <pre id="mcp-log" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px; margin: 0; white-space: pre-wrap;">No log entries yet.</pre>
