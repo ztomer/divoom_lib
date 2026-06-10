@@ -41,16 +41,14 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        // Tiles are image-only — the name/version live in the tooltip, so the
+        // grid packs more art per row (Rams: omit the inessential).
         list.innerHTML = items.map((item, i) => {
             const name = item.name || item.file_id;
-            return `<div class="hot-preview-item" title="${name}">
+            return `<div class="hot-preview-item" title="${name} (v${item.version})">
                 <img class="hot-preview-thumb" src="${item.preview_url || 'assets/pixoo.png'}"
                      alt="${name}" loading="lazy"
                      onerror="this.src='assets/pixoo.png'">
-                <div class="hot-preview-meta">
-                    <span class="hot-preview-name">${name}</span>
-                    <span class="hot-preview-version">v${item.version}</span>
-                </div>
             </div>`;
         }).join("");
 

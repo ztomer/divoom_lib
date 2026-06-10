@@ -140,6 +140,11 @@
     border-style: solid;
     background: rgba(255, 90, 31, 0.12);
 }
+.custom-art-slot.drag-over {
+    border-color: var(--accent);
+    border-style: solid;
+    background: rgba(0, 204, 102, 0.15);
+}
 .custom-art-slot img {
     position: absolute;
     inset: 0;

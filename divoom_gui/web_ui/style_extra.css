@@ -247,6 +247,16 @@ body.theme-light .arranger-node-image {
     flex-direction: column;
 }
 
+/* The .channel-panels wrapper must pass the bounded height down, or the
+   custom-art panel's height:100% resolves against an auto-height block and
+   its fixed header / pinned push button scroll away with the card body. */
+#control-panel .channel-panels {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 #panel-design {
     display: none;
     height: 100%;

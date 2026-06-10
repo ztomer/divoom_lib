@@ -89,6 +89,38 @@
         selectedSlot = selectedSlot === i ? null : i;
         renderSlots();
       });
+
+      // Drag & drop: drag a filled slot onto another to swap; drag art
+      // from the library onto a slot to place it there.
+      slot.addEventListener("dragstart", (e) => {
+        if (!assignments[currentPage][i]) { e.preventDefault(); return; }
+        e.dataTransfer.setData("text/x-slot", String(i));
+        e.dataTransfer.effectAllowed = "move";
+      });
+      slot.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        slot.classList.add("drag-over");
+      });
+      slot.addEventListener("dragleave", () => slot.classList.remove("drag-over"));
+      slot.addEventListener("drop", (e) => {
+        e.preventDefault();
+        slot.classList.remove("drag-over");
+        const page = assignments[currentPage];
+        const fromSlot = e.dataTransfer.getData("text/x-slot");
+        if (fromSlot !== "") {
+          const from = parseInt(fromSlot, 10);
+          if (from === i) return;
+          [page[from], page[i]] = [page[i], page[from]];
+        } else {
+          const fileId = e.dataTransfer.getData("text/x-fileid");
+          const thumb = e.dataTransfer.getData("text/x-thumb");
+          if (!fileId) return;
+          page[i] = { fileId, thumb };
+        }
+        renderSlots();
+        markAssignedLibraryItems();
+      });
+
       grid.appendChild(slot);
     }
     renderSlots();
@@ -101,6 +133,7 @@
       const a = assignments[currentPage][i];
       slot.classList.toggle("filled", !!a);
       slot.classList.toggle("selected", selectedSlot === i);
+      slot.draggable = !!a;
       const img = slot.querySelector("img");
       if (a) {
         if (img) {
@@ -129,6 +162,17 @@
       const fileId = tile.dataset.fileId || img?.dataset.fileId;
       if (!fileId || !img) return;
       assignToSlot(fileId, img.src);
+    });
+    // Delegated dragstart so tiles can be dropped straight onto a slot.
+    grid.addEventListener("dragstart", (e) => {
+      const tile = e.target.closest(".cache-thumb-item");
+      if (!tile || !grid.contains(tile)) return;
+      const img = tile.querySelector("img");
+      const fileId = tile.dataset.fileId || img?.dataset.fileId;
+      if (!fileId || !img) { e.preventDefault(); return; }
+      e.dataTransfer.setData("text/x-fileid", fileId);
+      e.dataTransfer.setData("text/x-thumb", img.src);
+      e.dataTransfer.effectAllowed = "copy";
     });
   }
 

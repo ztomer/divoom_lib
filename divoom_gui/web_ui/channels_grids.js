@@ -356,6 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
             wrapper.dataset.name = f.name || "";
             wrapper.dataset.fileId = f.file_id || f.path;
             wrapper.title = f.name;
+            wrapper.draggable = true;
             wrapper.style.cssText = `
                 display:flex; flex-direction:column; align-items:center; gap:2px;
                 background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1);

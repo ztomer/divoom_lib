@@ -2,8 +2,6 @@
 window.DivoomTemplates = window.DivoomTemplates || {};
 window.DivoomTemplates.hotChannel = `                <div class="hot-channel-layout">
                     <div class="card glass-card" style="height: 100%;">
-                        <div class="card-header">
-                        </div>
                         <div class="card-body">
                             <div id="hot-preview-area" class="hot-preview-area" style="margin-bottom:12px;">
                                 <div id="hot-preview-list" class="hot-preview-list">

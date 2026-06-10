@@ -25,7 +25,11 @@ window.DivoomTemplates.gallery = `                <div class="gallery-full-layou
                                 </div>
                             </div>
                             <div class="gallery-main">
-                                <div class="gallery-controls-row" style="display:flex; gap:10px; align-items:center; flex-shrink:0;">
+                                <!-- View controls live on the right edge: categories (left
+                                     sidebar) say WHAT to browse, these say HOW it's shown.
+                                     Rams: secondary controls stay quiet; Kare: one consistent
+                                     corner to find them. -->
+                                <div class="gallery-controls-row" style="display:flex; gap:10px; align-items:center; flex-shrink:0; justify-content:flex-end;">
                                     <div class="tabs-row" role="tablist" id="gallery-sort-tabs" style="margin:0;">
                                         <button class="tab-btn active" data-sort="1">Popular</button>
                                         <button class="tab-btn" data-sort="0">Latest</button>

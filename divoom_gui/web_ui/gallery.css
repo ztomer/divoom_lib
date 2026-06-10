@@ -156,8 +156,8 @@
 }
 .hot-preview-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 8px;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -192,29 +192,6 @@
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--border-color);
-}
-.hot-preview-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-    width: 100%;
-    min-width: 0;
-}
-.hot-preview-name {
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--text-main);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-}
-.hot-preview-version {
-    font-size: 9px;
-    font-weight: 500;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
 }
 
 @keyframes fadeSlideIn {
