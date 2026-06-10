@@ -133,9 +133,11 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (btn.getAttribute("data-pixel-tab") === "pixel-hot-channel" && window.loadHotPreview) {
             setTimeout(window.loadHotPreview, 50);
         } else if (btn.getAttribute("data-pixel-tab") === "pixel-custom-art") {
-            // Re-init custom art if needed (library may have been refreshed)
-            if (window.customArtSyncLibrary) setTimeout(window.customArtSyncLibrary, 50);
-            if (window.loadCachedGallery) setTimeout(window.loadCachedGallery, 50);
+            // R42 §3: the loader is loadCustomArtCacheGrid (loadCachedGallery
+            // never existed) — without it the library showed "No cached gallery
+            // files" even with a full cache.
+            if (window.loadCustomArtCacheGrid) setTimeout(window.loadCustomArtCacheGrid, 50);
+            if (window.customArtSyncLibrary) setTimeout(window.customArtSyncLibrary, 100);
         }
     });
 

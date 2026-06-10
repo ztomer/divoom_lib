@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function loadHotPreview() {
         const list = document.getElementById("hot-preview-list");
         if (!list) return;
+        list.innerHTML = '<div class="hot-preview-empty">Loading hot channel manifest...</div>';
 
         window.pywebview?.api?.hot_update_preview?.().then(json => {
             let r;
@@ -37,6 +38,10 @@ document.addEventListener("DOMContentLoaded", () => {
             renderHotPreview(r.items);
         });
     }
+    // R42 §4: the pixel-art sub-tab handler (settings_features.js) calls
+    // window.loadHotPreview — without this exposure the hot panel stayed on
+    // "Loading hot channel manifest..." forever when the sub-tab was clicked.
+    window.loadHotPreview = loadHotPreview;
 
     function renderHotPreview(items) {
         const list = document.getElementById("hot-preview-list");

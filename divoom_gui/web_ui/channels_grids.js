@@ -395,4 +395,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Expose for cross-file access from channels_core.js showChannelPanel
     window.loadCustomArtCacheGrid = loadCustomArtCacheGrid;
+
+    // R42 §3: custom art lives in Pixel Art now and is its DEFAULT sub-tab, so
+    // entering the section must load the library (the old trigger was the
+    // removed Channels "design" panel switch).
+    window.addEventListener("tab-changed", (e) => {
+        if (e.detail && e.detail.tab === "pixel-art") {
+            const active = document.querySelector(".tab-btn[data-pixel-tab].active");
+            if (!active || active.getAttribute("data-pixel-tab") === "pixel-custom-art") {
+                setTimeout(loadCustomArtCacheGrid, 50);
+            }
+        }
+    });
 });
