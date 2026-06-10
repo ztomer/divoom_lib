@@ -24,7 +24,12 @@ NATIVE_SRC_DIR="${LIB_DIR}/native_src"
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
-CFLAGS=(-O3 -fPIC -Wall -Wextra -Wno-unused-parameter)
+# -ffp-contract=off: forbid FMA contraction of `a*b+c` into a single fused op.
+# At -O3 with SIMD, clang contracts differently across versions/arches, which
+# made the LANCZOS3 downscaler byte-exact locally but 1 LSB off PIL on the CI
+# runner's clang (the test_native_downscaler::test_stress_random flake). Off =
+# IEEE-strict separate multiply+add everywhere, matching PIL's scalar math.
+CFLAGS=(-O3 -ffp-contract=off -fPIC -Wall -Wextra -Wno-unused-parameter)
 ARCH_FLAGS=()
 LD_FLAGS=()
 
