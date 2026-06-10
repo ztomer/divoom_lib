@@ -202,6 +202,34 @@ class TestDesign:
             COMMANDS["set design"], [0x14, 7, 30, 15]
         )
 
+    @pytest.mark.asyncio
+    async def test_get_user_define_time(self, fake_divoom):
+        fake_divoom.send_command_and_wait_for_response = AsyncMock(
+            return_value=bytes([10, 20, 30])
+        )
+        d = Design(fake_divoom)
+        result = await d.get_user_define_time()
+        assert result == {"hour": 10, "minute": 20, "second": 30}
+
+    @pytest.mark.asyncio
+    async def test_get_user_define_time_short_response(self, fake_divoom):
+        """Less than 3 bytes → returns None."""
+        fake_divoom.send_command_and_wait_for_response = AsyncMock(
+            return_value=bytes([10, 20])  # only 2 bytes
+        )
+        d = Design(fake_divoom)
+        result = await d.get_user_define_time()
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_user_define_time_none(self, fake_divoom):
+        fake_divoom.send_command_and_wait_for_response = AsyncMock(
+            return_value=None
+        )
+        d = Design(fake_divoom)
+        result = await d.get_user_define_time()
+        assert result is None
+
     # ── Round 9: screen config + factory reset (0xBD EXT) ──────────────
     @pytest.mark.asyncio
     async def test_set_screen_dir(self, fake_divoom):
@@ -239,6 +267,55 @@ class TestDesign:
         assert ok is True
         fake_divoom.send_command.assert_awaited_once_with(
             COMMANDS["set design"], [0x25, 1]
+        )
+
+    # ── Round 37: custom art page management (CmdManager.p1 / g) ───────
+    @pytest.mark.asyncio
+    async def test_use_user_define_index_page_0(self, fake_divoom):
+        ok = await fake_divoom.design.use_user_define_index(0)
+        assert ok is True
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x17, 0x00]
+        )
+
+    @pytest.mark.asyncio
+    async def test_use_user_define_index_page_1(self, fake_divoom):
+        ok = await fake_divoom.design.use_user_define_index(1)
+        assert ok is True
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x17, 0x01]
+        )
+
+    @pytest.mark.asyncio
+    async def test_use_user_define_index_page_2(self, fake_divoom):
+        ok = await fake_divoom.design.use_user_define_index(2)
+        assert ok is True
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x17, 0x02]
+        )
+
+    @pytest.mark.asyncio
+    async def test_clear_user_define_index_page_0(self, fake_divoom):
+        ok = await fake_divoom.design.clear_user_define_index(0)
+        assert ok is True
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x16, 0x00]
+        )
+
+    @pytest.mark.asyncio
+    async def test_clear_user_define_index_page_1(self, fake_divoom):
+        ok = await fake_divoom.design.clear_user_define_index(1)
+        assert ok is True
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x16, 0x01]
+        )
+
+    @pytest.mark.asyncio
+    async def test_clear_user_define_index_page_2(self, fake_divoom):
+        ok = await fake_divoom.design.clear_user_define_index(2)
+        assert ok is True
+        fake_divoom.send_command.assert_awaited_once_with(
+            COMMANDS["set design"], [0x16, 0x02]
         )
 
 

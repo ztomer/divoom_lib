@@ -23,7 +23,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     const cfg = JSON.parse(json);
                     const en = document.getElementById("routines-auto-sync-enabled");
                     if (en) en.checked = !!cfg.enabled;
-                    // Activate matching interval tab.
                     const iv = String(cfg.interval || 3600);
                     document.querySelectorAll("#routines-interval-tabs .tab-btn").forEach(b => {
                         b.classList.toggle("active", b.getAttribute("data-interval") === iv);
@@ -32,11 +31,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
         if (window.updateSyncTargetList) window.updateSyncTargetList();
-        if (window.pywebview?.api?.get_gallery_style) {
-            window.pywebview.api.get_gallery_style("").then(v => {
-                if (v !== null && v !== undefined) window.setGalleryStyle("routines", v);
-            });
-        }
     }
 
     // Auto-save on any change.

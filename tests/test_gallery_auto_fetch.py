@@ -28,7 +28,8 @@ def _cat(paths: list[Path]) -> str:
 
 TEMPLATES_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_tools.js",
-    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_gallery.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_hot_channel.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js",
@@ -63,35 +64,24 @@ def test_fetch_gallery_label_not_in_html() -> None:
     )
 
 
-# ── 2. Button labels renamed ──────────────────────────────────────────
+# ── 2. Removed batch-sync button + updated Routines ────────────────────
 
 
-def test_batch_sync_btn_renamed_to_update_device() -> None:
+def test_batch_sync_btn_fully_removed() -> None:
+    """batch-sync-btn (Update Device) has been removed."""
     src = TEMPLATES_JS
-    assert "Push Selected to Device" not in src, (
-        "Old 'Push Selected to Device' label still present — should be 'Update Device'."
+    assert "batch-sync-btn" not in src, (
+        "batch-sync-btn should be removed entirely."
     )
-    # R35: the button hosts a label span + a progress-status span, so the
-    # 'Update Device' text lives in #batch-sync-label rather than as the
-    # button's direct text node.
-    assert re.search(
-        r'<button\s+id="batch-sync-btn"[^>]*>\s*'
-        r'<span\s+id="batch-sync-label"[^>]*>\s*Update Device\s*</span>',
-        src,
-    ), "batch-sync-btn must carry 'Update Device' in #batch-sync-label."
 
 
-def test_sync_all_btn_moved_to_routines() -> None:
-    """R32 §A1+§B + R33: the multi-device sync button moved from Monthly Best
-    → Settings → Routines (now its own Routines panel) labelled 'Sync devices now'."""
-    src = TEMPLATES_JS
-    assert "Sync All" not in src, "Old 'Sync All' label still present."
-    # R33: Routines is now its own top-level panel, not a Settings sub-tab.
-    routines = _cat([ROUTINES_JS])
-    assert re.search(
-        r'<button\s+id="sync-all-btn"[^>]*>\s*Sync devices now\s*</button>',
-        routines,
-    ), "Routines must host the 'Sync devices now' (sync-all-btn) button."
+def test_sync_all_btn_removed() -> None:
+    """sync-all-btn removed together with sync_hot_channel."""
+    src = _cat([ROUTINES_JS])
+    assert "sync-all-btn" not in src, (
+        "sync-all-btn should be removed (sync_hot_channel is gone)."
+    )
+    assert "Sync All" not in TEMPLATES_JS, "Old 'Sync All' label still present."
 
 
 def test_refresh_targets_btn_removed() -> None:
@@ -126,21 +116,26 @@ def test_load_gallery_exposed_on_window() -> None:
 def test_classify_change_auto_fetches() -> None:
     js = GALLERY_JS.read_text()
     # The gallery style tabs trigger loadGallery() on click.
+    # The click handler uses `closest("#gallery-classify-tabs .tab-btn")`.
     assert re.search(
-        r"#gallery-classify-tabs[\s\S]*?click[\s\S]*?loadGallery\(\)",
+        r'closest\(\s*["\']#gallery-classify-tabs',
         js,
-    ), "gallery-classify-tabs is missing a click → loadGallery() hook."
+    ), "gallery-classify-tabs click handler not found."
+    assert re.search(
+        r"loadGallery\s*\(\s*\)",
+        js,
+    ), "loadGallery() call not found in gallery.js."
 
 
 def test_tab_activation_auto_fetches() -> None:
     js = GALLERY_JS.read_text()
     assert re.search(
         r'addEventListener\(\"tab-changed\",\s*\(?e\)?\s*=>\s*\{[^}]*'
-        r'e\.detail\.tab\s*===\s*\"monthly-best\"[^}]*loadGallery\(\)',
+        r'e\.detail\.tab\s*===\s*\"gallery\"[^}]*loadGallery\(\)',
         js,
         re.DOTALL,
     ), (
-        "tab-changed handler for 'monthly-best' tab is missing a "
+        "tab-changed handler for 'gallery' tab is missing a "
         "loadGallery() call."
     )
 

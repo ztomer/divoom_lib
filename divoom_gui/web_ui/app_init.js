@@ -29,8 +29,11 @@ document.addEventListener("DOMContentLoaded", () => {
     ).forEach((el) => el.addEventListener("mousedown", (e) => e.stopPropagation()));
 
     // Inject HTML Templates
-    if (document.getElementById('monthly-best') && window.DivoomTemplates?.monthlyBest) {
-        document.getElementById('monthly-best').innerHTML = window.DivoomTemplates.monthlyBest;
+    if (document.getElementById('gallery') && window.DivoomTemplates?.gallery) {
+        document.getElementById('gallery').innerHTML = window.DivoomTemplates.gallery;
+    }
+    if (document.getElementById('hot-channel') && window.DivoomTemplates?.hotChannel) {
+        document.getElementById('hot-channel').innerHTML = window.DivoomTemplates.hotChannel;
     }
     if (document.getElementById('data-sources') && window.DivoomTemplates?.widgets) {
         document.getElementById('data-sources').innerHTML = window.DivoomTemplates.widgets;
@@ -162,52 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ── 6. NATIVE FILE BROWSERS ──
-    const browseCustomArtBtn = document.getElementById("browse-custom-art-btn");
-    const customArtPathInput = document.getElementById("custom-art-path-input");
-    const customArtPreviewContainer = document.getElementById("custom-art-preview-container");
-    const customArtPreviewImg = document.getElementById("custom-art-preview-img");
-    const applyCustomArtBtn = document.getElementById("apply-custom-art-btn");
-
-    if (browseCustomArtBtn) {
-        browseCustomArtBtn.addEventListener("click", () => {
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.open_file_dialog) {
-                window.pywebview.api.open_file_dialog().then(path => {
-                    if (path) {
-                        if (customArtPathInput) customArtPathInput.value = path;
-                        if (window.showCustomArtPreview) window.showCustomArtPreview(path);
-                    }
-                });
-            }
-        });
-    }
-
-    if (applyCustomArtBtn) {
-        applyCustomArtBtn.addEventListener("click", () => {
-            if (!window.requireDevice()) return;
-            const path = customArtPathInput?.value;
-            if (!path) return;
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.display_custom_art) {
-                window.pywebview.api.display_custom_art(path).then(res => {
-                    if (res) {
-                        window.showToast("Custom artwork displayed!", "success", " BLE");
-                        const filename = path.split("/").pop();
-                        if (window.addCustomArtToHistory) {
-                            window.addCustomArtToHistory(filename, path, "file://" + path);
-                        }
-                        // R32 §C2: mirror the pushed artwork as the device preview.
-                        const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
-                        if (activeMac && window.setDevicePreview) {
-                            window.setDevicePreview(activeMac, "file://" + path);
-                        }
-                    } else {
-                        window.showToast("Failed to display", "error");
-                    }
-                });
-            }
-        });
-    }
-
+    // ── 6. NATIVE FILE BROWSERS (wall art only; custom art uses page/slot grid) ──
     const browseWallArtBtn = document.getElementById("browse-wall-art-btn");
     const filePathInput = document.getElementById("file-path-input");
     const filePreviewContainer = document.getElementById("file-preview-container");

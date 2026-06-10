@@ -186,22 +186,34 @@ class HotUpdate:
 
     async def update(self, *, device_size: int = 16,
                      progress_cb=None) -> dict:
-        """Run a full hot-channel update. Returns a summary dict."""
+        """Run a full hot-channel update. Returns a summary dict.
+        If ``progress_cb`` is provided it is called with a phase dict at each
+        stage: ``{"phase": "fetching_manifest"|"downloading"|"uploading"|"done",
+        "current": int, "total": int, "file_id": str, ...}``."""
         comm = getattr(self.divoom, "_conn", None) or self.divoom
         wait_any = getattr(comm, "wait_for_any_response", None)
         if wait_any is None:
             return {"success": False, "error": "transport lacks wait_for_any_response"}
 
+        if progress_cb:
+            progress_cb({"phase": "fetching_manifest"})
+
         device_type = DEVICE_TYPE_BY_SIZE.get(int(device_size), 1)
         files = await asyncio.to_thread(fetch_hot_manifest, device_type)
         if not files:
             return {"success": False, "error": "empty hot manifest"}
+
+        if progress_cb:
+            progress_cb({"phase": "downloading", "current": 0, "total": len(files)})
         ok_dl = 0
-        for f in files:
+        for i, f in enumerate(files):
             try:
                 ok_dl += 1 if await asyncio.to_thread(download_hot_file, f) else 0
             except Exception as e:
                 logger.warning(f"hot file {f.file_id}: download failed: {e}")
+            if progress_cb:
+                progress_cb({"phase": "downloading", "current": i + 1,
+                             "total": len(files), "file_id": f.file_id})
         if ok_dl == 0:
             return {"success": False, "error": "no hot files downloadable"}
         self.logger.info(f"hot: manifest {len(files)} files, {ok_dl} downloaded")
@@ -210,6 +222,10 @@ class HotUpdate:
         if isinstance(listen, set):
             listen.update({_CMD_REQUEST, _CMD_INFO, _CMD_DATA, _CMD_PAUSE})
         served, self._pending_request = [], None
+
+        if progress_cb:
+            progress_cb({"phase": "uploading", "current": 0, "total": ok_dl})
+
         try:
             if not await self.divoom.send_command(_CMD_LIST, self._manifest_payload(files)):
                 return {"success": False, "error": "manifest (0x9B) write failed"}
@@ -254,14 +270,18 @@ class HotUpdate:
                 if await self._stream_file(f, start, wait_any):
                     served.append({"file_id": f.file_id, "version": f.version})
                     if progress_cb:
-                        progress_cb(len(served), f.file_id)
+                        progress_cb({"phase": "uploading", "current": len(served),
+                                     "total": ok_dl, "file_id": f.file_id})
         finally:
             if isinstance(listen, set):
                 listen.difference_update({_CMD_REQUEST, _CMD_INFO, _CMD_DATA, _CMD_PAUSE})
 
+        result = {"success": True, "served": served,
+                  "manifest": len(files), "downloaded": ok_dl}
+        if progress_cb:
+            progress_cb({"phase": "done", **result})
         self.logger.info(f"hot: session complete — {len(served)} file(s) served")
-        return {"success": True, "served": served,
-                "manifest": len(files), "downloaded": ok_dl}
+        return result
 
     async def show_hot_channel(self, page: int | None = None) -> bool:
         """Switch the device to the HOT channel (APK ``w2``: 0x45 [HOT_MODE=2]);

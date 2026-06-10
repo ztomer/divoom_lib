@@ -34,6 +34,9 @@ SUB_LANGUAGE = 0x26
 SUB_SCREEN_DIR = 0x23
 SUB_SCREEN_MIRROR = 0x24
 SUB_CLEAR_SYS = 0x25
+# Custom art page management (LightMakeNewModel.java — CmdManager.p1/g)
+SUB_USE_USER_DEFINE_INDEX = 0x17
+SUB_CLEAR_USER_DEFINE_INDEX = 0x16
 
 
 class Design:
@@ -147,3 +150,24 @@ class Design:
         """
         self.logger.warning("Factory-resetting device (0xBD 0x25)...")
         return await self._send_subcmd(SUB_CLEAR_SYS, [1])
+
+    async def use_user_define_index(self, page: int) -> bool:
+        """Switch device to custom art page 0/1/2 (0xBD [0x17, page]).
+
+        After this, the device displays that page's user-define artwork.
+        Mirrors ``CmdManager.p1(page)`` — ``q.s().z(s.c(0xBD, [0x17, page]))``.
+
+        Args:
+            page: 0, 1, or 2 (3 pages × 12 slots on 32px devices).
+        """
+        return await self._send_subcmd(SUB_USE_USER_DEFINE_INDEX, [page & 0xFF])
+
+    async def clear_user_define_index(self, page: int) -> bool:
+        """Clear all artwork on a custom art page (0xBD [0x16, page]).
+
+        Mirrors ``CmdManager.g(page)``.
+
+        Args:
+            page: 0, 1, or 2.
+        """
+        return await self._send_subcmd(SUB_CLEAR_USER_DEFINE_INDEX, [page & 0xFF])

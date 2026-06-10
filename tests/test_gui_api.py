@@ -530,23 +530,6 @@ class TestDivoomGuiAPI(unittest.TestCase):
             self.assertFalse(res["success"])
             self.assertEqual(res["error"], "No device connected")
 
-    def test_sync_hot_channel_multi(self):
-        """4.b: sync_hot_channel pushes every artwork and reports a summary
-        (R34 §1: with a per-file error reason, not just a bool)."""
-        with patch.object(self.api, "_sync_artwork_detailed", return_value=(True, None)) as m:
-            res = json.loads(self.api.sync_hot_channel(json.dumps(["id1", "id2", "id3"])))
-            self.assertTrue(res["ok"])
-            self.assertEqual(res["synced"], ["id1", "id2", "id3"])
-            self.assertEqual(res["errors"], {})
-            self.assertEqual(m.call_count, 3)
-
-        with patch.object(self.api, "_sync_artwork_detailed",
-                          side_effect=[(True, None), (False, "timed out")]):
-            res2 = json.loads(self.api.sync_hot_channel(json.dumps(["a", "b"])))
-            self.assertFalse(res2["ok"])
-            self.assertEqual(res2["failed"], ["b"])
-            self.assertEqual(res2["errors"], {"b": "timed out"})
-
     @patch("urllib.request.urlopen")
     def test_fetch_gallery_and_batch_sync(self, mock_urlopen):
         """Test cloud gallery catalog scraping and concurrent monthly best async streams."""

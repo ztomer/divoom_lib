@@ -77,10 +77,10 @@ class HeadlessGuiTester:
             # Debug prints
             js_errors = window.evaluate_js('window.__js_errors ? JSON.stringify(window.__js_errors) : "[]"')
             templates_exist = window.evaluate_js('window.DivoomTemplates ? Object.keys(window.DivoomTemplates).join(",") : "none"')
-            monthly_best_html_len = window.evaluate_js('document.getElementById("monthly-best") ? document.getElementById("monthly-best").innerHTML.length : "null_elem"')
+            gallery_html_len = window.evaluate_js('document.getElementById("gallery") ? document.getElementById("gallery").innerHTML.length : "null_elem"')
             load_btn_exists = window.evaluate_js('document.getElementById("load-gallery-btn") ? "yes" : "no"')
             print_info(f"DEBUG E2E: js_errors={js_errors}")
-            print_info(f"DEBUG E2E: templates_exist={templates_exist}, monthly_best_html_len={monthly_best_html_len}, load_btn_exists={load_btn_exists}")
+            print_info(f"DEBUG E2E: templates_exist={templates_exist}, gallery_html_len={gallery_html_len}, load_btn_exists={load_btn_exists}")
 
             # Step 1: Control Center View
             window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'control-panel\']").click();')
@@ -92,13 +92,12 @@ class HeadlessGuiTester:
             time.sleep(1.0)
             self.capture_screenshot("2_virtual_wall")
 
-            # Step 3: Monthly Best Gallery View
-            window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'monthly-best\']").click();')
+            # Step 3: Gallery View
+            window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'gallery\']").click();')
             time.sleep(1.0)
             
-            # Trigger Fetch Gallery button click
-            print_info("E2E Test: Triggering 'Fetch Gallery' click...")
-            window.evaluate_js('document.getElementById("load-gallery-btn").click();')
+            # Gallery auto-fetches on tab activation — no button click needed
+            print_info("E2E Test: Waiting for gallery to auto-fetch...")
             
             # Poll until gallery items are rendered to handle cold caches or slower network/decoding
             print_info("E2E Test: Polling for gallery items to render...")
@@ -158,7 +157,7 @@ class HeadlessGuiTester:
                     raise AssertionError(f"E2E Gallery Assert: Card {item['idx']} preview URL '{item['src']}' is not fetched/cached locally!")
                     
             print_ok("E2E Gallery Assert: ALL gallery item previews rendered ACTUAL pixel art thumbnails successfully!")
-            self.capture_screenshot("3_monthly_best_gallery")
+            self.capture_screenshot("3_gallery")
 
             # Step 4: Live Widgets View
             window.evaluate_js('document.querySelector(".nav-btn[data-tab=\'data-sources\']").click();')
