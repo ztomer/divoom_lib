@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R42 SHIPPED (2026-06-10) — 9-item bug batch.** Plan+outcome
+  `docs/PLANNING_ROUND42.md`; commits e2029fd7..33dba70f. Highlights: scan
+  settings persist; macOS 26 NC db found in `group.com.apple.usernoted` (+
+  actionable Full Disk Access error — USER ACTION: grant FDA to python3 for
+  notification mirroring); Pixel Art custom-art/hot loaders fixed (dead
+  function name + missing window exposure); preset wipe-hazard + silent-save
+  fixed (cocoa pywebview has no window.prompt; atomic writes); **virtual wall
+  pushes HW-verified on Ditoo+Pixoo** (client read-timeouts on
+  wall_configure/device_call + un-awaited proxy coroutine in previews).
+  Suite 1327/75 (+7 tests; 1 pre-existing local-only playwright fail).
+
 - **R41 SHIPPED (2026-06-10) — UI, Startup, Reconnect, Virtual Wall & CI Fixes.** Plan+outcome `docs/PLANNING_ROUND41.md`. Local suite **1321/75** passed cleanly. Key changes:
   - Fixed duplicate `#panel-design` and custom art layout height constraints.
   - Constrained `.gallery-split-card` and `.gallery-split-layout` to support internal grid scrolling.

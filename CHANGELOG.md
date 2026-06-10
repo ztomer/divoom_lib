@@ -6,6 +6,27 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 42 — 2026-06-10 (bug batch: persistence, macOS 26, loaders, wall)
+
+- **Scan settings persist** (§1): new `get_scan_settings` restores
+  timeout/limit into the Settings inputs each session.
+- **macOS 26 notifications** (§2): NC db discovered in usernoted's group
+  container; unreadable store raises an actionable "grant Full Disk Access"
+  error instead of "DB not found".
+- **Pixel Art loaders** (§3/§4): Custom Art library actually loads (the old
+  trigger called a nonexistent function); Hot manifest loads on sub-tab click
+  (`loadHotPreview` was never exposed on `window`).
+- **Wall presets** (§5): save no longer silently no-ops on an empty name
+  (cocoa pywebview lacks `window.prompt`); the per-change last-active-slots
+  writer can no longer wipe named presets on a corrupt file; atomic writes.
+- **Virtual wall pushes work** (§6, HW-verified on Ditoo+Pixoo):
+  `wall_configure`/`device_call` were abandoned by the 2s client read timeout
+  (wall builds BLE-connect every slot; wall pushes stream 0x8B per device);
+  arranger previews were an un-awaited DaemonDeviceProxy coroutine.
+- **Layout** (§7/§8/§9): Schedule +15% (386px), Device Settings clusters
+  right-aligned, MCP toggle in the card header.
+
+
 ## Round 41 — 2026-06-10 (UI, Startup, Reconnect, Virtual Wall & CI Fixes)
 
 ### Fixed
