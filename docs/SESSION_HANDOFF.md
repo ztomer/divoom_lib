@@ -18,6 +18,31 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R39 SHIPPED (2026-06-10) — UI polish round, suite fully green (1306/75/0).**
+  Five user-reported items fixed in one pass (see CHANGELOG R39 for detail):
+  1. Hot channel: thumbnails 2× (112px, `image-rendering: pixelated`), file
+     counter removed, preview grid fills the card (dead space above the
+     Update button gone). Washed-out colors were `.hot-preview-item-uncached
+     { opacity: 0.55 }` — removed.
+  2. Custom art overhaul: fixed header (page tabs + 12 slots, same tile size
+     as library), scrolling library, click-to-assign with auto-advance, ×
+     to clear, assigned tiles dimmed. Backend now takes a `{slot: file_id}`
+     page mapping and pushes the page ONCE (old per-file `push_slot` wiped
+     the other 11 slots each call). Also fixed a `renderCustomArtHistory`
+     ReferenceError left from R37 that broke channels_grids wiring.
+  3. Alarms: phantom rows root-caused — 0x42 response records are 10 bytes
+     INCLUDING a leading alarm-index byte (APK `u1/b.a()`); our 9-byte-stride
+     parser misaligned everything after record 0. Fixed in
+     `divoom_lib/scheduling/alarm.py` + constants. "On" column is now a
+     toggle switch. NEEDS HW VERIFY: clear alarms, re-open tab, list should
+     be empty.
+  4. Routines→Schedule narrowed 760 → 560px.
+  5. 500-LOC splits: `divoom_daemon/owner_art.py` (from device_owner),
+     `divoom_gui/gallery_hot_api.py` (from gallery_sync). Emoji cleanup in
+     docs/CUSTOM_CHANNEL_VS_APK.md. Both prior failures green.
+  Open: hardware verify custom-art slot push (full-page mapping) and alarm
+  read-back on the Ditoo.
+
 - **0xAA hot-file decoder FIXED — garbage frames resolved (2026-06-09, late).**
   The first 0xAA reverse-engineering ("10-byte header, byte 6 = frame count, raw
   768-byte RGB frames") was WRONG → previews decoded to noise. Correct format

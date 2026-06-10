@@ -6,6 +6,57 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 39 — 2026-06-10 (UI polish round: hot preview, custom art overhaul, alarms)
+
+### Fixed — alarms showed phantom entries after clearing
+- **Root cause (APK-verified, `u1/b.a()`)**: the 0x42 get-alarm response is
+  **10 bytes per record and starts with the alarm index byte**; our parser
+  used a 9-byte stride starting at status, so every record after the first
+  was misaligned — random week/status bytes rendered as ghost alarms.
+  `divoom_lib/scheduling/alarm.py` + `models/constants.py` now use the
+  correct layout, tolerate old-mode devices (3 records), and parse partial
+  responses instead of returning None.
+- Alarms "On" column is now a proper toggle switch (reuses `.switch`/
+  `.slider-round`), not a bare checkbox.
+
+### Changed — hot channel preview
+- Thumbnails doubled 56px → 112px with `image-rendering: pixelated`
+  (crisp upscaling); file counter removed; preview grid now fills the card
+  down to the Update button (no dead space; was `max-height: 280px`).
+- Washed-out colors fixed: `.hot-preview-item-uncached { opacity: 0.55 }`
+  dimmed nearly every tile (hot items rarely have a gallery cache entry) —
+  rule and gating removed.
+
+### Changed — custom art channel overhaul (Rams/Kare pass)
+- Page tabs + 12-slot grid are a fixed header; only the art library scrolls.
+  Slots are the same tile size as library previews (shared 6-column grid).
+- Click-to-assign flow: click art → fills selected / first empty slot and
+  auto-advances; click a slot to target it; hover a filled slot → × clears
+  it. Assigned tiles dim in the library. Push button reads
+  "Push Page N to Device".
+- **Push semantics fixed**: the daemon now accepts a full `{slot: file_id}`
+  page mapping and sends the page ONCE (previously each file triggered
+  `push_slot` with a fresh empty page — every push wiped the other 11 slots).
+  `daemon_protocol.custom_art_push(slots=...)`, `gallery_sync.custom_art_push`
+  accepts mapping or legacy list payloads.
+- Fixed `window.renderCustomArtHistory` ReferenceError (export + call left
+  behind after the R37 history-filmstrip removal broke `DOMContentLoaded`
+  wiring in `channels_grids.js`).
+
+### Changed — routines
+- Schedule card narrowed 760px → 560px (device rows are now dot + name +
+  toggle; the old width left a dead gap in the middle).
+
+### Maintenance
+- 500-LOC rule: split `device_owner.py` (627) → `owner_art.py` mixin
+  (custom-art + hot-update RPC handlers), and `gallery_sync.py` (653) →
+  `gallery_hot_api.py` mixin (hot/custom-art wrappers + animated preview).
+- Emojis stripped from `docs/CUSTOM_CHANNEL_VS_APK.md` (R14 §6).
+
+### Test suite
+- **1306 passed, 75 skipped, 0 failed** — fully green, including refreshed
+  alarm-parser, custom-art push, and layout assertions.
+
 ## Round 37 — 2026-06-09 (custom art push — Phase 3 web UI)
 
 ### Added
