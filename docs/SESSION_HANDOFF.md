@@ -18,6 +18,22 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R40 SHIPPED (2026-06-10) — UI batch items 2-9.** Plan+outcome
+  `docs/PLANNING_ROUND40.md`. Local suite **1319/75** (2 playwright tests need a
+  viewport-height chain → skip in CI). Custom-art 0xAA push crash fixed
+  (`resolve_to_gif`), header toggles for sysmon/weather/macnotif/anniversary,
+  gallery 128px cap + scroll fix, sticky settings tabs, schedule spacing, new
+  **Device Settings** sidebar section (segmented pills, danger at bottom),
+  **keep-daemon-alive** lifecycle (event-driven shutdown broadcast). Item 7
+  (Pixel Art sidebar) was already shipped by the user's R37-R39 work.
+  **CI: R40 fixed 4/5 pre-existing failures + the daemon-socket flakiness. ONE
+  pre-existing CI failure remains, OUT OF SCOPE:**
+  `test_native_downscaler::test_stress_random` (LANCZOS 1-LSB C-vs-PIL diff on
+  `300x2->7x1`) — byte-exact 60/60 LOCALLY, fails only on the CI runner's
+  clang/libm, was failing in CI before R40. `-ffp-contract=off` didn't resolve
+  it. Needs a focused native-parity round (reproduce on CI arch, or a ≤1 LSB
+  tolerance for the random stress shapes) — do NOT blind-edit the C kernel.
+
 - **R39b SHIPPED (2026-06-10) — UI polish part 2, browser-preview verified (1307/75/0).**
   1. Custom art: tabs + slot strip + Push button now ALWAYS visible — root
      cause was `.channel-panels` breaking the flex height chain under

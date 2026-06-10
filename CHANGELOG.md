@@ -6,6 +6,35 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 40 — 2026-06-10 (UI batch: bug fix, toggles, Device Settings, lifecycle)
+
+### Fixed
+- **Custom-art page push crash** ("cannot identify image file …gif") when a
+  slot held a hot file — new `media_decoder.resolve_to_gif` resolves every CDN
+  container (GIF/PNG/JPG/magic 43/AES 9·18·26/0xAA) used by both the custom-art
+  and sync paths.
+- **Gallery grid stranded at 400px** after the R39 Pixel Art move — restored the
+  `#pixel-gallery` grid override + added the pixel-subtab flex-height chain so
+  the grid fills the card and scrolls internally.
+
+### Changed / Added
+- Live Widgets: System Monitor / Weather / macOS Notifications and Routines →
+  Anniversary controls are now header-right toggles; removed the SysMon + Weather
+  "Push to Device" buttons; Weather gains a Live (15m) toggle (both live toggles
+  persist).
+- Gallery tiles capped to hot-channel scale (128px); Settings sub-tabs sticky;
+  Schedule rows keep the toggle beside the device name.
+- **Device Settings** sidebar section — one glass pane (name / clock / temp /
+  power / auto-off / orientation / mirror / update-time, Danger zone last);
+  clock/temp/power are segmented pills.
+- **Keep daemon (menu bar) alive** toggle (Settings → Connectivity, default off):
+  event-driven shared-vs-independent lifecycle via a daemon `shutdown` broadcast.
+
+### Build
+- `-ffp-contract=off` in `build_libdivoom.sh` for more deterministic LANCZOS
+  float rounding across clang versions.
+
+
 ## Round 39b — 2026-06-10 (UI polish, part 2 — verified in browser preview)
 
 ### Fixed — custom art chrome scrolled away

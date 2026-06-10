@@ -117,5 +117,42 @@ ON = independent lifecycles. Event-driven (no polling):
 - [ ] Browser-preview verification of every UI item
 - [ ] Full suite green locally → push → **watch GitHub CI to green** (gh tools)
 
-## §outcome
-_(fill as items land)_
+## §outcome — SHIPPED (commits 00eeff55 → e13c99da)
+
+- **§2** (`7a415b16`): custom-art page push crash fixed. New
+  `media_decoder.resolve_to_gif` resolves ANY CDN container (GIF/PNG/JPG/magic
+  43/AES 9·18·26/0xAA hot files) → owner_art + sync_artwork both use it. The
+  0xAA case was the crash ("cannot identify image file"). +7 tests.
+- **§3**: gallery tile cap 168→128px (matches hot-channel scale).
+- **§4**: System Monitor / Weather / macOS Notifications / Anniversary → header
+  toggles; removed the SysMon + Weather "Push to Device" buttons; Weather Live
+  (15m) toggle; live toggles persist to localStorage.
+- **§5**: Settings sub-tabs `position:sticky`.
+- **§6**: Schedule rows — name shrink-only so the toggle sits beside it.
+- **§7**: ALREADY SHIPPED by the user's R37-R39 Pixel Art work (verified). Also
+  fixed a real regression it left: the gallery grid was stranded at 400px
+  because the `#gallery`→`#pixel-gallery` override + the pixel-subtab flex chain
+  were missing.
+- **§8** (`1f338bbf`): new Device Settings sidebar section — one glass pane,
+  wireframe order, segmented pills for clock/temp/power, Danger zone at the
+  bottom. Moved out of Settings → Devices.
+- **§9** (`ff2409e2`): keep-daemon-alive lifecycle — Connectivity toggle
+  (default OFF), `EVENT_SHUTDOWN` broadcast, menubar + dashboard follow the
+  daemon down (or stay independent) — event-driven, no polling.
+  `divoom_lib/lifecycle_config.py` + tests.
+
+**Tests:** local suite **1319 passed / 75 skipped**; 2 playwright tests need a
+real viewport-height chain (skip in CI). Browser-preview verified every UI item
+via fresh-fetch eval (http.server heuristic-caches static assets).
+
+**CI (gh):** R40 fixed 4 of the 5 pre-existing CI failures AND eliminated the
+daemon-socket startup flakiness (robust connection-probe wait). **One CI failure
+remains and is OUT OF R40 SCOPE:**
+`tests/test_native_downscaler.py::TestNativeParity::test_stress_random` —
+`c=3 300x2->7x1: 1/21 pixels differ, max=1 LSB`. It is **byte-exact 60/60
+locally** (cannot reproduce) and was **already failing in CI before R40**. It's
+a LANCZOS C-vs-PIL float-rounding-boundary divergence specific to the CI
+runner's clang/libm on one extreme-aspect seeded case. `-ffp-contract=off`
+(`e13c99da`) ruled out FMA contraction. Proper fix needs a focused round that
+can reproduce on the CI arch (or a deliberate ≤1 LSB tolerance for the random
+stress shapes only) — NOT a blind C-kernel edit bundled into a UI batch.
