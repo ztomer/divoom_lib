@@ -145,7 +145,12 @@ class PresetsManagerMixin:
                 except Exception:
                     pass
             presets[name] = json.loads(slots_json)
-            presets_file.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+            # R42 §5: atomic write — a crash mid-write must not corrupt the
+            # shared presets file (a corrupt file used to cascade into
+            # update_wall_slots wiping every saved preset).
+            tmp = presets_file.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+            tmp.replace(presets_file)
             return True
         except Exception as e:
             logger.error(f"Failed to save preset: {e}")

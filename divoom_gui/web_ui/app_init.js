@@ -139,12 +139,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.showToast("Add at least one screen before saving", "error");
                 return;
             }
-            // R11 item 6: name comes from the toolbar's editable field (falls back
-            // to a prompt if the field is empty).
+            // R42 §5: pywebview's cocoa backend does NOT implement
+            // window.prompt — the old fallback returned null and the save
+            // silently no-opped (the user believed the preset was saved).
+            // Require the toolbar name field and say so.
             const nameInput = document.getElementById("preset-name-input");
-            let name = (nameInput?.value || "").trim();
-            if (!name) name = (prompt("Enter a unique preset name:", "My Layout Preset") || "").trim();
-            if (!name) return;
+            const name = (nameInput?.value || "").trim();
+            if (!name) {
+                window.showToast("Type a preset name first (toolbar field)", "error");
+                nameInput?.focus();
+                return;
+            }
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.save_preset(name, JSON.stringify(window.DivoomState.assignedSlots)).then(res => {
                     if (res) {
