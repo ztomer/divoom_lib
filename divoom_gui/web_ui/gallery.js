@@ -200,8 +200,11 @@ document.addEventListener("DOMContentLoaded", () => {
             name.className = "target-name";
             name.textContent = c.name;
             name.title = c.name;
+            // R40 §6: don't stretch the name (flex:1 stranded the toggle at the
+            // far edge with a big gap). Shrink-only, with the toggle right after.
             name.style.cssText =
-                "flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+                "flex:0 1 auto; min-width:0; max-width:240px; overflow:hidden; "
+                + "text-overflow:ellipsis; white-space:nowrap;";
 
             const toggle = document.createElement("label");
             toggle.className = "switch";

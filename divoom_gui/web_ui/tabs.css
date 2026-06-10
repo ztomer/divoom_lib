@@ -55,6 +55,15 @@
   margin-bottom: calc(var(--tab-pane-gap) - var(--panel-gap));
 }
 
+/* R40 §5: keep the Settings sub-tab row visible while the panel scrolls
+   (the scroll container is .main-content; the pane is a normal-flow child, so
+   sticky pins it to the top). The pane already has an opaque var(--card-bg). */
+#settings > .tabs-section {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
 .tabs-row {
   display: flex;
   gap: 6px;

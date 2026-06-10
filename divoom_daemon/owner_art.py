@@ -71,12 +71,17 @@ class OwnerArtMixin:
                 if len(file_bytes) < 4:
                     return None
 
-                gif_data = media_decoder.extract_gif_from_magic_43(file_bytes) or file_bytes
-                if file_bytes[0] in media_decoder.CLOUD_CONTAINER_MAGICS:
-                    decoded = tmp / f"ca_{fid.replace('/', '_')}.gif"
-                    if await asyncio.to_thread(
-                            media_decoder.decode_cloud_to_gif, file_bytes, decoded):
-                        gif_data = decoded.read_bytes()
+                # R40 §2: one resolver for every CDN container (plain GIF,
+                # magic 43, AES 9/18/26, AND 0xAA hot files — the previous
+                # branching missed 0xAA, so assigning a hot tile to a slot
+                # crashed Image.open with "cannot identify image file").
+                scratch = tmp / f"ca_{fid.replace('/', '_')}.gif"
+                gif_data = await asyncio.to_thread(
+                    media_decoder.resolve_to_gif, file_bytes, scratch)
+                if gif_data is None:
+                    logger.warning(f"custom_art_push: undecodable payload for {fid} "
+                                   f"(magic {file_bytes[0]})")
+                    return None
 
                 # Resize to 16x16 and encode as AA frame
                 src = tmp / f"ca_in_{fid.replace('/', '_')}.gif"
@@ -90,7 +95,7 @@ class OwnerArtMixin:
             for idx, fid in slot_map.items():
                 encoded = await _encode_file(fid)
                 if encoded is None:
-                    return {"success": False, "error": f"could not fetch {fid}"}
+                    return {"success": False, "error": f"could not fetch/decode {fid}"}
                 frames[idx] = encoded
 
             if not await push_page(device, page, frames, use_new_mode=False):

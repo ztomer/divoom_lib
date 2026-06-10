@@ -228,20 +228,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    const sysmonDisplayBtn = document.getElementById("sysmon-display-btn");
-    if (sysmonDisplayBtn) {
-        sysmonDisplayBtn.addEventListener("click", () => {
-            if (!(window.pywebview && window.pywebview.api && window.pywebview.api.apply_system_stats)) return;
-            window.pywebview.api.apply_system_stats().then(json => {
-                try {
-                    const r = JSON.parse(json);
-                    const img = document.getElementById("sysmon-device-preview");
-                    if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
-                    window.showToast(r.success ? "System monitor on device" : (r.error || "Failed"), r.success ? "success" : " BLE");
-                } catch (e) { window.showToast("Failed", "error"); }
-            });
-        });
-    }
+    // R40 §4: the "Push to Device" button was removed — the Live (5s) header
+    // toggle is the single control (on = stream sysmon to the device).
 
     // (The duplicate sysmonDisplayBtn block at the old line ~407 was
     //  removed — it redeclared the same `const` and broke the whole script.)
@@ -293,15 +281,15 @@ document.addEventListener("DOMContentLoaded", () => {
     function startWeatherPolling() {
         if (weatherTimer) return;
         refreshWeatherPreview();
-        // R18 item 3: keep the DEVICE in sync over time, not just the preview —
-        // each poll re-pushes the current weather to the device. Weather changes
-        // slowly, so 10 min is plenty.
+        if (window.pywebview?.api?.push_weather) window.pywebview.api.push_weather();
+        // R40 §4: the Live (15m) toggle drives this — each tick re-pushes the
+        // current weather to the device (weather changes slowly).
         weatherTimer = setInterval(() => {
             refreshWeatherPreview();
             if (window.pywebview?.api?.push_weather) {
                 window.pywebview.api.push_weather();
             }
-        }, 10 * 60 * 1000);
+        }, 15 * 60 * 1000);
     }
 
     function stopWeatherPolling() {
@@ -311,13 +299,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function pushWeatherToDevice() {
-        if (!window.pywebview?.api?.push_weather) return;
-        window.pywebview.api.push_weather().then(ok => {
-            if (ok) showToast("Weather pushed", "success", " BLE");
-            else showToast("Weather push failed", "error");
-        });
-    }
 
     function selectWidget(widgetId) {
         selectedWidget = widgetId;
@@ -410,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
             card.style.cursor = "pointer";
             card.addEventListener("click", (e) => {
                 if (e.target.closest("input") || e.target.closest("button") || e.target.closest("select")) {
-                    if (e.target.closest("#apply-stock-btn") || e.target.closest("#sysmon-display-btn") || e.target.closest("#sysmon-live")) {
+                    if (e.target.closest("#apply-stock-btn") || e.target.closest("#sysmon-live")) {
                         selectWidget(widgetName);
                     }
                     return;
@@ -435,13 +416,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const sysmonLive = document.getElementById("sysmon-live");
     if (sysmonLive) {
+        // R40 §4: persist the Live (5s) state across launches.
+        const saved = localStorage.getItem("divoom.sysmonLive");
+        if (saved !== null) sysmonLive.checked = saved === "1";
         sysmonLive.addEventListener("change", () => {
+            localStorage.setItem("divoom.sysmonLive", sysmonLive.checked ? "1" : "0");
             if (sysmonLive.checked) {
                 selectWidget("sysmon");
             } else {
                 syncActiveWidget();
             }
         });
+    }
+
+    // R40 §4: Weather Live (15m) toggle — replaces the old Push button.
+    const weatherLive = document.getElementById("weather-live");
+    if (weatherLive) {
+        const saved = localStorage.getItem("divoom.weatherLive");
+        if (saved !== null) weatherLive.checked = saved === "1";
+        const applyWeatherLive = () => {
+            localStorage.setItem("divoom.weatherLive", weatherLive.checked ? "1" : "0");
+            if (weatherLive.checked) startWeatherPolling();
+            else stopWeatherPolling();
+        };
+        weatherLive.addEventListener("change", applyWeatherLive);
+        if (weatherLive.checked) applyWeatherLive();
     }
 
     // ── 5. TAB-CHANGED AUTOMATIC WIDGET WORKER CONTROL ──

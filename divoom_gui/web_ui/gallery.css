@@ -7,7 +7,9 @@
  * can fit comfortably. */
 .gallery-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 168px));
+    /* R40 §3: cap cell width so gallery tiles render at the same scale as the
+       hot-channel thumbnails (112px image + tile chrome ≈ 128px). */
+    grid-template-columns: repeat(auto-fill, minmax(110px, 128px));
     gap: 12px;
     max-height: 400px;
     overflow-y: auto;

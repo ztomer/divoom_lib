@@ -401,17 +401,15 @@ class DeviceOwner(OwnerArtMixin):
             # (PixelBean.initWithCloudData) and re-encodes before any BLE send;
             # we do the same: decode → GIF → show_image (our APK-aligned
             # encoder + 0x8B).
-            extracted = media_decoder.extract_gif_from_magic_43(file_bytes)
-            is_gif = bool(extracted) or file_bytes[:6] in (b"GIF89a", b"GIF87a")
-            gif_data = extracted or file_bytes
-            if not is_gif and file_bytes[0] in media_decoder.CLOUD_CONTAINER_MAGICS:
-                decoded = tmp / "sync_decoded.gif"
-                if await asyncio.to_thread(
-                        media_decoder.decode_cloud_to_gif, file_bytes, decoded):
-                    is_gif = True
-                    gif_data = decoded.read_bytes()
-                    logger.info(f"sync_artwork: decoded cloud container "
-                                f"(magic {file_bytes[0]}) → {len(gif_data)}B GIF")
+            # R40 §2: unified resolver (plain GIF / magic 43 / AES 9-18-26 /
+            # 0xAA hot files) — same path custom_art_push uses.
+            resolved = await asyncio.to_thread(
+                media_decoder.resolve_to_gif, file_bytes, tmp / "sync_decoded.gif")
+            is_gif = resolved is not None
+            gif_data = resolved if resolved is not None else file_bytes
+            if is_gif and gif_data is not file_bytes:
+                logger.info(f"sync_artwork: decoded container "
+                            f"(magic {file_bytes[0]}) → {len(gif_data)}B image")
 
             results = []
             for divoom, size in targets:

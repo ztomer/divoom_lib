@@ -70,7 +70,8 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                     <div class="card glass-card" id="widget-card-sysmon" style="min-width:0; overflow:hidden;">
                         <div class="card-header flex-header">
                             <h3>System Monitor</h3>
-                            <span class="active-indicator"></span>
+                            <!-- R40 §4: Live (5s) is a header-right toggle (like Auto-Sync Gallery). -->
+                            <label class="switch" title="Live updates every 5s" style="margin:0;"><input type="checkbox" id="sysmon-live" checked><span class="slider-round"></span></label>
                         </div>
                         <div class="card-body" style="min-width:0;">
                             <!-- Device preview (the actual frame the device shows).
@@ -107,10 +108,6 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                                     <b class="sysmon-bar-value" id="sysmon-bat" style="color:#ff4444;">–</b>
                                 </div>
                             </div>
-                            <div class="hc-actions" style="display:flex; gap:10px; align-items:center;">
-                                <button id="sysmon-display-btn" class="glow-btn compact" style="margin:0;">Push to Device</button>
-                                <label class="hc-toggle" style="margin:0;"><input type="checkbox" id="sysmon-live" checked> Live (5s)</label>
-                            </div>
                         </div>
                     </div>
 
@@ -122,7 +119,8 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                     <div class="card glass-card" id="widget-card-weather" style="min-width:0; overflow:hidden;">
                         <div class="card-header flex-header">
                             <h3>Weather</h3>
-                            <span class="active-indicator"></span>
+                            <!-- R40 §4: Live (15m) header-right toggle; replaces the Push button. -->
+                            <label class="switch" title="Live updates every 15 min" style="margin:0;"><input type="checkbox" id="weather-live"><span class="slider-round"></span></label>
                         </div>
                         <div class="card-body" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
                             <div id="weather-device-preview" class="device-preview-wrap large" style="margin:0;">
@@ -132,11 +130,6 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                                 </svg>
                             </div>
                             <span id="weather-preview-location" style="margin:0; font-size:11px; font-family: var(--font-mono); color: var(--text-muted);">--</span>
-                            <div class="weather-card-actions" style="display:flex; gap:6px; margin-top:2px;">
-                                <button class="btn btn-sm" onclick="pushWeatherToDevice()">
-                                    Push to Device
-                                </button>
-                            </div>
                         </div>
                     </div>
 
@@ -178,13 +171,14 @@ window.DivoomTemplates.widgets = `                <div class="grid-layout three-
                     <div class="card glass-card" id="widget-card-notif-mirror" style="min-width:0; overflow:hidden;">
                         <div class="card-header flex-header">
                             <h3>macOS Notifications</h3>
-                            <span class="status-pill" id="macnotif-status-pill">unknown</span>
+                            <!-- R40 §4: Mirror is a header-right toggle (status pill moves left of it). -->
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span class="status-pill" id="macnotif-status-pill">unknown</span>
+                                <label class="switch" title="Mirror macOS notifications to the device" style="margin:0;"><input type="checkbox" id="macnotif-toggle"><span class="slider-round"></span></label>
+                            </div>
                         </div>
                         <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
-                            <label class="hc-toggle">
-                                <input type="checkbox" id="macnotif-toggle">
-                                <span id="macnotif-toggle-label">Mirror macOS notifications</span>
-                            </label>
+                            <span id="macnotif-toggle-label" class="panel-hint">Mirror macOS notifications to the device.</span>
                             <div id="macnotif-detail" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px;">
                                 Status: loading...
                             </div>

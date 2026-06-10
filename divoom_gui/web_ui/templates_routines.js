@@ -60,9 +60,12 @@ window.DivoomTemplates.routines = `
                 </div>
             </div>
             <div class="card glass-card">
-                <div class="card-header"><h3>Anniversary / Memorial</h3></div>
+                <div class="card-header flex-header">
+                    <h3>Anniversary / Memorial</h3>
+                    <!-- R40 §4: Enabled is a header-right toggle. -->
+                    <label class="switch" title="Enable anniversary display" style="margin:0;"><input type="checkbox" id="memorial-enabled" checked><span class="slider-round"></span></label>
+                </div>
                 <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
-                    <label class="hc-toggle"><input type="checkbox" id="memorial-enabled" checked> Enabled</label>
                     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                         <input type="text" id="memorial-title" class="text-input" maxlength="16" style="flex:1; min-width:120px;" placeholder="Title (e.g. Birthday)">
                     </div>

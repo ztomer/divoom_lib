@@ -230,9 +230,13 @@ def decode_hot_file_to_gif(raw_bytes: bytes, out_path: Path, *, max_frames: int 
         return False
     pil_frames = [Image.frombytes("RGB", (16, 16), rgb).resize((128, 128), Image.Resampling.NEAREST)
                   for rgb, _ in frames]
-    pil_frames[0].save(out_path, save_all=len(pil_frames) > 1,
-                       append_images=pil_frames[1:],
-                       duration=[d for _, d in frames], loop=0)
+    durations = [d for _, d in frames]
+    if len(pil_frames) > 1:
+        pil_frames[0].save(out_path, save_all=True, append_images=pil_frames[1:],
+                           duration=durations, loop=0)
+    else:
+        # PIL chokes on a list duration for a single-frame save_all=False.
+        pil_frames[0].save(out_path, duration=durations[0], loop=0)
     return True
 
 
@@ -295,3 +299,40 @@ def _compact_tiles(frame_data: bytes, row_count: int, column_count: int):
                         pixels[grid_x * 16 + x, grid_y * 16 + y] = (frame_data[pos], frame_data[pos+1], frame_data[pos+2])
                         pos += 3
     return img
+
+
+def resolve_to_gif(raw_bytes: bytes, scratch_path: Path) -> bytes | None:
+    """R40 §2: turn ANY known cloud download into displayable GIF bytes.
+
+    One resolver for every container the CDN serves, so senders stop
+    re-implementing the branching (and missing formats — the custom-art page
+    push crashed with "cannot identify image file" on 0xAA hot files):
+
+    - plain GIF → as-is
+    - magic 43 → embedded GIF/PNG/JPG (PIL opens png/jpg by content, so any
+      extracted image is returned)
+    - magic 9 / 18 / 26 → AES(/LZO) cloud container → decoded GIF
+    - 0xAA → hot-file palette-delta format → decoded GIF
+
+    ``scratch_path`` is used for decoders that write a file. Returns None for
+    unrecognized payloads.
+    """
+    if not raw_bytes or len(raw_bytes) < 4:
+        return None
+    if raw_bytes[:6] in (b"GIF89a", b"GIF87a"):
+        return raw_bytes
+    magic = raw_bytes[0]
+    if magic == 43:
+        res = extract_image_from_magic_43(raw_bytes)
+        if res:
+            return res[0]
+        return None
+    if magic in CLOUD_CONTAINER_MAGICS:
+        if decode_cloud_to_gif(raw_bytes, scratch_path):
+            return scratch_path.read_bytes()
+        return None
+    if magic == 0xAA:
+        if decode_hot_file_to_gif(raw_bytes, scratch_path):
+            return scratch_path.read_bytes()
+        return None
+    return None
