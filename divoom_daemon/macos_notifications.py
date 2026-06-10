@@ -50,13 +50,22 @@ logger = logging.getLogger(__name__)
 # ── DB-path discovery ─────────────────────────────────────────────────
 
 
-# Known paths in priority order. macOS has changed this twice (Sonoma,
-# Sequoia). We probe each; the first that exists wins. If none exist,
-# the monitor can't run — `find_notification_db_path()` returns None.
+# Known paths in priority order. macOS has changed this several times
+# (Sonoma, Sequoia, and the Tahoe/26 line). We probe each; the first that
+# exists wins. If none exist, the monitor can't run —
+# `find_notification_db_path()` returns None.
 _CANDIDATE_RELATIVE_PATHS = (
     "com.apple.notificationcenter/db2/db",          # Sonoma + earlier
     "com.apple.usernotifications/db2/db",           # some Sequoia builds
 )
+
+
+def _candidate_absolute_paths(home: Path) -> tuple[Path, ...]:
+    """Candidates that are NOT under DARWIN_USER_DIR. macOS 26 moved the
+    store into usernoted's group container (R42 §2 — verified on 26.5)."""
+    return (
+        home / "Library" / "Group Containers" / "group.com.apple.usernoted" / "db2" / "db",
+    )
 
 
 def find_notification_db_path() -> Optional[Path]:
@@ -77,6 +86,9 @@ def find_notification_db_path() -> Optional[Path]:
         base = Path.home() / "Library" / "Application Support"
     for rel in _CANDIDATE_RELATIVE_PATHS:
         p = base / rel
+        if p.exists():
+            return p
+    for p in _candidate_absolute_paths(Path.home()):
         if p.exists():
             return p
     return None
@@ -353,6 +365,19 @@ class MacNotificationMonitor:
                 "macOS Notification Center DB not found; "
                 "notifications are unavailable on this system."
             )
+        # R42 §2: on modern macOS the store sits behind TCC — the path exists
+        # but opening it requires Full Disk Access. Probe now so the error is
+        # actionable instead of a generic poll failure later.
+        try:
+            with sqlite3.connect(str(self._db_path), timeout=0.5) as conn:
+                conn.execute("SELECT 1")
+        except sqlite3.OperationalError as e:
+            raise PermissionError(
+                "macOS Notification Center DB exists but can't be opened "
+                f"({e}). Grant FULL DISK ACCESS to the Python runtime "
+                "(System Settings → Privacy & Security → Full Disk Access → "
+                "add python3 / the Divoom app) and restart the daemon."
+            ) from e
         self._stop.clear()
         self._last_seen = self._initial_max_delivered_date()
         self._thread = threading.Thread(

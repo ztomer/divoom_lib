@@ -35,6 +35,23 @@ class ScannerMixin:
             logger.warning(f"Failed to save scan config: {e}")
             return False
 
+    def get_scan_settings(self) -> str:
+        """R42 §1: the persisted scan timeout/limit (config.ini [gui]) so the
+        Settings inputs restore between sessions — save_scan_settings wrote them
+        on every scan but nothing ever read them back."""
+        import configparser
+        timeout, limit = 60, 4
+        try:
+            config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
+            if config_file.exists():
+                cfg = configparser.ConfigParser()
+                cfg.read(config_file)
+                timeout = cfg.getint("gui", "timeout", fallback=timeout)
+                limit = cfg.getint("gui", "limit", fallback=limit)
+        except Exception as e:
+            logger.warning(f"get_scan_settings failed: {e}")
+        return json.dumps({"timeout": timeout, "limit": limit})
+
     def scan_devices(self, timeout: int | None = None, limit: int | None = None) -> str:
         # Fall back to the shared daemon config (daemon.ini) when the UI sends
         # nothing, so the scan defaults live in ONE place. The UI normally passes
@@ -178,10 +195,22 @@ class ScannerMixin:
             if presets_file.exists():
                 try:
                     presets = json.loads(presets_file.read_text(encoding="utf-8"))
-                except Exception:
-                    pass
+                except Exception as parse_err:
+                    # R42 §5: this writer fires on EVERY arranger change; if an
+                    # existing file fails to parse (partial write, race), do NOT
+                    # plough on with {} — that rewrote presets.json with only
+                    # _last_active_slots_ and silently destroyed every saved
+                    # preset. Skip this save instead.
+                    logger.warning(
+                        f"presets.json exists but is unreadable ({parse_err}); "
+                        "skipping last-active-slots save to avoid wiping presets")
+                    return
             presets["_last_active_slots_"] = self.wall_slots
-            presets_file.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+            # Atomic write (tmp + rename) so a crash mid-write can't corrupt
+            # the file other writers/readers share.
+            tmp = presets_file.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+            tmp.replace(presets_file)
         except Exception as e:
             logger.warning(f"Failed to save last active slots: {e}")
 

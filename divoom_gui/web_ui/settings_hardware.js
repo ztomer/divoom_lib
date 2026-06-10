@@ -104,6 +104,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const scanSpinner = document.getElementById("scan-spinner");
     const deviceListUl = document.getElementById("device-list");
 
+    // R42 §1: restore the persisted scan timeout/limit into the inputs —
+    // they were saved on every change/scan but never read back, so the
+    // template defaults reappeared each session.
+    function restoreScanSettings() {
+        window.pywebview?.api?.get_scan_settings?.().then(json => {
+            try {
+                const s = JSON.parse(json);
+                const t = document.getElementById("scan-timeout");
+                const l = document.getElementById("scan-limit");
+                if (t && Number.isFinite(s.timeout)) t.value = s.timeout;
+                if (l && Number.isFinite(s.limit)) l.value = s.limit;
+            } catch (e) { /* keep template defaults */ }
+        });
+    }
+    if (window.pywebview) restoreScanSettings();
+    else window.addEventListener("pywebviewready", restoreScanSettings);
+
     // Persist scan timeout / limit values on change
     ["scan-timeout", "scan-limit"].forEach(id => {
         const el = document.getElementById(id);
