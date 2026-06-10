@@ -14,7 +14,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ── Auto-fetch hot channel manifest on tab activation ──────────────
     window.addEventListener("tab-changed", (e) => {
-        if (e.detail.tab === "hot-channel") loadHotPreview();
+        if (e.detail.tab === "hot-channel" || e.detail.tab === "pixel-art") {
+            if (e.detail.tab === "pixel-art") {
+                const activeTab = document.querySelector(".tab-btn[data-pixel-tab].active");
+                if (!activeTab || activeTab.getAttribute("data-pixel-tab") !== "pixel-hot-channel") return;
+            }
+            loadHotPreview();
+        }
     });
 
     function loadHotPreview() {

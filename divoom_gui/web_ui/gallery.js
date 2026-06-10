@@ -309,7 +309,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     window.addEventListener("tab-changed", (e) => {
-        if (e.detail.tab === "gallery") loadGallery();
+        if (e.detail.tab === "gallery" || e.detail.tab === "pixel-art") {
+            // For pixel-art, only load if the gallery sub-tab is active
+            if (e.detail.tab === "pixel-art") {
+                const activeTab = document.querySelector(".tab-btn[data-pixel-tab].active");
+                if (!activeTab || activeTab.getAttribute("data-pixel-tab") !== "pixel-gallery") return;
+            }
+            loadGallery();
+        }
     });
 
     setTimeout(() => {

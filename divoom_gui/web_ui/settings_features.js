@@ -118,6 +118,27 @@ document.addEventListener("DOMContentLoaded", () => {
         if (target) target.classList.add("active");
     });
 
+    // ── Pixel Art sub-tab nav ──
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".tab-btn[data-pixel-tab]");
+        if (!btn) return;
+        document.querySelectorAll(".tab-btn[data-pixel-tab]").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".pixel-subtab-content").forEach(c => c.classList.remove("active"));
+        btn.classList.add("active");
+        const target = document.getElementById(btn.getAttribute("data-pixel-tab"));
+        if (target) target.classList.add("active");
+        // Refresh gallery/hot preview when switching to those sub-tabs
+        if (btn.getAttribute("data-pixel-tab") === "pixel-gallery" && window.loadGallery) {
+            setTimeout(window.loadGallery, 50);
+        } else if (btn.getAttribute("data-pixel-tab") === "pixel-hot-channel" && window.loadHotPreview) {
+            setTimeout(window.loadHotPreview, 50);
+        } else if (btn.getAttribute("data-pixel-tab") === "pixel-custom-art") {
+            // Re-init custom art if needed (library may have been refreshed)
+            if (window.customArtSyncLibrary) setTimeout(window.customArtSyncLibrary, 50);
+            if (window.loadCachedGallery) setTimeout(window.loadCachedGallery, 50);
+        }
+    });
+
     // ── Round 8: Device settings / weather / memorial / FM ─────────────
     function api() { return window.pywebview && window.pywebview.api; }
     function dev() { return !window.requireDevice || window.requireDevice(); }

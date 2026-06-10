@@ -100,7 +100,7 @@
                         </svg>
                     </span> Live Widgets
                 </button>
-                <button class="nav-btn" data-tab="gallery">
+                <button class="nav-btn" data-tab="pixel-art">
                     <span class="btn-icon">
                         <svg class="kare-icon" viewBox="0 0 16 16">
                             <rect x="1" y="1" width="6" height="6" rx="1"/>
@@ -108,15 +108,7 @@
                             <rect x="1" y="9" width="6" height="6" rx="1"/>
                             <rect x="9" y="9" width="6" height="6" rx="1"/>
                         </svg>
-                    </span> Gallery
-                </button>
-                <button class="nav-btn" data-tab="hot-channel">
-                    <span class="btn-icon">
-                        <svg class="kare-icon" viewBox="0 0 16 16">
-                            <path d="M8,1 C8,1 11,4 11,7 C11,10 8,15 8,15 C8,15 5,10 5,7 C5,4 8,1 8,1 Z"/>
-                            <path d="M8,4 C8,4 9.5,6 9.5,7.5 C9.5,9.5 8,12 8,12 C8,12 6.5,9.5 6.5,7.5 C6.5,6 8,4 8,4 Z" fill="var(--bg-base)"/>
-                        </svg>
-                    </span> Hot Channel
+                    </span> Pixel Art
                 </button>
                 <button class="nav-btn" data-tab="display-wall">
                     <span class="btn-icon">
@@ -262,27 +254,10 @@
                                 <div class="channel-panel" id="panel-vj">
                                     <div class="selector-grid" id="vj-effects-grid"></div>
                                 </div>
-                                <!-- Custom art -->
+                                <!-- Custom art (panel moved to Pixel Art section; channel tab
+                                     button kept for device mode switching. -->
                                 <div class="channel-panel" id="panel-design">
-                                    <!-- Fixed header: page tabs + slot grid stay put while the
-                                         library below scrolls (Rams: structure is self-evident) -->
-                                    <div class="custom-art-fixed">
-                                        <div id="custom-art-page-tabs" class="custom-art-tabs">
-                                            <button class="page-tab glow-btn compact" data-page="0">Page 1</button>
-                                            <button class="page-tab glow-btn compact" data-page="1">Page 2</button>
-                                            <button class="page-tab glow-btn compact" data-page="2">Page 3</button>
-                                        </div>
-                                        <div id="custom-art-slot-grid" class="custom-art-slots"></div>
-                                        <p class="panel-hint custom-art-hint">Click or drag art into a slot. Drag slots to reorder; hover a filled slot and click &times; to clear it.</p>
-                                    </div>
-                                    <!-- Scrolling library -->
-                                    <div class="gallery-cache-selector custom-art-library">
-                                        <input type="text" id="custom-art-search" placeholder="Search cached art…" class="text-input">
-                                        <div class="selector-grid" id="custom-art-cache-grid">
-                                            <div class="empty-list" style="grid-column: 1/-1;">No cached gallery files.</div>
-                                        </div>
-                                    </div>
-                                    <button id="push-custom-art-btn" class="glow-btn">Push Page 1 to Device</button>
+                                    <p class="panel-hint" style="margin-top:0;">Manage custom art in <strong>Pixel Art → Custom Art</strong>.</p>
                                 </div>
                                 <!-- Ambient light (now a channel selection) -->
                                 <div class="channel-panel" id="panel-ambient">
@@ -506,13 +481,10 @@
             <!-- TAB 3: ROUTINES (Schedule + Time) -->
             <section id="routines" class="tab-content"></section>
 
-            <!-- TAB 4: COMMUNITY GALLERY -->
-            <section id="gallery" class="tab-content"></section>
-
-            <!-- TAB 5: HOT CHANNEL (Divoom's curated set) -->
-            <section id="hot-channel" class="tab-content"></section>
+            <!-- TAB 4: PIXEL ART (Custom Art + Gallery + Hot Channel) -->
+            <section id="pixel-art" class="tab-content"></section>
             
-            <!-- TAB 6: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
+            <!-- TAB 5: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
             <section id="data-sources" class="tab-content"></section>
 
             <!-- TAB 6: CREDENTIALS & BLE CONFIG SETTINGS -->
@@ -526,8 +498,7 @@
     
     <script src="templates_tools.js"></script>
     <script src="templates_routines.js"></script>
-    <script src="templates_gallery.js"></script>
-    <script src="templates_hot_channel.js"></script>
+    <script src="templates_pixel_art.js"></script>
     <script src="templates_widgets.js"></script>
     <script src="templates_settings.js"></script>
     <script src="app_globals.js"></script>

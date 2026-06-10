@@ -29,11 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
     ).forEach((el) => el.addEventListener("mousedown", (e) => e.stopPropagation()));
 
     // Inject HTML Templates
-    if (document.getElementById('gallery') && window.DivoomTemplates?.gallery) {
-        document.getElementById('gallery').innerHTML = window.DivoomTemplates.gallery;
-    }
-    if (document.getElementById('hot-channel') && window.DivoomTemplates?.hotChannel) {
-        document.getElementById('hot-channel').innerHTML = window.DivoomTemplates.hotChannel;
+    if (document.getElementById('pixel-art') && window.DivoomTemplates?.pixelArt) {
+        document.getElementById('pixel-art').innerHTML = window.DivoomTemplates.pixelArt;
     }
     if (document.getElementById('data-sources') && window.DivoomTemplates?.widgets) {
         document.getElementById('data-sources').innerHTML = window.DivoomTemplates.widgets;
