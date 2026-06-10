@@ -48,7 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 return `<button class="alarm-day-cell${on ? " active" : ""}" data-bit="${b}" title="${d}" aria-pressed="${on ? "true" : "false"}"></button>`;
             }).join("");
             row.innerHTML =
-                `<input type="checkbox" class="alarm-enabled" ${a.status ? "checked" : ""} title="Enable">` +
+                `<label class="switch alarm-switch" title="Enable">` +
+                `<input type="checkbox" class="alarm-enabled" ${a.status ? "checked" : ""}>` +
+                `<span class="slider-round"></span></label>` +
                 `<span class="alarm-time">` +
                 `<input type="number" class="alarm-hour text-input" min="0" max="23" value="${a.hour}">` +
                 `<span>:</span>` +

@@ -176,15 +176,19 @@ ALARM_COUNT = 10
 MEMORIAL_COUNT = 10
 
 # GET ALARM TIME RESPONSE STRUCTURE (from alarm.py)
-GAT_ALARM_INFO_LENGTH = 9
-GAT_STATUS = 0
-GAT_HOUR = 1
-GAT_MINUTE = 2
-GAT_WEEK = 3
-GAT_MODE = 4
-GAT_TRIGGER_MODE = 5
-GAT_FM_FREQ_START = 6
-GAT_VOLUME = 8
+# APK-verified (u1/b.a()): each record is 10 bytes and STARTS WITH THE ALARM
+# INDEX byte. The previous 9-byte stride skipped the index and misaligned
+# every record after the first → phantom alarms in the GUI.
+GAT_ALARM_INFO_LENGTH = 10
+GAT_INDEX = 0
+GAT_STATUS = 1
+GAT_HOUR = 2
+GAT_MINUTE = 3
+GAT_WEEK = 4
+GAT_MODE = 5
+GAT_TRIGGER_MODE = 6
+GAT_FM_FREQ_START = 7
+GAT_VOLUME = 9
 
 # GET MEMORIAL TIME RESPONSE STRUCTURE (from alarm.py)
 GMT_MEMORIAL_INFO_LENGTH = 39

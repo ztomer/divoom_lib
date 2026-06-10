@@ -287,12 +287,16 @@ body.theme-light .arranger-node-image {
 .alarms-table { display: flex; flex-direction: column; }
 .alarms-table-row {
     display: grid;
-    grid-template-columns: 32px 112px repeat(7, 1fr) 28px;
+    grid-template-columns: 44px 112px repeat(7, 1fr) 28px;
     align-items: center;
     gap: 6px;
     padding: 6px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
+/* Compact On/Off switch for alarm rows (reuses .switch/.slider-round) */
+.alarm-switch { width: 36px; height: 18px; justify-self: start; }
+.alarm-switch .slider-round:before { height: 12px; width: 12px; left: 2px; bottom: 2px; }
+.alarm-switch input:checked + .slider-round:before { transform: translateX(18px); }
 .alarms-table-head {
     font-size: 10px;
     font-weight: 600;

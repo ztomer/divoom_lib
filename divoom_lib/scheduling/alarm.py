@@ -56,26 +56,28 @@ class Alarm:
         """
         self.logger.info("Getting alarm time (0x42)...")
         response = await self._divoom.send_command_and_wait_for_response(COMMANDS["get alarm time"])
-        if response and len(response) >= ALARM_COUNT * GAT_ALARM_INFO_LENGTH:  # 10 sets of alarm info
-            alarms = []
-            for i in range(ALARM_COUNT):
-                # Assuming data format is similar to set alarm time (excluding animation data)
-                # Uint8 alarm_index, status, hour, minute, week, mode, trigger_mode, Fm[2], volume
-                # Each alarm is 9 bytes (excluding index)
-                alarm_data = response[i*GAT_ALARM_INFO_LENGTH:(i+1)*GAT_ALARM_INFO_LENGTH]
-                if len(alarm_data) == GAT_ALARM_INFO_LENGTH:
-                    alarms.append({
-                        "status": alarm_data[GAT_STATUS],
-                        "hour": alarm_data[GAT_HOUR],
-                        "minute": alarm_data[GAT_MINUTE],
-                        "week": alarm_data[GAT_WEEK],
-                        "mode": alarm_data[GAT_MODE],
-                        "trigger_mode": alarm_data[GAT_TRIGGER_MODE],
-                        "fm_freq": int.from_bytes(alarm_data[GAT_FM_FREQ_START:GAT_FM_FREQ_START + 2], byteorder='little'),
-                        "volume": alarm_data[GAT_VOLUME],
-                    })
-            return alarms
-        return None
+        if not response:
+            return None
+        # APK-verified record layout (u1/b.a()): 10 bytes per alarm, byte 0 is
+        # the alarm index. Old-mode devices report 3 alarms, new-mode 10 —
+        # parse whatever full records are present.
+        count = min(ALARM_COUNT, len(response) // GAT_ALARM_INFO_LENGTH)
+        if count == 0:
+            return None
+        alarms = []
+        for i in range(count):
+            alarm_data = response[i*GAT_ALARM_INFO_LENGTH:(i+1)*GAT_ALARM_INFO_LENGTH]
+            alarms.append({
+                "status": alarm_data[GAT_STATUS],
+                "hour": alarm_data[GAT_HOUR],
+                "minute": alarm_data[GAT_MINUTE],
+                "week": alarm_data[GAT_WEEK],
+                "mode": alarm_data[GAT_MODE],
+                "trigger_mode": alarm_data[GAT_TRIGGER_MODE],
+                "fm_freq": int.from_bytes(alarm_data[GAT_FM_FREQ_START:GAT_FM_FREQ_START + 2], byteorder='little'),
+                "volume": alarm_data[GAT_VOLUME],
+            })
+        return alarms
 
     async def _set_animation_gif(self, command_key: str, index: int, total_length: int, gif_id: int, data: list) -> bool:
         """Helper method to set animation GIF for alarm or memorial."""

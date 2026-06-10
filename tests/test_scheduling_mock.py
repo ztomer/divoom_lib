@@ -69,17 +69,20 @@ async def test_set_alarm_builds_args():
 
 
 async def test_get_alarm_time_parses_response():
-    # 10 alarms × 9 bytes. Alarm 0: status=1,hour=7,min=15,week=2,mode=0,
-    # trigger=1, fm=0x036c (little-endian at bytes 6,7), volume@8=40.
-    block = bytes([1, 7, 15, 2, 0, 1, 0x6c, 0x03, 40])
-    response = block + bytes([0] * 9 * 9)  # remaining 9 alarms all-zero
-    s = MockSender(response=response)
+    # APK-verified (u1/b.a()): 10 alarms × 10 bytes, each record STARTS with
+    # the alarm index byte. Alarm 0: idx=0,status=1,hour=7,min=15,week=2,
+    # mode=0,trigger=1, fm=0x036c (LE at bytes 7,8), volume@9=40.
+    block = bytes([0, 1, 7, 15, 2, 0, 1, 0x6c, 0x03, 40])
+    rest = b"".join(bytes([i, 0, 0, 0, 0, 0, 0, 0, 0, 0]) for i in range(1, 10))
+    s = MockSender(response=block + rest)
     alarms = await Alarm(s).get_alarm_time()
     assert alarms is not None and len(alarms) == 10
     assert alarms[0] == {
         "status": 1, "hour": 7, "minute": 15, "week": 2, "mode": 0,
         "trigger_mode": 1, "fm_freq": 0x036c, "volume": 40,
     }
+    # Index bytes must NOT bleed into the next record's fields.
+    assert alarms[1]["status"] == 0 and alarms[1]["week"] == 0
     assert s.last[0] == COMMANDS["get alarm time"]
 
 
