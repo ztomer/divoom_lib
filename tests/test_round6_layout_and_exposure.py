@@ -47,7 +47,8 @@ def _cat(paths: list[Path]) -> str:
 
 TEMPLATES_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_tools.js",
-    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_monthly_best.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_gallery.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_hot_channel.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js",
@@ -71,86 +72,87 @@ CHANNELS_JS = _cat([
 
 
 # ──────────────────────────────────────────────────────────────────
-# 1. Monthly Best layout (Option B)
+# 1. Gallery + Hot Channel layouts
 # ──────────────────────────────────────────────────────────────────
 
 
-def test_monthly_best_devices_panel_moved_to_routines():
-    """R32 §A1 + R33: the Monthly Best devices panel (sync-targets list) moved
-    to Routines (now its own top-level panel). Monthly Best is a single
-    full-width gallery card with no embedded device list."""
+def test_gallery_has_no_device_list():
+    """The Gallery panel has classify tabs + gallery grid but NO
+    device list or sync-targets (those are in Routines)."""
     src = TEMPLATES_JS
-    mb_match = re.search(
-        r'<div class="monthly-best-layout">(.*?)</div>\s*`;',
+    g_match = re.search(
+        r'<div class="gallery-full-layout">(.*?)</div>\s*`;',
         src, re.DOTALL,
     )
-    assert mb_match is not None, "monthly-best-layout block not found in templates"
-    block = mb_match.group(1)
+    assert g_match is not None, "gallery-full-layout block not found in templates"
+    block = g_match.group(1)
     assert "sync-targets-list" not in block, (
-        "Monthly Best still embeds the sync-targets-list — it moved to "
-        "Routines (R32 §A1)."
+        "Gallery must not embed the sync-targets-list — it lives in Routines."
     )
-    # The devices list now lives in the Routines panel.
-    routines = ROUTINES_JS.read_text()
-    assert 'id="sync-targets-list"' in routines, (
-        "Routines panel should host the moved sync-targets-list (R32 §A1)."
+    assert 'id="gallery-classify-tabs"' in block, (
+        "Gallery should have classify tabs (#gallery-classify-tabs)."
+    )
+    assert 'id="gallery-container"' in block, (
+        "Gallery should have the gallery container."
     )
 
 
-def test_monthly_best_schedule_block_removed():
-    """The schedule block (hc-schedule + 'Enable scheduled sync' + Save
-    Schedule button) must be REMOVED from Monthly Best — it moved to
-    Settings → Routines."""
+def test_hot_channel_has_no_gallery_grid():
+    """Hot Channel has the hot preview + update button but NO gallery
+    grid or classify tabs."""
     src = TEMPLATES_JS
-    mb_match = re.search(
-        r'<div class="monthly-best-layout">(.*?)</div>\s*`;',
+    hc_match = re.search(
+        r'<div class="hot-channel-layout">(.*?)</div>\s*`;',
         src, re.DOTALL,
     )
-    assert mb_match is not None, "monthly-best-layout block not found in templates.js"
-    block = mb_match.group(1)
-    assert "hc-schedule" not in block, (
-        "Monthly Best still has the .hc-schedule block — it should have "
-        "moved to Settings → Routines (Routines sub-tab)."
+    assert hc_match is not None, "hot-channel-layout block not found in templates"
+    block = hc_match.group(1)
+    assert 'class="gallery-grid"' not in block, (
+        "Hot Channel must not have a gallery grid."
     )
-    assert "Enable scheduled sync" not in block, (
-        "Monthly Best still has the 'Enable scheduled sync (runs headless)' "
-        "checkbox — it should be gone (move to Routines, drop the "
-        "developer-term 'headless')."
+    assert 'id="gallery-classify-tabs"' not in block, (
+        "Hot Channel must not have gallery classify tabs."
     )
-    assert "hc-save-schedule-btn" not in block, (
-        "Monthly Best still has the Save Schedule button — it should be "
-        "in Settings → Routines."
+    assert 'id="hot-update-btn"' in block, (
+        "Hot Channel must have the hot update button."
+    )
+    assert 'id="hot-preview-list"' in block, (
+        "Hot Channel must have the hot preview list."
     )
 
 
-def test_monthly_best_grid_is_full_width():
-    """R32 §A1+§A3: with the devices card moved to Routines, the gallery
-    spans the full panel width (single column)."""
+def test_both_layouts_full_width():
+    """Both gallery-full-layout and hot-channel-layout are single-column
+    (full width, in a combined CSS rule)."""
     css = GALLERY_CSS.read_text()
-    m = re.search(r"\.monthly-best-layout\s*\{[^}]*grid-template-columns:\s*([^;]+);", css)
-    assert m is not None, ".monthly-best-layout grid-template-columns not found"
+    m = re.search(
+        r"\.hot-channel-layout,\s*\.gallery-full-layout\s*\{[^}]*grid-template-columns:\s*([^;]+);",
+        css,
+    )
+    assert m is not None, (
+        "Combined .hot-channel-layout, .gallery-full-layout rule not found in CSS"
+    )
     cols = m.group(1).strip()
     assert cols == "1fr", (
-        f"Expected single-column '1fr' (gallery full width, R32 §A1), got {cols!r}."
+        f"Expected single-column '1fr', got {cols!r}."
     )
 
 
-def test_target_row_no_longer_creates_mac_address_element():
-    """The renderSyncTargets function in gallery.js must NOT create
-    a .target-addr element — the MAC address was dropped from the row
-    per docs/PLANNING_ROUND5.md §3.b."""
+def test_target_row_has_no_mac_or_style_tabs():
+    """The renderSyncTargets function in gallery.js creates a simple
+    row (dot + name + toggle) — no MAC address and no gallery style
+    chooser tabs."""
     src = GALLERY_JS.read_text()
     fn_match = re.search(r"window\.renderSyncTargets\s*=\s*function[^{]*\{(.+?)\n\s*\}", src, re.DOTALL)
     assert fn_match is not None, "renderSyncTargets not found in gallery.js"
     fn_body = fn_match.group(1)
     assert "target-addr" not in fn_body, (
         "renderSyncTargets still creates a .target-addr element — "
-        "the MAC address should be removed from the target row "
-        "(already visible in Settings → Bluetooth Scanner)."
+        "the MAC address should be removed."
     )
-    assert "addr.textContent" not in fn_body, (
-        "renderSyncTargets still sets addr.textContent — the MAC "
-        "address should not be rendered."
+    assert "styleTabs" not in fn_body and 'class="tabs-row"' not in fn_body, (
+        "renderSyncTargets still creates a gallery style chooser — "
+        "it was removed per user request."
     )
 
 
@@ -191,7 +193,7 @@ def test_routines_panel_content_exists():
     # The form elements must exist.
     assert 'id="routines-auto-sync-enabled"' in src, "Missing routines-auto-sync-enabled toggle"
     assert 'id="routines-interval-tabs"' in src, "Missing routines-interval-tabs"
-    assert 'id="sync-all-btn"' in src, "Missing sync-all-btn"
+    assert 'id="sync-all-btn"' not in src, "sync-all-btn should be removed"
     assert 'id="sync-targets-list"' in src, "Missing sync-targets-list"
 
 
@@ -543,15 +545,51 @@ def test_r11_scoreboard_reset_button():
 
 
 def test_r11_custom_art_push_is_pinned_footer():
-    """The Custom Art panel is a flex column so the Push button stays pinned
-    (1a) — mirrors the Monthly Best sticky footer."""
+    """The Custom Art panel is a flex column with a fixed header (tabs+slots)
+    and a scrolling library, so the Push button stays pinned at the bottom."""
     css = CHANNELS_CSS.read_text()
     assert re.search(r"#panel-design\.active\s*\{[^}]*flex-direction:\s*column", css), (
         "#panel-design.active must be a flex column so the push button pins"
     )
-    assert re.search(r"#apply-custom-art-btn\s*\{[^}]*sticky", css), (
-        "#apply-custom-art-btn should be a sticky footer"
+    assert re.search(r"#push-custom-art-btn\s*\{[^}]*flex-shrink:\s*0", css), (
+        "#push-custom-art-btn must not shrink (pinned footer)"
     )
+    assert re.search(r"\.custom-art-fixed\s*\{[^}]*flex-shrink:\s*0", css), (
+        "tabs+slots header must stay fixed while the library scrolls"
+    )
+
+
+def test_r37_custom_art_page_tabs_in_html():
+    html = INDEX_HTML.read_text()
+    assert 'id="custom-art-page-tabs"' in html, "Page tabs container missing"
+    # 3 page-tab buttons
+    tabs = re.findall(r'class="page-tab glow-btn compact"', html)
+    assert len(tabs) == 3, f"Expected 3 .page-tab elements, got {len(tabs)}"
+
+
+def test_r37_custom_art_slot_grid_in_html():
+    html = INDEX_HTML.read_text()
+    assert 'id="custom-art-slot-grid"' in html, "Slot grid container missing"
+
+
+def test_r37_custom_art_push_button_id_in_html():
+    html = INDEX_HTML.read_text()
+    assert 'id="push-custom-art-btn"' in html, "#push-custom-art-btn missing"
+
+
+def test_r37_custom_art_js_loaded():
+    html = INDEX_HTML.read_text()
+    assert 'src="custom_art.js"' in html, "custom_art.js not loaded in index.html"
+
+
+def test_r37_custom_art_page_tab_css():
+    css = CHANNELS_CSS.read_text()
+    assert ".page-tab.active" in css, ".page-tab.active rule missing in channels.css"
+
+
+def test_r37_custom_art_slot_grid_css():
+    css = CHANNELS_CSS.read_text()
+    assert ".custom-art-slot:hover" in css, ".custom-art-slot:hover rule missing in channels.css"
 
 
 APPBAR_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "appbar.css"
@@ -635,11 +673,9 @@ def test_r18_subtabs_have_icons_and_fit_content():
 
 
 @pytest.mark.asyncio
-async def test_monthly_best_layout_renders_cleanly():
-    """Smoke test: load the real index.html in headless Chromium,
-    click the Monthly Best tab, and assert the new layout elements
-    exist in the rendered DOM. Behavioral drag test is not possible
-    (customize.js is not injected by HTTP serving)."""
+async def test_gallery_and_hot_channel_layouts_render_cleanly():
+    """Smoke test: load index.html in headless Chromium, click the Gallery
+    and Hot Channel tabs, and assert the right layout elements exist."""
     pytest.importorskip("playwright.async_api")
     from playwright.async_api import async_playwright
 
@@ -649,42 +685,39 @@ async def test_monthly_best_layout_renders_cleanly():
         await page.goto(f"file://{INDEX_HTML}")
         await page.wait_for_load_state("domcontentloaded")
 
-        await page.click('[data-tab="monthly-best"]', timeout=2000)
-        await page.wait_for_selector("#monthly-best.active", timeout=2000)
+        # ── Gallery tab ──
+        await page.click('[data-tab="gallery"]', timeout=2000)
+        await page.wait_for_selector("#gallery.active", timeout=2000)
 
-        # R32 §A1+§A3: the devices panel moved to Routines; Monthly Best is
-        # now a single full-width gallery with multi-select. There should be
-        # no embedded 'Devices' or 'Sync Targets' header, and the gallery's
-        # Select All / Clear controls should be present.
-        assert await page.locator("#monthly-best h3:has-text('Devices')").count() == 0, (
-            "Monthly Best should no longer embed a Devices header (moved to Routines)."
+        assert await page.locator("#gallery-classify-tabs").count() == 1, (
+            "Gallery tab should have classify tabs."
         )
-        assert await page.locator("#monthly-best h3:has-text('Sync Targets')").count() == 0, (
-            "Monthly Best still has the old 'Sync Targets & Schedule' header."
+        assert await page.locator("#gallery-container").count() == 1, (
+            "Gallery tab should have the gallery container."
         )
-        assert await page.locator("#gallery-select-all-btn").count() == 1, (
-            "Monthly Best gallery is missing the Select All control (R32 §A3)."
-        )
-        assert await page.locator("#gallery-clear-btn").count() == 1, (
-            "Monthly Best gallery is missing the Clear control (R32 §A3)."
+        assert await page.locator("#gallery h3:has-text('Devices')").count() == 0, (
+            "Gallery should not embed a Devices header (moved to Routines)."
         )
 
-        # The schedule UI must be GONE from Monthly Best.
-        assert await page.locator("#hc-save-schedule-btn").count() == 0, (
-            "Monthly Best still has the old Save Schedule button — it should "
-            "have moved to Settings → Routines."
+        # ── Hot Channel tab ──
+        await page.click('[data-tab="hot-channel"]', timeout=2000)
+        await page.wait_for_selector("#hot-channel.active", timeout=2000)
+
+        assert await page.locator("#hot-update-btn").count() == 1, (
+            "Hot Channel tab should have the update button."
         )
-        assert await page.locator("#hc-enabled").count() == 0, (
-            "Monthly Best still has the old 'Enable scheduled sync' checkbox — "
-            "it should have moved to Settings → Routines."
+        assert await page.locator("#hot-preview-list").count() == 1, (
+            "Hot Channel tab should have the preview list."
+        )
+        assert await page.locator("#hot-channel .gallery-grid").count() == 0, (
+            "Hot Channel tab should not have a gallery grid."
         )
 
-        # The appbar volume slider must exist.
+        # The appbar volume slider must still exist.
         assert await page.locator("#appbar-volume-slider").count() == 1, (
             "appbar-volume-slider not found in the rendered DOM"
         )
         # And the Control Panel must have the Scoreboard tab.
-        # (R15 §1+§7: `.channel-card` → `.tab-btn`.)
         await page.click('[data-tab="control-panel"]', timeout=2000)
         await page.wait_for_selector("#control-panel.active", timeout=2000)
         assert await page.locator(

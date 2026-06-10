@@ -11,7 +11,10 @@ from divoom_lib import media_decoder
 
 logger = logging.getLogger("divoom_gui")
 
-class GallerySyncMixin:
+from gallery_hot_api import GalleryHotApiMixin
+
+
+class GallerySyncMixin(GalleryHotApiMixin):
     """Mixin for cloud-voted gallery fetching and hot-channel schedule orchestration."""
     def load_cached_gallery(self) -> str:
         cache_file = Path.home() / ".config" / "divoom-control" / "gallery_cache.json"
@@ -93,8 +96,15 @@ class GallerySyncMixin:
             })
         return json.dumps(final_list)
 
-    def fetch_gallery(self, classify: int, target_size: int = 16) -> str:
-        logger.info(f"GUI Action: Fetching gallery classify={classify} target_size={target_size}...")
+    FILE_SIZE_BITMASK: dict[int, int] = {16: 1, 32: 2, 64: 4, 128: 16, 256: 32}
+
+    def fetch_gallery(self, classify: int, target_size: int = 16,
+                      file_sort: int = 1, file_size: int = 0) -> str:
+        """Fetch gallery items. file_size=0 means auto-detect from target_size."""
+        logger.info(
+            f"GUI Action: Fetching gallery classify={classify} "
+            f"target_size={target_size} file_sort={file_sort} file_size={file_size}..."
+        )
         
         cached_data = self.load_cached_gallery()
 
@@ -116,11 +126,10 @@ class GallerySyncMixin:
 
                     self.cached_creds = divoom_auth.get_credentials()
                     
-                file_size_bitmask = 1
-                if target_size == 32:
-                    file_size_bitmask = 2
-                elif target_size == 64:
-                    file_size_bitmask = 4
+                if file_size > 0:
+                    file_size_bitmask = file_size
+                else:
+                    file_size_bitmask = self.FILE_SIZE_BITMASK.get(target_size, 1)
                     
                 body = {
                     "Command": "GetCategoryFileListV2",
@@ -128,7 +137,7 @@ class GallerySyncMixin:
                     "UserId": self.cached_creds.user_id,
                     "DeviceId": self.device_id,
                     "Classify": classify,
-                    "FileSort": 1,
+                    "FileSort": file_sort,
                     "FileType": 5,
                     "FileSize": file_size_bitmask,
                     "Version": 19,
@@ -238,7 +247,7 @@ class GallerySyncMixin:
                             try:
                                 item_json = json.dumps(art_item)
                                 b64_item_data = base64.b64encode(item_json.encode("utf-8")).decode("utf-8")
-                                js_code = f"if (window.onGalleryItemLoaded) {{ window.onGalleryItemLoaded({classify}, {target_size}, {idx}, {len(file_list)}, '{b64_item_data}'); }}"
+                                js_code = f"if (window.onGalleryItemLoaded) {{ window.onGalleryItemLoaded({classify}, {target_size}, {idx}, {len(file_list)}, '{b64_item_data}', {file_sort}, {file_size}); }}"
                                 self.window.evaluate_js(js_code)
                             except Exception as js_err:
                                 logger.warning(f"Failed to send progressive gallery item: {js_err}")
@@ -254,7 +263,7 @@ class GallerySyncMixin:
                     if self.window:
                         js_data = json.dumps(results)
                         b64_js_data = base64.b64encode(js_data.encode("utf-8")).decode("utf-8")
-                        js_code = f"if (window.onGalleryBackgroundFetched) {{ window.onGalleryBackgroundFetched({classify}, {target_size}, '{b64_js_data}'); }}"
+                        js_code = f"if (window.onGalleryBackgroundFetched) {{ window.onGalleryBackgroundFetched({classify}, {target_size}, '{b64_js_data}', {file_sort}, {file_size}); }}"
                         self.window.evaluate_js(js_code)
             except Exception as e:
                 logger.error(f"Background gallery fetch failed: {e}")
@@ -444,57 +453,37 @@ class GallerySyncMixin:
             logger.warning(f"set_gallery_style failed: {e}")
             return False
 
-    def sync_hot_channel(self, *file_ids_arg, **kwargs) -> str:
-        file_ids = self._coerce_list(file_ids_arg, kwargs, "file_ids")
-        synced, failed, errors = [], [], {}
-        total = len(file_ids)
-        for idx, fid in enumerate(file_ids):
-            ok, err = False, None
-            try:
-                ok, err = self._sync_artwork_detailed(json.dumps({"file_id": fid}))
-            except Exception as e:
-                err = str(e)
-            if ok:
-                synced.append(fid)
-            else:
-                logger.error(f"hot-channel sync of {fid} failed: {err}")
-                failed.append(fid)
-                errors[fid] = err or "unknown error"
-            # Progress callback to JS (fire-and-forget; PyWebView queues it)
-            if self.window:
-                try:
-                    js = (
-                        f"if(window.onGallerySyncProgress)"
-                        f"window.onGallerySyncProgress({idx + 1},{total},"
-                        f"{json.dumps(fid)},{str(ok).lower()},"
-                        f"{json.dumps(err or '')});"
-                    )
-                    self.window.evaluate_js(js)
-                except Exception:
-                    pass
-        return json.dumps({"ok": len(failed) == 0, "synced": synced,
-                           "failed": failed, "errors": errors})
-
-    def hot_channel_update(self) -> str:
-        """R36b: device HOT channel update (APK-equivalent store). JSON summary."""
-        logger.info("GUI Action: Hot channel update (device-driven store)...")
-        client = self._client()
-        if client is None:
-            return json.dumps({"success": False, "error": "no daemon available"})
-        size = self._active_device_size() if hasattr(self, "_active_device_size") else 16
-        return json.dumps(client.hot_update(device_size=int(size), show=True))
-
-    def get_animated_preview(self, file_id: str) -> str:
-        """Helper to retrieve base64 encoded animated GIF for progressive loading."""
-        logger.info(f"GUI Action: Fetching animated preview for {file_id}")
+    def get_gallery_filter(self) -> str:
+        """Return current sort + file_size preferences as JSON."""
+        import configparser
         try:
-            safe_filename = file_id.replace("/", "_")
-            cache_dir = Path.home() / ".config" / "divoom-control" / "cache_gallery"
-            cache_file_gif = cache_dir / f"{safe_filename}.gif"
-            if cache_file_gif.exists():
-                img_data = cache_file_gif.read_bytes()
-                b64_str = base64.b64encode(img_data).decode("utf-8")
-                return f"data:image/gif;base64,{b64_str}"
+            path = self._gallery_config_path()
+            if path.exists():
+                cfg = configparser.ConfigParser()
+                cfg.read(path)
+                sort = int(cfg.get("gallery", "gallery_sort", fallback="1"))
+                file_size = int(cfg.get("gallery", "gallery_file_size", fallback="0"))
+                return json.dumps({"sort": sort, "file_size": file_size})
         except Exception as e:
-            logger.warning(f"get_animated_preview failed for {file_id}: {e}")
-        return ""
+            logger.warning(f"get_gallery_filter failed: {e}")
+        return json.dumps({"sort": 1, "file_size": 0})
+
+    def set_gallery_filter(self, sort: int = 1, file_size: int = 0) -> bool:
+        import configparser
+        try:
+            path = self._gallery_config_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            cfg = configparser.ConfigParser()
+            if path.exists():
+                cfg.read(path)
+            if "gallery" not in cfg:
+                cfg["gallery"] = {}
+            cfg["gallery"]["gallery_sort"] = str(int(sort))
+            cfg["gallery"]["gallery_file_size"] = str(int(file_size))
+            with open(path, "w") as f:
+                cfg.write(f)
+            return True
+        except Exception as e:
+            logger.warning(f"set_gallery_filter failed: {e}")
+            return False
+

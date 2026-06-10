@@ -9,6 +9,8 @@ import threading
 from pathlib import Path
 from typing import Callable, Optional
 
+from divoom_daemon.owner_art import OwnerArtMixin
+
 logger = logging.getLogger("divoom_daemon.device_owner")
 
 
@@ -25,7 +27,7 @@ def _json_safe(value):
     return str(value)
 
 
-class DeviceOwner:
+class DeviceOwner(OwnerArtMixin):
     """Single owner of the BLE/LAN device connection and wall (R17 P5).
     Provides command handlers for device lifecycle and a send_notification
     method used by NotificationService."""
@@ -47,6 +49,8 @@ class DeviceOwner:
         self._wall = None                       # DivoomWall (multi-device)
         self._wall_slots: dict = {}
         self._cmd_queue = None                  # CommandQueue, created with loop
+        self._hot_progress: dict = {"phase": "idle"}
+        self._hot_progress_lock = threading.Lock()
 
     # ── device loop ──────────────────────────────────────────────────────
     def _device_loop(self):
@@ -440,27 +444,6 @@ class DeviceOwner:
             return {"success": bool(ok)}
         except Exception as e:
             logger.warning(f"sync_artwork failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    def hot_update(self, args: dict) -> dict:
-        """R36b: run the APK-equivalent HOT channel update against the owned
-        device — downloads Divoom's curated hot files and serves the device's
-        file requests (155/247/157/158). Then optionally switches the device
-        to the HOT channel so the result is visible."""
-        device_size = int(args.get("device_size", 16) or 16)
-        show = bool(args.get("show", True))
-
-        async def _do():
-            device = await self._ensure_device_async(args.get("mac"))
-            result = await device.hot_update.update(device_size=device_size)
-            if result.get("success") and show:
-                await device.hot_update.show_hot_channel()
-            return result
-
-        try:
-            return _json_safe(self._run_device(_do()))
-        except Exception as e:
-            logger.warning(f"hot_update failed: {e}")
             return {"success": False, "error": str(e)}
 
     def probe_lan(self) -> dict:

@@ -280,15 +280,42 @@ class DaemonClient:
             "file_id": file_id, "default_size": default_size, "target": target,
         }, read_timeout=load_daemon_config().sync_read_timeout)
 
-    def hot_update(self, *, device_size: int = 16, show: bool = True) -> dict:
-        """R36b: run the APK-equivalent HOT channel update on the owned device
-        (download Divoom's curated hot files, serve the device's file requests,
-        then switch to the HOT channel). Long-running — uses the generous
-        ``hot_update_timeout`` (a full set is ~30 files over BLE)."""
+    def custom_art_push(self, file_ids: list[str], page: int,
+                        slot: int | None = None,
+                        slots: dict | None = None) -> dict:
+        """Push cloud files to a custom art page on the owned device.
+
+        Args:
+            file_ids: list of cloud file IDs (legacy sequential form)
+            page: target page 0-2
+            slot: optional starting slot for the legacy form
+            slots: preferred full-page mapping {slot 0-11: file_id};
+                   unmapped slots are cleared on the device
+        """
+        from divoom_daemon.daemon_config import load_daemon_config
+        return self.send_command("custom_art_push", {
+            "file_ids": file_ids, "page": page, "slot": slot, "slots": slots,
+        }, read_timeout=load_daemon_config().sync_read_timeout)
+
+    def custom_art_query_page(self, page: int = 0) -> dict:
+        """Query device for filled slot IDs on a custom art page."""
         from divoom_daemon.daemon_config import load_daemon_config
         return self.send_command(
+            "custom_art_query_page", {"page": page},
+            read_timeout=load_daemon_config().sync_read_timeout)
+
+    def hot_update(self, *, device_size: int = 16, show: bool = True) -> dict:
+        """Start a HOT channel update in the background on the daemon (returns
+        immediately). Call ``hot_update_progress()`` to poll progress."""
+        return self.send_command(
             "hot_update", {"device_size": device_size, "show": show},
-            read_timeout=load_daemon_config().hot_update_timeout)
+            read_timeout=30)
+
+    def hot_update_progress(self) -> dict:
+        """Query the current HOT channel update progress. Returns a phase dict:
+        ``{"phase": "idle"|"starting"|"fetching_manifest"|"downloading"|"uploading"|"done"|"error",
+        "current": int, "total": int, ...}``."""
+        return self.send_command("hot_update_progress", {})
 
     def subscribe(
         self,

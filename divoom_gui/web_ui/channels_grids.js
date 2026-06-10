@@ -349,30 +349,28 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         files.forEach(f => {
-                    const item = document.createElement("button");
-                    item.className = "cache-thumb-item";
-                    item.style.background = "rgba(0,0,0,0.3)";
-                    item.style.border = "1px solid rgba(255,255,255,0.1)";
-                    item.style.borderRadius = "4px";
-                    item.style.padding = "4px";
-                    item.style.cursor = "pointer";
-                    item.style.display = "flex";
-                    item.style.alignItems = "center";
-                    item.style.justifyContent = "center";
-                    item.style.aspectRatio = "1/1";
-                    item.title = f.name;
-                    
-                    item.innerHTML = `<img src="${f.preview_url}" style="width:100%; height:100%; object-fit:contain; image-rendering:pixelated; border-radius:2px;">`;
-                    item.addEventListener("click", () => {
-                        grid.querySelectorAll(".cache-thumb-item").forEach(c => c.style.borderColor = "rgba(255,255,255,0.1)");
-                        item.style.borderColor = "var(--primary)";
-                        
-                        const pathInput = document.getElementById("custom-art-path-input");
-                        if (pathInput) pathInput.value = f.path;
-                        if (window.showCustomArtPreview) window.showCustomArtPreview(f.path);
-                    });
-            grid.appendChild(item);
+            // Click-to-assign tiles: custom_art.js delegates clicks on the grid
+            // and places the tile's art into the selected/next free slot.
+            const wrapper = document.createElement("div");
+            wrapper.className = "cache-item cache-thumb-item";
+            wrapper.dataset.name = f.name || "";
+            wrapper.dataset.fileId = f.file_id || f.path;
+            wrapper.title = f.name;
+            wrapper.style.cssText = `
+                display:flex; flex-direction:column; align-items:center; gap:2px;
+                background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1);
+                border-radius:4px; padding:4px; cursor:pointer; position:relative;
+            `;
+
+            const img = document.createElement("img");
+            img.src = f.preview_url;
+            img.dataset.fileId = f.file_id || f.path;
+            img.style.cssText = "width:100%; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; border-radius:2px;";
+
+            wrapper.appendChild(img);
+            grid.appendChild(wrapper);
         });
+        if (window.customArtSyncLibrary) window.customArtSyncLibrary();
     }
 
     function loadCustomArtCacheGrid() {
@@ -394,71 +392,6 @@ document.addEventListener("DOMContentLoaded", () => {
         customArtSearch.addEventListener("input", () => renderCustomArtCacheGrid(customArtSearch.value));
     }
 
-    function renderCustomArtHistory() {
-        const filmstrip = document.getElementById("custom-art-history-filmstrip");
-        if (!filmstrip) return;
-        
-        let history = [];
-        try {
-            history = JSON.parse(localStorage.getItem("divoom_custom_art_history") || "[]");
-        } catch (e) {
-            history = [];
-        }
-        
-        if (history.length === 0) {
-            filmstrip.innerHTML = '<div class="empty-list" style="font-size:11px;">No design pushed yet.</div>';
-            return;
-        }
-        
-        filmstrip.innerHTML = "";
-        history.slice(0, 10).forEach(itemData => {
-            const item = document.createElement("button");
-            item.className = "cache-thumb-item";
-            item.style.background = "rgba(0,0,0,0.3)";
-            item.style.border = "1px solid rgba(255,255,255,0.1)";
-            item.style.borderRadius = "4px";
-            item.style.padding = "4px";
-            item.style.cursor = "pointer";
-            item.style.display = "flex";
-            item.style.alignItems = "center";
-            item.style.justifyContent = "center";
-            item.style.aspectRatio = "1/1";
-            item.style.width = "48px";
-            item.style.height = "48px";
-            item.style.flexShrink = "0";
-            item.title = itemData.name || "History Item";
-            
-            const src = itemData.preview_url || "assets/pixoo.png";
-            item.innerHTML = `<img src="${src}" style="width:100%; height:100%; object-fit:contain; image-rendering:pixelated; border-radius:2px;">`;
-            
-            item.addEventListener("click", () => {
-                const pathInput = document.getElementById("custom-art-path-input");
-                if (pathInput) pathInput.value = itemData.path;
-                if (window.showCustomArtPreview) window.showCustomArtPreview(itemData.path);
-            });
-            
-            filmstrip.appendChild(item);
-        });
-    }
-    
-    window.addCustomArtToHistory = function(name, path, preview_url) {
-        let history = [];
-        try {
-            history = JSON.parse(localStorage.getItem("divoom_custom_art_history") || "[]");
-        } catch (e) {
-            history = [];
-        }
-        history = history.filter(h => h.path !== path);
-        history.unshift({ name, path, preview_url });
-        history = history.slice(0, 10);
-        localStorage.setItem("divoom_custom_art_history", JSON.stringify(history));
-        renderCustomArtHistory();
-    };
-
-    // Load initial history
-    setTimeout(renderCustomArtHistory, 1500);
-
     // Expose for cross-file access from channels_core.js showChannelPanel
     window.loadCustomArtCacheGrid = loadCustomArtCacheGrid;
-    window.renderCustomArtHistory = renderCustomArtHistory;
 });

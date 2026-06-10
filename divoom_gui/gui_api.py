@@ -343,6 +343,17 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         logger.info(f"save_notification_routing: saved {len(rules)} rules via daemon")
         return {"rules": [list(r) for r in load_routing_table()], "error": None}
 
+    def device_call(self, method: str, args: list = None, kwargs: dict = None,
+                     target: str = "device", blobs: dict = None,
+                     token: str = None) -> str:
+        """Generic device method proxy (exposed to JS). Routes through daemon."""
+        client = self._client()
+        if client is None:
+            return json.dumps({"success": False, "error": "daemon unavailable"})
+        reply = client.device_call(method, args, kwargs, target=target,
+                                   blobs=blobs, token=token)
+        return json.dumps(reply)
+
     def display_wall_image(self, file_path: str, cell_size: int) -> bool:
         return self.lighting.display_wall_image(file_path, cell_size)
 

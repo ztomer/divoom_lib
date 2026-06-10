@@ -38,7 +38,6 @@ document.addEventListener("DOMContentLoaded", () => {
         channelPanels.forEach(p => p.classList.toggle("active", p.id === `panel-${channel}`));
         if (channel === "design") {
             window.loadCustomArtCacheGrid();
-            window.renderCustomArtHistory();
         }
     }
 

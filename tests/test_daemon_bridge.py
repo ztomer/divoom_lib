@@ -44,11 +44,25 @@ class _Facade:
         return {"brightness": 55}
 
 
+class _DesignFacade:
+    def __init__(self, calls):
+        self._calls = calls
+
+    async def use_user_define_index(self, page: int):
+        self._calls.append(("design.use_user_define_index", page))
+        return True
+
+    async def clear_user_define_index(self, page: int):
+        self._calls.append(("design.clear_user_define_index", page))
+        return True
+
+
 class FakeDevice:
     def __init__(self):
         self.is_connected = True
         self.calls = []
         self.display = _Facade(self.calls)
+        self.design = _DesignFacade(self.calls)
 
     async def connect(self):
         self.is_connected = True
@@ -236,6 +250,134 @@ def test_exclusive_call_issues_command(live_daemon):
                                token="x")
     assert reply.get("success") is True
     client.exclusive_end("x")
+
+
+# ── custom_art_push / query_page RPCs (Round 37) ──────────────────────────
+
+
+def test_custom_art_push_sends_correct_rpc(live_daemon):
+    """Verify DaemonClient.custom_art_push sends the expected command.
+    
+    We monkeypatch send_command to capture the payload without hitting the
+    real daemon handler (which needs network + real files)."""
+    from unittest.mock import MagicMock, ANY
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    client.send_command = MagicMock(return_value={"success": True})
+    reply = client.custom_art_push(file_ids=["abc123", "def"], page=1, slot=None)
+    assert reply == {"success": True}
+    client.send_command.assert_called_once_with("custom_art_push", {
+        "file_ids": ["abc123", "def"], "page": 1, "slot": None, "slots": None,
+    }, read_timeout=ANY)
+
+
+def test_custom_art_push_with_slot(live_daemon):
+    from unittest.mock import MagicMock, ANY
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    client.send_command = MagicMock(return_value={"success": True})
+    client.custom_art_push(file_ids=["abc"], page=2, slot=5)
+    client.send_command.assert_called_once_with("custom_art_push", {
+        "file_ids": ["abc"], "page": 2, "slot": 5, "slots": None,
+    }, read_timeout=ANY)
+
+
+def test_custom_art_query_page_sends_correct_rpc(live_daemon):
+    from unittest.mock import MagicMock, ANY
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    client.send_command = MagicMock(return_value={"success": True, "ids": [1, 2, 3]})
+    reply = client.custom_art_query_page(page=1)
+    assert reply == {"success": True, "ids": [1, 2, 3]}
+    client.send_command.assert_called_once_with("custom_art_query_page", {"page": 1}, read_timeout=ANY)
+
+
+# ── device_call → design module (Round 37) ────────────────────────────────
+
+
+def test_device_call_use_user_define_index(live_daemon):
+    _, dev, sp = live_daemon
+    client = DaemonClient(sp)
+    reply = client.device_call("design.use_user_define_index", args=[0])
+    assert reply.get("success") is True
+    assert reply.get("result") is True
+    assert ("design.use_user_define_index", 0) in dev.calls
+
+
+def test_device_call_use_user_define_index_page_1(live_daemon):
+    _, dev, sp = live_daemon
+    client = DaemonClient(sp)
+    reply = client.device_call("design.use_user_define_index", args=[1])
+    assert reply.get("success") is True
+    assert ("design.use_user_define_index", 1) in dev.calls
+
+
+def test_device_call_clear_user_define_index(live_daemon):
+    _, dev, sp = live_daemon
+    client = DaemonClient(sp)
+    reply = client.device_call("design.clear_user_define_index", args=[2])
+    assert reply.get("success") is True
+    assert ("design.clear_user_define_index", 2) in dev.calls
+
+
+def test_device_call_clear_user_define_index_invalid_method(live_daemon):
+    """Missing method should return an error, not crash."""
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    reply = client.send_command("device_call", {})
+    assert reply.get("success") is False
+
+
+# ── daemon_protocol client methods (sync_artwork, hot_update) ────────────
+
+
+def test_sync_artwork_rpc(live_daemon):
+    from unittest.mock import MagicMock, ANY
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    client.send_command = MagicMock(return_value={"success": True})
+    reply = client.sync_artwork("file123", default_size=32, target="device")
+    assert reply == {"success": True}
+    client.send_command.assert_called_once_with("sync_artwork", {
+        "file_id": "file123", "default_size": 32, "target": "device",
+    }, read_timeout=ANY)
+
+
+def test_sync_artwork_default_args(live_daemon):
+    from unittest.mock import MagicMock, ANY
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    client.send_command = MagicMock(return_value={"success": True})
+    client.sync_artwork("fid")
+    client.send_command.assert_called_once_with("sync_artwork", {
+        "file_id": "fid", "default_size": 16, "target": "device",
+    }, read_timeout=ANY)
+
+
+def test_hot_update_rpc(live_daemon):
+    from unittest.mock import MagicMock, ANY
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    client.send_command = MagicMock(return_value={"success": True})
+    reply = client.hot_update(device_size=32, show=True)
+    assert reply == {"success": True}
+    client.send_command.assert_called_once_with("hot_update", {
+        "device_size": 32, "show": True,
+    }, read_timeout=ANY)
+
+
+def test_hot_update_defaults(live_daemon):
+    from unittest.mock import MagicMock, ANY
+    _, _, sp = live_daemon
+    client = DaemonClient(sp)
+    client.send_command = MagicMock(return_value={"success": True})
+    client.hot_update()
+    client.send_command.assert_called_once_with("hot_update", {
+        "device_size": 16, "show": True,
+    }, read_timeout=ANY)
+
+
+# ── ensure_daemon ─────────────────────────────────────────────────────────
 
 
 def test_ensure_daemon_returns_client_when_already_up(live_daemon):

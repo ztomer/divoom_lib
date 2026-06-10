@@ -100,13 +100,23 @@
                         </svg>
                     </span> Live Widgets
                 </button>
-                <button class="nav-btn" data-tab="monthly-best">
+                <button class="nav-btn" data-tab="gallery">
+                    <span class="btn-icon">
+                        <svg class="kare-icon" viewBox="0 0 16 16">
+                            <rect x="1" y="1" width="6" height="6" rx="1"/>
+                            <rect x="9" y="1" width="6" height="6" rx="1"/>
+                            <rect x="1" y="9" width="6" height="6" rx="1"/>
+                            <rect x="9" y="9" width="6" height="6" rx="1"/>
+                        </svg>
+                    </span> Gallery
+                </button>
+                <button class="nav-btn" data-tab="hot-channel">
                     <span class="btn-icon">
                         <svg class="kare-icon" viewBox="0 0 16 16">
                             <path d="M8,1 C8,1 11,4 11,7 C11,10 8,15 8,15 C8,15 5,10 5,7 C5,4 8,1 8,1 Z"/>
                             <path d="M8,4 C8,4 9.5,6 9.5,7.5 C9.5,9.5 8,12 8,12 C8,12 6.5,9.5 6.5,7.5 C6.5,6 8,4 8,4 Z" fill="var(--bg-base)"/>
                         </svg>
-                    </span> Monthly Best
+                    </span> Hot Channel
                 </button>
                 <button class="nav-btn" data-tab="display-wall">
                     <span class="btn-icon">
@@ -254,39 +264,25 @@
                                 </div>
                                 <!-- Custom art -->
                                 <div class="channel-panel" id="panel-design">
-                                    <div class="custom-art-scroll-container" style="flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:12px; margin-bottom:12px; box-sizing:border-box; width:100%;">
-                                        <p class="panel-hint" style="margin-top: 0; margin-bottom: 0;">Display your own custom art/GIFs on the device's "Custom" channel.</p>
-                                        <div class="custom-art-upload-section" style="display:flex; flex-direction:column; gap:12px; max-width:100%; flex:1; min-height:0;">
-                                            <div style="display:flex; gap:10px; align-items:center;">
-                                                <button id="browse-custom-art-btn" class="glow-btn compact" style="margin:0; white-space:nowrap;">Browse File...</button>
-                                                <input type="text" id="custom-art-path-input" placeholder="No file selected" class="text-input" style="flex:1;" readonly>
-                                            </div>
-                                            
-                                            <!-- Realtime Custom Art Preview -->
-                                            <div id="custom-art-preview-container" style="display:none; justify-content:center; padding:12px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid var(--border-color);">
-                                                <img id="custom-art-preview-img" src="" style="max-width:128px; max-height:128px; object-fit:contain; image-rendering:pixelated; border-radius:4px;">
-                                            </div>
-                                            
-                                            <!-- Last 5 Selected Items filmstrip preview -->
-                                            <div id="custom-art-history-container" style="display:flex; flex-direction:column; gap:6px; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
-                                                <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:2px;">Last 10 Selected Items:</label>
-                                                <div id="custom-art-history-filmstrip" style="display:flex; gap:8px; overflow-x:auto; padding:2px; min-height:60px;">
-                                                    <div class="empty-list" style="font-size:11px;">No design pushed yet.</div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Gallery Cache Selection Grid — R24 #7: this is the ONLY
-                                                 scrollable region (browse + history stay fixed); with a search box. -->
-                                            <div class="gallery-cache-selector" style="margin-top: 4px; flex:1; min-height:0; display:flex; flex-direction:column;">
-                                                <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Select from Gallery Cache:</label>
-                                                <input type="text" id="custom-art-search" placeholder="Search cached art…" class="text-input" style="margin-bottom:6px; font-size:12px;">
-                                                <div class="selector-grid" id="custom-art-cache-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap:8px; flex:1; min-height:0; overflow-y: auto; padding: 6px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-sizing:border-box; width:100%;">
-                                                    <div class="empty-list" style="grid-column: 1/-1;">No cached gallery files.</div>
-                                                </div>
-                                            </div>
+                                    <!-- Fixed header: page tabs + slot grid stay put while the
+                                         library below scrolls (Rams: structure is self-evident) -->
+                                    <div class="custom-art-fixed">
+                                        <div id="custom-art-page-tabs" class="custom-art-tabs">
+                                            <button class="page-tab glow-btn compact" data-page="0">Page 1</button>
+                                            <button class="page-tab glow-btn compact" data-page="1">Page 2</button>
+                                            <button class="page-tab glow-btn compact" data-page="2">Page 3</button>
+                                        </div>
+                                        <div id="custom-art-slot-grid" class="custom-art-slots"></div>
+                                        <p class="panel-hint custom-art-hint">Click art below to fill the next slot — or pick a slot first. Hover a filled slot and click &times; to clear it.</p>
+                                    </div>
+                                    <!-- Scrolling library -->
+                                    <div class="gallery-cache-selector custom-art-library">
+                                        <input type="text" id="custom-art-search" placeholder="Search cached art…" class="text-input">
+                                        <div class="selector-grid" id="custom-art-cache-grid">
+                                            <div class="empty-list" style="grid-column: 1/-1;">No cached gallery files.</div>
                                         </div>
                                     </div>
-                                    <button id="apply-custom-art-btn" class="glow-btn" style="margin:0; width:100%; flex-shrink:0;">Push to Device</button>
+                                    <button id="push-custom-art-btn" class="glow-btn">Push Page 1 to Device</button>
                                 </div>
                                 <!-- Ambient light (now a channel selection) -->
                                 <div class="channel-panel" id="panel-ambient">
@@ -510,10 +506,13 @@
             <!-- TAB 3: ROUTINES (Schedule + Time) -->
             <section id="routines" class="tab-content"></section>
 
-            <!-- TAB 4: BATCH MONTHLY BEST WITH PREVIEWS -->
-            <section id="monthly-best" class="tab-content"></section>
+            <!-- TAB 4: COMMUNITY GALLERY -->
+            <section id="gallery" class="tab-content"></section>
+
+            <!-- TAB 5: HOT CHANNEL (Divoom's curated set) -->
+            <section id="hot-channel" class="tab-content"></section>
             
-            <!-- TAB 5: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
+            <!-- TAB 6: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
             <section id="data-sources" class="tab-content"></section>
 
             <!-- TAB 6: CREDENTIALS & BLE CONFIG SETTINGS -->
@@ -527,7 +526,8 @@
     
     <script src="templates_tools.js"></script>
     <script src="templates_routines.js"></script>
-    <script src="templates_monthly_best.js"></script>
+    <script src="templates_gallery.js"></script>
+    <script src="templates_hot_channel.js"></script>
     <script src="templates_widgets.js"></script>
     <script src="templates_settings.js"></script>
     <script src="app_globals.js"></script>
@@ -540,5 +540,6 @@
     <script src="alarms_editor.js"></script>
     <script src="gallery.js"></script>
     <script src="gallery_hot.js"></script>
+    <script src="custom_art.js"></script>
 </body>
 </html>
