@@ -63,6 +63,19 @@ class _Monitor:
     def stop(self): self.is_running = False
 
 
+def _wait_daemon_ready(sock, timeout=5.0):
+    """Wait until the daemon ACCEPTS a real connection, not just until the
+    socket file exists — the file can appear before the accept loop is ready,
+    which races on a loaded CI runner."""
+    from divoom_gui.daemon_bridge import daemon_alive
+    end = time.time() + timeout
+    while time.time() < end:
+        if os.path.exists(sock) and daemon_alive(sock, timeout=0.5):
+            return True
+        time.sleep(0.02)
+    return False
+
+
 def test_daemon_shutdown_broadcasts_event():
     # Short /tmp path — AF_UNIX rejects pytest's long tmp_path on macOS.
     sock = f"/tmp/divoom_lc_{os.getpid()}.sock"
@@ -71,10 +84,7 @@ def test_daemon_shutdown_broadcasts_event():
     daemon = DivoomDaemon(socket_path=sock, monitor=_Monitor(), device=object())
     t = threading.Thread(target=daemon.serve_forever, daemon=True)
     t.start()
-    for _ in range(50):
-        if os.path.exists(sock):
-            break
-        time.sleep(0.02)
+    assert _wait_daemon_ready(sock), "daemon did not become ready"
 
     events = []
     stop = threading.Event()
@@ -82,13 +92,18 @@ def test_daemon_shutdown_broadcasts_event():
         target=lambda: DaemonClient(sock, timeout=3.0).subscribe(events.append, should_stop=stop.is_set),
         daemon=True)
     st.start()
-    time.sleep(0.2)  # let the subscription register
+    # Wait until the subscription is REGISTERED — proven by the initial status
+    # event the daemon broadcasts on subscribe — before triggering shutdown, so
+    # the shutdown broadcast can't race ahead of registration.
+    end = time.time() + 5.0
+    while time.time() < end and not events:
+        time.sleep(0.02)
+    assert events, "subscriber never received the initial status event"
 
     reply = DaemonClient(sock, timeout=2.0).shutdown()
     assert reply.get("success") is True
-    for _ in range(50):
-        if any(e.get("type") == EVENT_SHUTDOWN for e in events):
-            break
+    end = time.time() + 3.0
+    while time.time() < end and not any(e.get("type") == EVENT_SHUTDOWN for e in events):
         time.sleep(0.02)
     assert any(e.get("type") == EVENT_SHUTDOWN for e in events), "no shutdown event received"
     stop.set()
