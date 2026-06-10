@@ -52,6 +52,8 @@ TEMPLATES_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js",
+    # R40 §8: device settings (clock/temp/power/display/danger) moved here.
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_device_settings.js",
 ])
 ROUTINES_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js"
 
@@ -445,20 +447,17 @@ def test_no_battery_badge_intentionally_not_implemented():
 
 
 def test_r9_display_card_exists():
-    """The Display card (orientation/mirror/factory-reset) exists — it now lives
-    in Settings → Devices (moved there in R12 Phase 7). R15 §4: factory reset
-    moved to its own Danger zone card."""
+    """Orientation/mirror/factory-reset live in the R40 §8 Device Settings
+    section (one glass pane with a Danger zone block at the bottom)."""
     src = TEMPLATES_JS
-    assert 'id="screen-dir-tabs"' in src, "Display card missing orientation tabs."
-    assert 'id="screen-mirror-toggle"' in src, "Display card missing mirror toggle."
-    # R15 §4: factory reset moved out of the Display card into its own
-    # Danger zone card — both must still be present, just not nested.
+    assert 'id="screen-dir-tabs"' in src, "Display controls missing orientation tabs."
+    assert 'id="screen-mirror-toggle"' in src, "Display controls missing mirror toggle."
     assert 'id="factory-reset-btn"' in src, "factory-reset-btn is missing from the DOM."
-    # The Danger zone card exists with a red border treatment.
+    # R40 §8: factory reset is in a danger-card block at the bottom of the pane.
     assert re.search(
-        r'<div class="card glass-card danger-card">[\s\S]*?id="factory-reset-btn"[\s\S]*?</div>',
+        r'class="danger-card"[\s\S]*?id="factory-reset-btn"',
         src,
-    ), "factory-reset-btn is not inside the new Danger zone card."
+    ), "factory-reset-btn is not inside the Danger zone block."
 
 
 def test_r9_settings_js_wires_display_and_guards_reset():
@@ -566,22 +565,23 @@ def test_r11_custom_art_push_is_pinned_footer():
     )
 
 
+# R39+: custom art lives in the Pixel Art section template (injected), not in
+# static index.html. These structure checks read that template.
+PIXEL_ART_JS = (REPO_ROOT / "divoom_gui" / "web_ui" / "templates_pixel_art.js").read_text()
+
+
 def test_r37_custom_art_page_tabs_in_html():
-    html = INDEX_HTML.read_text()
-    assert 'id="custom-art-page-tabs"' in html, "Page tabs container missing"
-    # 3 page-tab buttons
-    tabs = re.findall(r'class="page-tab glow-btn compact"', html)
+    assert 'id="custom-art-page-tabs"' in PIXEL_ART_JS, "Page tabs container missing"
+    tabs = re.findall(r'class="page-tab glow-btn compact"', PIXEL_ART_JS)
     assert len(tabs) == 3, f"Expected 3 .page-tab elements, got {len(tabs)}"
 
 
 def test_r37_custom_art_slot_grid_in_html():
-    html = INDEX_HTML.read_text()
-    assert 'id="custom-art-slot-grid"' in html, "Slot grid container missing"
+    assert 'id="custom-art-slot-grid"' in PIXEL_ART_JS, "Slot grid container missing"
 
 
 def test_r37_custom_art_push_button_id_in_html():
-    html = INDEX_HTML.read_text()
-    assert 'id="push-custom-art-btn"' in html, "#push-custom-art-btn missing"
+    assert 'id="push-custom-art-btn"' in PIXEL_ART_JS, "#push-custom-art-btn missing"
 
 
 def test_r37_custom_art_js_loaded():
@@ -692,32 +692,28 @@ async def test_gallery_and_hot_channel_layouts_render_cleanly():
         await page.goto(f"file://{INDEX_HTML}")
         await page.wait_for_load_state("domcontentloaded")
 
-        # ── Gallery tab ──
-        await page.click('[data-tab="gallery"]', timeout=2000)
-        await page.wait_for_selector("#gallery.active", timeout=2000)
+        # R39+: Gallery + Hot Channel are sub-tabs of the Pixel Art section.
+        await page.click('.nav-btn[data-tab="pixel-art"]', timeout=2000)
+        await page.wait_for_selector("#pixel-art.active", timeout=2000)
 
+        # ── Gallery sub-tab ──
+        await page.click('[data-pixel-tab="pixel-gallery"]', timeout=2000)
+        await page.wait_for_selector("#pixel-gallery.active", timeout=2000)
         assert await page.locator("#gallery-classify-tabs").count() == 1, (
-            "Gallery tab should have classify tabs."
+            "Gallery sub-tab should have classify tabs."
         )
         assert await page.locator("#gallery-container").count() == 1, (
-            "Gallery tab should have the gallery container."
-        )
-        assert await page.locator("#gallery h3:has-text('Devices')").count() == 0, (
-            "Gallery should not embed a Devices header (moved to Routines)."
+            "Gallery sub-tab should have the gallery container."
         )
 
-        # ── Hot Channel tab ──
-        await page.click('[data-tab="hot-channel"]', timeout=2000)
-        await page.wait_for_selector("#hot-channel.active", timeout=2000)
-
+        # ── Hot Channel sub-tab ──
+        await page.click('[data-pixel-tab="pixel-hot-channel"]', timeout=2000)
+        await page.wait_for_selector("#pixel-hot-channel.active", timeout=2000)
         assert await page.locator("#hot-update-btn").count() == 1, (
-            "Hot Channel tab should have the update button."
+            "Hot Channel sub-tab should have the update button."
         )
         assert await page.locator("#hot-preview-list").count() == 1, (
-            "Hot Channel tab should have the preview list."
-        )
-        assert await page.locator("#hot-channel .gallery-grid").count() == 0, (
-            "Hot Channel tab should not have a gallery grid."
+            "Hot Channel sub-tab should have the preview list."
         )
 
         # The appbar volume slider must still exist.
@@ -848,28 +844,29 @@ def test_r12_weather_moved_into_live_widgets():
     )
 
 
-def test_r12_device_settings_moved_to_settings_devices():
-    """The Device Settings card (24h, °F, low-power, device name, etc.)
-    now lives in Settings → Devices, not in the Tools tab."""
-    src = TEMPLATES_JS
-    # Settings → Devices sub-tab block: between id="settings-devices" and the
-    # next sub-tab id="settings-divoom" (or end of the Settings block).
-    m = re.search(
-        r'id="settings-devices">(.+?)<div class="settings-tab-content" id="settings-divoom">',
-        src, re.DOTALL,
+def test_r40_device_settings_section_one_pane_with_segmented_pills():
+    """R40 §8: clock/temp/power/name/auto-off/orientation/mirror/update-time
+    live in the dedicated Device Settings section (deviceSettings template),
+    in ONE glass pane, with the clock/temp/power controls as segmented pills
+    (not toggles), and the Danger zone block at the bottom."""
+    src = re.search(
+        r"window\.DivoomTemplates\.deviceSettings\s*=\s*`(.+?)`;",
+        TEMPLATES_JS, re.DOTALL,
     )
-    assert m is not None, "settings-devices sub-tab block not found"
-    block = m.group(1)
-    for _id in ["hour24-toggle", "tempf-toggle", "lowpower-toggle", "device-name-input", "sync-time-btn"]:
-        assert f'id="{_id}"' in block, (
-            f"Device Settings id={_id} not found in Settings → Devices — "
-            f"should have moved there in R12."
-        )
-    # And those ids MUST NOT be in the Tools tab.
-    tools = re.search(r"window\.DivoomTemplates\.tools\s*=\s*`(.+?)`;", src, re.DOTALL)
-    assert tools is not None
-    tools_block = tools.group(1)
-    for _id in ["hour24-toggle", "tempf-toggle", "lowpower-toggle", "device-name-input", "sync-time-btn"]:
-        assert f'id="{_id}"' not in tools_block, (
-            f"Device Settings id={_id} is still in the Tools tab — should be in Settings."
-        )
+    assert src is not None, "deviceSettings template not found"
+    block = src.group(1)
+    # Exactly one glass card pane.
+    assert block.count("card glass-card") == 1, "Device Settings must be one glass pane."
+    # Segmented pills (not the old checkbox toggles).
+    for seg in ["hour24-seg", "tempf-seg", "lowpower-seg"]:
+        assert f'id="{seg}"' in block, f"missing segmented pill {seg}"
+    for old in ["hour24-toggle", "tempf-toggle", "lowpower-toggle"]:
+        assert f'id="{old}"' not in block, f"old toggle {old} should be a segmented pill now"
+    # Other controls preserved, plus the renamed update-time button.
+    for _id in ["device-name-input", "auto-off-min", "screen-dir-tabs",
+                "screen-mirror-toggle", "sync-time-btn", "factory-reset-btn"]:
+        assert f'id="{_id}"' in block, f"Device Settings missing {_id}"
+    assert "Update device time" in block, "sync button must read 'Update device time'"
+    # Danger zone is the last block.
+    assert block.rfind("danger-card") > block.rfind('id="screen-mirror-toggle"'), \
+        "Danger zone must come at the bottom of the pane"

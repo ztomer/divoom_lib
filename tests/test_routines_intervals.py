@@ -31,6 +31,7 @@ TEMPLATES_JS = _cat([
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_widgets.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_settings.js",
     REPO_ROOT / "divoom_gui" / "web_ui" / "templates_routines.js",
+    REPO_ROOT / "divoom_gui" / "web_ui" / "templates_device_settings.js",
 ])
 SETTINGS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "settings.css"
 
@@ -46,32 +47,25 @@ from divoom_lib.hotchannel_config import (
 # ── 1. Danger zone is its own card ────────────────────────────────────
 
 
-def test_display_card_no_longer_contains_danger_zone() -> None:
-    """The `.danger-zone` div must be GONE from inside the Display
-    card. The Display card is between the `<!-- Display -->` and
-    `<!-- R15 §4: Danger zone -->` markers — we check that the div
-    isn't between those two markers."""
+def test_display_controls_separate_from_danger_zone() -> None:
+    """R40 §8: the mirror toggle (Display) and the Danger zone block live in
+    the same Device Settings pane, but the danger block comes strictly after
+    the display controls."""
     src = TEMPLATES_JS
-    display_start = src.find("<!-- Display (moved from Tools")
-    danger_start = src.find("<!-- R15 §4: Danger zone is its own card")
-    assert display_start > 0, "Display card marker not found"
-    assert danger_start > display_start, "Danger zone card must come after Display"
-    between = src[display_start:danger_start]
-    assert 'class="danger-zone"' not in between, (
-        ".danger-zone div is still inside the Display card — should be its own card."
-    )
+    mirror = src.find('id="screen-mirror-toggle"')
+    danger = src.rfind("danger-card")
+    assert mirror > 0, "mirror toggle not found"
+    assert danger > mirror, "Danger zone must come after the display controls"
 
 
-def test_danger_zone_card_exists() -> None:
+def test_danger_zone_block_exists() -> None:
+    """R40 §8: Danger zone is a danger-card block at the bottom of the Device
+    Settings pane (no longer a standalone glass card)."""
     src = TEMPLATES_JS
     assert re.search(
-        r'<div class="card glass-card danger-card">\s*'
-        r'<div class="card-header"><h3>Danger zone</h3></div>',
+        r'class="danger-card"[\s\S]*?<h3[^>]*>Danger zone</h3>',
         src,
-    ), (
-        "The new Danger zone card is missing — should be a "
-        "card.glass-card.danger-card with header 'Danger zone'."
-    )
+    ), "Danger zone block (danger-card + 'Danger zone' header) is missing."
 
 
 def test_danger_card_visual_marker() -> None:

@@ -129,6 +129,15 @@
                         </svg>
                     </span> Routines
                 </button>
+                <!-- R40 §8: Device Settings (clock/temp/power/display/danger). -->
+                <button class="nav-btn" data-tab="device-settings">
+                    <span class="btn-icon">
+                        <svg class="kare-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="8" cy="8" r="2.5"/>
+                            <path d="M8,1 L8,3 M8,13 L8,15 M1,8 L3,8 M13,8 L15,8 M3.2,3.2 L4.6,4.6 M11.4,11.4 L12.8,12.8 M3.2,12.8 L4.6,11.4 M11.4,4.6 L12.8,3.2"/>
+                        </svg>
+                    </span> Device Settings
+                </button>
             </nav>
             
             <!-- Connected Device Panel (Moved from channels).
@@ -483,6 +492,9 @@
 
             <!-- TAB 4: PIXEL ART (Custom Art + Gallery + Hot Channel) -->
             <section id="pixel-art" class="tab-content"></section>
+
+            <!-- R40 §8: Device Settings (injected from templates_device_settings.js) -->
+            <section id="device-settings" class="tab-content"></section>
             
             <!-- TAB 5: ADVANCED MEDIA & DATA SOURCES (EQ Animation Previews) -->
             <section id="data-sources" class="tab-content"></section>
@@ -501,6 +513,7 @@
     <script src="templates_pixel_art.js"></script>
     <script src="templates_widgets.js"></script>
     <script src="templates_settings.js"></script>
+    <script src="templates_device_settings.js"></script>
     <script src="app_globals.js"></script>
     <script src="app_init.js"></script>
     <script src="channels_core.js"></script>

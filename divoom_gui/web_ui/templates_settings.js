@@ -98,69 +98,10 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                 </div>
                             </div>
                         </div>
-                        <!-- Device Settings (moved from Tools → Settings, R11 item 8e) -->
-                        <div class="card glass-card">
-                            <div class="card-header"><h3>Device Settings</h3></div>
-                            <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="font-size:13px; color:var(--text-main);">24-hour clock</span>
-                                    <label class="switch" style="margin:0;"><input type="checkbox" id="hour24-toggle"><span class="slider-round"></span></label>
-                                </div>
-                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="font-size:13px; color:var(--text-main);">Fahrenheit (°F)</span>
-                                    <label class="switch" style="margin:0;"><input type="checkbox" id="tempf-toggle"><span class="slider-round"></span></label>
-                                </div>
-                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="font-size:13px; color:var(--text-main);">Low-power mode</span>
-                                    <label class="switch" style="margin:0;"><input type="checkbox" id="lowpower-toggle"><span class="slider-round"></span></label>
-                                </div>
-                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                                    <span class="form-label" style="font-size:12px; min-width:96px;">Device name</span>
-                                    <input type="text" id="device-name-input" class="text-input" maxlength="24" style="flex:1; min-width:140px;" placeholder="Name">
-                                    <button id="device-name-save" class="glow-btn compact">Save</button>
-                                </div>
-                                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                                    <span class="form-label" style="font-size:12px; min-width:96px;">Auto power-off</span>
-                                    <input type="number" id="auto-off-min" class="text-input" min="0" max="240" value="0" style="width:80px;" title="minutes (0 = off)">
-                                    <span style="font-size:12px; color:var(--text-muted);">min</span>
-                                    <button id="auto-off-save" class="glow-btn compact">Save</button>
-                                </div>
-                                <div style="display:flex; gap:10px;">
-                                    <button id="sync-time-btn" class="glow-btn" style="flex:1;">Sync time from this Mac</button>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Display (moved from Tools → Settings, R11 item 8e) -->
-                        <div class="card glass-card">
-                            <div class="card-header"><h3>Display</h3></div>
-                            <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-                                <div style="margin-bottom:4px;">
-                                    <span class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:6px;">Orientation</span>
-                                    <div class="tabs-row" role="tablist" id="screen-dir-tabs">
-                                        <button class="tab-btn active" data-dir="0">0°</button>
-                                        <button class="tab-btn" data-dir="1">90°</button>
-                                        <button class="tab-btn" data-dir="2">180°</button>
-                                        <button class="tab-btn" data-dir="3">270°</button>
-                                    </div>
-                                </div>
-                                <div class="toggle-control-bar" style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="font-size:13px; color:var(--text-main);">Mirror / flip display</span>
-                                    <label class="switch" style="margin:0;"><input type="checkbox" id="screen-mirror-toggle"><span class="slider-round"></span></label>
-                                </div>
-                                <p class="panel-hint" style="margin:0;">Orientation support is device-dependent; the exact angle mapping may vary by model.</p>
-                            </div>
-                        </div>
-                        <!-- R15 §4: Danger zone is its own card so destructive
-                             actions aren't buried at the bottom of an unrelated
-                             card. Visual treatment (red border, warning text)
-                             unchanged from when it lived inside Display. -->
-                        <div class="card glass-card danger-card">
-                            <div class="card-header"><h3>Danger zone</h3></div>
-                            <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
-                                <p class="panel-hint" style="margin:0;">Factory reset wipes the device's stored configuration. This cannot be undone.</p>
-                                <button id="factory-reset-btn" class="glow-btn danger">Factory reset device…</button>
-                            </div>
-                        </div>
+                        <!-- R40 §8: Device Settings / Display / Danger zone moved to
+                             the new "Device Settings" sidebar section
+                             (templates_device_settings.js). This tab keeps only the
+                             scan/connect tables above. -->
                         <!-- R15 §3: the Notification + macOS Notifications cards
                              moved to Live Widgets (siblings of the Weather card)
                              so all "things the device can show right now" live

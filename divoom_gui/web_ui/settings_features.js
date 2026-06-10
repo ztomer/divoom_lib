@@ -148,10 +148,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const el = document.getElementById(id);
         if (el) el.addEventListener("change", () => { if (dev()) api()?.[fn]?.(el.checked).then(r => toast(r, "Saved")); });
     };
-    wireToggle("hour24-toggle", "set_hour_type");
-    wireToggle("tempf-toggle", "set_temp_unit");
-    wireToggle("lowpower-toggle", "set_low_power");
     wireToggle("screen-mirror-toggle", "set_screen_mirror");
+
+    // R40 §8: clock/temp/power are now segmented pills (.tabs-row with
+    // data-api on the container + data-val 0/1 on the buttons). Each maps to
+    // the same boolean API the old toggles called.
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest("#hour24-seg .tab-btn, #tempf-seg .tab-btn, #lowpower-seg .tab-btn");
+        if (!btn) return;
+        const seg = btn.parentElement;
+        seg.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const fn = seg.getAttribute("data-api");
+        const on = btn.getAttribute("data-val") === "1";
+        if (fn && dev()) api()?.[fn]?.(on).then(r => toast(r, "Saved"));
+    });
 
     // Display orientation (0-3 = 0/90/180/270°) via tab selector.
     document.addEventListener("click", (e) => {

@@ -42,6 +42,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById('routines') && window.DivoomTemplates?.routines) {
         document.getElementById('routines').innerHTML = window.DivoomTemplates.routines;
     }
+    /* R40 §8: Device Settings section */
+    if (document.getElementById('device-settings') && window.DivoomTemplates?.deviceSettings) {
+        document.getElementById('device-settings').innerHTML = window.DivoomTemplates.deviceSettings;
+    }
 
     // ── 5. CANVAS ARRANGER AND PRESETS BINDINGS ──
     const addArrangerBtn = document.getElementById("add-arranger-screen-btn");
