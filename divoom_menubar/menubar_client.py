@@ -14,6 +14,7 @@ from divoom_daemon.daemon_protocol import (
     DaemonClient,
     DEFAULT_SOCKET_PATH,
     EVENT_STATUS,
+    EVENT_SHUTDOWN,
     make_request,
     encode_message,
     iter_messages,
@@ -104,6 +105,7 @@ class MenubarClient:
         self._running = False
         self._status = {"state": STATE_IDLE, "counters": {}}
         self._on_status_change: Callable[[dict], None] | None = None
+        self._on_shutdown: Callable[[], None] | None = None  # R40 §9
 
     def start(self) -> bool:
         """Start the subscription thread. Returns True if daemon reachable."""
@@ -126,16 +128,24 @@ class MenubarClient:
 
     def _subscribe_loop(self) -> None:
         def on_event(ev: dict) -> None:
-            if ev.get("type") == EVENT_STATUS:
+            etype = ev.get("type")
+            if etype == EVENT_STATUS:
                 state = derive_state(ev)
                 self._status = {"state": state, "counters": ev.get("counters", {})}
                 if self._on_status_change:
                     self._on_status_change(self._status)
+            elif etype == EVENT_SHUTDOWN:
+                # R40 §9: daemon is stopping — let the agent decide whether to follow.
+                if self._on_shutdown:
+                    self._on_shutdown()
 
         self._client.subscribe(on_event, should_stop=lambda: not self._running)
 
     def set_status_callback(self, cb: Callable[[dict], None]) -> None:
         self._on_status_change = cb
+
+    def set_shutdown_callback(self, cb: Callable[[], None]) -> None:
+        self._on_shutdown = cb
 
     # ── device commands (proxied through daemon) ────────────────────────
 

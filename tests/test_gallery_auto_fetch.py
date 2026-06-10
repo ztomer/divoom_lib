@@ -128,31 +128,29 @@ def test_classify_change_auto_fetches() -> None:
 
 
 def test_tab_activation_auto_fetches() -> None:
+    """R39+: the gallery auto-fetches on the 'gallery' tab-changed event (and on
+    'pixel-art' when the gallery sub-tab is active)."""
     js = GALLERY_JS.read_text()
-    assert re.search(
-        r'addEventListener\(\"tab-changed\",\s*\(?e\)?\s*=>\s*\{[^}]*'
-        r'e\.detail\.tab\s*===\s*\"gallery\"[^}]*loadGallery\(\)',
-        js,
-        re.DOTALL,
-    ), (
-        "tab-changed handler for 'gallery' tab is missing a "
-        "loadGallery() call."
-    )
+    m = re.search(r'addEventListener\("tab-changed",[\s\S]+?\}\);', js)
+    assert m, "tab-changed handler not found in gallery.js"
+    handler = m.group(0)
+    assert 'e.detail.tab === "gallery"' in handler, "handler must react to the gallery tab"
+    assert "loadGallery()" in handler, "handler must call loadGallery()"
 
 
 # ── 4. Box size cap ───────────────────────────────────────────────────
 
 
 def test_gallery_grid_box_cap_present() -> None:
-    """The grid template must cap the box at 168px (Rams #10 + a
-    legible preview). The floor is 110px (smallest preview + name)."""
+    """R40 §3: the grid cap is 128px so gallery tiles match the hot-channel
+    thumbnail scale (was 168px). The floor stays 110px."""
     css = GALLERY_CSS.read_text()
     assert re.search(
-        r"grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(110px,\s*168px\)\)",
+        r"grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(110px,\s*128px\)\)",
         css,
     ), (
         "gallery-grid box cap missing — should be "
-        "`repeat(auto-fill, minmax(110px, 168px))`."
+        "`repeat(auto-fill, minmax(110px, 128px))`."
     )
 
 

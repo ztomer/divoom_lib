@@ -49,6 +49,7 @@ class DivoomMenuBarAgent(NSObject):
             self.status_item = None
             self.client = MenubarClient()
             self.client.set_status_callback(self._on_status_change)
+            self.client.set_shutdown_callback(self._on_daemon_shutdown)
             self.client.start()
         return self
 
@@ -110,14 +111,36 @@ class DivoomMenuBarAgent(NSObject):
         subprocess.Popen([sys.executable, str(gui_path)])
 
     def quitApp_(self, sender):
-        logger.info("Quitting Divoom: stopping daemon + status bar agent...")
-        # Kill switch for the single-owner daemon: tell it to shut down so it
-        # doesn't linger after the app is gone. Best-effort.
-        try:
-            from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
-            DaemonClient(DEFAULT_SOCKET_PATH, timeout=1.0).shutdown()
-        except Exception as e:
-            logger.debug(f"daemon shutdown on quit skipped: {e}")
+        # R40 §9: when the lifecycles are shared (keep-alive OFF), 'Quit Divoom'
+        # stops the daemon — which broadcasts a shutdown event so the dashboard
+        # closes too. When keep-alive is ON, just exit the menubar and leave the
+        # daemon (and any dashboard) running.
+        from divoom_lib.lifecycle_config import (
+            get_keep_daemon_alive, should_stop_daemon_on_menubar_quit)
+        keep = get_keep_daemon_alive()
+        if should_stop_daemon_on_menubar_quit(keep):
+            logger.info("Quitting Divoom: stopping daemon (shared lifecycle)...")
+            try:
+                from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
+                DaemonClient(DEFAULT_SOCKET_PATH, timeout=1.0).shutdown()
+            except Exception as e:
+                logger.debug(f"daemon shutdown on quit skipped: {e}")
+        else:
+            logger.info("Quitting menu bar only (keep-daemon-alive is on)...")
+        self.client.stop()
+        NSApplication.sharedApplication().terminate_(self)
+
+    def _on_daemon_shutdown(self) -> None:
+        """Daemon broadcast a shutdown (e.g. the dashboard quit and brought the
+        shared lifecycle down). Follow it down unless keep-alive is set."""
+        from divoom_lib.lifecycle_config import (
+            get_keep_daemon_alive, should_follow_daemon_shutdown)
+        if should_follow_daemon_shutdown(get_keep_daemon_alive()):
+            logger.info("Daemon shut down; menu bar following (shared lifecycle).")
+            self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                "terminateFromEvent:", None, False)
+
+    def terminateFromEvent_(self, sender):
         self.client.stop()
         NSApplication.sharedApplication().terminate_(self)
 

@@ -111,6 +111,11 @@
     min-height: 0;
 }
 
+/* R40: the gallery moved into the Pixel Art section (#pixel-gallery); this
+   override lets the grid FILL the card and scroll internally instead of being
+   clamped at the base .gallery-grid max-height:400px. The old #gallery selector
+   no longer matched after the move, which stranded the grid at 400px. */
+#pixel-gallery .gallery-grid,
 #gallery .gallery-grid {
     flex: 1;
     max-height: none;

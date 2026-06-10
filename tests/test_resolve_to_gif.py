@@ -85,6 +85,14 @@ def test_aa_hot_file_decodes_to_gif(tmp_path):
         img.convert("RGB").resize((16, 16))
 
 
+def test_png_and_jpg_pass_through(tmp_path):
+    """Raw PNG/JPG (e.g. the custom-art unit fixtures) are PIL-openable as-is."""
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+    assert media_decoder.resolve_to_gif(png, tmp_path / "s.gif") == png
+    assert media_decoder.resolve_to_gif(jpg, tmp_path / "s.gif") == jpg
+
+
 def test_unknown_payload_returns_none(tmp_path):
     assert media_decoder.resolve_to_gif(b"\x77garbagegarbage", tmp_path / "s.gif") is None
     assert media_decoder.resolve_to_gif(b"", tmp_path / "s.gif") is None

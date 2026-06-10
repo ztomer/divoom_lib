@@ -204,6 +204,15 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             return False
         return self.tools.factory_reset(confirm)
 
+    # ── R40 §9: daemon (menu bar) keep-alive lifecycle ────────────────────
+    def get_keep_daemon_alive(self) -> bool:
+        from divoom_lib.lifecycle_config import get_keep_daemon_alive
+        return get_keep_daemon_alive()
+
+    def set_keep_daemon_alive(self, value) -> bool:
+        from divoom_lib.lifecycle_config import set_keep_daemon_alive
+        return set_keep_daemon_alive(bool(value))
+
     def send_notification(self, app_type, text="") -> bool:
         t = int(app_type)
         if not (1 <= t <= 14):

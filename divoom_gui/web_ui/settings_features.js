@@ -341,6 +341,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ── R15 §5: MCP server toggle ────────────────────────────────
+    // R40 §9: keep-daemon-alive toggle (Connectivity → Background agent).
+    const keepDaemonToggle = document.getElementById("keep-daemon-toggle");
+    if (keepDaemonToggle) {
+        api()?.get_keep_daemon_alive?.().then(v => { keepDaemonToggle.checked = !!v; });
+        keepDaemonToggle.addEventListener("change", () => {
+            api()?.set_keep_daemon_alive?.(keepDaemonToggle.checked).then(ok => {
+                window.showToast(ok ? (keepDaemonToggle.checked
+                    ? "Menu bar will stay running after quit"
+                    : "Menu bar will close with the dashboard") : "Failed to save",
+                    ok ? "success" : "error");
+            });
+        });
+    }
+
     const mcpToggle = document.getElementById("mcp-toggle");
     const mcpStatusDetail = document.getElementById("mcp-status-detail");
     const mcpLog = document.getElementById("mcp-log");

@@ -95,11 +95,17 @@ class DivoomDaemon:
         self._registry = r
 
     def _cmd_shutdown(self, _args: dict) -> dict:
-        """Stop the daemon process. Replies first, then stops the server shortly
-        after so the client receives the ack (used by the menu-bar 'Quit Divoom'
-        and the GUI on close — a clean kill switch for the single-owner daemon)."""
+        """Stop the daemon process. Replies first, broadcasts a ``shutdown``
+        event so subscribers (menubar, dashboard) can follow it down, then stops
+        the server shortly after so the client receives the ack (a clean kill
+        switch for the single-owner daemon)."""
+        from divoom_daemon.daemon_protocol import EVENT_SHUTDOWN
         def _later():
             import time
+            try:
+                self.broadcast({"type": EVENT_SHUTDOWN})
+            except Exception:
+                pass
             time.sleep(0.25)
             try:
                 self.stop()

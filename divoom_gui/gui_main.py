@@ -200,7 +200,49 @@ def main():
         except Exception as e:
             logger.warning(f"eager daemon spawn failed: {e}")
     _spawn_menubar_agent()
+    # R40 §9: follow the daemon down if it shuts down while we're open AND the
+    # lifecycles are shared (keep-alive off) — e.g. the menu bar's 'Quit Divoom'.
+    _start_shutdown_follower(window)
     webview.start()
+
+    # webview.start() blocks until the window closes. On close, when lifecycles
+    # are shared, stop the daemon too (which broadcasts → the menu bar follows).
+    try:
+        from divoom_lib.lifecycle_config import (
+            get_keep_daemon_alive, should_stop_daemon_on_dashboard_quit)
+        if should_stop_daemon_on_dashboard_quit(get_keep_daemon_alive()):
+            from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
+            logger.info("Dashboard closed; stopping daemon (shared lifecycle).")
+            DaemonClient(DEFAULT_SOCKET_PATH, timeout=1.0).shutdown()
+    except Exception as e:
+        logger.debug(f"daemon shutdown on dashboard close skipped: {e}")
+
+
+def _start_shutdown_follower(window) -> None:
+    """Subscribe to the daemon's shutdown event on a daemon thread; if it fires
+    while keep-alive is OFF, close the dashboard window. Event-driven — no
+    polling."""
+    def _run():
+        try:
+            from divoom_daemon.daemon_protocol import (
+                DaemonClient, DEFAULT_SOCKET_PATH, EVENT_SHUTDOWN)
+            from divoom_lib.lifecycle_config import (
+                get_keep_daemon_alive, should_follow_daemon_shutdown)
+
+            def on_event(ev: dict) -> None:
+                if ev.get("type") == EVENT_SHUTDOWN and \
+                        should_follow_daemon_shutdown(get_keep_daemon_alive()):
+                    logger.info("Daemon shut down; closing dashboard (shared lifecycle).")
+                    try:
+                        window.destroy()
+                    except Exception:
+                        pass
+            DaemonClient(DEFAULT_SOCKET_PATH, timeout=2.0).subscribe(on_event)
+        except Exception as e:
+            logger.debug(f"shutdown follower stopped: {e}")
+
+    import threading
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _spawn_menubar_agent() -> None:

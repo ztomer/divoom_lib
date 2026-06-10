@@ -119,3 +119,15 @@
     border-color: var(--accent) !important;
     opacity: 0.65;
 }
+
+/* R40: the Pixel Art sub-tab panels must form a bounded flex-height chain so
+   inner scrollers (gallery grid, hot preview list) actually scroll instead of
+   growing the whole card. #pixel-art is a flex column (.tab-content.active);
+   the active sub-tab fills it and clamps its own children. */
+#pixel-art > .pixel-subtab-content { display: none; }
+#pixel-art > .pixel-subtab-content.active {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}

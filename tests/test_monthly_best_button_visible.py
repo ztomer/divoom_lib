@@ -23,8 +23,11 @@ async def test_hot_channel_button_visible_with_many_preview_items():
         await page.goto(f"file://{INDEX_HTML}")
         await page.wait_for_load_state("domcontentloaded")
 
-        await page.click('[data-tab="hot-channel"]', timeout=2000)
-        await page.wait_for_selector("#hot-channel.active", timeout=2000)
+        # R39+: Hot Channel is a Pixel Art sub-tab.
+        await page.click('.nav-btn[data-tab="pixel-art"]', timeout=2000)
+        await page.wait_for_selector("#pixel-art.active", timeout=2000)
+        await page.click('[data-pixel-tab="pixel-hot-channel"]', timeout=2000)
+        await page.wait_for_selector("#pixel-hot-channel.active", timeout=2000)
 
         # Inject 50 fake preview items into the hot preview list.
         await page.evaluate("""
@@ -35,6 +38,7 @@ async def test_hot_channel_button_visible_with_many_preview_items():
                 for (let i = 0; i < 50; i++) {
                     const item = document.createElement('div');
                     item.className = 'hot-preview-item';
+                    item.style.height = '120px';  // realistic thumb height
                     item.textContent = 'Preview ' + (i + 1);
                     list.appendChild(item);
                 }
@@ -42,7 +46,7 @@ async def test_hot_channel_button_visible_with_many_preview_items():
         """)
         await page.wait_for_timeout(200)
 
-        card_box = await page.locator("#hot-channel .card.glass-card").first.bounding_box()
+        card_box = await page.locator("#pixel-hot-channel .card.glass-card").first.bounding_box()
         button_box = await page.locator("#hot-update-btn").bounding_box()
 
         assert card_box is not None, "Hot Channel card not found"
@@ -84,8 +88,11 @@ async def test_gallery_scrolls_internally_not_whole_card():
         await page.goto(f"file://{INDEX_HTML}")
         await page.wait_for_load_state("domcontentloaded")
 
-        await page.click('[data-tab="gallery"]', timeout=2000)
-        await page.wait_for_selector("#gallery.active", timeout=2000)
+        # R39+: Gallery is a Pixel Art sub-tab.
+        await page.click('.nav-btn[data-tab="pixel-art"]', timeout=2000)
+        await page.wait_for_selector("#pixel-art.active", timeout=2000)
+        await page.click('[data-pixel-tab="pixel-gallery"]', timeout=2000)
+        await page.wait_for_selector("#pixel-gallery.active", timeout=2000)
 
         # Inject 100 items to ensure overflow.
         await page.evaluate("""
@@ -96,6 +103,7 @@ async def test_gallery_scrolls_internally_not_whole_card():
                 for (let i = 0; i < 100; i++) {
                     const item = document.createElement('div');
                     item.className = 'gallery-item';
+                    item.style.height = '140px';  // realistic tile height
                     item.textContent = 'Item ' + (i + 1);
                     grid.appendChild(item);
                 }
@@ -111,7 +119,7 @@ async def test_gallery_scrolls_internally_not_whole_card():
         """)
         card_scroll = await page.evaluate("""
             () => {
-                const c = document.querySelector('#gallery .card.glass-card');
+                const c = document.querySelector('#pixel-gallery .card.glass-card');
                 return { scrollHeight: c.scrollHeight, clientHeight: c.clientHeight };
             }
         """)

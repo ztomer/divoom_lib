@@ -302,31 +302,31 @@ def _compact_tiles(frame_data: bytes, row_count: int, column_count: int):
 
 
 def resolve_to_gif(raw_bytes: bytes, scratch_path: Path) -> bytes | None:
-    """R40 §2: turn ANY known cloud download into displayable GIF bytes.
+    """R40 §2: turn ANY known cloud download into PIL-openable image bytes.
 
     One resolver for every container the CDN serves, so senders stop
     re-implementing the branching (and missing formats — the custom-art page
     push crashed with "cannot identify image file" on 0xAA hot files):
 
-    - plain GIF → as-is
-    - magic 43 → embedded GIF/PNG/JPG (PIL opens png/jpg by content, so any
-      extracted image is returned)
+    - plain GIF / PNG / JPG → as-is (PIL opens them directly)
+    - magic 43 → embedded GIF/PNG/JPG
     - magic 9 / 18 / 26 → AES(/LZO) cloud container → decoded GIF
     - 0xAA → hot-file palette-delta format → decoded GIF
 
-    ``scratch_path`` is used for decoders that write a file. Returns None for
-    unrecognized payloads.
+    ``scratch_path`` is used for decoders that write a file. Returns None only
+    for genuinely unrecognized payloads.
     """
     if not raw_bytes or len(raw_bytes) < 4:
         return None
-    if raw_bytes[:6] in (b"GIF89a", b"GIF87a"):
+    # Already a displayable image (GIF/PNG/JPG) — hand it straight to PIL.
+    if (raw_bytes[:6] in (b"GIF89a", b"GIF87a")
+            or raw_bytes[:8] == b"\x89PNG\r\n\x1a\n"
+            or raw_bytes[:2] == b"\xff\xd8"):
         return raw_bytes
     magic = raw_bytes[0]
     if magic == 43:
         res = extract_image_from_magic_43(raw_bytes)
-        if res:
-            return res[0]
-        return None
+        return res[0] if res else None
     if magic in CLOUD_CONTAINER_MAGICS:
         if decode_cloud_to_gif(raw_bytes, scratch_path):
             return scratch_path.read_bytes()

@@ -99,9 +99,13 @@ def test_weather_card_has_no_panel_hint() -> None:
     assert "panel-hint" not in body_inner, (
         "Weather card has a panel-hint — should be preview-only."
     )
-    # R26: manual "Push to Device" button added alongside auto-push.
-    assert 'onclick="pushWeatherToDevice()"' in body_inner, (
-        "Weather card missing the Push to Device button."
+    # R40 §4: the "Push to Device" button was replaced by a Live (15m) header
+    # toggle, so the body has no push button.
+    assert "pushWeatherToDevice" not in body_inner, (
+        "Weather card still has a Push to Device button — replaced by Live toggle."
+    )
+    assert 'id="weather-live"' in body or 'id="weather-live"' in lw, (
+        "Weather card missing the Live (15m) header toggle."
     )
 
 
@@ -167,11 +171,11 @@ def test_widgets_js_calls_get_weather_on_select() -> None:
     # selectWidget("weather") path calls api.get_weather() (via
     # refreshWeatherPreview).
     assert "get_weather" in src, "widgets.js does not call get_weather."
-    # And there's a 10-minute poll.
+    # R40 §4: the Weather Live toggle polls every 15 minutes.
     assert re.search(
-        r"10\s*\*\s*60\s*\*\s*1000",
+        r"15\s*\*\s*60\s*\*\s*1000",
         src,
-    ), "widgets.js is missing the 10-minute weather poll timer."
+    ), "widgets.js is missing the 15-minute weather poll timer."
 
 
 def test_widgets_js_calls_push_weather_on_select() -> None:

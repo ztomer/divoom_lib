@@ -33,6 +33,7 @@ ENV_TOKEN = "DIVOOM_DAEMON_TOKEN"
 # Event types streamed to subscribers.
 EVENT_STATUS = "status"
 EVENT_NOTIFICATION = "notification"
+EVENT_SHUTDOWN = "shutdown"   # R40 §9: daemon is stopping — subscribers may follow it down
 
 SUBSCRIBE_COMMAND = "subscribe"
 
