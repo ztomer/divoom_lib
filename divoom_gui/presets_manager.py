@@ -69,7 +69,7 @@ class PresetsManagerMixin:
             config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
             cfg = configparser.ConfigParser()
             email = ""
-            timeout = 15
+            timeout = 60
             limit = 4
             lan_ip = ""
             lan_token = 0
@@ -80,7 +80,7 @@ class PresetsManagerMixin:
             if config_file.exists():
                 cfg.read(config_file)
                 email = cfg.get("divoom", "email", fallback="")
-                timeout = int(cfg.get("gui", "timeout", fallback="15"))
+                timeout = int(cfg.get("gui", "timeout", fallback="60"))
                 limit = int(cfg.get("gui", "limit", fallback="4"))
                 last_connected_device = cfg.get("gui", "last_connected_device", fallback="")
                 last_detected_count = int(cfg.get("gui", "last_detected_count", fallback="0"))
@@ -242,3 +242,196 @@ class PresetsManagerMixin:
         except Exception as e:
             logger.error(f"Failed to delete LAN device: {e}")
             return False
+
+    def export_settings_dialog(self) -> bool:
+        logger.info("Opening save file dialog for settings export...")
+        try:
+            import webview
+            window = getattr(self, "window", None)
+            if not window:
+                logger.error("No webview window reference available in PresetsManagerMixin.")
+                return False
+            
+            result = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename="divoom_settings_backup.json",
+                file_types=('JSON files (*.json)', 'All files (*.*)')
+            )
+            
+            path = result[0] if isinstance(result, list) else result
+            if not path:
+                logger.info("Export cancelled by user.")
+                return False
+                
+            return self.export_settings_to_path(path)
+        except Exception as e:
+            logger.error(f"Error opening export file dialog: {e}")
+            return False
+
+    def export_settings_to_path(self, path: str) -> bool:
+        logger.info(f"Exporting settings to {path}...")
+        try:
+            config_dir = Path.home() / ".config" / "divoom-control"
+            data = {}
+            
+            # 1. presets.json
+            presets_file = config_dir / "presets.json"
+            if presets_file.exists():
+                try:
+                    data["presets"] = json.loads(presets_file.read_text(encoding="utf-8"))
+                except Exception as e:
+                    logger.warning(f"Failed to read presets.json for export: {e}")
+                    
+            # 2. config.ini
+            config_file = config_dir / "config.ini"
+            if config_file.exists():
+                data["config_ini"] = config_file.read_text(encoding="utf-8")
+                
+            # 3. alarms.json
+            alarms_file = config_dir / "alarms.json"
+            if alarms_file.exists():
+                try:
+                    data["alarms"] = json.loads(alarms_file.read_text(encoding="utf-8"))
+                except Exception as e:
+                    logger.warning(f"Failed to read alarms.json for export: {e}")
+                    
+            # 4. hotchannel.json
+            hotchannel_file = config_dir / "hotchannel.json"
+            if hotchannel_file.exists():
+                try:
+                    data["hotchannel"] = json.loads(hotchannel_file.read_text(encoding="utf-8"))
+                except Exception as e:
+                    logger.warning(f"Failed to read hotchannel.json for export: {e}")
+                    
+            # 5. notification_routing.json
+            routing_file = config_dir / "notification_routing.json"
+            if routing_file.exists():
+                try:
+                    data["notification_routing"] = json.loads(routing_file.read_text(encoding="utf-8"))
+                except Exception as e:
+                    logger.warning(f"Failed to read notification_routing.json for export: {e}")
+
+            Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
+            logger.info("Export completed successfully.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to export settings: {e}")
+            return False
+
+    def import_settings_dialog(self) -> bool:
+        logger.info("Opening open file dialog for settings import...")
+        try:
+            import webview
+            window = getattr(self, "window", None)
+            if not window:
+                logger.error("No webview window reference available in PresetsManagerMixin.")
+                return False
+            
+            result = window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                allow_multiple=False,
+                file_types=('JSON files (*.json)', 'All files (*.*)')
+            )
+            
+            path = result[0] if (isinstance(result, list) and len(result) > 0) else result
+            if not path:
+                logger.info("Import cancelled by user.")
+                return False
+                
+            return self.import_settings_from_path(path)
+        except Exception as e:
+            logger.error(f"Error opening import file dialog: {e}")
+            return False
+
+    def import_settings_from_path(self, path: str) -> bool:
+        logger.info(f"Importing settings from {path}...")
+        try:
+            backup_data = json.loads(Path(path).read_text(encoding="utf-8"))
+            config_dir = Path.home() / ".config" / "divoom-control"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Restore presets.json
+            if "presets" in backup_data:
+                presets_file = config_dir / "presets.json"
+                presets_file.write_text(json.dumps(backup_data["presets"], indent=2), encoding="utf-8")
+                
+            # Restore config.ini
+            if "config_ini" in backup_data:
+                config_file = config_dir / "config.ini"
+                config_file.write_text(backup_data["config_ini"], encoding="utf-8")
+                
+            # Restore alarms.json
+            if "alarms" in backup_data:
+                alarms_file = config_dir / "alarms.json"
+                alarms_file.write_text(json.dumps(backup_data["alarms"], indent=2), encoding="utf-8")
+                
+            # Restore hotchannel.json
+            if "hotchannel" in backup_data:
+                hotchannel_file = config_dir / "hotchannel.json"
+                hotchannel_file.write_text(json.dumps(backup_data["hotchannel"], indent=2), encoding="utf-8")
+                
+            # Restore notification_routing.json
+            if "notification_routing" in backup_data:
+                routing_file = config_dir / "notification_routing.json"
+                routing_file.write_text(json.dumps(backup_data["notification_routing"], indent=2), encoding="utf-8")
+                
+            logger.info("Import completed successfully.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to import settings: {e}")
+            return False
+
+    def save_preset_file(self, slots_json: str) -> bool:
+        logger.info("Opening save file dialog for layout preset...")
+        try:
+            import webview
+            window = getattr(self, "window", None)
+            if not window:
+                return False
+            
+            result = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename="divoom_layout.json",
+                file_types=('JSON files (*.json)', 'All files (*.*)')
+            )
+            
+            path = result[0] if isinstance(result, list) else result
+            if not path:
+                return False
+                
+            data = {
+                "type": "divoom_preset",
+                "slots": json.loads(slots_json)
+            }
+            Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save preset to file: {e}")
+            return False
+
+    def load_preset_file(self) -> str:
+        logger.info("Opening open file dialog for layout preset...")
+        try:
+            import webview
+            window = getattr(self, "window", None)
+            if not window:
+                return ""
+            
+            result = window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                allow_multiple=False,
+                file_types=('JSON files (*.json)', 'All files (*.*)')
+            )
+            
+            path = result[0] if (isinstance(result, list) and len(result) > 0) else result
+            if not path:
+                return ""
+                
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data.get("type") == "divoom_preset":
+                return json.dumps(data.get("slots", {}))
+            else:
+                return json.dumps(data)
+        except Exception as e:
+            logger.error(f"Failed to load preset from file: {e}")
+            return ""

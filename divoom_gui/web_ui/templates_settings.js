@@ -212,6 +212,26 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Backup & Restore -->
+                        <div class="card glass-card">
+                            <div class="card-header">
+                                <h3>Backup &amp; Restore</h3>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p style="font-size:11px; color:rgba(255,255,255,0.45); margin:0;">
+                                    Export or import your entire configuration, presets, alarms, and settings.
+                                </p>
+                                <div style="display:flex; gap:10px; margin-top:4px;">
+                                    <button id="export-settings-btn" class="glow-btn compact" title="Export settings to JSON file">
+                                        Export to File...
+                                    </button>
+                                    <button id="import-settings-btn" class="glow-btn compact" title="Import settings from JSON file" style="background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.3);">
+                                        Import from File...
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
     `;

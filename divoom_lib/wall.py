@@ -160,39 +160,53 @@ class DivoomWall:
             
         self.logger.info(f"Processing asset {file_path!r} for display wall...")
         
-        # Load and resize the main asset to the wall's composite resolution
+        # Resolve cache directory under ~/.config/divoom-control/cache_wall
+        cache_dir = Path.home() / ".config" / "divoom-control" / "cache_wall"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        import hashlib
+        # Compute a unique key based on file path, size, and modification time
+        file_hash = hashlib.md5(str(file_path).encode("utf-8")).hexdigest()[:8]
+        try:
+            stat = Path(file_path).stat()
+            key = f"{Path(file_path).stem}_{file_hash}_{stat.st_size}_{int(stat.st_mtime)}"
+        except Exception:
+            key = f"{Path(file_path).stem}_{file_hash}"
+            
         main_img = Image.open(file_path)
+        is_ani = hasattr(main_img, 'is_animated') and main_img.is_animated
         
         display_tasks = []
-        temp_files: List[Path] = []
         
-        # Generate temporary files for each cropped quadrant and dispatch them
-        with tempfile.TemporaryDirectory() as temp_dir:
-            for slot in self.devices:
-                divoom = slot.device
-                x = slot.x
-                y = slot.y
-                size = slot.size
-                width = slot.width
-                height = slot.height
-                
-                if self.is_free_form:
-                    left = x - self.min_x
-                    upper = y - self.min_y
-                    right = left + width
-                    lower = upper + height
-                else:
-                    left = x * size
-                    upper = y * size
-                    right = left + size
-                    lower = upper + size
-                
-                # Perform the crop
+        for slot in self.devices:
+            divoom = slot.device
+            x = slot.x
+            y = slot.y
+            size = slot.size
+            width = slot.width
+            height = slot.height
+            
+            if self.is_free_form:
+                left = x - self.min_x
+                upper = y - self.min_y
+                right = left + width
+                lower = upper + height
+            else:
+                left = x * size
+                upper = y * size
+                right = left + size
+                lower = upper + size
+            
+            mac_clean = divoom.mac.replace(":", "_").replace("-", "_")
+            ext = ".gif" if is_ani else ".png"
+            cached_file_path = cache_dir / f"{key}_{mac_clean}{ext}"
+            temp_path_str = str(cached_file_path)
+            
+            if cached_file_path.exists():
+                self.logger.info(f"Using cached wall split: {cached_file_path}")
+            else:
                 self.logger.info(f"Cropping slots bounding box: Left={left}, Upper={upper}, Right={right}, Lower={lower}")
-                
-                # Check if image is animated
-                if hasattr(main_img, 'is_animated') and main_img.is_animated:
-                    # Construct a new animated GIF for this quadrant
+                if is_ani:
                     frames = []
                     for frame in ImageSequence.Iterator(main_img):
                         resized_frame = frame.resize((self.total_width, self.total_height), Image.NEAREST)
@@ -200,58 +214,44 @@ class DivoomWall:
                         if self.is_free_form:
                             cropped_frame = cropped_frame.resize((size, size), Image.NEAREST)
                         frames.append(cropped_frame)
-                        
-                    # Save cropped GIF
-                    cropped_gif_path = Path(temp_dir) / f"quad_{x}_{y}.gif"
+                    
                     frames[0].save(
-                        cropped_gif_path,
+                        cached_file_path,
                         save_all=True,
                         append_images=frames[1:],
                         duration=main_img.info.get('duration', 100),
                         loop=main_img.info.get('loop', 0)
                     )
-                    temp_path_str = str(cropped_gif_path)
                 else:
-                    # Process static image
                     resized_img = main_img.resize((self.total_width, self.total_height), Image.NEAREST)
                     cropped_img = resized_img.crop((left, upper, right, lower))
                     if self.is_free_form:
                         cropped_img = cropped_img.resize((size, size), Image.NEAREST)
-                    
-                    cropped_img_path = Path(temp_dir) / f"quad_{x}_{y}.png"
-                    cropped_img.save(cropped_img_path)
-                    temp_path_str = str(cropped_img_path)
-                
-                try:
-                    self.last_previews[slot.device.mac] = Path(temp_path_str).read_bytes()
-                except Exception as ex:
-                    self.logger.warning(f"Failed to cache preview bytes for {slot.device.mac}: {ex}")
-
-                # We need to preserve the files until the async BLE show_image call completes
-                # So we save a copy of the bytes out of the temp dir lifecycle if needed,
-                # or we just read the bytes immediately into memory to avoid cleanup issues.
-                # Fortunately, we can pass a byte buffer/in-memory file or we can do it inside this block.
-                # Let's read the cropped file into memory and use it. Wait! Does show_image accept a path?
-                # Yes, show_image expects a path string. So we will block/await here inside the block,
-                # ensuring the temp files are not deleted until display completes!
-                display_tasks.append(divoom.display.show_image(temp_path_str, time=time))
-                
-            # Execute all BLE streams concurrently
-            self.logger.info(f"Streaming splits concurrently to {len(self.devices)} screens...")
-            results = await asyncio.gather(*display_tasks, return_exceptions=True)
+                    cropped_img.save(cached_file_path)
             
-            # Check results
-            all_ok = True
-            for idx, res in enumerate(results):
-                slot = self.devices[idx]
-                if isinstance(res, Exception):
-                    self.logger.error(f"Failed to display slot ({slot.x}, {slot.y}) on device {slot.device.mac}: {res}")
-                    all_ok = False
-                elif not res:
-                    self.logger.error(f"Failed to display slot ({slot.x}, {slot.y}) on device {slot.device.mac}")
-                    all_ok = False
-                    
-            return all_ok
+            try:
+                self.last_previews[slot.device.mac] = Path(temp_path_str).read_bytes()
+            except Exception as ex:
+                self.logger.warning(f"Failed to cache preview bytes for {slot.device.mac}: {ex}")
+                
+            display_tasks.append(divoom.display.show_image(temp_path_str, time=time))
+            
+        # Execute all BLE streams concurrently
+        self.logger.info(f"Streaming splits concurrently to {len(self.devices)} screens...")
+        results = await asyncio.gather(*display_tasks, return_exceptions=True)
+        
+        # Check results
+        all_ok = True
+        for idx, res in enumerate(results):
+            slot = self.devices[idx]
+            if isinstance(res, Exception):
+                self.logger.error(f"Failed to display slot ({slot.x}, {slot.y}) on device {slot.device.mac}: {res}")
+                all_ok = False
+            elif not res:
+                self.logger.error(f"Failed to display slot ({slot.x}, {slot.y}) on device {slot.device.mac}")
+                all_ok = False
+                
+        return all_ok
             
     async def set_light(self, color: str, brightness: int = 100) -> bool:
         """Sets a unified solid light color across all screens in the wall."""

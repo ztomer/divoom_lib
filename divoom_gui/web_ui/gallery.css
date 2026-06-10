@@ -93,6 +93,8 @@
     min-height: 0;
 }
 
+#pixel-hot-channel .card.glass-card,
+#pixel-gallery .card.glass-card,
 #hot-channel .card.glass-card,
 #gallery .card.glass-card {
     display: flex;
@@ -102,6 +104,8 @@
     min-height: 0;
 }
 
+#pixel-hot-channel .card-body,
+#pixel-gallery .card-body,
 #hot-channel .card-body,
 #gallery .card-body {
     display: flex;

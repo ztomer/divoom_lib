@@ -341,6 +341,37 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ── 7. BACKUP & RESTORE WIRING ──
+    const exportSettingsBtn = document.getElementById("export-settings-btn");
+    const importSettingsBtn = document.getElementById("import-settings-btn");
+
+    if (exportSettingsBtn) {
+        exportSettingsBtn.addEventListener("click", () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.export_settings_dialog().then(ok => {
+                    if (ok) {
+                        window.showToast("Settings exported successfully!", "success");
+                    }
+                });
+            }
+        });
+    }
+
+    if (importSettingsBtn) {
+        importSettingsBtn.addEventListener("click", () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.import_settings_dialog().then(ok => {
+                    if (ok) {
+                        window.showToast("Settings imported successfully! Reloading...", "success");
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    }
+                });
+            }
+        });
+    }
+
     // Initializers on mount after small delays
     setTimeout(window.loadLanDevices, 1200);
 });

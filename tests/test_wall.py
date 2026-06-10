@@ -74,12 +74,17 @@ class TestDivoomWall(unittest.IsolatedAsyncioTestCase):
             mock_clients.append(mc)
         mock_divoom_class.side_effect = mock_clients
         
-        # Patch Path.exists to pass validation
-        with patch('divoom_lib.wall.Path.exists', return_value=True):
+        orig_exists = Path.exists
+        def mock_exists(self_path):
+            return "mock_path.png" in str(self_path)
+
+        Path.exists = mock_exists
+        try:
             wall = DivoomWall(self.device_configs)
             success = await wall.show_image("mock_path.png")
-            
             self.assertTrue(success)
+        finally:
+            Path.exists = orig_exists
             
             # Verify cropping bounds for each grid coordinate
             # Top-left slot (0, 0)

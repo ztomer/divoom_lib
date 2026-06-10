@@ -125,7 +125,41 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (slotsJson) {
                         window.DivoomState.assignedSlots = JSON.parse(slotsJson);
                         window.renderArrangerCanvas();
+                        window.syncArrangerToPython();
                         window.showToast(`Layout preset '${name}' applied!`, "success");
+                    }
+                });
+            }
+        });
+    }
+
+    const savePresetFileBtn = document.getElementById("save-preset-file-btn");
+    if (savePresetFileBtn) {
+        savePresetFileBtn.addEventListener("click", () => {
+            if (Object.keys(window.DivoomState.assignedSlots).length === 0) {
+                window.showToast("Add at least one screen before saving", "error");
+                return;
+            }
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.save_preset_file(JSON.stringify(window.DivoomState.assignedSlots)).then(res => {
+                    if (res) {
+                        window.showToast("Preset saved to file successfully!", "success");
+                    }
+                });
+            }
+        });
+    }
+
+    const loadPresetFileBtn = document.getElementById("load-preset-file-btn");
+    if (loadPresetFileBtn) {
+        loadPresetFileBtn.addEventListener("click", () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.load_preset_file().then(slotsJson => {
+                    if (slotsJson) {
+                        window.DivoomState.assignedSlots = JSON.parse(slotsJson);
+                        window.renderArrangerCanvas();
+                        window.syncArrangerToPython();
+                        window.showToast("Preset loaded from file successfully!", "success");
                     }
                 });
             }

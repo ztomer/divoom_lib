@@ -5,6 +5,13 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Round 43 — 2026-06-10 (Permissions Dialog, Settings Backup/Restore, Preset Files, and Wall Split Cache)
+
+- **macOS notification permissions check** (§1): added step-by-step instructions popup modal and red status indicator when database access is blocked.
+- **Settings Backup & Restore** (§2): export and import all configuration settings (`presets.json`, `config.ini`, `alarms.json`, `hotchannel.json`, `notification_routing.json`) via JSON backup files.
+- **Arranger presets save/load file** (§3): export and import layout presets via JSON preset files, immediately syncing layout to Python on selection change.
+- **Display wall downscale caching** (§4): downscale, crop, split, and cache quadrants under `~/.config/divoom-control/cache_wall/` to prevent redundant resizing and fix routing target crash.
+- **Layout and styling fixes** (§5): fixed flex layout selectors for `#pixel-hot-channel` and `#pixel-gallery` sub-tabs, repairing the hot-channel update button layout when many preview items are rendered.
 
 ## Round 42 — 2026-06-10 (bug batch: persistence, macOS 26, loaders, wall)
 

@@ -1,10 +1,5 @@
-/* settings_features.js — Routines, alarms, sleep, tools, device settings, macOS, MCP */
 document.addEventListener("DOMContentLoaded", () => {
-    // ── 4. ROUTINES (Round 6 — moved from Monthly Best) ──
-    // Auto-sync gallery schedule. The underlying API methods
-    // (get_hot_channel_config / save_hot_channel_config) are unchanged
-    // — the config key in `hotchannel_config.json` is also unchanged
-    // for backward compat with running daemons.
+    // ── 4. ROUTINES ──
     function saveSchedule() {
         const enabled = document.getElementById("routines-auto-sync-enabled")?.checked || false;
         const interval = parseInt(document.querySelector("#routines-interval-tabs .tab-btn.active")?.getAttribute("data-interval")) || 3600;
@@ -32,8 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (window.updateSyncTargetList) window.updateSyncTargetList();
     }
-
-    // Auto-save on any change.
     document.getElementById("routines-auto-sync-enabled")?.addEventListener("change", saveSchedule);
     document.addEventListener("click", (e) => {
         const intervalBtn = e.target.closest("#routines-interval-tabs .tab-btn");
@@ -44,15 +37,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Load the routines form when the Routines tab is opened.
     window.addEventListener("tab-changed", (e) => {
         if (e.detail && e.detail.tab === "routines") {
             setTimeout(window.loadRoutinesAutoSync, 0);
         }
     });
 
-
-    // ── Round 7: Sleep Aid ─────────────────────────────────────────────
+    // ── Sleep Aid ──
     const sleepVol = document.getElementById("sleep-volume");
     const sleepVolVal = document.getElementById("sleep-vol-val");
     if (sleepVol && sleepVolVal) sleepVol.addEventListener("input", () => { sleepVolVal.textContent = sleepVol.value; });
@@ -239,10 +230,45 @@ document.addEventListener("DOMContentLoaded", () => {
     const macRulesMsg  = document.getElementById("macnotif-rules-msg");
     const macRoutingPathEl = document.getElementById("macnotif-routing-path");
 
+    let permissionsDialogShownThisSession = false;
+
+    window.showMacPermissionsDialog = function(errorMessage) {
+        document.querySelectorAll(".arranger-popup.mac-permissions-popup").forEach(p => p.remove());
+
+        const popup = document.createElement("div");
+        popup.className = "arranger-popup mac-permissions-popup";
+        popup.style.maxWidth = "480px";
+        popup.style.width = "90%";
+        popup.innerHTML = `
+            <h3 style="font-family: var(--font-display); font-size:16px; margin-bottom:15px; color: var(--text-main);">macOS Notification Permissions Required</h3>
+            <p style="font-size:12px; color:var(--text-main); margin-bottom:15px; line-height:1.4;">
+                To mirror macOS notifications to your Divoom screens, the background Python runtime needs Full Disk Access to read the Notification Center database.
+            </p>
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:12px; margin-bottom:15px; font-size:11px; line-height:1.5; color:rgba(255,255,255,0.7);">
+                <strong style="display:block; margin-bottom:4px; color:#ef4444;">Step-by-step instructions:</strong>
+                1. Open <b>System Settings</b> on your Mac.<br>
+                2. Navigate to <b>Privacy &amp; Security</b> &rarr; <b>Full Disk Access</b>.<br>
+                3. Click the <b>+ (Plus)</b> icon at the bottom of the list.<br>
+                4. Select and add <b>python3</b> (located in your Python installation directory, e.g. <code>/opt/homebrew/bin/python3</code> or <code>/usr/bin/python3</code>).<br>
+                5. Make sure the toggle next to <b>python3</b> is turned <b>ON</b>.<br>
+                6. Restart the Divoom Control application.
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="mac-permissions-close" class="glow-btn compact" style="background: var(--primary); border: 1px solid var(--primary); color:#fff; box-shadow:none;">Close</button>
+            </div>
+        `;
+        document.body.appendChild(popup);
+        document.getElementById("mac-permissions-close").addEventListener("click", () => popup.remove());
+    };
+
     function setMacPill(state) {
         if (!macPill) return;
         macPill.textContent = state;
-        macPill.dataset.state = state.toLowerCase();
+        if (state.toLowerCase().includes("error")) {
+            macPill.dataset.state = "error";
+        } else {
+            macPill.dataset.state = state.toLowerCase();
+        }
     }
 
     function renderMacNotifStatus(s) {
@@ -255,17 +281,58 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         if (macToggle) macToggle.disabled = false;
+
+        const isPermissionError = s.error && (
+            s.error.includes("PermissionError") || 
+            s.error.includes("FULL DISK ACCESS") || 
+            s.error.includes("sqlite3.OperationalError") ||
+            s.error.includes("Full Disk Access")
+        );
+
         if (s.running) {
             setMacPill("running");
             if (macToggle) macToggle.checked = true;
         } else {
-            setMacPill(s.error ? "error" : "stopped");
+            if (isPermissionError) {
+                setMacPill("Permission Error");
+            } else {
+                setMacPill(s.error ? "error" : "stopped");
+            }
             if (macToggle) macToggle.checked = false;
         }
+
+        if (isPermissionError) {
+            if (macPill && !document.getElementById("macnotif-fix-permissions-btn")) {
+                const fixBtn = document.createElement("button");
+                fixBtn.id = "macnotif-fix-permissions-btn";
+                fixBtn.className = "glow-btn compact";
+                fixBtn.style.marginLeft = "10px";
+                fixBtn.style.padding = "2px 8px";
+                fixBtn.style.fontSize = "10px";
+                fixBtn.style.background = "rgba(239,68,68,0.15)";
+                fixBtn.style.borderColor = "rgba(239,68,68,0.3)";
+                fixBtn.style.color = "#ef4444";
+                fixBtn.textContent = "Fix Permissions...";
+                fixBtn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    window.showMacPermissionsDialog(s.error);
+                });
+                macPill.parentNode.appendChild(fixBtn);
+            }
+            
+            if (!permissionsDialogShownThisSession) {
+                permissionsDialogShownThisSession = true;
+                window.showMacPermissionsDialog(s.error);
+            }
+        } else {
+            const fixBtn = document.getElementById("macnotif-fix-permissions-btn");
+            if (fixBtn) fixBtn.remove();
+        }
+
         const c = s.counters || { seen: 0, routed: 0, dropped: 0 };
         if (macDetail) {
             macDetail.textContent = [
-                `status:    ${s.running ? "running" : (s.error || "stopped")}`,
+                `status:    ${s.running ? "running" : (isPermissionError ? "Permission Error" : (s.error || "stopped"))}`,
                 `db:        ${s.db_path || "(not found)"}`,
                 `seen:      ${c.seen}`,
                 `routed:    ${c.routed}`,
@@ -294,7 +361,17 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 if (macToggle.checked) {
                     const r = await a.start_notification_listener();
-                    if (r && r.error) { macToggle.checked = false; toast(r.error, "Mirror failed"); }
+                    if (r && r.error) {
+                        macToggle.checked = false;
+                        toast(r.error, "Mirror failed");
+                        const isPermErr = r.error.includes("PermissionError") || 
+                                          r.error.includes("FULL DISK ACCESS") || 
+                                          r.error.includes("sqlite3.OperationalError") ||
+                                          r.error.includes("Full Disk Access");
+                        if (isPermErr) {
+                            window.showMacPermissionsDialog(r.error);
+                        }
+                    }
                 } else {
                     await a.stop_notification_listener();
                 }

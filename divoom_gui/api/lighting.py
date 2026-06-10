@@ -158,7 +158,16 @@ class LightingApi(ApiBase):
     def display_wall_image(self, file_path: str, cell_size: int) -> dict:
         logger.info(f"GUI Action: Push display wall asset {file_path!r} (cell size={cell_size})...")
         try:
-            ok = self._dispatch(lambda t: t.show_image(file_path))
+            self._rebuild_wall_instance(cell_size)
+            target = self._wall_instance if self._wall_instance else self._current_divoom
+            if target is None:
+                raise RuntimeError("No active device or wall configured")
+
+            if target is self._wall_instance:
+                ok = self._run_async(target.show_image(file_path))
+            else:
+                ok = self._run_async(target.display.show_image(file_path))
+
             previews = {}
             if ok and self._wall_instance:
                 try:

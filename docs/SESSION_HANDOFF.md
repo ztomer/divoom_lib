@@ -18,6 +18,10 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R43 SHIPPED (2026-06-10) — Permissions Dialog, Settings Backup/Restore, Preset Files, and Wall Split Cache.** Plan+outcome
+  `docs/PLANNING_ROUND43.md`. Highlights: macOS Notification Permissions step-by-step instructions popup and red status indicator; unified settings Backup & Restore (export/import entire configurations, presets, alarms to/from JSON files); Virtual Wall presets save/load file buttons and immediate sync dropdown behavior; downscale, crop, split, and cache quadrants under `~/.config/divoom-control/cache_wall/` to prevent redundant resizing and fix routing target crash.
+  Suite passed cleanly (1331 passed, 75 skipped).
+
 - **R42 SHIPPED (2026-06-10) — 9-item bug batch.** Plan+outcome
   `docs/PLANNING_ROUND42.md`; commits e2029fd7..33dba70f. Highlights: scan
   settings persist; macOS 26 NC db found in `group.com.apple.usernoted` (+
