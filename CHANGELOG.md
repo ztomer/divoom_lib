@@ -6,7 +6,93 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 41 — 2026-06-10 (UI, Startup, Reconnect, Virtual Wall & CI Fixes)
+
+### Fixed
+- **gallery_sync.py SyntaxError** — retry loop now correctly nested inside an outer
+  `try-except`; on permanent failure calls `window.onGalleryFetchError` with
+  `isExpired` + message rather than silently returning.
+- **gallery.js JS syntax error** — `window.onGalleryBackgroundFetched` was missing
+  its closing `};` before `window.onGalleryFetchError`, breaking the whole file.
+- **gallery_sync.py 500-LOC rule violation** — moved `_coerce_list` / `_coerce_dict`
+  static helpers up to `GalleryHotApiMixin` (their natural owner), keeping
+  `gallery_sync.py` under 490 LOC.
+
+### Changed / Added
+
+**Channels & Pixel Art Tab:**
+- Removed the duplicate empty Custom Art channel tab and `#panel-design` panel
+  from `index.html`.
+- Added `height: 100%; min-height: 0` to `#pixel-art.tab-content.active` so the
+  "Push Page to Device" button stays pinned instead of scrolling away.
+
+**Gallery scrolling:**
+- `.gallery-split-card` is now a flex column container capped at height with
+  overflow hidden; `.gallery-split-layout` fills the available height — enabling
+  the inner grid to scroll without scrolling the card itself.
+
+**Routines layout:**
+- `renderSyncTargets` right-aligns toggles (`marginLeft: "auto"`) and increases
+  row padding to 13 px.
+- `.sync-targets-list` gap increased from 4 px → 5 px.
+- Auto-Sync schedule card narrowed from 560 px → 336 px; vertical margins 18 px.
+- Anniversary card swapped above Alarms inside `#routines-time`.
+
+**Device Settings:**
+- Removed the `<h3>Device Settings</h3>` card-header (redundant with the sidebar
+  nav label). Card `max-width` reduced from 640 px → 448 px.
+
+**Startup auto-scan:**
+- `populateDeviceSelectors` exported on `window` from `settings_hardware.js`.
+- Default scan-timeout changed from 15 s → 60 s (both JS defaults + template input).
+- `app_init.js` `load_config` callback immediately populates the device selectors
+  from `conf.devices`; the BLE scan fires unconditionally on startup (no longer
+  guarded by `conf.last_detected_count`).
+
+**Cloud credentials expiry:**
+- `gallery_sync.py` retries once on any API error (clearing cached creds, forcing
+  a fresh login) then calls `window.onGalleryFetchError(classify, targetSize,
+  isExpired, errMsg)` for a permanent failure.
+- `gallery.js` implements `window.onGalleryFetchError`: shows an error toast
+  ("Credentials expired. Reconnect in Settings → Divoom." when `isExpired`) and
+  replaces the gallery grid with a styled error message.
+
+**Tivoo Max speaker:**
+- Speaker-capability regex in `settings_hardware.js` updated to
+  `/timoo|ditoo|tivoo/i`; `isSpk` in `app_globals.js` also includes `tivoo`.
+
+**Menu bar error details:**
+- `make_status_event` now accepts an optional `error` string and includes it in the
+  event payload.
+- `notification_service.py` passes `self._error` to the status event.
+- `menubar_client.py` copies the `error` field from `EVENT_STATUS` into
+  `self._status`.
+- `menubar.py` inserts/updates/removes a disabled "Error: …" `NSMenuItem` at
+  index 0 and sets the tooltip when the error field is non-empty.
+
+**Virtual Wall coordinates & previews:**
+- `device_owner.py` `wall_configure` omits `width`/`height` from grid slot configs
+  unless explicitly provided, avoiding the `is_free_form` false-positive.
+- `wall.py`: `self.last_previews = {}` in `__init__`; `show_image` captures the
+  cropped slice bytes per-slot; `get_last_previews()` returns base64 Data URLs.
+- `lighting.py` `display_wall_image` fetches previews from the wall instance and
+  returns them in the response dict.
+- `app_init.js` `display_wall_image` resolve callback updates `assignedSlots[mac]
+  .preview` and calls `renderArrangerCanvas()` + `syncArrangerToPython()`.
+- Renamed "Matrix Wall Grid" → "Virtual Wall" in `app_globals.js` and `app_init.js`.
+
+**CI test seed:**
+- `test_native_downscaler.py` reads `DIVOOM_TEST_SEED` (env var; falls back to
+  `20260605`); `test_stress_random` prints the seed; `_assert_byte_exact` appends
+  `(seed=…)` to failure messages for easy reproduction.
+
+### Test suite
+- **1321 passed, 75 skipped, 0 failed.** (commit `70188c0`)
+
+---
+
 ## Round 40 — 2026-06-10 (UI batch: bug fix, toggles, Device Settings, lifecycle)
+
 
 ### Fixed
 - **Custom-art page push crash** ("cannot identify image file …gif") when a
