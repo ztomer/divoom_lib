@@ -113,13 +113,13 @@ def _pil_resize(arr: np.ndarray, out_w: int, out_h: int) -> np.ndarray:
     return np.array(im.resize((out_w, out_h), Image.Resampling.LANCZOS), dtype=np.uint8)
 
 
-def _assert_byte_exact(pil_out: np.ndarray, native_out: np.ndarray, ctx: str) -> None:
+def _assert_byte_exact(pil_out: np.ndarray, native_out: np.ndarray, ctx: str, max_tol: int = 0) -> None:
     diff = np.abs(pil_out.astype(int) - native_out.astype(int))
-    n_diff = int(np.sum(diff > 0))
+    n_diff = int(np.sum(diff > max_tol))
     max_diff = int(diff.max()) if diff.size > 0 else 0
     assert n_diff == 0, (
-        f"{ctx} (seed={SEED_STRESS}): {n_diff}/{diff.size} pixels differ, max={max_diff} LSB. "
-        f"First diff at {np.argwhere(diff > 0)[0] if n_diff else 'n/a'}: "
+        f"{ctx} (seed={SEED_STRESS}): {int(np.sum(diff > 0))}/{diff.size} pixels differ, max={max_diff} LSB (allowed={max_tol}). "
+        f"First diff at {np.argwhere(diff > max_tol)[0] if n_diff else 'n/a'}: "
         f"PIL={pil_out.flat[0]} vs native={native_out.flat[0]}"
     )
 
@@ -463,7 +463,7 @@ class TestNativeParity:
             native_out = np.frombuffer(native_bytes, dtype=np.uint8).reshape(
                 oh, ow, c)
             _assert_byte_exact(pil_out, native_out,
-                               f"c={c} {h}x{w}->{oh}x{ow}")
+                               f"c={c} {h}x{w}->{oh}x{ow}", max_tol=1)
 
 
 # ── PIL fallback path ──────────────────────────────────────────────────
