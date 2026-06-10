@@ -10,9 +10,9 @@ window.DivoomTemplates.routines = `
 
         <!-- SCHEDULE sub-tab (ex-Settings → Routines) -->
         <div class="routines-subtab-content active" id="routines-schedule">
-        <!-- R34 §3: 760px (was 540) so a device row — dot + name + 4 style tabs +
-             toggle — fits on ONE line instead of wrapping. -->
-        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 760px;">
+        <!-- Device rows are now just dot + name + toggle, so the card no longer
+             needs the R34 760px width — 560px kills the dead middle space. -->
+        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 560px;">
             <div class="card glass-card">
                 <div class="card-header flex-header">
                     <h3>Auto-Sync Gallery</h3>
@@ -36,7 +36,6 @@ window.DivoomTemplates.routines = `
                         </div>
                     </div>
 
-                    <button id="sync-all-btn" class="glow-btn" style="width:100%;">Sync devices now</button>
                     <span id="routines-auto-sync-status" class="panel-hint" style="display:block; margin-top:8px;"></span>
                 </div>
             </div>

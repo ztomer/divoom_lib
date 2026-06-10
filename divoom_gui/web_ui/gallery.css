@@ -82,23 +82,17 @@
     border-radius: 4px;
 }
 
-/* ── Sticky Flex Monthly Best & Scrollable Grid ─────────────────────── */
-#monthly-best.active {
+/* ── Sticky Flex Hot Channel & Gallery ──────────────────────────────── */
+#hot-channel.active,
+#gallery.active {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
 }
 
-#monthly-best .card.glass-card {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-}
-
-#monthly-best .card-body {
+#hot-channel .card.glass-card,
+#gallery .card.glass-card {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -106,32 +100,22 @@
     min-height: 0;
 }
 
-#monthly-best .gallery-grid {
+#hot-channel .card-body,
+#gallery .card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#gallery .gallery-grid {
     flex: 1;
     max-height: none;
     overflow-y: auto;
     min-height: 0;
     margin-bottom: 0;
     padding-bottom: 20px;
-}
-
-.batch-sync-bar {
-    margin-top: auto;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 16px 20px;
-    background: var(--card-bg);
-    backdrop-filter: blur(10px);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 15px;
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
-    border-radius: 0 0 6px 6px;
-    margin-left: -20px;
-    margin-right: -20px;
-    margin-bottom: -20px;
 }
 
 /* ── Hot-channel: target multi-select + schedule (area 4) ──────────── */
@@ -156,6 +140,86 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-muted);
+}
+
+/* ── Hot channel preview ─────────────────────────────────────────────── */
+.hot-preview-area {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    animation: fadeSlideIn 0.25s ease;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.hot-preview-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px;
+    align-content: start;
+}
+.hot-preview-empty {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 8px 0;
+    grid-column: 1 / -1;
+}
+.hot-preview-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    transition: background 0.15s;
+    cursor: default;
+}
+.hot-preview-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+.hot-preview-thumb {
+    width: 112px;
+    height: 112px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+}
+.hot-preview-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 100%;
+    min-width: 0;
+}
+.hot-preview-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+.hot-preview-version {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .sync-targets-list {
@@ -231,107 +295,57 @@
     gap: 6px;
 }
 
-/* ── Monthly Best single-column layout ─────────────────────────────── */
-/* R32 §A1+§A3: the devices card moved to Settings → Routines, so the
- * gallery now spans the full panel width (Rams #10 — give the content the
- * real estate). Was a 1.6fr 0.6fr two-column grid in Round 6. */
-.monthly-best-layout {
+/* ── Gallery side-by-side layout ──────────────────────────────────────── */
+.gallery-split-card { overflow: hidden; }
+.gallery-split-layout {
+    display: grid;
+    grid-template-columns: 112px 1fr;
+    gap: 0; flex: 1; min-height: 0;
+}
+.gallery-sidebar {
+    display: flex; flex-direction: column;
+    gap: 2px; padding: 10px 8px;
+    border-right: 1px solid var(--border-color);
+    overflow-y: auto; min-height: 0;
+}
+.gallery-sidebar-title {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); margin-bottom: 6px; flex-shrink: 0;
+}
+.gallery-category-list {
+    display: flex; flex-direction: column;
+    gap: 1px; flex: 1; min-height: 0;
+    overflow-y: auto;
+}
+.cat-btn {
+    display: block; width: 100%; text-align: left;
+    padding: 6px 10px; border: none; border-radius: 4px;
+    background: transparent; color: var(--text-main);
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: all 0.15s; font-family: var(--font-sans);
+}
+.cat-btn:hover { background: rgba(255, 255, 255, 0.05); }
+.cat-btn.active { background: var(--primary); color: #fff; font-weight: 600; }
+.gallery-main {
+    display: flex; flex-direction: column;
+    padding: 10px; min-height: 0; overflow: hidden;
+}
+
+/* ── Gallery controls row (sort + size) ──────────────────────────────── */
+.gallery-controls-row {
+    flex-shrink: 0;
+}
+
+/* ── Hot Channel / Gallery — single-column fill layouts ─────────────── */
+.hot-channel-layout,
+.gallery-full-layout {
     display: grid;
     grid-template-columns: 1fr;
     gap: 20px;
     flex: 1;
     min-height: 0;
     align-items: stretch;
-}
-
-/* R32 §A3: per-tile selection checkbox, pinned top-right of each preview. */
-.gallery-item-check {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 2;
-    width: 18px;
-    height: 18px;
-    -webkit-appearance: none;
-    appearance: none;
-    border: 1px solid var(--input-border);
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.55);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    margin: 0;
-    flex-shrink: 0;
-}
-.gallery-item-check:checked {
-    background: var(--primary);
-    border-color: var(--primary);
-}
-.gallery-item-check:checked::after {
-    content: "";
-    width: 10px;
-    height: 10px;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 8 8'%3E%3Cpath d='M1 3h1v1H1zm1 1h1v1H2zm1 1h1v1H3zm1-1h1v1H4zm1-1h1v1H5zm1-1h1v1H6zm1-1h1v1H7z' fill='%23ffffff'/%3E%3C/svg%3E");
-    background-size: 10px 10px;
-    background-repeat: no-repeat;
-    display: block;
-}
-
-.device-accent-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
-}
-
-/* ── Gallery selection buttons (Select All / Clear) ─────────────────── */
-.gallery-select-btn {
-    padding: 8px 14px;
-    font-size: 12px;
-    font-weight: 700;
-    font-family: var(--font-display);
-    border-radius: 4px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    transition: background 0.2s, border-color 0.2s;
-    background: #2e2f36;
-    border: 1px solid #3e3f46;
-    color: #e8e9eb;
-    box-shadow: none;
-    line-height: 1.4;
-}
-.gallery-select-btn:hover {
-    background: #3d3e46;
-}
-
-/* ── Sync progress status text ─────────────────────────────────────── */
-#batch-sync-btn {
-    position: relative;
-}
-#batch-sync-btn .sync-status-text {
-    font-weight: 400;
-    font-size: 11px;
-    opacity: 0.85;
-}
-#batch-sync-btn.syncing {
-    pointer-events: none;
-    opacity: 0.7;
-    background: #a0520a;
-    border-color: #c06812;
-}
-#batch-sync-btn.synced-ok {
-    background: #166534;
-    border-color: #22c55e;
-}
-#batch-sync-btn.synced-fail {
-    background: #7f1d1d;
-    border-color: #ef4444;
 }
 
 /* ── Gallery Card Item Info and Ellipsis ────────────────────────────── */
@@ -378,6 +392,56 @@
     background: var(--primary);
     border-color: var(--primary);
 }
+/* ── Hot-channel update — in-button progress bar ──────────────────────*/
+#hot-update-btn {
+    position: relative;
+    overflow: hidden;
+    transition: opacity 0.3s, box-shadow 0.3s;
+}
+#hot-update-btn.progress-active {
+    pointer-events: none;
+    cursor: default;
+    opacity: 0.85;
+    box-shadow: none;
+}
+#hot-update-btn.progress-ok {
+    border-color: #22c55e;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
+}
+#hot-update-btn.progress-fail {
+    border-color: #ef4444;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+}
+.hot-progress-wrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: inherit;
+}
+.hot-progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    transition: width 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    border-radius: inherit;
+}
+.hot-progress-text {
+    position: relative;
+    z-index: 1;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-display);
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
 .target-checkbox:checked::after {
     content: "";
     width: 8px;
