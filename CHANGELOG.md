@@ -6,7 +6,42 @@ shipped milestone (per the project planning docs).
 
 ---
 
-## Round 39 — 2026-06-10 (UI polish round: hot preview, custom art overhaul, alarms)
+## Round 39b — 2026-06-10 (UI polish, part 2 — verified in browser preview)
+
+### Fixed — custom art chrome scrolled away
+- Root cause: `#control-panel .card-body { overflow-y: auto }` scrolled the
+  whole panel because the `.channel-panels` wrapper broke the flex chain
+  (the panel's `height: 100%` resolved against an auto-height block).
+  `.channel-panels` now passes the bounded height down — page tabs, slot
+  grid and the Push button stay visible; only the art library scrolls.
+- Slot grid is now ONE row of 12 (6×2 under 900px) so the library keeps
+  most of the panel height.
+
+### Added — drag & drop for custom art slots
+- Drag a filled slot onto another to swap them; drag art straight from the
+  library onto any slot to place it. Green highlight on the drop target.
+  Verified in the browser preview with synthetic DataTransfer events
+  (swap, library→slot, draggable only when filled).
+
+### Changed — hot channel
+- Preview tiles are image-only (name/version moved into the tooltip) and
+  the empty card header is gone — more art per screen.
+
+### Changed — gallery
+- Popular/Latest + size selector right-aligned on the controls row:
+  categories (left sidebar) say WHAT to browse, view controls say HOW —
+  they stay in one quiet, predictable corner (Rams/Kare).
+
+### Maintenance
+- `channels.css` split: custom-art styles → `custom_art.css` (500-LOC rule);
+  `@import` added in style.css; layout tests read both files.
+- `.claude/launch.json` added: `web_ui-static` serves the web UI for
+  browser-preview verification.
+
+### Test suite
+- **1307 passed, 75 skipped, 0 failed.**
+
+## Round 39 — 2026-06-09 (UI polish round: hot preview, custom art overhaul, alarms)
 
 ### Fixed — alarms showed phantom entries after clearing
 - **Root cause (APK-verified, `u1/b.a()`)**: the 0x42 get-alarm response is

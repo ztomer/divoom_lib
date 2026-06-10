@@ -522,6 +522,13 @@ def test_r10_gui_api_and_lib_expose_notification():
 # ──────────────────────────────────────────────────────────────────
 
 CHANNELS_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "channels.css"
+CUSTOM_ART_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "custom_art.css"
+
+
+def _channels_css() -> str:
+    """channels.css + custom_art.css (the custom-art block was split out
+    under the 500-LOC rule but is part of the same channel chrome)."""
+    return CHANNELS_CSS.read_text() + CUSTOM_ART_CSS.read_text()
 
 
 def test_r11_ambient_color_controls_gated_and_no_custom_label():
@@ -547,7 +554,7 @@ def test_r11_scoreboard_reset_button():
 def test_r11_custom_art_push_is_pinned_footer():
     """The Custom Art panel is a flex column with a fixed header (tabs+slots)
     and a scrolling library, so the Push button stays pinned at the bottom."""
-    css = CHANNELS_CSS.read_text()
+    css = _channels_css()
     assert re.search(r"#panel-design\.active\s*\{[^}]*flex-direction:\s*column", css), (
         "#panel-design.active must be a flex column so the push button pins"
     )
@@ -583,12 +590,12 @@ def test_r37_custom_art_js_loaded():
 
 
 def test_r37_custom_art_page_tab_css():
-    css = CHANNELS_CSS.read_text()
+    css = _channels_css()
     assert ".page-tab.active" in css, ".page-tab.active rule missing in channels.css"
 
 
 def test_r37_custom_art_slot_grid_css():
-    css = CHANNELS_CSS.read_text()
+    css = _channels_css()
     assert ".custom-art-slot:hover" in css, ".custom-art-slot:hover rule missing in channels.css"
 
 
@@ -626,7 +633,7 @@ def test_r11_scoreboard_restyle_blue_over_red():
     assert block.index("scoreboard-row blue") < block.index("scoreboard-row red"), \
         "BLUE row must come before RED"
     assert 'id="scoreboard-blue"' in block and 'id="scoreboard-red"' in block
-    css = CHANNELS_CSS.read_text()
+    css = _channels_css()
     assert ".scoreboard-score" in css and ".scoreboard-row" in css
 
 

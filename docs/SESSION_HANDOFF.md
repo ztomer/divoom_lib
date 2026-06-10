@@ -18,6 +18,21 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R39b SHIPPED (2026-06-10) — UI polish part 2, browser-preview verified (1307/75/0).**
+  1. Custom art: tabs + slot strip + Push button now ALWAYS visible — root
+     cause was `.channel-panels` breaking the flex height chain under
+     `#control-panel .card-body { overflow-y:auto }`; fixed in
+     style_extra.css. Slots are one row of 12 (6×2 <900px). Drag & drop:
+     slot↔slot swap + library→slot placement (verified with synthetic
+     DataTransfer events in the preview).
+  2. Hot channel: tiles image-only (tooltip holds name/version), empty
+     card-header removed.
+  3. Gallery: sort + size controls right-aligned on the controls row.
+  4. channels.css split → custom_art.css (@import in style.css);
+     `_channels_css()` in test_round6 reads both. `.claude/launch.json`
+     serves web_ui statically for preview verification.
+  Open: same HW verifies as R39 (custom art full-page push, alarm read-back).
+
 - **R39 SHIPPED (2026-06-10) — UI polish round, suite fully green (1306/75/0).**
   Five user-reported items fixed in one pass (see CHANGELOG R39 for detail):
   1. Hot channel: thumbnails 2× (112px, `image-rendering: pixelated`), file
