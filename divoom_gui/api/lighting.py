@@ -162,7 +162,13 @@ class LightingApi(ApiBase):
             previews = {}
             if ok and self._wall_instance:
                 try:
-                    previews = self._wall_instance.get_last_previews()
+                    # R42 §6: the wall handle is a DaemonDeviceProxy — method
+                    # calls return AWAITABLES. The bare call returned an
+                    # un-awaited coroutine that poisoned the JSON reply, so the
+                    # arranger never received its previews.
+                    previews = self._run_async(self._wall_instance.get_last_previews())
+                    if not isinstance(previews, dict):
+                        previews = {}
                 except Exception as ex:
                     logger.warning(f"Failed to get wall previews: {ex}")
             return {"success": bool(ok), "previews": previews}

@@ -189,7 +189,14 @@ class DaemonClient:
             payload["blobs"] = {
                 str(i): base64.b64encode(b).decode("ascii") for i, b in blobs.items()
             }
-        return self.send_command("device_call", payload)
+        # R42 §6: device methods can be SLOW — a wall show_image streams 0x8B
+        # to every wall device sequentially (10-30s+). The 2s quick-command
+        # timeout abandoned those calls mid-stream ("images are not pushed").
+        # A long read timeout is safe: it only applies while a live daemon is
+        # processing; a dead daemon still fails fast at connect.
+        from divoom_daemon.daemon_config import load_daemon_config
+        return self.send_command("device_call", payload,
+                                 read_timeout=load_daemon_config().sync_read_timeout)
 
     def exclusive_start(self, token: str) -> dict:
         """Begin an exclusive-mode session on the daemon. Only ``device_call``
@@ -266,7 +273,14 @@ class DaemonClient:
         )
 
     def wall_configure(self, slots: dict, cell_size: int = 16) -> dict:
-        return self.send_command("wall_configure", {"slots": slots, "cell_size": cell_size})
+        # R42 §6: building the wall BLE-connects every slot device — far longer
+        # than the quick-command timeout (the 2s read abandoned the reply, the
+        # GUI never got its wall handle, and every wall push then failed with
+        # "no wall configured" even though the daemon-side wall was healthy).
+        from divoom_daemon.daemon_config import load_daemon_config
+        return self.send_command("wall_configure",
+                                 {"slots": slots, "cell_size": cell_size},
+                                 read_timeout=load_daemon_config().connect_timeout)
 
     def probe_lan(self) -> dict:
         return self.send_command("probe_lan")
