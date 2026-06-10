@@ -158,6 +158,84 @@ def decode_cloud_to_gif(raw_bytes: bytes, out_path: Path) -> bool:
         return False
 
 
+def decode_hot_file_format(raw_bytes: bytes, *, max_frames: int = 60
+                           ) -> list[tuple[bytes, int]] | None:
+    """Decode a Divoom hot channel file (magic 0xAA) into 16×16 RGB frames.
+
+    A hot file is a sequence of palette-indexed frames, each laid out as:
+
+        0xAA len(u16 LE) time_ms(u16 LE) flag n_colors [palette] [pixels]
+
+    ``flag`` 0 resets the running palette (``n_colors`` RGB entries,
+    0 meaning 256); ``flag`` 1 *appends* ``n_colors`` new entries to it
+    (delta frame). The pixel map is always the full 256 indices into the
+    cumulative palette, packed LSB-first at ``ceil(log2(palette_size))``
+    bits per pixel, and omitted entirely while the palette holds a single
+    color. Frames are concatenated back-to-back until end of file.
+
+    Returns a list of ``(rgb_bytes, duration_ms)`` tuples (768 bytes of
+    RGB each), or ``None`` if the payload isn't a decodable hot file.
+    """
+    if len(raw_bytes) < 7 or raw_bytes[0] != 0xAA:
+        return None
+    frames: list[tuple[bytes, int]] = []
+    palette: list[bytes] = []
+    off = 0
+    while off + 7 <= len(raw_bytes) and len(frames) < max_frames:
+        if raw_bytes[off] != 0xAA:
+            break
+        frame_len = int.from_bytes(raw_bytes[off + 1:off + 3], "little")
+        duration = int.from_bytes(raw_bytes[off + 3:off + 5], "little")
+        flag = raw_bytes[off + 5]
+        n_colors = raw_bytes[off + 6]
+        if frame_len < 7 or off + frame_len > len(raw_bytes):
+            break
+        pos = off + 7
+        if flag == 0:
+            palette = []
+            n_colors = n_colors or 256
+        if pos + n_colors * 3 > len(raw_bytes):
+            break
+        for _ in range(n_colors):
+            palette.append(bytes(raw_bytes[pos:pos + 3]))
+            pos += 3
+        if not palette:
+            break
+        bpp = (len(palette) - 1).bit_length()
+        if bpp == 0:
+            indices = [0] * 256
+        else:
+            n_bytes = (256 * bpp + 7) // 8
+            if pos + n_bytes > len(raw_bytes):
+                break
+            packed = int.from_bytes(raw_bytes[pos:pos + n_bytes], "little")
+            mask = (1 << bpp) - 1
+            indices = [(packed >> (i * bpp)) & mask for i in range(256)]
+            if any(i >= len(palette) for i in indices):
+                return None
+        frames.append((b"".join(palette[i] for i in indices),
+                       duration if duration > 0 else 100))
+        off += frame_len
+    return frames or None
+
+
+def decode_hot_file_to_gif(raw_bytes: bytes, out_path: Path, *, max_frames: int = 60) -> bool:
+    """Decode a hot channel file to an upscaled (128×128) animated GIF.
+
+    Returns ``True`` on success, ``False`` if the payload isn't decodable.
+    """
+    from PIL import Image
+    frames = decode_hot_file_format(raw_bytes, max_frames=max_frames)
+    if not frames:
+        return False
+    pil_frames = [Image.frombytes("RGB", (16, 16), rgb).resize((128, 128), Image.Resampling.NEAREST)
+                  for rgb, _ in frames]
+    pil_frames[0].save(out_path, save_all=len(pil_frames) > 1,
+                       append_images=pil_frames[1:],
+                       duration=[d for _, d in frames], loop=0)
+    return True
+
+
 def decode_and_save_preview(raw_bytes: bytes, cache_file_png: Path) -> bool:
     """Decode a cloud container and save a 128x128 PNG (static) / GIF
     (animation) preview for the gallery cache. Thin wrapper around

@@ -6,6 +6,75 @@ shipped milestone (per the project planning docs).
 
 ---
 
+## Round 37 — 2026-06-09 (custom art push — Phase 3 web UI)
+
+### Added
+- **Multi-select gallery cache grid**: `renderCustomArtCacheGrid` now renders each
+  cached file with a checkbox and `data-file-id` for selecting multiple items to push.
+- **Page tabs (3 pills)**: clicking a tab calls `design.use_user_define_index(page)`
+  via the daemon to switch the device's displayed page.
+- **12-slot grid**: visual slot selector with click-to-select highlighting.
+- **`gui_api.device_call(method, args, ...)`**: generic Python→daemon proxy exposed
+  to JS for calling arbitrary device library methods.
+- **`divoom_gui/web_ui/custom_art.js`**: new controller module (page tabs, slot grid,
+  push button wiring).
+
+### Removed
+- Old custom-art file browser UI (browse button, path input, preview container,
+  history filmstrip) — replaced by gallery cache + slot grid flow.
+- `renderCustomArtHistory`, `addCustomArtToHistory`, `window.addCustomArtToHistory`
+  (dead after history filmstrip removal).
+- Dead `#custom-art-path-input` reference in `app_init.js` (the browse+apply event
+  listeners).
+
+## Round 38 — 2026-06-09 (gallery side-by-side + hot channel animated previews + 0xAA decoder)
+
+### Added — hot channel 0xAA file format decoder (`divoom_lib/media_decoder.py`)
+- **Empirically reverse-engineered** the hot channel CDN file format (magic byte
+  `0xAA`). A hot file is a concatenated chain of palette-indexed frames:
+  `0xAA len(u16 LE) time_ms(u16 LE) flag n_colors [palette] [pixels]`.
+  `flag` 0 resets the running palette (`n_colors` RGB entries, 0 meaning 256);
+  `flag` 1 *appends* `n_colors` new colors (delta frame). The pixel map is the
+  full 256 indices into the cumulative palette, packed LSB-first at
+  `ceil(log2(palette_size))` bits per pixel, omitted while the palette has one
+  color. (A first cut misread byte 6 as a frame count over raw 768-byte RGB
+  frames → garbage previews; corrected same day, validated frame-exact against
+  6 live CDN files, 186–463 frames each, zero length/index errors.)
+- `decode_hot_file_format(raw_bytes)` → `list[tuple[bytes, int]] | None` —
+  768-byte RGB + per-frame duration (ms) per frame.
+- `decode_hot_file_to_gif(raw_bytes, out_path)` → `bool` — saves upscaled
+  128×128 animated GIF with real per-frame durations.
+- `tests/test_hot_file_decoder.py` — 11 regression tests (keyframe/delta/reset,
+  LSB bit packing, solid-color frames, truncation, GIF output).
+
+### Fixed — hot channel animated previews
+- `get_animated_preview` in `gallery_sync.py` now uses the library decoder for magic
+  `0xAA` files (previously fell through all decoders and returned empty).
+- `renderHotPreview` (`gallery_hot.js`) calls `get_animated_preview` for ALL hot channel
+  items, not just those with a gallery cache entry (`has_cache` gate removed).
+- Added PIL `Image.open()` catch-all as final fallback.
+
+### Added — side-by-side categories | gallery grid
+- `templates_gallery.js`: side-by-side layout with `.gallery-sidebar` (`.cat-btn`
+  vertical category list) + `gallery-main` (controls + grid).
+- `gallery.css`: new grid rules, `.cat-btn` styles. Sidebar width reduced ~30%
+  (160px → 112px).
+
+### Fixed — progressive loading race
+- `onGalleryItemLoaded` replaces items in-place by index (cached items render first,
+  network items replace silently).
+- `onGalleryBackgroundFetched` only re-renders if item count differs by >2.
+
+### Changed
+- Removed "Divoom's Curated Hot Set" and "Hot Channel Preview" header text from
+  `templates_hot_channel.js`.
+- All classify-tab selectors renamed `.tab-btn` → `.cat-btn`.
+- CSS compacted to 467 LOC.
+
+### Test suite
+- 1304 passed, 75 skipped, 2 failed (`test_file_size.py` + `test_no_emojis.py` —
+  violations in the uncommitted R37 custom-art docs, not this round).
+
 ## Round 36b — 2026-06-09 (the REAL hot-channel update, APK port)
 
 ### Added — device hot-channel update (`b85004b5`)

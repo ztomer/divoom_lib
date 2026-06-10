@@ -18,6 +18,50 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **0xAA hot-file decoder FIXED — garbage frames resolved (2026-06-09, late).**
+  The first 0xAA reverse-engineering ("10-byte header, byte 6 = frame count, raw
+  768-byte RGB frames") was WRONG → previews decoded to noise. Correct format
+  (validated frame-exact on 6 live CDN files, 186–463 frames each, 0 errors):
+  concatenated palette-indexed frames `0xAA len(u16 LE) time_ms(u16 LE) flag
+  n_colors [palette] [pixels]`. `flag` 0 = keyframe (palette reset, n_colors RGB
+  entries, 0 → 256); `flag` 1 = delta frame (APPENDS n_colors to the running
+  palette). Pixels = full 256 indices into the cumulative palette, LSB-first at
+  `ceil(log2(palette_size))` bpp, omitted while palette size is 1 (solid frame).
+  New `tests/test_hot_file_decoder.py` (11 tests). Stale garbage preview GIFs
+  purged from `~/.config/divoom-control/cache_gallery/` (27 files) so the UI
+  re-decodes. NOTE: this decoder is preview-only — `hot_update.py` still sends
+  containers AS-IS (firmware decodes them itself). Suite 1304/75/2-failed (the
+  2 failures are emoji/file-size violations in the uncommitted R37 docs).
+
+- **Hot channel animated previews SHIPPED + 0xAA decoder in library (2026-06-09).**
+  Fixed hot channel showing only placeholders: hot CDN files use format **0xAA** (magic
+  byte 170) — completely different from gallery's magic-43/9/18/26. (Format details
+  corrected later the same day — see the entry above.)
+  - `divoom_lib/media_decoder.py`: new `decode_hot_file_format()` (returns 768B RGB
+    frames + per-frame durations) and `decode_hot_file_to_gif()` (saves upscaled
+    128×128 animated GIF).
+  - `gallery_sync.py` `get_animated_preview()`: uses library decoder instead of inline
+    code. Hot channel JS `renderHotPreview` now calls `get_animated_preview` for ALL
+    items (was gated on `has_cache`). Added PIL `Image.open()` as ultimate catch-all.
+  - Removed header text "Divoom's Curated Hot Set" and "Hot Channel Preview" from
+    template. Gallery sidebar width reduced 160px → 112px.
+  - Tests: 1291 passed, 75 skipped (pre-existing `test_file_size.py` + `test_no_emojis.py`).
+
+- **Custom Art Push (Phase 3 Web UI) SHIPPED (2026-06-09) — page tabs + slot grid + gallery cache multi-select.**
+  Phase 3 of the custom art slot-based push implementation: replaced the old file-browser
+  (browse + preview + history filmstrip) with APK-matching UI — 3 page pill tabs, 12-slot
+  grid, gallery cache checkbox multi-select, and a single "Push Selected to Page" button.
+  - New `divoom_gui/web_ui/custom_art.js`: page tab switching via `device_call`, slot
+    grid with click-to-select, push button wiring to daemon RPC.
+  - `channels_grids.js`: `renderCustomArtCacheGrid` now renders each cache item with a
+    checkbox + `data-file-id` for multi-select.
+  - `gui_api.py`: added `device_call(method, args, ...)` thin wrapper (exposed to JS).
+  - Removed dead code: old custom-art file browser (`#browse-custom-art-btn`,
+    `#custom-art-path-input`, `#custom-art-preview-container`, `#apply-custom-art-btn`,
+    `#custom-art-history-container/filmstrip`, `renderCustomArtHistory`,
+    `addCustomArtToHistory`).
+  - Remaining: test on real hardware; Phase 4 (monthly best → hot channel push).
+
 - **R36b SHIPPED (2026-06-09) — the REAL hot-channel update.** (`b85004b5`)
   User feedback after R36: images displayed on the CUSTOM channel, not the hot
   channel. Correct — `show_image` is drawing-send. Reverse-engineered the APK's
