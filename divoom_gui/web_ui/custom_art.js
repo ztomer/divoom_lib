@@ -263,9 +263,9 @@
   }
 
   // Bootstrap
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
+  if (document.getElementById("panel-design")) {
     init();
+  } else {
+    document.addEventListener("DOMContentLoaded", init);
   }
 })();

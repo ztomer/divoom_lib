@@ -52,4 +52,6 @@ Planning and outcomes for Round 43 batch, addressing macOS Notification permissi
 ## Outcome — SHIPPED
 
 - **All implemented changes verified and functional.**
-- **Test suite fully green.**
+- **Custom Art empty screen race condition resolved**: Fixed race condition in `custom_art.js` initialization that sometimes left the Custom Art grid and buttons uninitialized/blank by replacing the readyState bootstrap check with a direct element existence check.
+- **Coroutine warning fixes**: Closed the coroutines explicitly on exceptions in `owner_art.py` custom art push and query page handlers, resolving the `RuntimeWarning` from unawaited coroutines during unit tests.
+- **Test suite fully green**: Local and GitHub Actions CI suites passed cleanly (1331 passed, 75 skipped, 0 warnings/failures).

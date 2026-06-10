@@ -102,10 +102,15 @@ class OwnerArtMixin:
                 return {"success": False, "error": "page push failed"}
             return {"success": True, "files_pushed": len(slot_map)}
 
+        coro = _do()
         try:
-            result = self._run_device(_do())
+            result = self._run_device(coro)
             return result
         except Exception as e:
+            try:
+                coro.close()
+            except Exception:
+                pass
             logger.warning(f"custom_art_push failed: {e}")
             return {"success": False, "error": str(e)}
 
@@ -124,10 +129,15 @@ class OwnerArtMixin:
             ids = await query_page(device, page)
             return {"ids": ids or []}
 
+        coro = _do()
         try:
-            result = self._run_device(_do())
+            result = self._run_device(coro)
             return {"success": True, **result}
         except Exception as e:
+            try:
+                coro.close()
+            except Exception:
+                pass
             logger.warning(f"custom_art_query_page failed: {e}")
             return {"success": False, "error": str(e)}
 
