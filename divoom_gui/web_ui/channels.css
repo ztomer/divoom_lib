@@ -66,7 +66,15 @@
 }
 
 .channel-panel.active {
-    display: block;
+    /* The panels container is stretched tall to give the Design panel its
+       full-height scroll area; the SHORT panels (clock / EQ / VJ / ambient /
+       scoreboard / text) used to cram their content at the top with a large
+       void below. Center the content so each reads as balanced, not unfinished.
+       (#panel-design.active overrides this with its own flex-column layout.) */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100%;
 }
 
 /* R11 item 1a: the Custom Art panel is a flex column so its scroll area

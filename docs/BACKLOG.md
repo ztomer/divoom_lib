@@ -65,10 +65,14 @@ round's planning doc.
   history, the 5 named ambient effects, apply-on-select, and the unified
   picker/swatches all ship; confirm the ambient effect previews actually *loop*
   (the one residual of the old "Custom Art polish" item).
-- `OPEN` **Channel panels have large dead space** — e.g. the Clock channel shows
-  only a "Clock Color" swatch with ~80% of the panel empty. Rams "useful / as
-  little design": either fill the panel (style options + a live device preview)
-  or size the window/panel to its content. Audit Clock/Scoreboard/Text/etc.
+- `VERIFY` **Channel panels have large dead space** — the panels container is
+  stretched tall to give the Design panel its full-height scroll area, so the
+  short panels (clock/EQ/VJ/ambient/scoreboard/text) crammed their content at
+  the top with a big void below. 2026-06-11: now vertically CENTER the short
+  panels' content (`.channel-panel.active` → flex column + `justify-content:
+  center`; `#panel-design.active` override untouched) — reads balanced, no
+  clipping on any panel (browser-verified). A richer treatment (live device
+  preview filling the slack) is still possible if wanted.
 - `VERIFY` **Animated previews** (Monthly Best gallery, Custom Art ambient,
   Live Widgets) — couldn't be checked interactively in the live pass: a
   fullscreen always-on-top overlay app ("Osaurus") intercepted all clicks to the
