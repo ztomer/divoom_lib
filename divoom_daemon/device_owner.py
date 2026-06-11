@@ -95,8 +95,8 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
         return bool(d is not None and getattr(d, "is_connected", False))
 
     async def _ensure_device_async(self, mac: Optional[str] = None):
-        # BLE Hardening P1: a failed reconnect raises a typed reason (never a
-        # dead handle the next command silently times out on).
+        # BLE Hardening P1: a failed reconnect raises a typed reason, never a
+        # dead handle the next command silently times out on.
         from divoom_lib.ble_connection import ensure_connected, BleConnectionError
         if self._device is not None:
             if not getattr(self._device, "is_connected", False) and hasattr(self._device, "connect"):
@@ -279,6 +279,15 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
 
     def connect(self, args: dict) -> dict:
         from divoom_lib.ble_connection import BleConnectionError
+        # BLE Hardening P4: a BLE connect (mac, not LAN) preflights adapter/
+        # permission so a powered-off radio / missing grant fails fast with cause.
+        if args.get("mac") and not args.get("lan_ip"):
+            from divoom_lib.ble_preflight import preflight_bluetooth
+            pf = preflight_bluetooth()
+            if not pf.ok:
+                logger.warning("connect blocked by preflight: %s", pf.reason.value)
+                return {"success": False, "error": pf.message,
+                        "reason": pf.reason.value, "message": pf.message}
         try:
             self._run_device(self._build_device_async(args))
             return {"success": True, **self._status_fields()}
@@ -313,22 +322,19 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
     def scan(self, args: dict) -> dict:
         from divoom_daemon.daemon_config import load_daemon_config
         cfg = load_daemon_config()
-        # 0 is a valid limit ("no cap"), so fall back to the config default only
-        # when the key is absent/None — not via `or` (which would eat the 0).
+        # 0 is a valid limit ("no cap"); only default when absent/None (not `or`).
         timeout = float(args.get("timeout") or cfg.scan_timeout)
         raw_limit = args.get("limit")
         limit = int(raw_limit if raw_limit is not None else cfg.scan_limit)
 
-        # Diagnostic: log this daemon process's Bluetooth (TCC) state + identity so
-        # we can tell a permission denial (empty/0) from "no devices" or a too-short
-        # scan, when the daemon is spawned by the GUI vs a terminal.
-        try:
-            import sys as _sys
-            from CoreBluetooth import CBCentralManager
-            logger.info("scan: pid=%s exe=%s CBauth=%s (0=notDetermined,2=DENIED,3=ALLOWED)",
-                        os.getpid(), _sys.executable, CBCentralManager.authorization())
-        except Exception as e:
-            logger.info("scan: CB auth probe skipped: %s", e)
+        # BLE Hardening P4: preflight so an empty scan carries a cause (denied
+        # permission / powered-off adapter) instead of a silent "no devices".
+        from divoom_lib.ble_preflight import preflight_bluetooth
+        pf = preflight_bluetooth()
+        if not pf.ok:
+            logger.warning("scan blocked by preflight: %s (%s)", pf.reason.value, pf.detail)
+            return {"success": False, "error": pf.message,
+                    "reason": pf.reason.value, "message": pf.message, "devices": []}
 
         async def _scan():
             from divoom_lib.utils import discovery
@@ -415,16 +421,10 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
 
             tmp = _P(__file__).parent.parent / "scratch"
             tmp.mkdir(parents=True, exist_ok=True)
-
-            # Resolve the download to a plain GIF (R36). Cloud containers
-            # (magic 9/18/26) are APP-SIDE AES ciphertext — the device cannot
-            # decode them, so raw-streaming them "succeeds" (every chunk ACKed)
-            # but renders NOTHING (the R36 Ditoo bug). The APK decodes
-            # (PixelBean.initWithCloudData) and re-encodes before any BLE send;
-            # we do the same: decode → GIF → show_image (our APK-aligned
-            # encoder + 0x8B).
-            # R40 §2: unified resolver (plain GIF / magic 43 / AES 9-18-26 /
-            # 0xAA hot files) — same path custom_art_push uses.
+            # Resolve to a plain GIF (R36): cloud containers (magic 9/18/26) are
+            # app-side AES ciphertext the device can't decode — raw-streaming them
+            # ACKs every chunk yet renders NOTHING. Decode → GIF → show_image like
+            # the APK. R40 §2 unified resolver (GIF / magic 43 / AES / 0xAA hot).
             resolved = await asyncio.to_thread(
                 media_decoder.resolve_to_gif, file_bytes, tmp / "sync_decoded.gif")
             is_gif = resolved is not None

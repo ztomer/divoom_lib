@@ -124,7 +124,26 @@ Original spec below.
 - Wall connect: bounded-concurrency gather (e.g. 2 at a time) + per-slot
   typed result so a partial wall reports WHICH screen failed and why.
 
-### Phase 4 — Adapter / permission preflight (W10)
+### Phase 4 — Adapter / permission preflight — **SHIPPED** (W10)
+Done: `divoom_lib/ble_preflight.py` `preflight_bluetooth()` runs before
+scan/connect and maps CoreBluetooth state → the SAME typed `FailureReason` the
+connect path uses, so an empty scan / blocked connect carries a CAUSE. The
+default check is the **synchronous, thread-safe** `CBCentralManager.authorization()`
+(denied/restricted → `PERMISSION` with an actionable message); auth
+not-determined/allowed proceeds. Daemon `scan()` returns
+`{success:False, reason, message, devices:[]}` and `connect()` (BLE only, LAN
+skips) returns `{success:False, reason, message}` when blocked. +13 tests
+(injected readers — no hardware).
+
+IMPORTANT — the live `CBManagerState` power probe (`_read_power_state`, run-loop
+pumping) is **opt-in only, NOT the daemon default**: creating a CBCentralManager
++ pumping NSRunLoop crashes libdispatch off the main thread, and daemon command
+handlers run on socket-accept worker threads. The radio-off case is instead
+surfaced by the connect path's typed `ADAPTER_OFF` (`classify_connect_error`
+maps bleak's "powered off"). A main-thread/GUI caller may pass
+`read_power=_read_power_state` to additionally diagnose a powered-off adapter.
+Original spec below.
+
 - Before any scan/connect, check the adapter is powered + authorized
   (CoreBluetooth `CBManagerState`; we already read `CBCentralManager.authorization()`
   for TCC). Map states → actionable messages ("Bluetooth is off",
