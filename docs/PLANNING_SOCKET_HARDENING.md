@@ -7,10 +7,10 @@ safe module defaults (16 MiB / 30 s / 32 / 16). The TCP token auth is unchanged.
 Spec below.
 
 
-Goal: make the daemon's socket interface (Unix + opt-in TCP, NDJSON) **safe
-against untrusted/buggy clients and resource exhaustion**, and **never crash a
-handler thread or leak the boundary**. The daemon owns the BLE device and reads
-notification content, so its socket IS a privilege boundary.
+The daemon's socket (Unix + opt-in TCP, NDJSON) is a privilege boundary: the
+daemon owns the BLE device and reads notification content. Goals: survive
+untrusted/buggy clients and resource exhaustion; don't crash a handler thread or
+leak internals in error replies.
 
 ## Threat model
 - **Local (primary):** other processes/users on the same machine. The Unix
@@ -27,7 +27,7 @@ notification content, so its socket IS a privilege boundary.
   a shared box any local user can drive the daemon (push to device, read
   notifications). No `chmod`.
 - **S2 — unbounded read buffer (memory DoS).** `_handle_conn` loops
-  `recv(4096)` until `\n` with NO size cap → a client that never sends a newline
+  `recv(4096)` until `\n` with no size cap → a client that never sends a newline
   (or one huge line) grows `buf` until OOM. Same shape in the client read loop.
 - **S3 — slow-loris.** The 5s timeout is per-`recv`, not a total deadline; a
   byte-every-4s client keeps the connection (and buffer) alive indefinitely.
@@ -45,10 +45,10 @@ notification content, so its socket IS a privilege boundary.
 ## Hardening (this workstream)
 - **H1 (S1):** `os.chmod(socket_path, 0o600)` immediately after bind; warn (not
   fail) if it can't.
-- **H2 (S2):** `max_message_bytes` cap on the server request read AND the client
+- **H2 (S2):** `max_message_bytes` cap on the server request read and the client
   reply read → reject oversized frames with a typed error instead of buffering.
   Sized for the largest legitimate frame (base64 image blobs in `device_call`).
-- **H3 (S3):** a TOTAL read deadline for one request line (separate from the
+- **H3 (S3):** a total read deadline for one request line (separate from the
   daemon's own processing time, which starts only after the full line arrives).
 - **H4 (S4):** wrap the handler call in a catch-all → log the detail, return a
   generic `{"success": False, "error": "internal error"}` (don't leak internals

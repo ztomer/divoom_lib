@@ -1,23 +1,18 @@
-# BLE Hardening & Foolproofing — workstream plan
+# BLE Hardening — workstream plan
 
-Goal: make every Bluetooth interaction **predictable, self-healing, and
-honestly reported**. No silent failures, no lying state, no dead-ends the user
-can't recover from. This spans several rounds; phases are ordered by
-risk-reduction per effort.
+Phases ordered by risk reduced per unit effort. Acceptance criteria:
 
-## Definition of "foolproof"
-
-1. **Honest state** — the UI/daemon never reports a device "connected/active"
-   when it isn't, and never silently drops to a stale frame.
-2. **Self-healing** — a transient drop (RF blip, device sleep, OS race)
-   recovers automatically with bounded retries + backoff, without user action.
-3. **Recoverable dead-ends** — when it genuinely can't connect, the user gets a
-   specific, actionable reason (BT off, device asleep, owned by the phone app,
-   out of range, needs permission) — never a generic "timed out".
-4. **Concurrency-safe** — wall (N devices) + per-device live jobs can hold
-   several BLE links at once without connect-storms or cross-talk.
-5. **Testable** — failures are reproducible in CI via a fault-injecting fake
-   transport; we don't rely on hardware to prove the hardening.
+1. **Honest state** — never report a device connected when it isn't; never
+   silently fall back to a stale frame.
+2. **Self-healing** — a transient drop (RF blip, device sleep, OS race) recovers
+   via bounded retry + backoff, no user action.
+3. **Specific failures** — when connect genuinely fails, return the cause (BT
+   off, device asleep, held by the phone app, out of range, no permission), not
+   a bare "timed out".
+4. **Concurrency-safe** — wall (N devices) + per-device live jobs hold several
+   BLE links at once without connect-storms or cross-talk.
+5. **Testable without hardware** — every failure path reproducible in CI via a
+   fault-injecting fake transport.
 
 ## Current weaknesses (grounded in `divoom_lib/ble_transport.py`,
 `divoom_lib/connection.py`, `divoom_daemon/device_owner.py`,
@@ -46,7 +41,7 @@ risk-reduction per effort.
   `_notifications_started`, `current_divoom`, daemon `_device`/`_live_devices`
   — no single state machine; hard to reason about or test.
 - **W8 — swallowed errors → wrong UI.** `except Exception: pass` in several
-  device paths surfaces nothing; the R44 §5 connection-truth check fixed ONE
+  device paths surfaces nothing; the R44 §5 connection-truth check fixed one
   site (connect), the pattern remains in reconnect/live/wall/`get_*`.
 - **W9 — `get_*` read-backs unreliable** (task #20): name/alarms/brightness
   reads time out; no retry or graceful "unknown".
@@ -83,7 +78,7 @@ typed `timeout` reason in 16.4s). Original spec below.
 ### Phase 2 — OS disconnect callback + health — **SHIPPED (live jobs)** (W4, W5, W11)
 Done: `BleakClient(..., disconnected_callback=_on_os_disconnect)` on both
 construction sites → a drop flips state immediately (no inference lag); new
-`is_alive` (connected AND no pending drop) on transport → connection → Divoom.
+`is_alive` (connected and no pending drop) on transport → connection → Divoom.
 Live jobs consult `is_alive` and self-heal via Phase 1 `ensure_connected`
 (`_ensure_live_device`); the cached background device is rebuilt when its link
 dies; an unrecoverable drop skips the tick (loop survives) with a typed reason.
@@ -94,9 +89,9 @@ Original spec below.
 - Pass `disconnected_callback=` to `BleakClient` so a drop flips
   `ConnectionState` immediately (no inference lag). Keep the write-failure
   inference as a fallback.
-- A lightweight per-device `is_alive()` (cached `is_connected` AND no pending
+- A lightweight per-device `is_alive()` (cached `is_connected` and no pending
   `_connection_likely_broken`) consulted by live jobs / wall before each push;
-  on a confirmed drop, attempt ONE in-loop reconnect via Phase 1 before
+  on a confirmed drop, attempt one in-loop reconnect via Phase 1 before
   skipping the tick (so a live widget self-heals instead of freezing).
 
 ### Phase 3 — Concurrency safety + wall self-heal — **SHIPPED** (W6, W11-wall)
@@ -106,12 +101,12 @@ connect-storm CoreBluetooth (writes already serialize via `_write_lock`; the
 lock is lazy-per-loop so the daemon loop and each test loop get their own).
 `connect_devices(items, concurrency=2)` brings up many devices with bounded
 concurrency, returning a `{key: ConnectResult}` map. `DivoomWall.connect()`
-uses it → per-slot typed results on `self.connect_results`, logs WHICH screen
-failed and why, stays usable on partial success, raises only on TOTAL failure.
+uses it → per-slot typed results on `self.connect_results`, logs which screen
+failed and why, stays usable on partial success, raises only on total failure.
 `DivoomWall.show_image` self-heals: a dropped slot is revived via Phase 1
 `ensure_connected` before its push (captured per-slot, so one dead screen
 doesn't freeze the rest). New `DivoomWall.is_alive`. Also hardened the daemon
-socket server (`serve_forever` binds+listens on a LOCAL socket before
+socket server (`serve_forever` binds+listens on a local socket before
 publishing `self._server`, killing a startup race where a concurrent `stop()`
 nulled it mid-setup → flaky "Connection refused" in CI). +8 fault-injected
 tests (serialized handshake, per-loop lock, bounded concurrency, per-slot
@@ -122,12 +117,12 @@ Original spec below.
   operation so wall + live jobs don't connect-storm CoreBluetooth (connect is
   the fragile op; writes already serialize per-device via `_write_lock`).
 - Wall connect: bounded-concurrency gather (e.g. 2 at a time) + per-slot
-  typed result so a partial wall reports WHICH screen failed and why.
+  typed result so a partial wall reports which screen failed and why.
 
 ### Phase 4 — Adapter / permission preflight — **SHIPPED** (W10)
 Done: `divoom_lib/ble_preflight.py` `preflight_bluetooth()` runs before
-scan/connect and maps CoreBluetooth state → the SAME typed `FailureReason` the
-connect path uses, so an empty scan / blocked connect carries a CAUSE. The
+scan/connect and maps CoreBluetooth state → the same typed `FailureReason` the
+connect path uses, so an empty scan / blocked connect carries a cause. The
 default check is the **synchronous, thread-safe** `CBCentralManager.authorization()`
 (denied/restricted → `PERMISSION` with an actionable message); auth
 not-determined/allowed proceeds. Daemon `scan()` returns
@@ -136,7 +131,7 @@ skips) returns `{success:False, reason, message}` when blocked. +13 tests
 (injected readers — no hardware).
 
 IMPORTANT — the live `CBManagerState` power probe (`_read_power_state`, run-loop
-pumping) is **opt-in only, NOT the daemon default**: creating a CBCentralManager
+pumping) is **opt-in only, not the daemon default**: creating a CBCentralManager
 + pumping NSRunLoop crashes libdispatch off the main thread, and daemon command
 handlers run on socket-accept worker threads. The radio-off case is instead
 surfaced by the connect path's typed `ADAPTER_OFF` (`classify_connect_error`
@@ -175,7 +170,7 @@ way. Original spec below.
 
 ### Phase 6 — State consolidation + observability — **SHIPPED (observability)** (W7)
 Done: a single pure `ble_connection.derive_connection_state(active)` maps the
-device/wall's HONEST liveness (is_connected + is_alive, which already fold in
+device/wall's honest liveness (is_connected + is_alive, which already fold in
 the P2 OS-drop callback + write-failure inference) to one `ConnectionState` —
 DISCONNECTED / CONNECTED / DEGRADED. The daemon exposes it on `device_status`
 as `connection_state` (so the GUI dot can show DEGRADED — connected-but-link-
@@ -185,7 +180,7 @@ in `/tmp/divoom_daemon.log`). Housekeeping: extracted `OwnerNotifyMixin`
 
 DEFERRED: physically folding the scattered flags (`is_connected`,
 `_connection_likely_broken`, `_notifications_started`) into one state object is
-a larger refactor of the hot write path; P1–P3 already made those flags HONEST
+a larger refactor of the hot write path; P1–P3 already made those flags honest
 and `derive_connection_state` now reads them through one funnel, so the
 remaining consolidation is cleanup, not correctness. GUI-side: consuming
 `connection_state` to render a DEGRADED (amber) dot is a small follow-up.

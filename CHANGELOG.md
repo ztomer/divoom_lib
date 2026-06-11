@@ -13,7 +13,7 @@ exhaustion. Plan: `docs/PLANNING_SOCKET_HARDENING.md`.
 
 - **Unix socket is now owner-only** (`chmod 0600` after bind) — `bind()` honoured
   only the umask, so any local user could previously drive the daemon.
-- **Max message-size cap** on the server request read AND the client reply read
+- **Max message-size cap** on the server request read and the client reply read
   (16 MiB) — a client/daemon that never sends a newline can no longer OOM the
   peer; oversized frames get a typed error, not unbounded buffering.
 - **Total read deadline** (30 s) for one request line — closes the slow-loris
@@ -30,32 +30,30 @@ exhaustion. Plan: `docs/PLANNING_SOCKET_HARDENING.md`.
 - Limits are `SocketServer` constructor params with safe defaults; TCP token
   auth (constant-time compare) unchanged. +11 real-socket tests.
 
-## BLE Hardening & Foolproofing — 2026-06-11 (Phases 1–6 + daemon-socket)
+## BLE Hardening — 2026-06-11 (Phases 1–6 + daemon-socket)
 
-Make every Bluetooth (and daemon-socket) interaction honest, self-healing, and
-specifically diagnosed — no lying "connected" state, no silent stale frame, no
-generic "timed out"/"Connection refused" dead-ends. Plan: `docs/PLANNING_BLE_HARDENING.md`.
+Plan: `docs/PLANNING_BLE_HARDENING.md`.
 
 - **P1 — honest connect/reconnect**: new `divoom_lib/ble_connection.py`
   (`ConnectionState`/`FailureReason`/`ConnectResult`/`ensure_connected`) retries
-  connect with bounded backoff+jitter, verifies the link, and NEVER returns a
-  dead handle — on failure it carries a typed, actionable reason (device asleep,
-  BT off, held by the phone app, …). DeviceOwner connect/reconnect propagate it;
-  the GUI shows the reason instead of "timed out". HW-verified.
+  connect with bounded backoff+jitter, verifies the link, and never returns a
+  dead handle — on failure it carries a typed reason (device asleep, BT off,
+  held by the phone app, …). DeviceOwner connect/reconnect propagate it; the GUI
+  shows the reason instead of "timed out". HW-verified.
 - **P2 — OS disconnect callback + live-job self-heal**: `disconnected_callback`
   wired into both BleakClient sites so a drop flips health immediately (no
   inference lag); new honest `is_alive` (connected AND no pending drop) on
   transport→connection→Divoom; live jobs revive a dropped device via P1 before
-  pushing instead of blasting a dead link.
+  pushing instead of writing into a dead link.
 - **P3 — concurrency safety + wall self-heal**: a per-loop connect lock
-  serializes the fragile handshake (wall N devices + live jobs no longer
+  serializes the connect handshake (wall N devices + live jobs no longer
   connect-storm CoreBluetooth); `DivoomWall.connect()` reports per-slot typed
   results (which screen failed and why), stays usable on partial success, raises
-  only on total failure; `show_image()` self-heals a dropped slot before its push
+  only on total failure; `show_image()` reconnects a dropped slot before its push
   so one dead screen doesn't freeze the rest.
 - **P4 — adapter/permission preflight**: new `divoom_lib/ble_preflight.py` runs
   before scan/connect and maps CoreBluetooth `authorization()` → the typed
-  `PERMISSION` reason, so an empty scan / blocked connect carries a CAUSE instead
+  `PERMISSION` reason, so an empty scan / blocked connect carries a cause instead
   of a silent "no devices". The live `CBManagerState` power probe is opt-in only
   (run-loop pumping crashes off the main thread); radio-off stays covered by the
   connect path's typed `ADAPTER_OFF`.
@@ -68,9 +66,9 @@ generic "timed out"/"Connection refused" dead-ends. Plan: `docs/PLANNING_BLE_HAR
   + `device_status.connection_state` (DISCONNECTED / CONNECTED / DEGRADED) so the
   GUI dot can show a connected-but-dead link; one-line transition logging.
   Extracted `OwnerNotifyMixin` to keep `device_owner.py` under budget.
-- **daemon-socket flake fix** (same UX impact): `serve_forever` now binds+listens
-  on a local socket before publishing `self._server` (kills a startup race where
-  a concurrent `stop()` nulled it mid-setup → "Connection refused"); the client
+- **daemon-socket flake fix**: `serve_forever` now binds+listens on a local
+  socket before publishing `self._server` — fixes a startup race where a
+  concurrent `stop()` nulled it mid-setup → "Connection refused"; the client
   retries a transient connect refusal over <1s while liveness probes fast-fail.
 - +80 fault-injected tests (fake-BLE double + socket round-trips); full suite
   1398 passed / 75 skipped.
