@@ -95,12 +95,14 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
         return bool(d is not None and getattr(d, "is_connected", False))
 
     async def _ensure_device_async(self, mac: Optional[str] = None):
+        # BLE Hardening P1: a failed reconnect raises a typed reason (never a
+        # dead handle the next command silently times out on).
+        from divoom_lib.ble_connection import ensure_connected, BleConnectionError
         if self._device is not None:
             if not getattr(self._device, "is_connected", False) and hasattr(self._device, "connect"):
-                try:
-                    await self._device.connect()
-                except Exception:
-                    pass
+                res = await ensure_connected(self._device)
+                if not res.ok:
+                    raise BleConnectionError(res)
             return self._device
         from divoom_lib.divoom import Divoom
         from divoom_lib.utils import discovery
@@ -113,17 +115,21 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
                 raise RuntimeError("no Divoom device found")
             target = devs[0]["address"]
             self.mac = target
-        self._device = Divoom(mac=target, logger=logger, use_ios_le_protocol=False)
-        await self._device.connect()
+        dev = Divoom(mac=target, logger=logger, use_ios_le_protocol=False)
+        res = await ensure_connected(dev)
+        if not res.ok:
+            raise BleConnectionError(res)
+        self._device = dev
         return self._device
 
     async def _build_device_async(self, args: dict):
+        # BLE Hardening P1: honest connect (retry+backoff, verify, typed reason).
+        from divoom_lib.ble_connection import ensure_connected, BleConnectionError
         if self._device is not None:
             if not getattr(self._device, "is_connected", False) and hasattr(self._device, "connect"):
-                try:
-                    await self._device.connect()
-                except Exception:
-                    pass
+                res = await ensure_connected(self._device, attempts=2, attempt_timeout=8.0)
+                if not res.ok:
+                    raise BleConnectionError(res)
             return self._device
         from divoom_lib.divoom import Divoom
         lan_ip = args.get("lan_ip")
@@ -140,12 +146,15 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
         mac = args.get("mac")
         if not mac:
             return await self._ensure_device_async(None)
-        self._device = Divoom(
+        dev = Divoom(
             mac=mac, logger=logger,
             use_ios_le_protocol=bool(args.get("use_ios_le_protocol", True)),
             device_name=args.get("device_name"),
         )
-        await self._device.connect()
+        res = await ensure_connected(dev, attempts=2, attempt_timeout=8.0)
+        if not res.ok:
+            raise BleConnectionError(res)   # don't keep a dead handle
+        self._device = dev
         self.mac = mac
         return self._device
 
@@ -269,9 +278,14 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
             return {"success": False, "error": str(e)}
 
     def connect(self, args: dict) -> dict:
+        from divoom_lib.ble_connection import BleConnectionError
         try:
             self._run_device(self._build_device_async(args))
             return {"success": True, **self._status_fields()}
+        except BleConnectionError as e:
+            logger.warning(f"connect failed: {e.result.reason.value} ({e.result.detail})")
+            return {"success": False, "error": str(e),
+                    "reason": e.result.reason.value, "message": e.result.message}
         except Exception as e:
             return {"success": False, "error": str(e)}
 

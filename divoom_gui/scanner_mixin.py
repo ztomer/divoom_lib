@@ -35,6 +35,11 @@ class ScannerMixin:
             logger.warning(f"Failed to save scan config: {e}")
             return False
 
+    def get_last_connect_error(self) -> str:
+        """BLE Hardening P1: the actionable reason from the most recent failed
+        connect (empty if none / last connect succeeded)."""
+        return getattr(self, "_last_connect_error", "") or ""
+
     def get_scan_settings(self) -> str:
         """R42 §1: the persisted scan timeout/limit (config.ini [gui]) so the
         Settings inputs restore between sessions — save_scan_settings wrote them
@@ -129,7 +134,13 @@ class ScannerMixin:
                     mac=address, device_name=device_name, use_ios_le_protocol=True)
 
             if not reply.get("success") or not reply.get("connected"):
-                logger.error(f"Daemon connect failed: {reply.get('error', reply)}")
+                # BLE Hardening P1: keep the daemon's actionable message/reason
+                # so the GUI toast says WHY (asleep / BT off / held by phone),
+                # not just "Failed to connect".
+                self._last_connect_error = (
+                    reply.get("message") or reply.get("error") or "Could not connect")
+                logger.error(f"Daemon connect failed: {reply.get('reason', '')} "
+                             f"{reply.get('error', reply)}")
                 self.current_divoom = None
                 return False
 
@@ -139,10 +150,12 @@ class ScannerMixin:
                 self.current_divoom = None
                 return False
 
+            self._last_connect_error = ""
             self._persist_last_connected(address)
             return True
         except Exception as e:
             logger.error(f"Single connect failed: {e}")
+            self._last_connect_error = str(e)
             self.current_divoom = None
             return False
 

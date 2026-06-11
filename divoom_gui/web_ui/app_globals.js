@@ -208,7 +208,16 @@ window.connectDevice = function(name, address) {
                 if (window.updateChannelButtonsVisibility) window.updateChannelButtonsVisibility(name);
             } else {
                 window.DivoomState.appConnected = false;
-                window.showToast(`Failed to connect to ${name}`, "error");
+                // BLE Hardening P1: show the daemon's actionable reason (asleep /
+                // BT off / held by the phone app), not a generic failure.
+                if (window.pywebview?.api?.get_last_connect_error) {
+                    window.pywebview.api.get_last_connect_error().then(msg => {
+                        window.showToast(msg && msg.trim()
+                            ? `${name}: ${msg}` : `Failed to connect to ${name}`, "error");
+                    });
+                } else {
+                    window.showToast(`Failed to connect to ${name}`, "error");
+                }
                 if (statusDot) { statusDot.className = "transport-dot inactive"; statusDot.removeAttribute("style"); }
                 // R34 §2: stop the pulse + restore the per-device hue.
                 if (window.renderDeviceDots) window.renderDeviceDots();
