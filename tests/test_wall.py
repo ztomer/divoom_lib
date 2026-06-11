@@ -32,15 +32,21 @@ class TestDivoomWall(unittest.IsolatedAsyncioTestCase):
     @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
     async def test_wall_connect_disconnect(self, mock_divoom_class):
         """Test DivoomWall connect and disconnect async methods."""
-        # Setup mocks
+        # Setup mocks — start DISCONNECTED and flip to connected on connect(),
+        # mirroring reality. The P3 honest connect (ensure_connected) skips a
+        # device that already reports is_connected, so a mock pinned True would
+        # never call connect().
         mock_clients = []
         for _ in range(4):
             mc = MagicMock()
-            mc.connect = AsyncMock(return_value=None)
+
+            async def _connect(_m=mc):
+                _m.is_connected = True
+            mc.connect = AsyncMock(side_effect=_connect)
             mc.disconnect = AsyncMock(return_value=None)
-            mc.is_connected = True
+            mc.is_connected = False
             mock_clients.append(mc)
-            
+
         mock_divoom_class.side_effect = mock_clients
         
         wall = DivoomWall(self.device_configs)

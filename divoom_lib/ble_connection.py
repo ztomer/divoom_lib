@@ -105,6 +105,26 @@ DEFAULT_ATTEMPTS = 3
 DEFAULT_BASE_DELAY = 0.4       # seconds; grows 0.4, 0.8, 1.6 …
 DEFAULT_MAX_DELAY = 4.0
 DEFAULT_ATTEMPT_TIMEOUT = 12.0  # per-attempt connect timeout
+WALL_CONNECT_CONCURRENCY = 2    # P3: how many wall slots may connect at once
+
+
+# BLE Hardening P3 — serialize the *connect* handshake. The CoreBluetooth
+# central is fragile under a connect-storm (wall = N devices + per-device live
+# jobs all calling connect() at once), so the actual handshake is funnelled
+# through a single lock while backoff waits / writes still overlap freely.
+# Lazily per running loop so the daemon's device loop and each test's fresh
+# loop get their own lock (an import-time asyncio.Lock would bind to the first
+# loop that awaited it and then raise "bound to a different event loop").
+_connect_locks: "dict[int, asyncio.Lock]" = {}
+
+
+def _connect_lock() -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    lock = _connect_locks.get(id(loop))
+    if lock is None:
+        lock = asyncio.Lock()
+        _connect_locks[id(loop)] = lock
+    return lock
 
 
 async def ensure_connected(
@@ -133,7 +153,10 @@ async def ensure_connected(
     detail = ""
     for attempt in range(attempts):
         try:
-            await asyncio.wait_for(device.connect(), timeout=attempt_timeout)
+            # P3: only the fragile handshake is serialized; verify + backoff
+            # run outside the lock so other devices aren't blocked by our waits.
+            async with _connect_lock():
+                await asyncio.wait_for(device.connect(), timeout=attempt_timeout)
             if not getattr(device, "is_connected", False):
                 # The OS lied (CoreBluetooth race) — treat as a drop and retry.
                 raise ConnectionError("connect returned but is_connected is False")
@@ -159,3 +182,26 @@ async def ensure_connected(
                 await sleep(delay)
 
     return ConnectResult(False, ConnectionState.FAILED, reason=last, detail=detail)
+
+
+async def connect_devices(
+    items,
+    *,
+    concurrency: int = WALL_CONNECT_CONCURRENCY,
+    **kw,
+) -> "dict[object, ConnectResult]":
+    """BLE Hardening P3: connect many devices with BOUNDED concurrency, returning
+    a ``{key: ConnectResult}`` map so a partial wall reports WHICH slot failed and
+    why (instead of a bare ``gather`` connect-storm that fails opaquely). ``items``
+    is an iterable of ``(key, device)``. The semaphore bounds how many
+    ``ensure_connected`` coroutines run at once; the global connect lock inside
+    ``ensure_connected`` still serializes the actual handshakes underneath."""
+    sem = asyncio.Semaphore(max(1, concurrency))
+    results: "dict[object, ConnectResult]" = {}
+
+    async def _one(key, dev):
+        async with sem:
+            results[key] = await ensure_connected(dev, **kw)
+
+    await asyncio.gather(*(_one(k, d) for k, d in items))
+    return results

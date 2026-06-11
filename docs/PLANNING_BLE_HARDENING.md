@@ -99,7 +99,25 @@ Original spec below.
   on a confirmed drop, attempt ONE in-loop reconnect via Phase 1 before
   skipping the tick (so a live widget self-heals instead of freezing).
 
-### Phase 3 — Concurrency safety (W6)
+### Phase 3 — Concurrency safety + wall self-heal — **SHIPPED** (W6, W11-wall)
+Done: a per-running-loop connect lock (`ble_connection._connect_lock`) funnels
+the fragile *connect* handshake one-at-a-time so wall + live jobs never
+connect-storm CoreBluetooth (writes already serialize via `_write_lock`; the
+lock is lazy-per-loop so the daemon loop and each test loop get their own).
+`connect_devices(items, concurrency=2)` brings up many devices with bounded
+concurrency, returning a `{key: ConnectResult}` map. `DivoomWall.connect()`
+uses it → per-slot typed results on `self.connect_results`, logs WHICH screen
+failed and why, stays usable on partial success, raises only on TOTAL failure.
+`DivoomWall.show_image` self-heals: a dropped slot is revived via Phase 1
+`ensure_connected` before its push (captured per-slot, so one dead screen
+doesn't freeze the rest). New `DivoomWall.is_alive`. Also hardened the daemon
+socket server (`serve_forever` binds+listens on a LOCAL socket before
+publishing `self._server`, killing a startup race where a concurrent `stop()`
+nulled it mid-setup → flaky "Connection refused" in CI). +8 fault-injected
+tests (serialized handshake, per-loop lock, bounded concurrency, per-slot
+results, partial-ok, total-failure reason, slot self-heal, unrecoverable slot).
+Original spec below.
+
 - A process-wide `asyncio.Lock` (or small semaphore) around the *connect*
   operation so wall + live jobs don't connect-storm CoreBluetooth (connect is
   the fragile op; writes already serialize per-device via `_write_lock`).

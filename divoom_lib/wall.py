@@ -73,6 +73,7 @@ class DivoomWall:
         self.device_configs = device_configs
         self.devices: List[DeviceSlot] = []
         self.last_previews: Dict[str, bytes] = {}
+        self.connect_results: Dict[str, Any] = {}   # P3: {mac: ConnectResult}
         
         # Calculate composite bounding box
         self.is_free_form = any("width" in config for config in self.device_configs)
@@ -157,15 +158,36 @@ class DivoomWall:
 
         self.logger.info(f"Initialized DivoomWall (composite canvas size: {self.total_width}x{self.total_height} pixels)")
 
-    async def connect(self) -> None:
-        """Establishes connections to all wall Divoom devices in parallel."""
+    async def connect(self) -> dict:
+        """Connect every wall screen with BOUNDED concurrency + honest per-slot
+        results (BLE Hardening P3). Instead of a bare ``gather`` connect-storm
+        that fails opaquely, each slot is brought up via the retrying
+        ``ensure_connected`` (serialized handshake, typed failure reason) so a
+        partial wall reports WHICH screen failed and why. Returns the
+        ``{mac: ConnectResult}`` map (also stored on ``self.connect_results``).
+        Raises ``BleConnectionError`` only when EVERY slot fails — a partial
+        wall stays usable for the screens that came up."""
+        from divoom_lib.ble_connection import (
+            connect_devices, BleConnectionError, WALL_CONNECT_CONCURRENCY,
+        )
         self.logger.info("Connecting to all Divoom display wall devices...")
-        connect_tasks = []
-        for slot in self.devices:
-            self.logger.info(f"Connecting to screen at Slot ({slot.x}, {slot.y}) MAC: {slot.device.mac}...")
-            connect_tasks.append(slot.device.connect())
-        await asyncio.gather(*connect_tasks)
-        self.logger.info("All display wall devices connected successfully.")
+        items = [(slot.device.mac, slot.device) for slot in self.devices]
+        results = await connect_devices(
+            items, concurrency=WALL_CONNECT_CONCURRENCY,
+            attempts=2, attempt_timeout=8.0,
+        )
+        self.connect_results = results
+        ok = [m for m, r in results.items() if r.ok]
+        bad = {m: r for m, r in results.items() if not r.ok}
+        for mac, r in bad.items():
+            self.logger.error("Wall slot %s failed to connect: %s (%s)",
+                              mac, r.reason.value, r.detail)
+        if not ok and results:
+            # Total failure — surface the first slot's actionable reason.
+            first = next(iter(results.values()))
+            raise BleConnectionError(first)
+        self.logger.info("Wall connected: %d/%d screens up.", len(ok), len(results))
+        return results
 
     async def disconnect(self) -> None:
         """Disconnects all wall Divoom devices in parallel."""
@@ -180,6 +202,14 @@ class DivoomWall:
     def is_connected(self) -> bool:
         """Returns True if all Divoom wall devices are connected."""
         return all(s.device.is_connected for s in self.devices)
+
+    @property
+    def is_alive(self) -> bool:
+        """P2/P3 honest liveness — every slot genuinely alive (no pending drop),
+        so the daemon's live-device cache doesn't hand back a half-dead wall."""
+        return bool(self.devices) and all(
+            getattr(s.device, "is_alive", getattr(s.device, "is_connected", False))
+            for s in self.devices)
 
     async def show_image(self, file_path: str, time: int | None = None) -> bool:
         """
@@ -266,7 +296,7 @@ class DivoomWall:
             except Exception as ex:
                 self.logger.warning(f"Failed to cache preview bytes for {slot.device.mac}: {ex}")
                 
-            display_tasks.append(divoom.display.show_image(temp_path_str, time=time))
+            display_tasks.append(self._push_slot(divoom, temp_path_str, time))
             
         # Execute all BLE streams concurrently
         self.logger.info(f"Streaming splits concurrently to {len(self.devices)} screens...")
@@ -285,6 +315,20 @@ class DivoomWall:
                 
         return all_ok
             
+    async def _push_slot(self, divoom, path: str, time: int | None) -> bool:
+        """BLE Hardening P3 self-heal: revive a dropped slot via Phase 1's
+        bounded reconnect BEFORE pushing, so one screen's transient drop doesn't
+        freeze its content while the rest keep updating. A genuinely dead slot
+        raises (captured per-slot by ``show_image``'s ``return_exceptions``)."""
+        alive = getattr(divoom, "is_alive", getattr(divoom, "is_connected", False))
+        if not alive:
+            from divoom_lib.ble_connection import ensure_connected, BleConnectionError
+            self.logger.warning("Wall slot %s not alive — reconnecting before push", divoom.mac)
+            res = await ensure_connected(divoom, attempts=2, attempt_timeout=8.0)
+            if not res.ok:
+                raise BleConnectionError(res)
+        return await divoom.display.show_image(path, time=time)
+
     async def set_light(self, color: str, brightness: int = 100) -> bool:
         """Sets a unified solid light color across all screens in the wall."""
         self.logger.info(f"Setting solid light {color} across all screens...")
