@@ -141,7 +141,27 @@ class MenubarClient:
                 if self._on_shutdown:
                     self._on_shutdown()
 
-        self._client.subscribe(on_event, should_stop=lambda: not self._running)
+        # R44 §4: loop so a transient daemon drop reconnects, BUT if the daemon
+        # is confirmed gone (a reconnect can't reach it) while we're still meant
+        # to run, treat it as a shutdown we may have missed and let the agent
+        # decide (it follows the daemon down only when keep-alive is off). This
+        # closes the race where the explicit EVENT_SHUTDOWN arrives after the
+        # socket already closed — the symptom of "menubar stays alive".
+        import time
+        while self._running:
+            self._client.subscribe(on_event, should_stop=lambda: not self._running)
+            if not self._running:
+                return
+            # subscribe() returned without us asking to stop → connection lost.
+            # Probe before deciding: a live daemon means a transient drop.
+            time.sleep(0.3)
+            if not self._running:
+                return
+            if self._client.send_command("device_status").get("success"):
+                continue  # daemon is back — re-subscribe
+            if self._on_shutdown:
+                self._on_shutdown()
+            return
 
     def set_status_callback(self, cb: Callable[[dict], None]) -> None:
         self._on_status_change = cb

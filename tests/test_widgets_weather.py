@@ -178,24 +178,27 @@ def test_widgets_js_calls_get_weather_on_select() -> None:
     ), "widgets.js is missing the 15-minute weather poll timer."
 
 
-def test_widgets_js_calls_push_weather_on_select() -> None:
+def test_widgets_js_weather_device_push_is_a_daemon_job() -> None:
+    """R44 §6: the weather DEVICE push moved to a daemon live job, so the GUI
+    starts/stops it via toggle_weather_sync (it no longer calls push_weather
+    on its own timer)."""
     src = WIDGETS_JS.read_text()
-    assert "push_weather" in src, "widgets.js does not call push_weather on selection."
+    assert "toggle_weather_sync" in src, (
+        "widgets.js does not start the daemon weather job via toggle_weather_sync."
+    )
 
 
-def test_widgets_js_stops_weather_poller_on_tab_leave() -> None:
+def test_widgets_js_stops_weather_preview_poller_on_tab_leave() -> None:
     src = WIDGETS_JS.read_text()
-    # The tab-leave branch must call stopWeatherPolling() so the
-    # interval timer doesn't keep running when the user is on a
-    # different tab. The tab-leave branch is the one with the
-    # `// Stop everything` comment.
+    # R44 §6: the tab-leave branch stops LOCAL preview pollers (the daemon
+    # background jobs keep running). It must still clear the weather preview
+    # interval. The branch carries the 'Stop local preview pollers' comment.
     tab_leave = re.search(
-        r"//\s*Stop everything[\s\S]+?\}\s*\}\);",
+        r"//\s*Stop local preview pollers[\s\S]+?\}\s*\}\);",
         src,
     )
-    assert tab_leave, "tab-leave branch (with 'Stop everything' comment) not found"
-    branch = tab_leave.group(0)
-    assert "stopWeatherPolling()" in branch, (
+    assert tab_leave, "tab-leave branch (with 'Stop local preview pollers' comment) not found"
+    assert "stopWeatherPolling()" in tab_leave.group(0), (
         "tab-leave handler does not call stopWeatherPolling()."
     )
 

@@ -141,65 +141,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function renderTickers(symbols) {
-        const el = document.getElementById("tickers-list");
-        if (!el) return;
-        el.innerHTML = "";
-        (symbols || []).forEach(sym => {
-            const chip = document.createElement("span");
-            chip.className = "ticker-chip";
-            const label = document.createElement("button");
-            label.className = "ticker-chip-label";
-            label.textContent = sym;
-            label.title = `Display ${sym}`;
-            label.addEventListener("click", () => {
-                const input = document.getElementById("stock-symbol-input");
-                if (input) input.value = sym;
-                window.displayTicker(sym);   // R24 #9: selecting displays immediately
-            });
-            const rm = document.createElement("button");
-            rm.className = "ticker-chip-remove";
-            rm.textContent = "×";
-            rm.title = `Remove ${sym}`;
-            rm.addEventListener("click", () => removeTicker(sym));
-            chip.append(label, rm);
-            el.appendChild(chip);
-        });
-    }
-
-    function loadTickers() {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_tickers) {
-            window.pywebview.api.get_tickers().then(json => {
-                try { window.DivoomState.savedTickers = JSON.parse(json) || []; renderTickers(window.DivoomState.savedTickers); } catch (e) {}
-            });
-        }
-    }
-
-    function persistTickers() {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_tickers) {
-            window.pywebview.api.set_tickers(JSON.stringify(window.DivoomState.savedTickers));
-        }
-        renderTickers(window.DivoomState.savedTickers);
-    }
-
-    function removeTicker(sym) {
-        window.DivoomState.savedTickers = window.DivoomState.savedTickers.filter(s => s !== sym);
-        persistTickers();
-    }
-
-    const addTickerBtn = document.getElementById("add-ticker-btn");
-    if (addTickerBtn) {
-        addTickerBtn.addEventListener("click", () => {
-            const sym = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
-            if (!sym) { window.showToast("Enter a ticker symbol first.", "error"); return; }
-            if (!window.DivoomState.savedTickers.includes(sym)) {
-                window.DivoomState.savedTickers.push(sym);
-                persistTickers();
-                window.showToast(`Saved ${sym}`, "success");
-            }
-            window.displayTicker(sym);   // R24 #9: Add also displays
-        });
-    }
 
     // ── 4. SYSTEM STATS MONITOR ──
     function refreshSysmonPreview() {
@@ -281,15 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function startWeatherPolling() {
         if (weatherTimer) return;
         refreshWeatherPreview();
-        if (window.pywebview?.api?.push_weather) window.pywebview.api.push_weather();
-        // R40 §4: the Live (15m) toggle drives this — each tick re-pushes the
-        // current weather to the device (weather changes slowly).
-        weatherTimer = setInterval(() => {
-            refreshWeatherPreview();
-            if (window.pywebview?.api?.push_weather) {
-                window.pywebview.api.push_weather();
-            }
-        }, 15 * 60 * 1000);
+        weatherTimer = setInterval(refreshWeatherPreview, 15 * 60 * 1000);
     }
 
     function stopWeatherPolling() {
@@ -299,6 +232,33 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    window.restoreActiveWidgetForDevice = function(mac) {
+        if (!mac || !window.pywebview || !window.pywebview.api || !window.pywebview.api.live_job_list) return;
+        window.pywebview.api.live_job_list(mac).then(resJson => {
+            let res = resJson;
+            if (typeof resJson === "string") {
+                try { res = JSON.parse(resJson); } catch (e) {}
+            }
+            if (res && res.success && res.jobs) {
+                const activeJob = res.jobs.find(j => !j.done && !j.cancelled);
+                if (activeJob) {
+                    selectedWidget = activeJob.kind;
+                } else {
+                    selectedWidget = "music";
+                }
+            } else {
+                selectedWidget = "music";
+            }
+            const cards = ["music", "stock", "sysmon", "weather", "notif-manual", "notif-mirror"];
+            cards.forEach(id => {
+                const cardEl = document.getElementById(`widget-card-${id}`);
+                if (cardEl) {
+                    cardEl.classList.toggle("widget-active", id === selectedWidget);
+                }
+            });
+            syncActiveWidgetPreviewsOnly();
+        });
+    };
 
     function selectWidget(widgetId) {
         selectedWidget = widgetId;
@@ -314,6 +274,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Trigger background sync toggles
         syncActiveWidget();
+    }
+
+    function syncActiveWidgetPreviewsOnly() {
+        const isTabActive = document.getElementById("data-sources")?.classList.contains("active");
+
+        // 1. Music (Cover Art)
+        const startMusic = isTabActive && (selectedWidget === "music");
+        if (startMusic) {
+            startTrackPolling();
+        } else {
+            stopTrackPolling();
+        }
+
+        // 2. Stocks
+        const symbol = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
+        const startStocks = isTabActive && (selectedWidget === "stock") && !!symbol;
+        if (startStocks) {
+            refreshStockPreview();
+            if (!stockTimer) {
+                stockTimer = setInterval(refreshStockPreview, 15000);
+            }
+        } else {
+            if (stockTimer) {
+                clearInterval(stockTimer);
+                stockTimer = null;
+            }
+        }
+
+        // 3. System Monitor
+        const sysmonLiveChecked = sysmonLive ? sysmonLive.checked : true;
+        const startSysmon = isTabActive && (selectedWidget === "sysmon") && sysmonLiveChecked;
+        if (startSysmon) {
+            refreshSysmonPreview();
+            if (!sysmonTimer) {
+                sysmonTimer = setInterval(refreshSysmonPreview, 5000);
+            }
+        } else {
+            if (sysmonTimer) {
+                clearInterval(sysmonTimer);
+                sysmonTimer = null;
+            }
+        }
+
+        // 4. Weather
+        const weatherLiveChecked = weatherLive ? weatherLive.checked : true;
+        const startWeather = isTabActive && (selectedWidget === "weather") && weatherLiveChecked;
+        if (startWeather) {
+            startWeatherPolling();
+        } else {
+            stopWeatherPolling();
+        }
     }
 
     function syncActiveWidget() {
@@ -365,24 +376,17 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        // 4. Weather (R15 §3): auto-fetch + auto-push on selection; 10-min
-        // poll for slow-changing weather. push_weather writes the live
-        // temperature + icon to the device's built-in weather channel.
-        const startWeather = isTabActive && (selectedWidget === "weather");
+        // 4. Weather
+        const weatherLiveChecked = weatherLive ? weatherLive.checked : true;
+        const startWeather = isTabActive && (selectedWidget === "weather") && weatherLiveChecked;
+        if (window.pywebview.api.toggle_weather_sync) {
+            window.pywebview.api.toggle_weather_sync(startWeather);
+        }
         if (startWeather) {
             startWeatherPolling();
-            if (typeof window.pywebview.api.push_weather === "function") {
-                window.pywebview.api.push_weather();
-            }
         } else {
             stopWeatherPolling();
         }
-
-        // 5. Notification cards (R15 §3): pure visual selection — no
-        // auto-push, no poller. The form widgets retain their existing
-        // click handlers (Send button, toggle, JSON Save).
-        // Nothing to do here — the active class is already toggled in
-        // selectWidget().
     }
 
     function bindCardSelection(cardId, widgetName) {
@@ -436,34 +440,28 @@ document.addEventListener("DOMContentLoaded", () => {
         if (saved !== null) weatherLive.checked = saved === "1";
         const applyWeatherLive = () => {
             localStorage.setItem("divoom.weatherLive", weatherLive.checked ? "1" : "0");
-            if (weatherLive.checked) startWeatherPolling();
-            else stopWeatherPolling();
+            syncActiveWidget();
         };
         weatherLive.addEventListener("change", applyWeatherLive);
-        if (weatherLive.checked) applyWeatherLive();
     }
 
     // ── 5. TAB-CHANGED AUTOMATIC WIDGET WORKER CONTROL ──
     window.addEventListener("tab-changed", (e) => {
         const tab = e.detail.tab;
+        const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
         if (tab === "data-sources") {
             // Auto-refresh all previews on tab open (no device push until card is selected)
             refreshSysmonPreview();
             refreshWeatherPreview();
             const sym = document.getElementById("stock-symbol-input")?.value.trim().toUpperCase();
             if (sym) refreshStockPreview();
-            selectWidget(selectedWidget);
-        } else {
-            // Stop everything when leaving the tab
-            if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.toggle_music_sync(false);
-                if (window.pywebview.api.toggle_sysmon_sync) {
-                    window.pywebview.api.toggle_sysmon_sync(false);
-                }
-                if (window.pywebview.api.toggle_stocks_sync) {
-                    window.pywebview.api.toggle_stocks_sync(false);
-                }
+            if (mac && mac !== "None") {
+                window.restoreActiveWidgetForDevice(mac);
+            } else {
+                selectWidget(selectedWidget);
             }
+        } else {
+            // Stop local preview pollers (but let the daemon background tasks keep running)
             stopTrackPolling();
             if (sysmonTimer) {
                 clearInterval(sysmonTimer);
@@ -473,7 +471,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 clearInterval(stockTimer);
                 stockTimer = null;
             }
-            // R15 §3: weather poller also stops on tab-leave.
             stopWeatherPolling();
             ["music", "stock", "sysmon", "weather", "notif-manual", "notif-mirror"].forEach(id => {
                 const cardEl = document.getElementById(`widget-card-${id}`);
@@ -483,7 +480,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Startup Delay Inits
-    setTimeout(loadTickers, 1500);
+    setTimeout(() => window.loadTickers && window.loadTickers(), 1500);
     setTimeout(() => {
         if (document.getElementById("data-sources")?.classList.contains("active")) {
             window.dispatchEvent(new CustomEvent("tab-changed", { detail: { tab: "data-sources" } }));
