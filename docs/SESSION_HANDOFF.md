@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **BLE HARDENING P1–P3 + daemon-socket SHIPPED (2026-06-11).** Plan
+  `docs/PLANNING_BLE_HARDENING.md` (P1/P2/P3 marked SHIPPED inline). Commits
+  156857bd (P1), be12e0dc (P2), d7036cf1 (P3), 516995fb (daemon-socket).
+  Honest typed connect (`divoom_lib/ble_connection.py`, never a dead handle,
+  actionable reason); OS `disconnected_callback` + `is_alive` honest liveness;
+  live-job + wall self-heal; per-loop connect lock (no connect-storm); wall
+  per-slot typed results (partial-ok, names the failed screen). Daemon socket:
+  `serve_forever` binds+listens on a local socket before publishing `_server`
+  (killed the "NoneType…listen"/"Connection refused" startup race); client
+  retries a transient connect refusal <1s, liveness probes fast-fail. Full
+  suite **1369 passed / 75 skipped**. HW-verified on Ditoo (connect 2.4s + push).
+  **Open threads (next phases, see plan):** P4 adapter/permission preflight
+  (CBManagerState → "BT off"/"grant permission"); P5 `get_*` read-back
+  hardening (task #20 — name/alarms/brightness reads time out); P6 connection
+  state-machine consolidation + `device_status` observability. Wall self-heal
+  is HW-untested (needs 2+ devices); single-device paths HW-verified.
+
 - **R43 SHIPPED (2026-06-10) — Permissions Dialog, Settings Backup/Restore, Preset Files, and Wall Split Cache.** Plan+outcome
   `docs/PLANNING_ROUND43.md`. Highlights: macOS Notification Permissions step-by-step instructions popup and red status indicator; unified settings Backup & Restore (export/import entire configurations, presets, alarms to/from JSON files); Virtual Wall presets save/load file buttons and immediate sync dropdown behavior; downscale, crop, split, and cache quadrants under `~/.config/divoom-control/cache_wall/` to prevent redundant resizing and fix routing target crash; Custom Art empty screen race condition fix in `custom_art.js` (element check bootstrap); custom art push/query unawaited coroutine warning fixes.
   Suite passed cleanly locally and on GitHub CI (1331 passed, 75 skipped, 0 warnings).
