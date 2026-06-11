@@ -81,5 +81,33 @@ into (asset work — may defer to a follow-up).
 runtime) → §1 (wall cache, HW) → §6 (per-device live sync, big) → §7 (preview
 content, big; asset regen may defer).
 
-## §outcome
-_(fill as items land)_
+## §outcome — ALL 7 ADDRESSED
+
+Much of R44 was implemented by the user; this session evaluated the state,
+hardware-verified the risky items, filled gaps, fixed the broken tests, and
+added the device-preview content feature.
+
+- **§1 wall colors — FIXED + HW-verified.** Root cause: the OLD path-based
+  split-cache key served my stale R42 test split (red-left/blue-right). The
+  user's new key (`sha256(file_bytes)[:16]_geometry_mac`) is collision-proof.
+  HW test (Ditoo+Pixoo, gradient): each device shows a distinct 256-color half.
+- **§2 device name — DONE.** `get_device_name` does the 0x76 BLE name read;
+  `loadDeviceName` populates the input on Device-Settings entry (get_* is flaky
+  on HW per task #20 → graceful None fallback).
+- **§3 clock pill — DONE.** The three 2-option pills share `width:180px` +
+  `flex:1` buttons so their edges align.
+- **§4 menubar quit — hardened.** Signals existed (dashboard close →
+  daemon.shutdown() → EVENT_SHUTDOWN → menubar terminate). Added a fallback: if
+  the menubar's subscription drops and a reconnect can't reach the daemon while
+  keep-alive is off, follow it down — closes the missed-event race.
+- **§5 connection truth — DONE.** `connect_single_device` verifies
+  `is_connected` post-connect and clears the handle if not, so the dot can't lie.
+- **§6 per-device live sync — DONE + HW-smoke.** Daemon owns per-(mac,kind)
+  live jobs; a widget keeps driving its device after the GUI switches target.
+  Added a per-mac background-device cache (was reconnecting every 5s tick).
+- **§7 device-preview content — SHIPPED (phase 1).** Product PNG = device body;
+  the live frame composites into the device SCREEN via a positioned overlay with
+  a per-model rect map. Browser-verified. Per-model rect precision + forward-
+  facing renders = follow-up (asset work the user anticipated).
+
+Suite green locally; pushed + CI watched.

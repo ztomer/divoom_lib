@@ -127,11 +127,64 @@ def test_menubar_client_dispatches_shutdown():
     assert fired == [True]
 
 
+def test_menubar_follows_on_dropped_subscription_when_daemon_gone():
+    """R44 §4: if subscribe() returns (connection lost) without us stopping AND
+    a reconnect probe finds the daemon gone, fire the shutdown callback."""
+    from divoom_menubar.menubar_client import MenubarClient
+    mc = MenubarClient(socket_path="/tmp/divoom_absent_lifecycle.sock")
+    fired = []
+    mc.set_shutdown_callback(lambda: fired.append(True))
+
+    calls = {"n": 0}
+
+    def _stub_subscribe(on_event, should_stop=None):
+        calls["n"] += 1
+        return True  # returns immediately = "connection lost", _running stays True
+
+    mc._client.subscribe = _stub_subscribe
+    # probe reports the daemon is unreachable → follow it down
+    mc._client.send_command = lambda *a, **k: {"success": False, "error": "down"}
+    mc._running = True
+    mc._subscribe_loop()
+    assert fired == [True], "menubar must follow the daemon down when it's gone"
+
+
+def test_menubar_resubscribes_on_transient_drop():
+    """A transient drop (daemon still reachable) must re-subscribe, not quit."""
+    from divoom_menubar.menubar_client import MenubarClient
+    mc = MenubarClient(socket_path="/tmp/divoom_absent_lifecycle.sock")
+    fired = []
+    mc.set_shutdown_callback(lambda: fired.append(True))
+
+    seen = {"n": 0}
+
+    def _stub_subscribe(on_event, should_stop=None):
+        seen["n"] += 1
+        if seen["n"] >= 2:
+            mc._running = False  # second pass: stop so the test ends
+        return True
+
+    mc._client.subscribe = _stub_subscribe
+    mc._client.send_command = lambda *a, **k: {"success": True}  # daemon alive
+    mc._running = True
+    mc._subscribe_loop()
+    assert seen["n"] == 2, "must re-subscribe after a transient drop"
+    assert fired == [], "must NOT follow down while the daemon is alive"
+
+
 def _capture_on_event(mc):
     """Extract the inner on_event closure from _subscribe_loop by stubbing the
-    client's subscribe to capture it."""
+    client's subscribe to capture it. R44 §4: _subscribe_loop now retries in a
+    `while self._running` loop, so the stub clears _running on capture to make
+    the loop exit immediately (and we don't reach the daemon-gone probe)."""
     captured = {}
-    mc._client.subscribe = lambda on_event, should_stop=None: captured.setdefault("fn", on_event)
+
+    def _stub_subscribe(on_event, should_stop=None):
+        captured["fn"] = on_event
+        mc._running = False   # exit the retry loop after one pass
+        return True
+
+    mc._client.subscribe = _stub_subscribe
     mc._running = True
     mc._subscribe_loop()
     return captured["fn"]
