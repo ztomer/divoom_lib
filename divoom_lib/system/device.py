@@ -47,31 +47,46 @@ class Device(DeviceSettings):
         args = [brightness]
         return await self.communicator.send_command(COMMANDS["set brightness"], args)
 
-    async def get_brightness(self) -> int | None:
-        """
-        Get the screen brightness by querying the light mode (0x46).
-        """
-        self.logger.info("Getting brightness via get light mode (0x46)...")
-        
+    def _read_cache(self):
+        """BLE Hardening P5: lazily attach a last-good read cache to the
+        communicator so flaky ``get_*`` reads degrade to the previous value
+        across calls (and survive a reconnect on the same device)."""
+        cache = getattr(self.communicator, "_read_cache", None)
+        if cache is None:
+            from divoom_lib.ble_reads import ReadCache
+            cache = ReadCache()
+            try:
+                self.communicator._read_cache = cache
+            except Exception:
+                pass
+        return cache
+
+    async def _read_brightness_once(self) -> int | None:
         command_id = COMMANDS["get light mode"]
         self.communicator._expected_response_command = command_id
-        
         async with self.communicator._framing_context(use_ios=self.communicator.use_ios_le_protocol, escape=False):
             await self.communicator.send_command(command_id, [])
-
         response_payload = await self.communicator.wait_for_response(command_id)
-
         if response_payload and len(response_payload) >= 7:
             try:
-                brightness = response_payload[6]
-                self.logger.info(f"Successfully parsed brightness: {brightness}")
-                return brightness
+                return response_payload[6]
             except IndexError:
-                self.logger.warning("Failed to parse brightness from response, payload is too short.")
                 return None
-        else:
-            self.logger.warning(f"Did not receive a valid or sufficiently long payload for get_brightness command.")
-            return None
+        return None
+
+    async def get_brightness(self) -> int | None:
+        """Get the screen brightness via get-light-mode (0x46), with BLE
+        Hardening P5 bounded retry + last-good fallback so a single dropped reply
+        doesn't blank the field. Returns the (possibly cached) value, or None
+        only when never read and nothing cached."""
+        self.logger.info("Getting brightness via get light mode (0x46)...")
+        from divoom_lib.ble_reads import read_with_retry
+        res = await read_with_retry(
+            self._read_brightness_once,
+            cache=self._read_cache(), cache_key="brightness")
+        if res.ok and res.from_cache:
+            self.logger.info("get_brightness: serving last-good cached value")
+        return res.value if res.ok else None
 
     async def get_work_mode(self) -> int | None:
         """
@@ -178,18 +193,31 @@ class Device(DeviceSettings):
         args.extend(list(name_bytes))
         return await self.communicator.send_command(COMMANDS["set device name"], args)
 
-    async def get_device_name(self) -> str | None:
-        """
-        Obtain the Bluetooth device name (0x76).
-        """
-        self.logger.info("Getting device name (0x76)...")
+    async def _read_device_name_once(self) -> str | None:
         response = await self.communicator.send_command_and_wait_for_response(COMMANDS["get device name"])
         if response and len(response) >= 1:
             name_length = response[GDN_NAME_LENGTH]
             if len(response) >= GDN_NAME_BYTES_START + name_length:
                 name_bytes = bytes(response[GDN_NAME_BYTES_START:GDN_NAME_BYTES_START + name_length])
-                return name_bytes.decode('utf-8')
+                try:
+                    return name_bytes.decode('utf-8')
+                except UnicodeDecodeError:
+                    return None
         return None
+
+    async def get_device_name(self) -> str | None:
+        """Obtain the Bluetooth device name (0x76), with BLE Hardening P5 bounded
+        retry + last-good fallback. Returns the (possibly cached) name, or None
+        only when never read and nothing cached."""
+        self.logger.info("Getting device name (0x76)...")
+        from divoom_lib.ble_reads import read_with_retry
+        res = await read_with_retry(
+            self._read_device_name_once,
+            validate=lambda v: isinstance(v, str) and len(v) > 0,
+            cache=self._read_cache(), cache_key="device_name")
+        if res.ok and res.from_cache:
+            self.logger.info("get_device_name: serving last-good cached value")
+        return res.value if res.ok else None
 
     async def send_current_temp(self, temp: int, weather: int) -> bool:
         """

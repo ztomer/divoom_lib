@@ -150,7 +150,23 @@ Original spec below.
   "Grant Bluetooth permission to python3"). Surface via the existing daemon→GUI
   error channel + menubar tooltip.
 
-### Phase 5 — `get_*` read-back hardening (W9 / task #20)
+### Phase 5 — `get_*` read-back hardening — **SHIPPED (resilience layer)** (W9 / task #20)
+Done: `divoom_lib/ble_reads.py` `read_with_retry()` + `ReadCache` + typed
+`ReadResult` (ok / value / from_cache / reason; `.known` drives the UI dash).
+A flaky read now retries with a short per-attempt timeout and degrades to the
+**last-good cached value** (`from_cache=True`) instead of a bare `None` the UI
+can't distinguish from a real value; with nothing cached it returns a typed
+unknown (`ok=False`). Wired into `Device.get_brightness` + `get_device_name`
+(cache attached lazily to the communicator, survives reconnects). Reads no
+longer raise out (an exception → typed UNKNOWN). +10 tests (fake comm, no HW).
+
+DEFERRED (needs hardware): the root-cause framing investigation — WHY the
+0x42/0x46/0x13 query frame goes unanswered on some models (likely a per-model
+command variant). The resilience layer makes the timeout degrade gracefully
+regardless; closing the protocol gap is a separate HW-iteration task. Remaining
+`get_*` reads (alarms, temp, work mode, …) can adopt `read_with_retry` the same
+way. Original spec below.
+
 - Wrap reads in a bounded retry with a short per-attempt timeout, and on
   exhaustion return a typed "unknown" the UI renders as a dash (not a spinner /
   not a wrong value). Cache the last *good* read so the UI degrades gracefully.
