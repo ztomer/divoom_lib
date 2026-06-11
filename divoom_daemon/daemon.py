@@ -89,6 +89,7 @@ class DivoomDaemon:
         r["live_job_start"] = self._device_owner.live_job_start
         r["live_job_stop"] = self._device_owner.live_job_stop
         r["live_job_list"] = self._device_owner.live_job_list
+        r["live_jobs_stop_for"] = self._device_owner.live_jobs_stop_for
         r["sync_artwork"] = self._device_owner.sync_artwork
         r["custom_art_push"] = self._device_owner.custom_art_push
         r["custom_art_query_page"] = self._device_owner.custom_art_query_page

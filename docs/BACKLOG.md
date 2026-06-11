@@ -30,10 +30,17 @@ round's planning doc.
 - `VERIFY` **Scan devices** — root cause is macOS TCC, NOT a Python/3.14 bug: BLE crashes/denies based on the *responsible process's* Bluetooth grant + `NSBluetoothAlwaysUsageDescription`. **Verified via System Settings > Privacy > Bluetooth: `python3.14` and the user's terminal (Ghostty) are already GRANTED; there is no `Divoom` entry.** So: (1) the R17 cutover broke scan by spawning the daemon DETACHED -> own unattributed process -> crash/deny; the non-detached spawn fix makes it inherit the launching terminal's grant. (2) The `Divoom.app` bundle (scripts/make_app_bundle.sh) was a wrong turn for this: it re-attributes BLE to a NEW `com.divoom.control` identity that isn't granted, and a background daemon can't raise the grant prompt -> empty scan. **Current fix: `run_gui.sh` launches the GUI directly (attributed to the granted python3.14/terminal) + non-detached daemon.** Must be verified by the USER (launch from the granted terminal, devices powered on) - can't be tested from the Claude harness (its process tree isn't a granted Bluetooth context). make_app_bundle.sh kept for distribution/double-click (would need its own one-time grant).
 
 ### Device / protocol
-- `OPEN` **Custom Art / Design channel switch** doesn't reliably change the active
-  channel on device (esp. **Divoom Max**). Suspected: `0x45` channel-switch is
-  rejected while a prior drawing stream is active → clear/interrupt active loops
-  first. (Long-standing "Divoom Max channel-switch bug" open thread.)
+- `DONE` **Custom Art / Design channel switch** (HW-investigated 2026-06-11 on
+  Tivoo-Max + Ditoo). The suspected "0x45 rejected after a draw" does NOT
+  reproduce — `current_light_effect_mode` (read via 0x46) cleanly tracks every
+  switch (clock=0 / design=5 / visualizer=4), after a draw, rapidly, and on the
+  Max; the 10-byte payload padding in `show_clock`/`show_design` already fixed
+  the original. The REAL current cause (only reproducible now that live jobs
+  actually push — they were deadlocked before): a running live widget clobbered
+  the switch on its next tick. Fix: a channel/clock/VJ/visualizer/solid-light
+  switch now stops the active device's live jobs first (`live_jobs_stop_for`
+  RPC + GUI `LightingApi._stop_live_widgets`). HW-confirmed: switch to Clock
+  while sysmon ran → mode 0 and stays 0 (was stuck on the sysmon frame).
 - `DONE` **`get_*` read-backs** (task #20, HW-verified 2026-06-11 on 4 models).
   Root cause was NOT a timeout — reads return <0.1s. It was a STALE read: the
   device emits an unsolicited 0x46 on state change and the manual readers

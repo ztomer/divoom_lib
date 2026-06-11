@@ -14,8 +14,21 @@ class LightingApi(ApiBase):
     def __init__(self, loop_thread, daemon_client_getter, state_getter):
         super().__init__(loop_thread, daemon_client_getter, state_getter)
 
+    def _stop_live_widgets(self) -> None:
+        """A static-display takeover (channel / clock / VJ / visualizer / solid
+        light) is mutually exclusive with a streaming live widget. Stop the
+        active device's live jobs first, or the widget's next tick re-pushes its
+        frame and clobbers the switch (HW-confirmed). Best-effort."""
+        try:
+            client = self._client
+            if client is not None:
+                client.live_jobs_stop_for()
+        except Exception as e:
+            logger.debug(f"stop live widgets before switch: {e}")
+
     def set_solid_light(self, color: str, brightness: int, mode_type: int = 0) -> bool:
         logger.info(f"GUI Action: Applying solid light {color} (brightness={brightness}, mode_type={mode_type})...")
+        self._stop_live_widgets()
         try:
             return self._dispatch(lambda t: t.set_light(color, brightness)
                                 if t is self._wall_instance else t.display.show_light(color, brightness, True, mode_type))
@@ -25,6 +38,7 @@ class LightingApi(ApiBase):
 
     def set_clock(self, style: int, color: str = None) -> bool:
         logger.info(f"GUI Action: Applying clock style {style} with color {color}...")
+        self._stop_live_widgets()
         try:
             return self._dispatch(lambda t: t.show_clock(clock=style)
                                 if t is self._wall_instance else t.display.show_clock(clock=style, color=color))
@@ -34,6 +48,7 @@ class LightingApi(ApiBase):
 
     def switch_channel(self, channel: str) -> bool:
         logger.info(f"GUI Action: Switching channel to {channel}...")
+        self._stop_live_widgets()
         try:
             return self._dispatch(lambda t: t.switch_channel(channel)
                                 if t is self._wall_instance else t.display.switch_channel(channel))
@@ -43,6 +58,7 @@ class LightingApi(ApiBase):
 
     def set_vj_effect(self, number: int) -> bool:
         logger.info(f"GUI Action: Applying VJ effect {number}...")
+        self._stop_live_widgets()
         try:
             return self._dispatch(lambda t: t.show_effects(number=int(number))
                                 if t is self._wall_instance else t.display.show_effects(number=int(number)))
@@ -52,6 +68,7 @@ class LightingApi(ApiBase):
 
     def set_visualization(self, number: int) -> bool:
         logger.info(f"GUI Action: Applying visualizer {number}...")
+        self._stop_live_widgets()
         try:
             return self._dispatch(lambda t: t.show_visualization(number=int(number))
                                 if t is self._wall_instance else t.display.show_visualization(number=int(number)))

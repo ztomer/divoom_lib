@@ -338,6 +338,12 @@ class DaemonClient:
     def live_job_list(self, mac: str | None = None) -> dict:
         return self.send_command("live_job_list", {"mac": mac})
 
+    def live_jobs_stop_for(self, mac: str | None = None) -> dict:
+        """Stop all live jobs for a device (default: the daemon's active device).
+        Called before a channel/display switch so a running widget doesn't
+        clobber it on its next tick."""
+        return self.send_command("live_jobs_stop_for", {"mac": mac})
+
     def sync_artwork(self, file_id: str, *, default_size: int = 16,
                      target: str = "device") -> dict:
         """Ask the daemon to download a gallery asset and stream it to the owned

@@ -5,6 +5,24 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Channel switch vs. live widget (HW, 2026-06-11)
+
+HW investigation of the long-standing "channel switch doesn't reliably change
+the active channel (esp. Divoom Max)" report. The suspected "0x45 rejected after
+a draw" does NOT reproduce on Tivoo-Max or Ditoo — reading the mode back via
+0x46 (`current_light_effect_mode`) shows every switch lands (clock=0 / design=5
+/ visualizer=4), after a draw, rapidly, on the Max; the 10-byte payload padding
+already fixed the original. The real current cause — surfaced only because live
+jobs now actually push (they were deadlocked) — was a running live widget
+re-pushing its frame on the next tick and clobbering the switch.
+
+- New `live_jobs_stop_for` daemon RPC stops a device's live jobs (default: the
+  active device). The GUI's channel / clock / VJ / visualizer / solid-light
+  actions call it first (`LightingApi._stop_live_widgets`), so a static-display
+  takeover isn't fought by a streaming widget.
+- HW-confirmed on Ditoo: switch to Clock while sysmon ran → mode 0 and stays 0
+  (was stuck on the sysmon frame). +9 tests.
+
 ## Live-widget on-device sync — deadlock fix (HW, 2026-06-11)
 
 Live widgets (stocks / sysmon / weather) never reached the device: e2e was 100%

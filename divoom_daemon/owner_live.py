@@ -67,6 +67,21 @@ class OwnerLiveMixin:
                     pass
             asyncio.run_coroutine_threadsafe(_disc(), self._loop)
 
+    def live_jobs_stop_for(self, args: dict) -> dict:
+        """Stop ALL live jobs for a device (default: the active device, ``self.mac``).
+        A channel / clock / VJ / visualizer switch takes over the screen and is
+        mutually exclusive with a streaming widget — without stopping the widget
+        first, its next tick re-pushes its frame and clobbers the switch
+        (HW-confirmed: switch to Clock while sysmon runs → screen stays on the
+        sysmon frame)."""
+        mac = (args or {}).get("mac") or getattr(self, "mac", None)
+        if not mac:
+            return {"success": True, "stopped": 0}
+        kinds = [k for (m, k) in list(self._live_tasks.keys()) if m == mac]
+        for kind in kinds:
+            self.live_job_stop({"mac": mac, "kind": kind})
+        return {"success": True, "stopped": len(kinds)}
+
     def live_job_list(self, args: dict) -> dict:
         mac = args.get("mac")
         jobs = []
