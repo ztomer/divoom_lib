@@ -56,6 +56,29 @@ async def test_fifo_single_submit(loop, queue):
     assert result == 42
 
 
+# ── deadlock regression: submit_async FROM the queue's own loop ────────────
+
+
+def test_submit_async_from_queue_own_loop_does_not_deadlock(loop, queue):
+    """A live job runs ON the device loop and awaits submit_async. The old
+    submit_async routed through the blocking submit() — run_coroutine_threadsafe
+    + .result() targeting the SAME loop it was blocking → deadlock, so the
+    live-widget push hung forever (no frame, no error). HW-found. Now an on-loop
+    caller enqueues with a direct await."""
+    ran = []
+
+    async def work():
+        ran.append("x")
+        return 42
+
+    async def caller():        # runs ON the queue's loop, like a live job
+        return await queue.submit_async(work())
+
+    fut = asyncio.run_coroutine_threadsafe(caller(), loop)
+    assert fut.result(timeout=5) == 42      # TimeoutError here == regressed
+    assert ran == ["x"]
+
+
 # ── result / exception propagation ────────────────────────────────────────
 
 

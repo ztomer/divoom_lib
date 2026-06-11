@@ -289,10 +289,33 @@ class CommandQueue:
 
     async def submit_async(self, coro, token: Any = None,
                            timeout: float | None | object = _UNSET) -> Any:
-        """Submit and await from async code on any loop."""
-        return await asyncio.wrap_future(
-            self.submit(coro, token=token, timeout=timeout)
-        )
+        """Submit and await from async code on any loop.
+
+        When the caller is ALREADY running on the queue's own loop (e.g. a live
+        job created on the device loop), we must NOT route through the sync
+        ``submit()`` — it blocks the loop on ``run_coroutine_threadsafe(_add,
+        self._loop).result()`` while ``_add`` can only run on that same, now
+        blocked, loop → deadlock (the live-widget push hung forever, silently).
+        On the device loop we enqueue with a direct ``await self._add(...)``."""
+        try:
+            on_queue_loop = asyncio.get_running_loop() is self._loop
+        except RuntimeError:
+            on_queue_loop = False
+
+        if not on_queue_loop:
+            return await asyncio.wrap_future(
+                self.submit(coro, token=token, timeout=timeout))
+
+        if self._stopped:
+            coro.close()
+            raise QueueStopped("queue is stopped")
+        fut: concurrent.futures.Future = concurrent.futures.Future()
+        await self._add(coro, fut, token, timeout)
+        if fut.done():
+            exc = fut.exception()
+            if isinstance(exc, (QueueFull, QueueStopped)):
+                raise exc
+        return await asyncio.wrap_future(fut)
 
     async def _add(self, coro, fut: concurrent.futures.Future,
                    token: Any, per_item_timeout: float | None | object) -> None:

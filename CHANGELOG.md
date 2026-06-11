@@ -5,6 +5,22 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Live-widget on-device sync — deadlock fix (HW, 2026-06-11)
+
+Live widgets (stocks / sysmon / weather) never reached the device: e2e was 100%
+broken by a deadlock found only with hardware on hand. A live job runs on the
+daemon's device loop and awaits `CommandQueue.submit_async`, whose impl called
+the synchronous `submit()` — `run_coroutine_threadsafe(_add, self._loop)
+.result()` targeting the *same* loop it was blocking, so `_add` could never run.
+The push hung forever (10s timeout swallowed, no frame, no error); direct
+`device_call` worked because it runs on the socket thread, not the device loop.
+
+- `submit_async` now detects it's already on the queue's loop and enqueues with
+  a direct `await self._add(...)` instead of the blocking `submit()`.
+- HW-verified on Ditoo: sysmon + stocks stream frames via 0x8B, weather via
+  0x5F. +1 regression test (submit_async from the queue's own loop must not
+  deadlock).
+
 ## Socket Interface Hardening — 2026-06-11
 
 The daemon's socket is a privilege boundary (it owns the BLE device + reads

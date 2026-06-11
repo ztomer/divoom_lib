@@ -34,10 +34,21 @@ round's planning doc.
   channel on device (esp. **Divoom Max**). Suspected: `0x45` channel-switch is
   rejected while a prior drawing stream is active → clear/interrupt active loops
   first. (Long-standing "Divoom Max channel-switch bug" open thread.)
-- `HW` **`get_*` read-backs time out on real devices** (brightness/work-mode/
-  scoreboard/volume). Task #20. Affects UI initializing to true device state.
-- `HW` **Live-widget on-device sync** (stocks / system-monitor / weather) — the
-  backend streams frames; **end-to-end hardware verification still pending**.
+- `DONE` **`get_*` read-backs** (task #20, HW-verified 2026-06-11 on 4 models).
+  Root cause was NOT a timeout — reads return <0.1s. It was a STALE read: the
+  device emits an unsolicited 0x46 on state change and the manual readers
+  (get_brightness/get_light_mode) skipped the queue drain, so they lagged one
+  step behind (set 60 → read 25). Fixed with `Divoom.drain_notifications()`;
+  round-trip now exact. The 0x76 get-name query returns only a 2-char suffix on
+  every model, so `get_device_name` prefers the advertised name.
+- `DONE` **Live-widget on-device sync** (stocks / sysmon / weather, HW-verified
+  2026-06-11 on Ditoo). e2e was 100% broken by a DEADLOCK: live jobs run on the
+  device loop and await `CommandQueue.submit_async`, whose old impl called the
+  blocking `submit()` (`run_coroutine_threadsafe(_add, self._loop).result()`)
+  targeting the same loop it was blocking → the push hung forever, no frame, no
+  error. Fixed: an on-loop caller now enqueues with a direct `await self._add`.
+  All three widgets now stream frames to the device (sysmon/stocks via 0x8B,
+  weather via 0x5F).
 
 ### GUI / UX
 - `VERIFY` **Monthly Best gallery animated previews** — previews should loop, not end on
