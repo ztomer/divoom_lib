@@ -38,7 +38,10 @@ class BLETransport(DeviceTransport):
             self.client = cfg.client
         elif self.mac:
             from .divoom import BleakClient
-            self.client = BleakClient(self.mac)
+            # BLE Hardening P2: subscribe to the OS-level disconnect signal so a
+            # drop flips our health state IMMEDIATELY instead of being inferred
+            # from the next failed write (macOS CoreBluetooth's is_connected lags).
+            self.client = BleakClient(self.mac, disconnected_callback=self._on_os_disconnect)
         else:
             self.client = None
 
@@ -72,6 +75,21 @@ class BLETransport(DeviceTransport):
     @property
     def is_connected(self) -> bool:
         return bool(self.client and self.client.is_connected)
+
+    @property
+    def is_alive(self) -> bool:
+        """BLE Hardening P2: the HONEST liveness — connected per the OS AND no
+        pending drop signal (callback or inferred write failure). Live jobs /
+        wall consult this before pushing so they self-heal instead of blasting
+        into a dead link."""
+        return self.is_connected and not self._connection_likely_broken
+
+    def _on_os_disconnect(self, _client) -> None:
+        """bleak fires this on the OS event loop when the link drops. Flag the
+        link broken so is_alive() reports the truth before the next write."""
+        self._connection_likely_broken = True
+        self._notifications_started = False
+        self.logger.warning("OS-level BLE disconnect for %s", self.mac)
 
     async def connect(self) -> None:
         if not self.mac:
@@ -115,7 +133,7 @@ class BLETransport(DeviceTransport):
         if not is_mock:
             if not self.client or getattr(self.client, "address", None) != self.mac:
                 from .divoom import BleakClient
-                self.client = BleakClient(self.mac)
+                self.client = BleakClient(self.mac, disconnected_callback=self._on_os_disconnect)
 
         if not self.client.is_connected:
             try:

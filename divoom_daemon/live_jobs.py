@@ -5,10 +5,22 @@ from divoom_lib.utils import media_source
 
 logger = logging.getLogger("divoom_daemon.live_jobs")
 
-async def _push_image_coro(device_owner, mac, params, frame_path):
+async def _ensure_live_device(device_owner, mac, params):
+    """BLE Hardening P2: hand back a device that's genuinely ALIVE, self-healing
+    a dropped link with Phase 1's bounded retry. Raises a typed reason when it
+    can't recover so the loop logs + skips that tick instead of blasting a dead
+    link (the OS disconnect_callback already flipped is_alive to False)."""
+    from divoom_lib.ble_connection import ensure_connected, BleConnectionError
     dev = await device_owner.get_live_device(mac, params)
-    if not getattr(dev, "is_connected", False):
-        await dev.connect()
+    if not getattr(dev, "is_alive", getattr(dev, "is_connected", False)):
+        res = await ensure_connected(dev, attempts=2, attempt_timeout=8.0)
+        if not res.ok:
+            raise BleConnectionError(res)
+    return dev
+
+
+async def _push_image_coro(device_owner, mac, params, frame_path):
+    dev = await _ensure_live_device(device_owner, mac, params)
     await dev.display.show_image(str(frame_path))
 
 async def push_image_to_device(device_owner, mac, params, frame_path):
@@ -18,9 +30,7 @@ async def push_image_to_device(device_owner, mac, params, frame_path):
 async def _push_weather_coro(device_owner, mac, params, temp_c, weather_type):
     from divoom_lib.system.weather import Weather
     from divoom_lib.models import COMMANDS
-    dev = await device_owner.get_live_device(mac, params)
-    if not getattr(dev, "is_connected", False):
-        await dev.connect()
+    dev = await _ensure_live_device(device_owner, mac, params)
     await dev.send_command(
         COMMANDS["set light mode"],
         [0x01, 0x00, 0xFF, 0xFF, 0xFF, 0x00],

@@ -80,7 +80,17 @@ typed `timeout` reason in 16.4s). Original spec below.
   count, the typed failure reasons, and that a failed reconnect returns
   `ok=False` (not a live-looking handle).
 
-### Phase 2 — OS disconnect callback + health (W4, W5, W11)
+### Phase 2 — OS disconnect callback + health — **SHIPPED (live jobs)** (W4, W5, W11)
+Done: `BleakClient(..., disconnected_callback=_on_os_disconnect)` on both
+construction sites → a drop flips state immediately (no inference lag); new
+`is_alive` (connected AND no pending drop) on transport → connection → Divoom.
+Live jobs consult `is_alive` and self-heal via Phase 1 `ensure_connected`
+(`_ensure_live_device`); the cached background device is rebuilt when its link
+dies; an unrecoverable drop skips the tick (loop survives) with a typed reason.
++6 tests (fault-injected OS drop + live-job self-heal). HW-verified. **Wall
+self-heal deferred to Phase 3** (handled with the bounded-concurrency rework).
+Original spec below.
+
 - Pass `disconnected_callback=` to `BleakClient` so a drop flips
   `ConnectionState` immediately (no inference lag). Keep the write-failure
   inference as a fallback.

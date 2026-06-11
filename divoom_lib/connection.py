@@ -30,6 +30,12 @@ class DivoomConnection(DeviceTransport):
         return self._active_transport.is_connected
 
     @property
+    def is_alive(self) -> bool:
+        """BLE Hardening P2: honest liveness (OS-connected AND no pending drop).
+        Falls back to is_connected on transports that don't track it (LAN/SPP)."""
+        return getattr(self._active_transport, "is_alive", self._active_transport.is_connected)
+
+    @property
     def use_spp(self) -> bool:
         return self._use_spp
 

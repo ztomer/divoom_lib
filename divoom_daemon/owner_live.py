@@ -101,7 +101,8 @@ class OwnerLiveMixin:
         # rebuilding+reconnecting every loop iteration (the symptom would be a
         # constant 5s reconnect churn / "shows last image").
         cached = self._live_devices.get(mac)
-        if cached is not None and getattr(cached, "is_connected", False):
+        if cached is not None and getattr(cached, "is_alive",
+                                          getattr(cached, "is_connected", False)):
             return cached
         # For MatrixWall
         if mac == "MatrixWall":

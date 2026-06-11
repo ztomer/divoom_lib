@@ -31,6 +31,12 @@ class FakeBleDevice:
     def is_connected(self) -> bool:
         return True if self._lie else self._connected
 
+    @property
+    def is_alive(self) -> bool:
+        # P2 honest liveness: the REAL state, even when is_connected lies (the OS
+        # disconnect callback flips this immediately; drop() simulates it).
+        return self._connected
+
     async def connect(self):
         self.connect_calls += 1
         await asyncio.sleep(0)

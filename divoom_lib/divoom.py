@@ -285,6 +285,11 @@ class Divoom:
     def is_connected(self) -> bool:
         return self._conn.is_connected
 
+    @property
+    def is_alive(self) -> bool:
+        """BLE Hardening P2: honest liveness — connected AND no pending drop."""
+        return getattr(self._conn, "is_alive", self._conn.is_connected)
+
     # ── Transport Layer Awareness ─────────────────────────────────────────────
 
     @property
