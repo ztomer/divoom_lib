@@ -69,6 +69,13 @@ Plan: `docs/PLANNING_BLE_HARDENING.md`.
   round-trip now exact on Ditoo/Pixoo/Timoo/Tivoo-Max. The 0x76 "get name" query
   returns only a 2-char suffix on every model, so `get_device_name` prefers the
   advertised name the lib already holds.
+- **P3b — wall HW verification + lifecycle leak fix (4 screens)**: all-real wall
+  connects 4/4 + pushes to every screen; a partial wall (3 real + 1 bogus MAC)
+  connects 3/4 and pushes to the 3 real screens with the dead slot captured
+  per-slot — P3 partial-tolerance proven on hardware. Fixed a leak HW surfaced:
+  `wall_configure` dropped `self._wall` without disconnecting, so clearing/
+  reconfiguring a wall leaked every screen's link and the next build timed out;
+  `_drop_current_wall` now disconnects first (+4 tests).
 - **P6 — connection-state observability**: `ble_connection.derive_connection_state`
   + `device_status.connection_state` (DISCONNECTED / CONNECTED / DEGRADED);
   one-line transition logging. The appbar polls it on a 4s heartbeat

@@ -50,9 +50,13 @@ Claude) should read this on entry and **update it at the end of every round**
   `Divoom.drain_notifications()`, called by get_brightness/get_light_mode;
   round-trip now exact. 0x76 get-name returns a 2-char suffix on every model →
   `get_device_name` prefers the advertised name. +9 tests.
-  **Open follow-ups (deferred, not blocking):** (c) wall self-heal is
-  HW-untested (needs 2+ devices — IN PROGRESS this session, 4 devices on hand);
-  (d) P6 physical flag-consolidation is cleanup, not correctness (flags already
+  Wall HW-VERIFIED (4 screens): all-real wall 4/4 connect+push; partial wall
+  (3 real + 1 bogus) 3/4 + pushes to the 3, dead slot captured per-slot. Fixed a
+  wall lifecycle leak HW surfaced (`wall_configure` dropped `_wall` without
+  disconnecting → reconfigure timed out; now `_drop_current_wall` disconnects).
+  **Open follow-ups (deferred, not blocking):** mid-session per-slot wall
+  reconnect stays unit-tested (can't force a real drop without power-cycling);
+  P6 physical flag-consolidation is cleanup, not correctness (flags already
   honest). Remaining `get_*` reads can adopt the drain / `read_with_retry`.
 
 - **R43 SHIPPED (2026-06-10) — Permissions Dialog, Settings Backup/Restore, Preset Files, and Wall Split Cache.** Plan+outcome

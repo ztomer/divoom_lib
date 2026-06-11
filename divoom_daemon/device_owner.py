@@ -330,16 +330,30 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
             logger.warning(f"scan failed: {e}")
             return {"success": False, "error": str(e), "devices": []}
 
+    def _drop_current_wall(self) -> None:
+        """Disconnect + drop the current wall's BLE links. Without this, clearing
+        or RECONFIGURING a wall leaked every screen's connection (HW-confirmed:
+        the next build then times out reconnecting devices the daemon still
+        held)."""
+        w = self._wall
+        if w is not None and hasattr(w, "disconnect"):
+            try:
+                self._run_device(w.disconnect())
+            except Exception as e:
+                logger.debug(f"wall teardown disconnect: {e}")
+        self._wall = None
+
     def wall_configure(self, args: dict) -> dict:
         slots = args.get("slots") or {}
         cell = int(args.get("cell_size", 16) or 16)
         if not slots:
+            self._drop_current_wall()
             self._wall_slots = {}
-            self._wall = None
             return {"success": True, "wall": False}
         if (self._wall is not None and slots == self._wall_slots
                 and getattr(self._wall, "is_connected", False)):
             return {"success": True, "wall": True}
+        self._drop_current_wall()    # release the old wall before rebuilding
         self._wall_slots = slots
 
         async def _build():

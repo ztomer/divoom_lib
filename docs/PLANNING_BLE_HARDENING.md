@@ -111,7 +111,17 @@ publishing `self._server`, killing a startup race where a concurrent `stop()`
 nulled it mid-setup → flaky "Connection refused" in CI). +8 fault-injected
 tests (serialized handshake, per-loop lock, bounded concurrency, per-slot
 results, partial-ok, total-failure reason, slot self-heal, unrecoverable slot).
-Original spec below.
+
+HW-VERIFIED (4 screens: Ditoo/Pixoo/Timoo/Tivoo-Max). All-real wall connects
+4/4 + pushes to every screen. Partial wall (3 real + 1 bogus MAC) connects 3/4
+— the bogus slot reports a typed `timeout`, the wall stays usable, and the push
+reaches the 3 real screens while the dead slot's failure is captured per-slot
+without blocking the rest. Mid-session per-slot reconnect remains unit-tested
+(can't force a real drop without power-cycling). HW also surfaced + fixed a
+wall LIFECYCLE leak: `wall_configure` nulled `self._wall` without disconnecting,
+so clearing/reconfiguring a wall leaked every screen's link and the next build
+timed out reconnecting devices the daemon still held — now `_drop_current_wall`
+disconnects first (+4 tests). Original spec below.
 
 - A process-wide `asyncio.Lock` (or small semaphore) around the *connect*
   operation so wall + live jobs don't connect-storm CoreBluetooth (connect is
