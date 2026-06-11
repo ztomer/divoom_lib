@@ -35,6 +35,10 @@ DEFAULT_CONNECT_RETRIES = 4
 CONNECT_RETRY_BASE_DELAY = 0.06   # grows 0.06, 0.12, 0.24, 0.48 (~0.9s worst case)
 CONNECT_RETRY_MAX_DELAY = 0.5
 
+# Cap the client's reply buffer too — a buggy/hostile daemon shouldn't be able
+# to OOM the GUI by never sending a newline. Matches the server's frame cap.
+MAX_REPLY_BYTES = 16 * 1024 * 1024
+
 # Env overrides so any DaemonClient (incl. the GUI) can target a remote daemon
 # instead of the local Unix socket.
 ENV_HOST = "DIVOOM_DAEMON_HOST"
@@ -192,6 +196,8 @@ class DaemonClient:
                         if not chunk:
                             break
                         buf += chunk
+                        if len(buf) > MAX_REPLY_BYTES:
+                            return {"success": False, "error": "reply exceeds max size"}
                     msgs, _ = iter_messages(buf)
                     return msgs[0] if msgs else {"success": False, "error": "no reply"}
             except (OSError, ValueError) as e:

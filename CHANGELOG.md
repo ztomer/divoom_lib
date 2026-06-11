@@ -5,6 +5,31 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Socket Interface Hardening — 2026-06-11
+
+The daemon's socket is a privilege boundary (it owns the BLE device + reads
+notification content). Hardened against untrusted/buggy clients + resource
+exhaustion. Plan: `docs/PLANNING_SOCKET_HARDENING.md`.
+
+- **Unix socket is now owner-only** (`chmod 0600` after bind) — `bind()` honoured
+  only the umask, so any local user could previously drive the daemon.
+- **Max message-size cap** on the server request read AND the client reply read
+  (16 MiB) — a client/daemon that never sends a newline can no longer OOM the
+  peer; oversized frames get a typed error, not unbounded buffering.
+- **Total read deadline** (30 s) for one request line — closes the slow-loris
+  hole where the old per-`recv` 5 s timeout let a byte-every-4 s client live
+  forever.
+- **Handler exception safety** — a handler that raises now returns a generic
+  `{"success":false,"error":"internal error"}` (detail logged, not leaked) instead
+  of killing the connection thread and stranding the client.
+- **Bounded concurrent connections** (32) + **subscriber cap** (16) — a
+  connection/subscribe flood is rejected ("server busy" / "subscriber limit")
+  instead of exhausting threads + sockets.
+- **Request validation** — non-string `command` / non-dict `args` are rejected /
+  coerced before reaching a handler.
+- Limits are `SocketServer` constructor params with safe defaults; TCP token
+  auth (constant-time compare) unchanged. +11 real-socket tests.
+
 ## BLE Hardening & Foolproofing — 2026-06-11 (Phases 1–6 + daemon-socket)
 
 Make every Bluetooth (and daemon-socket) interaction honest, self-healing, and

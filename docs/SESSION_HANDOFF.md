@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **SOCKET INTERFACE HARDENING SHIPPED (2026-06-11).** Plan
+  `docs/PLANNING_SOCKET_HARDENING.md`. The daemon socket is a privilege boundary
+  (owns BLE + reads notifications). Landed: Unix socket `chmod 0600`; max
+  message-size cap (server read + client reply, 16 MiB); total read deadline
+  (30 s, kills slow-loris); handler exception safety (generic "internal error",
+  detail logged not leaked, thread survives); bounded concurrent connections
+  (32, "server busy") + subscriber cap (16); request validation (command str /
+  args dict). Limits are `SocketServer` params w/ safe defaults; TCP token auth
+  unchanged. +11 real-socket tests (`tests/test_socket_hardening.py`).
+
 - **BLE HARDENING P1–P6 + daemon-socket SHIPPED (2026-06-11).** Plan
   `docs/PLANNING_BLE_HARDENING.md` (all phases marked SHIPPED inline). Commits
   156857bd (P1), be12e0dc (P2), d7036cf1 (P3), 516995fb (daemon-socket),
