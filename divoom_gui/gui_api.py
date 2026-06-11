@@ -104,7 +104,9 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         # Tie the daemon's lifecycle to the GUI: stop the daemon we spawned so it
         # doesn't linger after the window closes (clean kill switch).
         try:
-            if self._daemon_client is not None:
+            from divoom_lib.lifecycle_config import (
+                get_keep_daemon_alive, should_stop_daemon_on_dashboard_quit)
+            if self._daemon_client is not None and should_stop_daemon_on_dashboard_quit(get_keep_daemon_alive()):
                 self._daemon_client.shutdown()
         except Exception as e:
             logger.debug(f"daemon shutdown on close skipped: {e}")
@@ -212,6 +214,24 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     def set_keep_daemon_alive(self, value) -> bool:
         from divoom_lib.lifecycle_config import set_keep_daemon_alive
         return set_keep_daemon_alive(bool(value))
+
+    def live_job_start(self, mac: str, kind: str, params: dict) -> dict:
+        client = self._client()
+        if client is None:
+            return {"success": False, "error": "daemon unavailable"}
+        return client.live_job_start(mac, kind, params)
+
+    def live_job_stop(self, mac: str, kind: str) -> dict:
+        client = self._client()
+        if client is None:
+            return {"success": False, "error": "daemon unavailable"}
+        return client.live_job_stop(mac, kind)
+
+    def live_job_list(self, mac: str | None = None) -> dict:
+        client = self._client()
+        if client is None:
+            return {"success": False, "error": "daemon unavailable"}
+        return client.live_job_list(mac)
 
     def send_notification(self, app_type, text="") -> bool:
         t = int(app_type)
@@ -399,6 +419,9 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
 
     def get_brightness(self) -> int | None:
         return self.tools.get_brightness()
+
+    def get_device_name(self) -> str | None:
+        return self.tools.get_device_name()
 
     def get_work_mode(self) -> int | None:
         return self.tools.get_work_mode()

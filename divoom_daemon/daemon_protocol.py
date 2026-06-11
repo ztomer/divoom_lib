@@ -285,6 +285,15 @@ class DaemonClient:
     def probe_lan(self) -> dict:
         return self.send_command("probe_lan")
 
+    def live_job_start(self, mac: str, kind: str, params: dict) -> dict:
+        return self.send_command("live_job_start", {"mac": mac, "kind": kind, "params": params})
+
+    def live_job_stop(self, mac: str, kind: str) -> dict:
+        return self.send_command("live_job_stop", {"mac": mac, "kind": kind})
+
+    def live_job_list(self, mac: str | None = None) -> dict:
+        return self.send_command("live_job_list", {"mac": mac})
+
     def sync_artwork(self, file_id: str, *, default_size: int = 16,
                      target: str = "device") -> dict:
         """Ask the daemon to download a gallery asset and stream it to the owned

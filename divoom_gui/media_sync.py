@@ -53,107 +53,27 @@ class MediaSyncMixin(GallerySyncMixin):
             logger.error(f"apply_system_stats failed: {e}")
             return json.dumps({"success": False, "error": str(e)})
 
-    # Poll interval for the now-playing watcher. AppleScript reads are cheap and
-    # a device push only happens when the track actually changes, so a short
-    # interval gives a near-immediate "listen for album change" feel.
-    _MUSIC_POLL_SECONDS = 1.5
-
-    def _ensure_device_ready(self) -> bool:
-        """Reconnect the active single BLE target if it went idle. Returns False
-        only if a reconnect was needed and failed."""
-        dev = self.current_divoom
-        if dev and not dev.lan and not dev.is_connected:
-            logger.info("Music Sync: Device is offline. Reconnecting BLE...")
-            try:
-                self._run_async(dev.connect())
-            except Exception as cx:
-                logger.warning(f"Music Sync: Auto-reconnect failed: {cx}")
-                return False
-        return True
-
-    def _push_cover_for_track(self, track: str, artist: str, source: str) -> bool:
-        """Fetch + render + push the cover art for one track and refresh the
-        track cache. Single code path shared by the watcher loop and the
-        immediate push on enable. Returns True if a frame was pushed."""
-        art_url = media_source.fetch_album_art_url(track, artist)
-        if not art_url:
-            self.current_track_cache = {
-                "track": track, "artist": artist, "source": source, "artwork_url": ""
-            }
-            return False
-
-        size = self._active_device_size()
-        out_path = media_source.render_and_downsample_artwork(art_url, size=size)
-        preview_url = ""
-        pushed = False
-        if out_path and out_path.exists():
-            preview_url = self._frame_to_data_url(out_path)
-            logger.info(f"Music Sync: Push cover art frame ({size}px): {out_path}")
-            try:
-                pushed = bool(self._push_frame(out_path, size))
-                if not pushed:
-                    logger.warning("Music Sync: no connected target for cover art")
-            except Exception as e:
-                logger.error(f"Failed to stream artwork: {e}")
-        self.current_track_cache = {
-            "preview": preview_url, "track": track, "artist": artist,
-            "source": source, "artwork_url": art_url,
-        }
-        return pushed
-
-    def _sync_now_playing(self, force: bool = False) -> None:
-        """Read the current track and push its cover if it changed (or if
-        `force`, e.g. right after the user enables sync)."""
-        if not self._ensure_device_ready():
-            return
-        track_info = media_source.get_current_playing_track()
-        if not track_info:
-            self.current_track_cache = None
-            self._last_synced_track = None
-            self._last_synced_artist = None
-            return
-        track = track_info.get("track")
-        artist = track_info.get("artist")
-        source = track_info.get("source")
-        if force or track != self._last_synced_track or artist != self._last_synced_artist:
-            logger.info(f"Music Sync: New track: {track} by {artist} ({source})")
-            self._last_synced_track = track
-            self._last_synced_artist = artist
-            self._push_cover_for_track(track, artist, source)
-
-    def _music_sync_loop(self):
-        self._last_synced_track = None
-        self._last_synced_artist = None
-        while self.music_sync_active:
-            try:
-                self._sync_now_playing()
-            except Exception as e:
-                logger.error(f"Music sync error: {e}")
-            time.sleep(self._MUSIC_POLL_SECONDS)
-
-    def toggle_music_sync(self, enable: bool) -> bool:
-        logger.info(f"GUI Action: Toggle music sync to {enable}")
-        self.music_sync_active = enable
-        if enable:
-            # Push the currently-playing cover immediately rather than waiting
-            # for the watcher's first poll (item b: push immediately).
-            self._last_synced_track = None
-            self._last_synced_artist = None
-            try:
-                threading.Thread(
-                    target=lambda: self._sync_now_playing(force=True), daemon=True
-                ).start()
-            except Exception as e:
-                logger.warning(f"Music Sync: immediate push failed to start: {e}")
-            if not self.music_thread or not self.music_thread.is_alive():
-                self.music_thread = threading.Thread(target=self._music_sync_loop, daemon=True)
-                self.music_thread.start()
-        return True
-
     def get_current_track_info(self) -> str:
-        if self.current_track_cache:
-            return json.dumps(self.current_track_cache)
-        return json.dumps({})
+        try:
+            track_info = media_source.get_current_playing_track()
+            if not track_info:
+                return json.dumps({})
+            track = track_info.get("track")
+            artist = track_info.get("artist")
+            source = track_info.get("source")
+            art_url = media_source.fetch_album_art_url(track, artist)
+            preview_url = ""
+            if art_url:
+                size = self._active_device_size()
+                out_path = media_source.render_and_downsample_artwork(art_url, size=size)
+                if out_path and out_path.exists():
+                    preview_url = self._frame_to_data_url(out_path)
+            return json.dumps({
+                "track": track, "artist": artist, "source": source,
+                "artwork_url": art_url, "preview": preview_url
+            })
+        except Exception:
+            return json.dumps({})
 
     def push_music_cover_now(self) -> str:
         """Manual cover-art push triggered from the music card UI button.
@@ -392,43 +312,88 @@ class MediaSyncMixin(GallerySyncMixin):
             logger.error(f"trigger_notification failed: {e}")
             return json.dumps({"success": False, "error": str(e)})
 
-    # ── 1. ACTIVE LIVE WIDGETS SYNC LOOPS ──
-    def _sysmon_sync_loop(self):
-        while getattr(self, "sysmon_sync_active", False):
-            try:
-                self.apply_system_stats()
-            except Exception as e:
-                logger.error(f"Sysmon sync loop error: {e}")
-            time.sleep(5.0)
+    # ── 1. ACTIVE LIVE WIDGETS SYNC LOOPS (Daemon-delegated) ──
+    def _active_device_mac(self) -> str | None:
+        if self.wall_slots:
+            return "MatrixWall"
+        dev = self.current_divoom
+        if not dev:
+            return None
+        if dev.lan:
+            return f"LAN:{dev.lan.device_ip}"
+        mac = getattr(getattr(dev, "_conn", None), "mac", None) or getattr(dev, "mac", None)
+        return mac
+
+    def _get_live_params(self) -> dict:
+        params = {"size": self._active_device_size()}
+        if self.wall_slots:
+            params["wall_slots"] = self.wall_slots
+        dev = self.current_divoom
+        if dev and dev.lan:
+            params["lan_token"] = getattr(dev.lan, "local_token", 0)
+        return params
 
     def toggle_sysmon_sync(self, enable: bool) -> bool:
         logger.info(f"GUI Action: Toggle sysmon sync to {enable}")
         self.sysmon_sync_active = enable
+        client = self._client()
+        if client is None:
+            return False
+        mac = self._active_device_mac()
+        if not mac:
+            return False
         if enable:
-            if not getattr(self, "sysmon_thread", None) or not self.sysmon_thread.is_alive():
-                self.sysmon_thread = threading.Thread(target=self._sysmon_sync_loop, daemon=True)
-                self.sysmon_thread.start()
+            client.live_job_start(mac, "sysmon", self._get_live_params())
+        else:
+            client.live_job_stop(mac, "sysmon")
         return True
-
-    def _stocks_sync_loop(self):
-        while getattr(self, "stocks_sync_active", False):
-            try:
-                symbol = getattr(self, "stocks_symbol", "")
-                if symbol:
-                    self.apply_stock_ticker(symbol)
-            except Exception as e:
-                logger.error(f"Stocks sync loop error: {e}")
-            time.sleep(15.0)
 
     def toggle_stocks_sync(self, enable: bool, symbol: str = "") -> bool:
         logger.info(f"GUI Action: Toggle stocks sync to {enable} for symbol {symbol}")
         self.stocks_sync_active = enable
         if symbol:
             self.stocks_symbol = symbol
+        client = self._client()
+        if client is None:
+            return False
+        mac = self._active_device_mac()
+        if not mac:
+            return False
         if enable:
-            if not getattr(self, "stocks_thread", None) or not self.stocks_thread.is_alive():
-                self.stocks_thread = threading.Thread(target=self._stocks_sync_loop, daemon=True)
-                self.stocks_thread.start()
+            params = self._get_live_params()
+            params["symbol"] = symbol or getattr(self, "stocks_symbol", "")
+            client.live_job_start(mac, "stocks", params)
+        else:
+            client.live_job_stop(mac, "stocks")
+        return True
+
+    def toggle_music_sync(self, enable: bool) -> bool:
+        logger.info(f"GUI Action: Toggle music sync to {enable}")
+        self.music_sync_active = enable
+        client = self._client()
+        if client is None:
+            return False
+        mac = self._active_device_mac()
+        if not mac:
+            return False
+        if enable:
+            client.live_job_start(mac, "music", self._get_live_params())
+        else:
+            client.live_job_stop(mac, "music")
+        return True
+
+    def toggle_weather_sync(self, enable: bool) -> bool:
+        logger.info(f"GUI Action: Toggle weather sync to {enable}")
+        client = self._client()
+        if client is None:
+            return False
+        mac = self._active_device_mac()
+        if not mac:
+            return False
+        if enable:
+            client.live_job_start(mac, "weather", self._get_live_params())
+        else:
+            client.live_job_stop(mac, "weather")
         return True
 
     # ── 2. AUDIO VISUALIZER API BINDINGS ──

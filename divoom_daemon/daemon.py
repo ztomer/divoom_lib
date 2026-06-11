@@ -86,6 +86,9 @@ class DivoomDaemon:
         r["scan"] = self._device_owner.scan
         r["wall_configure"] = self._device_owner.wall_configure
         r["probe_lan"] = lambda _: self._device_owner.probe_lan()
+        r["live_job_start"] = self._device_owner.live_job_start
+        r["live_job_stop"] = self._device_owner.live_job_stop
+        r["live_job_list"] = self._device_owner.live_job_list
         r["sync_artwork"] = self._device_owner.sync_artwork
         r["custom_art_push"] = self._device_owner.custom_art_push
         r["custom_art_query_page"] = self._device_owner.custom_art_query_page
@@ -100,12 +103,12 @@ class DivoomDaemon:
         the server shortly after so the client receives the ack (a clean kill
         switch for the single-owner daemon)."""
         from divoom_daemon.daemon_protocol import EVENT_SHUTDOWN
+        try:
+            self.broadcast({"type": EVENT_SHUTDOWN})
+        except Exception:
+            pass
         def _later():
             import time
-            try:
-                self.broadcast({"type": EVENT_SHUTDOWN})
-            except Exception:
-                pass
             time.sleep(0.25)
             try:
                 self.stop()

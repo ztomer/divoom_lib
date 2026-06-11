@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from divoom_daemon.owner_art import OwnerArtMixin
+from divoom_daemon.owner_live import OwnerLiveMixin
 
 logger = logging.getLogger("divoom_daemon.device_owner")
 
@@ -27,7 +28,7 @@ def _json_safe(value):
     return str(value)
 
 
-class DeviceOwner(OwnerArtMixin):
+class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
     """Single owner of the BLE/LAN device connection and wall (R17 P5).
     Provides command handlers for device lifecycle and a send_notification
     method used by NotificationService."""
@@ -51,6 +52,7 @@ class DeviceOwner(OwnerArtMixin):
         self._cmd_queue = None                  # CommandQueue, created with loop
         self._hot_progress: dict = {"phase": "idle"}
         self._hot_progress_lock = threading.Lock()
+        OwnerLiveMixin.__init__(self)
 
     # ── device loop ──────────────────────────────────────────────────────
     def _device_loop(self):
@@ -468,6 +470,10 @@ class DeviceOwner(OwnerArtMixin):
 
     # ── lifecycle ────────────────────────────────────────────────────────
     def stop(self) -> None:
+        try:
+            self.stop_all_live_jobs()
+        except Exception:
+            pass
         if self._cmd_queue is not None:
             try:
                 self._cmd_queue.stop()

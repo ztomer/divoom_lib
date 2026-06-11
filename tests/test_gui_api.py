@@ -18,11 +18,18 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.presets_patcher = patch("pathlib.Path.exists", return_value=False)
         self.presets_patcher.start()
 
+        import tempfile
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.home_patcher = patch("pathlib.Path.home", return_value=Path(self.temp_dir.name))
+        self.home_patcher.start()
+
         self.api = DivoomGuiAPI()
         self.api.window = MagicMock()
 
     def tearDown(self):
         self.presets_patcher.stop()
+        self.home_patcher.stop()
+        self.temp_dir.cleanup()
 
     def test_window_controls(self):
         """Test native window minimize, maximize, and thread-delayed close controls."""

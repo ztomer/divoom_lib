@@ -18,10 +18,12 @@ window.DivoomTemplates.deviceSettings = `
                     <button id="device-name-save" class="glow-btn compact">Save</button>
                 </div>
 
+                <!-- R44 §3: the three 2-option pills share one fixed width and
+                     equal-width buttons so their left+right edges line up. -->
                 <!-- 2. Clock format -->
                 <div class="ds-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <span class="form-label" style="font-size:12px;">Clock format</span>
-                    <div class="tabs-row" role="tablist" id="hour24-seg" data-api="set_hour_type">
+                    <div class="tabs-row ds-pill-2" role="tablist" id="hour24-seg" data-api="set_hour_type">
                         <button class="tab-btn active" data-val="0">12-hour</button>
                         <button class="tab-btn" data-val="1">24-hour</button>
                     </div>
@@ -30,7 +32,7 @@ window.DivoomTemplates.deviceSettings = `
                 <!-- 3. Temperature unit -->
                 <div class="ds-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <span class="form-label" style="font-size:12px;">Temperature</span>
-                    <div class="tabs-row" role="tablist" id="tempf-seg" data-api="set_temp_unit">
+                    <div class="tabs-row ds-pill-2" role="tablist" id="tempf-seg" data-api="set_temp_unit">
                         <button class="tab-btn active" data-val="0">Celsius</button>
                         <button class="tab-btn" data-val="1">Fahrenheit</button>
                     </div>
@@ -39,7 +41,7 @@ window.DivoomTemplates.deviceSettings = `
                 <!-- 4. Power mode -->
                 <div class="ds-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <span class="form-label" style="font-size:12px;">Power mode</span>
-                    <div class="tabs-row" role="tablist" id="lowpower-seg" data-api="set_low_power">
+                    <div class="tabs-row ds-pill-2" role="tablist" id="lowpower-seg" data-api="set_low_power">
                         <button class="tab-btn active" data-val="0">Normal</button>
                         <button class="tab-btn" data-val="1">Low power</button>
                     </div>
@@ -56,7 +58,7 @@ window.DivoomTemplates.deviceSettings = `
                 <!-- 6. Orientation -->
                 <div class="ds-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <span class="form-label" style="font-size:12px;">Orientation</span>
-                    <div class="tabs-row" role="tablist" id="screen-dir-tabs">
+                    <div class="tabs-row" role="tablist" id="screen-dir-tabs" style="margin-right:0; margin-left:auto;">
                         <button class="tab-btn active" data-dir="0">0°</button>
                         <button class="tab-btn" data-dir="1">90°</button>
                         <button class="tab-btn" data-dir="2">180°</button>

@@ -160,6 +160,17 @@ class ToolsApi(ApiBase):
     def set_device_name(self, name: str) -> bool:
         return self._tool_call(lambda d: d.device.set_device_name(str(name)), "device name")
 
+    def get_device_name(self) -> str | None:
+        logger.info("GUI Action: Getting current device name...")
+        try:
+            target = self._current_divoom
+            if not target:
+                return None
+            return self._run_async(target.device.get_device_name())
+        except Exception as e:
+            logger.error(f"Device name get failed: {e}")
+            return None
+
     def set_auto_power_off(self, minutes: int) -> bool:
         from divoom_lib.system.device_settings import DeviceSettings
         return self._tool_call(lambda d: DeviceSettings(d).set_auto_power_off(int(minutes)), "auto power off")

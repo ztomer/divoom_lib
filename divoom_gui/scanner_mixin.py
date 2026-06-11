@@ -134,6 +134,11 @@ class ScannerMixin:
                 return False
 
             self.current_divoom = DaemonDeviceProxy(client, target="device")
+            if not self.current_divoom.is_connected:
+                logger.error("Daemon reported success but device is NOT connected.")
+                self.current_divoom = None
+                return False
+
             self._persist_last_connected(address)
             return True
         except Exception as e:

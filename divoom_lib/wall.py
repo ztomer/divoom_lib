@@ -122,6 +122,39 @@ class DivoomWall:
             self.min_x = 0
             self.min_y = 0
             
+        import json
+        import hashlib
+        config_str = json.dumps(self.device_configs, sort_keys=True)
+        config_hash = hashlib.sha256(config_str.encode("utf-8")).hexdigest()
+        
+        cache_dir = Path.home() / ".config" / "divoom-control" / "cache_wall"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        geom_file = cache_dir / "last_geometry.txt"
+        
+        geometry_changed = False
+        if geom_file.exists():
+            try:
+                old_hash = geom_file.read_text().strip()
+                if old_hash != config_hash:
+                    geometry_changed = True
+            except Exception:
+                geometry_changed = True
+        else:
+            geometry_changed = True
+            
+        if geometry_changed:
+            self.logger.info("Wall geometry changed. Purging wall cache...")
+            for f in cache_dir.glob("*"):
+                if f.is_file() and f.name != "last_geometry.txt":
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+            try:
+                geom_file.write_text(config_hash)
+            except Exception:
+                pass
+
         self.logger.info(f"Initialized DivoomWall (composite canvas size: {self.total_width}x{self.total_height} pixels)")
 
     async def connect(self) -> None:
@@ -165,13 +198,12 @@ class DivoomWall:
         cache_dir.mkdir(parents=True, exist_ok=True)
         
         import hashlib
-        # Compute a unique key based on file path, size, and modification time
-        file_hash = hashlib.md5(str(file_path).encode("utf-8")).hexdigest()[:8]
         try:
-            stat = Path(file_path).stat()
-            key = f"{Path(file_path).stem}_{file_hash}_{stat.st_size}_{int(stat.st_mtime)}"
+            with open(file_path, "rb") as f:
+                file_bytes = f.read()
+            file_hash = hashlib.sha256(file_bytes).hexdigest()[:16]
         except Exception:
-            key = f"{Path(file_path).stem}_{file_hash}"
+            file_hash = hashlib.sha256(str(file_path).encode("utf-8")).hexdigest()[:16]
             
         main_img = Image.open(file_path)
         is_ani = hasattr(main_img, 'is_animated') and main_img.is_animated
@@ -199,7 +231,7 @@ class DivoomWall:
             
             mac_clean = divoom.mac.replace(":", "_").replace("-", "_")
             ext = ".gif" if is_ani else ".png"
-            cached_file_path = cache_dir / f"{key}_{mac_clean}{ext}"
+            cached_file_path = cache_dir / f"{file_hash}_{width}x{height}_{left}_{upper}_{right}_{lower}_{size}_{mac_clean}{ext}"
             temp_path_str = str(cached_file_path)
             
             if cached_file_path.exists():

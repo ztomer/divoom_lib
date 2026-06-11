@@ -343,3 +343,14 @@ body.theme-light .arranger-node-image {
     justify-self: center;
 }
 .alarm-remove:hover { color: var(--error); }
+
+/* ── Segmented pills in Device Settings (equalized width and centered text) ── */
+#hour24-seg, #tempf-seg, #lowpower-seg {
+    display: flex;
+    width: 180px;
+}
+#hour24-seg .tab-btn, #tempf-seg .tab-btn, #lowpower-seg .tab-btn {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+}

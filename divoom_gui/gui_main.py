@@ -203,6 +203,19 @@ def main():
     # R40 §9: follow the daemon down if it shuts down while we're open AND the
     # lifecycles are shared (keep-alive off) — e.g. the menu bar's 'Quit Divoom'.
     _start_shutdown_follower(window)
+
+    def on_closing():
+        try:
+            from divoom_lib.lifecycle_config import (
+                get_keep_daemon_alive, should_stop_daemon_on_dashboard_quit)
+            if should_stop_daemon_on_dashboard_quit(get_keep_daemon_alive()):
+                from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
+                logger.info("Dashboard closing; stopping daemon (shared lifecycle).")
+                DaemonClient(DEFAULT_SOCKET_PATH, timeout=1.0).shutdown()
+        except Exception as e:
+            logger.debug(f"daemon shutdown on close failed: {e}")
+
+    window.events.closing += on_closing
     webview.start()
 
     # webview.start() blocks until the window closes. On close, when lifecycles

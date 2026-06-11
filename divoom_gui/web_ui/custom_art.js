@@ -21,11 +21,14 @@
   let selectedSlot = null;
   // assignments[page][slot] = {fileId, thumb} | null
   const assignments = Array.from({ length: PAGES }, () => new Array(SLOTS).fill(null));
+  let initialized = false;
 
   function init() {
+    if (initialized) return;
     const panel = document.getElementById("panel-design");
     if (!panel) return;
 
+    initialized = true;
     initPageTabs(panel);
     buildSlotGrid(panel);
     initLibraryClicks(panel);
@@ -261,6 +264,14 @@
         });
     });
   }
+
+  // Self-heal on tab changes to make sure initialization happens if
+  // templates were loaded after DOMContentLoaded.
+  window.addEventListener("tab-changed", (e) => {
+    if (e.detail && e.detail.tab === "pixel-art") {
+      init();
+    }
+  });
 
   // Bootstrap
   if (document.getElementById("panel-design")) {
