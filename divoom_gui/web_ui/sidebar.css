@@ -224,7 +224,27 @@
     align-items: center;
     justify-content: center;
     margin: 0 auto 8px auto;
+    /* R44 §7: anchor for the screen overlay. */
+    position: relative;
 }
+
+/* R44 §7: live content composited into the device's screen region. The rect
+   (top/left/size) defaults to the central LED area and is overridden per model
+   via CSS custom properties set by app_globals.js (data-model). */
+.device-screen-overlay {
+    position: absolute;
+    left: var(--screen-x, 19%);
+    top: var(--screen-y, 19%);
+    width: var(--screen-w, 62%);
+    height: var(--screen-h, 62%);
+    background-size: cover;
+    background-position: center;
+    image-rendering: pixelated;
+    border-radius: var(--screen-radius, 2px);
+    pointer-events: none;
+    display: none;            /* shown only when a live frame is set */
+}
+.device-screen-overlay.has-frame { display: block; }
 
 /* R32 §C3: device switch dots — per-device colors, wraps for >4 devices.
    R33: moved outside the glass panel, sits below it in the sidebar. */

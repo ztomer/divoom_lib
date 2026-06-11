@@ -165,6 +165,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 setBar("bat", s.battery);
                 const img = document.getElementById("sysmon-device-preview");
                 if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
+                // R44 §7: when System Monitor is the active widget, mirror its
+                // frame into the lower-left device screen overlay too.
+                if (r.preview && selectedWidget === "sysmon" && window.setDevicePreview) {
+                    const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+                    if (mac && mac !== "None") window.setDevicePreview(mac, r.preview);
+                }
             } catch (e) { /* ignore */ }
         });
     }

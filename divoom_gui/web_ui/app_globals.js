@@ -45,10 +45,51 @@ window.deviceColor = function(key) {
     return `hsl(${h % 360}, 70%, 55%)`;
 };
 
-// ── R32 §C2: last-pushed device preview ───────────────────────────────
-// The device can't report its framebuffer, so we mirror the last image
-// this app pushed. setDevicePreview() is called from the image-push sites
-// (gallery, custom art); restoreDevicePreview() runs on connect / switch.
+// ── R32 §C2 / R44 §7: last-pushed device preview ──────────────────────
+// The device can't report its framebuffer, so we mirror the last frame this
+// app (or a daemon live job) pushed. R44 §7: the product PNG stays as the
+// device BODY; the frame is composited into the device's SCREEN region via the
+// #banner-device-screen overlay, so the preview shows what's on the device now.
+//
+// Per-model screen rectangle (percent of the product image). The matrix sits in
+// a different spot per model; tune here. Default covers the central LED area.
+window._DEVICE_SCREEN_RECTS = {
+    "tivoo-max": { x: 25, y: 20, w: 50, h: 44, r: 2 },
+    "tivoo":     { x: 22, y: 20, w: 56, h: 48, r: 2 },
+    "ditoo":     { x: 22, y: 27, w: 56, h: 45, r: 3 },
+    "timoo":     { x: 20, y: 20, w: 60, h: 56, r: 2 },
+    "timebox":   { x: 19, y: 19, w: 62, h: 62, r: 3 },
+    "pixoo64":   { x: 12, y: 12, w: 76, h: 76, r: 2 },
+    "pixoo":     { x: 15, y: 15, w: 70, h: 70, r: 2 },
+};
+
+window._applyDeviceScreenRect = function(name) {
+    const overlay = document.getElementById("banner-device-screen");
+    if (!overlay) return;
+    const n = (name || "").toLowerCase();
+    let rect = window._DEVICE_SCREEN_RECTS.pixoo;   // sensible default
+    for (const key of Object.keys(window._DEVICE_SCREEN_RECTS)) {
+        if (n.includes(key)) { rect = window._DEVICE_SCREEN_RECTS[key]; break; }
+    }
+    overlay.style.setProperty("--screen-x", rect.x + "%");
+    overlay.style.setProperty("--screen-y", rect.y + "%");
+    overlay.style.setProperty("--screen-w", rect.w + "%");
+    overlay.style.setProperty("--screen-h", rect.h + "%");
+    overlay.style.setProperty("--screen-radius", (rect.r || 2) + "px");
+};
+
+window._setScreenOverlayFrame = function(src) {
+    const overlay = document.getElementById("banner-device-screen");
+    if (!overlay) return;
+    if (src) {
+        overlay.style.backgroundImage = `url("${src}")`;
+        overlay.classList.add("has-frame");
+    } else {
+        overlay.style.backgroundImage = "";
+        overlay.classList.remove("has-frame");
+    }
+};
+
 window.setDevicePreview = function(address, src) {
     if (!address || !src) return;
     window.DivoomState.devicePreviews[address] = src;
@@ -57,16 +98,18 @@ window.setDevicePreview = function(address, src) {
     } catch (e) { /* quota — non-fatal */ }
     const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
     if (activeMac === address) {
-        const img = document.getElementById("banner-device-image");
-        if (img) img.src = src;
+        window._setScreenOverlayFrame(src);   // composite into the screen, not the whole body
     }
 };
 
 window.restoreDevicePreview = function(address, fallbackSrc) {
     const img = document.getElementById("banner-device-image");
     if (!img) return;
-    const stored = window.DivoomState.devicePreviews[address];
-    img.src = stored || fallbackSrc || "assets/pixoo.png";
+    // The product image is the device body; the live frame goes in the screen.
+    img.src = fallbackSrc || "assets/pixoo.png";
+    const name = (document.getElementById("banner-device-name")?.textContent || "").trim();
+    window._applyDeviceScreenRect(name);
+    window._setScreenOverlayFrame(window.DivoomState.devicePreviews[address] || null);
 };
 
 // ── R32 §C3: per-device switch dots overlaid on the preview ───────────
@@ -152,8 +195,9 @@ window.connectDevice = function(name, address) {
                 // product icon when this device hasn't been pushed to yet.
                 const dims = window.getDeviceDimensions(name);
                 window.restoreDevicePreview(address, dims.image);
-                // R32 §C3: refresh the switch dots so the active one highlights.
                 if (window.renderDeviceDots) window.renderDeviceDots();
+                if (window.loadDeviceName) window.loadDeviceName();
+                if (window.restoreActiveWidgetForDevice) window.restoreActiveWidgetForDevice(address);
                 // banner-device-res and banner-device-speaker moved to Settings → Devices.
                 // Their textContent assignments are intentionally skipped here.
                 const isSpk = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo") || name.toLowerCase().includes("tivoo");

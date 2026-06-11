@@ -147,8 +147,13 @@
                  on the preview — color-coded, tooltipped, click to switch.
                  The <select> is kept hidden as the canonical selection state. -->
             <div class="sidebar-device-panel" id="connected-device-banner">
+                <!-- R44 §7: the product image is the device BODY; the live
+                     channel/widget/wall frame is composited into the screen
+                     overlay (positioned per model) so you see what's on the
+                     device right now, not a whole-image swap. -->
                 <div class="sidebar-device-preview">
                     <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
+                    <div id="banner-device-screen" class="device-screen-overlay" aria-hidden="true"></div>
                 </div>
                 <select id="sidebar-device-select" class="sidebar-device-select" hidden>
                     <option value="">Select Screen…</option>
