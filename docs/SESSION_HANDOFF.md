@@ -44,12 +44,16 @@ Claude) should read this on entry and **update it at the end of every round**
   GUI DEGRADED dot SHIPPED: appbar 4s heartbeat polls `connection_state`
   (`get_connection_state` → `refreshConnectionState`) → amber dot / drop
   (`#global-status-dot.degraded`).
-  **Open follow-ups (deferred, not blocking):** (a) task #20 root cause — why
-  the 0x42/0x46/0x13 query frame is unanswered on some models (HW iteration; P5
-  resilience layer degrades gracefully meanwhile); (c) wall self-heal is
-  HW-untested (needs 2+ devices); (d) P6 physical flag-consolidation is cleanup,
-  not correctness (flags already honest). Remaining `get_*` reads can adopt
-  `read_with_retry` the same way.
+  task #20 (get_* reads) ROOT-CAUSED + FIXED on HW (4 models): not a timeout —
+  a STALE read. Device emits an unsolicited 0x46 on state change; manual readers
+  skipped the queue drain → lagged one behind (set 60 → read 25). Added
+  `Divoom.drain_notifications()`, called by get_brightness/get_light_mode;
+  round-trip now exact. 0x76 get-name returns a 2-char suffix on every model →
+  `get_device_name` prefers the advertised name. +9 tests.
+  **Open follow-ups (deferred, not blocking):** (c) wall self-heal is
+  HW-untested (needs 2+ devices — IN PROGRESS this session, 4 devices on hand);
+  (d) P6 physical flag-consolidation is cleanup, not correctness (flags already
+  honest). Remaining `get_*` reads can adopt the drain / `read_with_retry`.
 
 - **R43 SHIPPED (2026-06-10) — Permissions Dialog, Settings Backup/Restore, Preset Files, and Wall Split Cache.** Plan+outcome
   `docs/PLANNING_ROUND43.md`. Highlights: macOS Notification Permissions step-by-step instructions popup and red status indicator; unified settings Backup & Restore (export/import entire configurations, presets, alarms to/from JSON files); Virtual Wall presets save/load file buttons and immediate sync dropdown behavior; downscale, crop, split, and cache quadrants under `~/.config/divoom-control/cache_wall/` to prevent redundant resizing and fix routing target crash; Custom Art empty screen race condition fix in `custom_art.js` (element check bootstrap); custom art push/query unawaited coroutine warning fixes.

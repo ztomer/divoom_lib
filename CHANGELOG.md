@@ -60,8 +60,15 @@ Plan: `docs/PLANNING_BLE_HARDENING.md`.
 - **P5 — get_* read-back resilience**: new `divoom_lib/ble_reads.py`
   (`read_with_retry` + `ReadCache` + typed `ReadResult`); a flaky read retries
   then degrades to the last-good cached value (or a typed unknown the UI renders
-  as "—"), wired into `get_brightness` / `get_device_name`. (Root-cause query
-  framing on some models deferred to HW.)
+  as "—"), wired into `get_brightness` / `get_device_name`.
+- **P5b — get_* root cause (HW, 4 models)**: reads don't time out post-hardening
+  — the bug was a STALE read. The device emits an unsolicited 0x46 on state
+  change; the manual readers (`get_brightness`/`get_light_mode`) skipped the
+  queue drain and consumed the leftover frame, lagging one step behind (set 60 →
+  read 25). Added `Divoom.drain_notifications()`, called before those queries;
+  round-trip now exact on Ditoo/Pixoo/Timoo/Tivoo-Max. The 0x76 "get name" query
+  returns only a 2-char suffix on every model, so `get_device_name` prefers the
+  advertised name the lib already holds.
 - **P6 — connection-state observability**: `ble_connection.derive_connection_state`
   + `device_status.connection_state` (DISCONNECTED / CONNECTED / DEGRADED);
   one-line transition logging. The appbar polls it on a 4s heartbeat

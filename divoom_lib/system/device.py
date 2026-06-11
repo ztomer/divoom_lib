@@ -63,6 +63,12 @@ class Device(DeviceSettings):
 
     async def _read_brightness_once(self) -> int | None:
         command_id = COMMANDS["get light mode"]
+        # Drain stale/proactive frames first: the device emits an UNSOLICITED
+        # 0x46 when brightness/light state changes, so without this the query
+        # reads a leftover frame and the value lags one step behind
+        # (HW-confirmed on Ditoo/Pixoo/Timoo/Tivoo). send_command_and_wait_for_
+        # response already drains; this manual reader must too.
+        self.communicator.drain_notifications()
         self.communicator._expected_response_command = command_id
         async with self.communicator._framing_context(use_ios=self.communicator.use_ios_le_protocol, escape=False):
             await self.communicator.send_command(command_id, [])
@@ -206,10 +212,17 @@ class Device(DeviceSettings):
         return None
 
     async def get_device_name(self) -> str | None:
-        """Obtain the Bluetooth device name (0x76), with BLE Hardening P5 bounded
-        retry + last-good fallback. Returns the (possibly cached) name, or None
-        only when never read and nothing cached."""
-        self.logger.info("Getting device name (0x76)...")
+        """The Bluetooth device name. HW finding (Ditoo/Pixoo/Timoo/Tivoo): the
+        0x76 query does NOT return the full advertised name on these models — it
+        replies with a 2-char suffix (e.g. "-2" for "Ditoo-light-2"). So prefer
+        the authoritative advertised name the lib already holds (the name we
+        connected with); fall back to the 0x76 read only when no name is known
+        (connected by bare MAC). Keeps the P5 retry + last-good cache for the
+        fallback path."""
+        known = (getattr(self.communicator, "device_name", "") or "").strip()
+        if known:
+            return known
+        self.logger.info("No advertised name; reading device name via 0x76...")
         from divoom_lib.ble_reads import read_with_retry
         res = await read_with_retry(
             self._read_device_name_once,

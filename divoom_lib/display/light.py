@@ -63,7 +63,11 @@ class Light:
         self.logger.info("Getting light mode (0x46)...")
         
         command_id = COMMANDS["get light mode"]
-        
+
+        # Drain stale/unsolicited frames (the device emits a 0x46 on light-state
+        # change) so we read THIS query's fresh response, not a leftover that
+        # lags one step behind — HW-confirmed. See Divoom.drain_notifications.
+        self.communicator.drain_notifications()
         # Set the command we are waiting for and send it with the correct protocol
         self.communicator._expected_response_command = command_id
         async with self.communicator._framing_context(use_ios=self.communicator.use_ios_le_protocol, escape=False):

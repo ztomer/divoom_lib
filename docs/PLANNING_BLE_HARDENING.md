@@ -155,12 +155,20 @@ unknown (`ok=False`). Wired into `Device.get_brightness` + `get_device_name`
 (cache attached lazily to the communicator, survives reconnects). Reads no
 longer raise out (an exception → typed UNKNOWN). +10 tests (fake comm, no HW).
 
-DEFERRED (needs hardware): the root-cause framing investigation — WHY the
-0x42/0x46/0x13 query frame goes unanswered on some models (likely a per-model
-command variant). The resilience layer makes the timeout degrade gracefully
-regardless; closing the protocol gap is a separate HW-iteration task. Remaining
-`get_*` reads (alarms, temp, work mode, …) can adopt `read_with_retry` the same
-way. Original spec below.
+ROOT CAUSE FOUND + FIXED (HW, 4 models: Ditoo/Pixoo/Timoo/Tivoo-Max). The reads
+do NOT time out post-P1/P5 — they return in <0.1s. The real bug was a STALE
+read: the device emits an unsolicited 0x46 frame on state change, and the
+manual read-back methods (`get_brightness`, `get_light_mode`) set
+`_expected_response_command` + send + wait but skipped the queue drain that
+`send_command_and_wait_for_response` does — so they consumed the leftover frame
+and lagged one step behind (set 60 → read 25). Fix: `Divoom.drain_notifications()`,
+called by those readers before the query. HW round-trip now exact on all 4
+(set 25/60/100/40 → read 25/60/100/40). Separately, the 0x76 "get name" query
+returns only a 2-char suffix ("-2" for "Ditoo-light-2") on every model, so
+`get_device_name` prefers the authoritative advertised name the lib already
+holds (0x76 fallback only when connected by bare MAC). +9 tests. Remaining
+`get_*` reads can adopt the drain / `read_with_retry` the same way. Original
+spec below.
 
 - Wrap reads in a bounded retry with a short per-attempt timeout, and on
   exhaustion return a typed "unknown" the UI renders as a dash (not a spinner /

@@ -126,7 +126,11 @@ class _FakeComm:
         self._expected_response_command = None
         self._name_response = name_response
         self._brightness_payload = brightness_payload
+        self.device_name = ""        # no advertised name → reads go to the device
         self.fail = False
+
+    def drain_notifications(self):
+        return 0
 
     @asynccontextmanager
     async def _framing_context(self, **kw):

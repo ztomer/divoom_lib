@@ -218,6 +218,22 @@ class Divoom:
     def notification_queue(self, val: Any) -> None:
         self._conn.notification_queue = val
 
+    def drain_notifications(self) -> int:
+        """Discard any queued (stale/unsolicited) notification frames so the next
+        query reads its OWN fresh response. The device sends unsolicited frames
+        on state change (e.g. a 0x46 when brightness changes), which otherwise
+        make manual read-back methods lag one step behind. Returns the count
+        drained. Mirrors the drain in send_command_and_wait_for_response."""
+        q = self._conn.notification_queue
+        n = 0
+        while not q.empty():
+            try:
+                q.get_nowait()
+                n += 1
+            except Exception:
+                break
+        return n
+
     @property
     def use_ios_le_protocol(self) -> bool:
         return self._conn.use_ios_le_protocol
