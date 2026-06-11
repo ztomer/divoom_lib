@@ -58,7 +58,15 @@ risk-reduction per effort.
 
 ## Phased workstreams
 
-### Phase 1 — Honest connect + reconnect (kills W1, W2, W8 at the source)
+### Phase 1 — Honest connect + reconnect — **SHIPPED** (kills W1, W2, W8)
+Done: `divoom_lib/ble_connection.py` (ConnectionState/FailureReason/ConnectResult
+/BleConnectionError/classify_connect_error/`ensure_connected`); DeviceOwner
+connect+reconnect use it (tight 2×8s budget on the interactive path so the typed
+reason beats the 20s client timeout); `connect` reply carries {reason, message};
+GUI `get_last_connect_error` + actionable toast. `tests/support/fake_ble.py`
+fault-injection double; +19 tests. HW-verified (real Ditoo connects; bogus MAC →
+typed `timeout` reason in 16.4s). Original spec below.
+
 - New `divoom_lib/ble_connection.py` `ConnectionState` enum
   (DISCONNECTED / CONNECTING / CONNECTED / DEGRADED / FAILED) + a small
   `ensure_connected(deadline)` that: scans-preflight (is the MAC advertising?),
