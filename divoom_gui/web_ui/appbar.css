@@ -42,6 +42,10 @@
 #global-status-dot.active.wall { background-color: #8b5cf6; color: #8b5cf6; box-shadow: 0 0 8px #8b5cf6; opacity: 1; }
 #global-status-dot.connecting { background-color: #f59e0b; color: #f59e0b; box-shadow: 0 0 8px #f59e0b; opacity: 1; animation: dot-pulse 1s ease-in-out infinite; }
 #global-status-dot.inactive { background-color: #6b7280; color: #6b7280; opacity: 0.3; box-shadow: none; }
+/* BLE Hardening P6: DEGRADED — connected per the OS but a write/drop just
+   failed. Amber with a SLOW pulse, distinct from the faster "connecting" pulse.
+   No transport sub-class is set in this state, so this (1,1,0) rule wins. */
+#global-status-dot.degraded { background-color: #f59e0b; color: #f59e0b; box-shadow: 0 0 8px #f59e0b; opacity: 1; animation: dot-pulse 2s ease-in-out infinite; }
 
 /* "Connecting" state — pulses in the device's own accent color.
    JS sets --dot-pulse-color inline so each device dot pulses in its

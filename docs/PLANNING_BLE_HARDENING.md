@@ -178,13 +178,16 @@ dead — not just on/off) and logs a one-line transition (a connection timeline
 in `/tmp/divoom_daemon.log`). Housekeeping: extracted `OwnerNotifyMixin`
 (`owner_notify.py`) to keep `device_owner.py` under 500 LOC. +10 tests.
 
+GUI follow-up SHIPPED: the appbar polls `connection_state` on a 4s heartbeat
+(`scanner_mixin.get_connection_state` → `app_globals.refreshConnectionState`)
+and renders the amber DEGRADED dot / flips to disconnected on a genuine drop
+(`#global-status-dot.degraded` in appbar.css). +9 tests; browser-verified.
+
 DEFERRED: physically folding the scattered flags (`is_connected`,
 `_connection_likely_broken`, `_notifications_started`) into one state object is
 a larger refactor of the hot write path; P1–P3 already made those flags honest
 and `derive_connection_state` now reads them through one funnel, so the
-remaining consolidation is cleanup, not correctness. GUI-side: consuming
-`connection_state` to render a DEGRADED (amber) dot is a small follow-up.
-Original spec below.
+remaining consolidation is cleanup, not correctness. Original spec below.
 
 - Fold the scattered flags into the `ConnectionState` owner; expose it on
   `device_status` so the GUI dot reflects CONNECTING/DEGRADED, not just

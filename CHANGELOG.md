@@ -63,8 +63,10 @@ Plan: `docs/PLANNING_BLE_HARDENING.md`.
   as "—"), wired into `get_brightness` / `get_device_name`. (Root-cause query
   framing on some models deferred to HW.)
 - **P6 — connection-state observability**: `ble_connection.derive_connection_state`
-  + `device_status.connection_state` (DISCONNECTED / CONNECTED / DEGRADED) so the
-  GUI dot can show a connected-but-dead link; one-line transition logging.
+  + `device_status.connection_state` (DISCONNECTED / CONNECTED / DEGRADED);
+  one-line transition logging. The appbar polls it on a 4s heartbeat
+  (`get_connection_state` → `refreshConnectionState`) and shows an amber DEGRADED
+  dot for a connected-but-dead link, or flips to disconnected on a genuine drop.
   Extracted `OwnerNotifyMixin` to keep `device_owner.py` under budget.
 - **daemon-socket flake fix**: `serve_forever` now binds+listens on a local
   socket before publishing `self._server` — fixes a startup race where a

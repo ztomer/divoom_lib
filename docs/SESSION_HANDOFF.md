@@ -41,10 +41,12 @@ Claude) should read this on entry and **update it at the end of every round**
   `OwnerNotifyMixin`. Daemon socket: bind+listen-before-publish race fix +
   client connect-retry. Full suite **1398 passed / 75 skipped**. HW-verified on
   Ditoo (connect 2.4s + push).
-  **Open follow-ups (deferred, not blocking):** (a) task #20 root cause — WHY
+  GUI DEGRADED dot SHIPPED: appbar 4s heartbeat polls `connection_state`
+  (`get_connection_state` → `refreshConnectionState`) → amber dot / drop
+  (`#global-status-dot.degraded`).
+  **Open follow-ups (deferred, not blocking):** (a) task #20 root cause — why
   the 0x42/0x46/0x13 query frame is unanswered on some models (HW iteration; P5
-  resilience layer degrades gracefully meanwhile); (b) GUI consumes
-  `connection_state` to render a DEGRADED/amber dot; (c) wall self-heal is
+  resilience layer degrades gracefully meanwhile); (c) wall self-heal is
   HW-untested (needs 2+ devices); (d) P6 physical flag-consolidation is cleanup,
   not correctness (flags already honest). Remaining `get_*` reads can adopt
   `read_with_retry` the same way.

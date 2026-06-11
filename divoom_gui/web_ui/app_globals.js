@@ -231,6 +231,54 @@ window.connectDevice = function(name, address) {
     }
 };
 
+// ── BLE Hardening P6: appbar connection heartbeat ─────────────────────────
+// The connect/disconnect handlers set the dot at transition time, but a link
+// can DROP mid-session (device sleeps, RF blip). Poll the daemon's honest
+// connection_state so the dot reflects DEGRADED (amber) and a genuine drop,
+// not a stale solid "connected".
+window._activeTransportType = function() {
+    const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+    if (mac === "MatrixWall") return "wall";
+    if (mac.startsWith("LAN:")) return "lan";
+    return "ble";
+};
+
+window.refreshConnectionState = function() {
+    if (!window.DivoomState.appConnected) return;
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.get_connection_state) return;
+    api.get_connection_state().then(raw => {
+        let s;
+        try { s = JSON.parse(raw); } catch (e) { return; }
+        const dot = document.getElementById("global-status-dot");
+        if (!dot) return;
+        const state = s && s.state;
+        if (state === "degraded") {
+            // Reports connected but a write/drop just failed — show amber, keep
+            // appConnected (the daemon's live-job self-heal may revive it).
+            dot.className = "transport-dot active degraded";
+            dot.removeAttribute("style");
+            dot.title = "Link degraded — reconnecting";
+        } else if (s && s.connected) {
+            const type = window._activeTransportType();
+            dot.className = `transport-dot active ${type}`;
+            dot.removeAttribute("style");
+            dot.title = "";
+        } else {
+            // Genuinely dropped while we thought we were connected.
+            window.DivoomState.appConnected = false;
+            dot.className = "transport-dot inactive";
+            dot.removeAttribute("style");
+            dot.title = "Disconnected";
+        }
+    }).catch(() => {});
+};
+
+window.startConnectionHeartbeat = function() {
+    if (window._connHeartbeat) return;
+    window._connHeartbeat = setInterval(window.refreshConnectionState, 4000);
+};
+
 window.updateDeviceSelectorDropdown = function() {
     const sel = document.getElementById("sidebar-device-select");
     if (!sel) return;

@@ -40,6 +40,24 @@ class ScannerMixin:
         connect (empty if none / last connect succeeded)."""
         return getattr(self, "_last_connect_error", "") or ""
 
+    def get_connection_state(self) -> str:
+        """BLE Hardening P6: the daemon's honest connection_state for the active
+        device, for the appbar heartbeat. Returns JSON
+        ``{"connected": bool, "state": "connected"|"degraded"|"disconnected"}``;
+        a missing/unreachable daemon reads as disconnected."""
+        try:
+            client = self._client()
+            if client is None:
+                return json.dumps({"connected": False, "state": "disconnected"})
+            status = client.device_status() or {}
+            return json.dumps({
+                "connected": bool(status.get("connected")),
+                "state": status.get("connection_state", "disconnected"),
+            })
+        except Exception as e:
+            logger.debug(f"get_connection_state failed: {e}")
+            return json.dumps({"connected": False, "state": "disconnected"})
+
     def get_scan_settings(self) -> str:
         """R42 §1: the persisted scan timeout/limit (config.ini [gui]) so the
         Settings inputs restore between sessions — save_scan_settings wrote them

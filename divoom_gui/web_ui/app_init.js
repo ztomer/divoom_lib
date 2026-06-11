@@ -1,6 +1,10 @@
 /* app_init.js — DOMContentLoaded initialisation (all event wiring + session restore) */
 document.addEventListener("DOMContentLoaded", () => {
 
+    // BLE Hardening P6: poll the daemon's honest connection_state so the appbar
+    // dot reflects a mid-session drop / DEGRADED link, not a stale "connected".
+    if (window.startConnectionHeartbeat) window.startConnectionHeartbeat();
+
     // ── 0. FRAMELESS WINDOW DRAG (appbar) ──
     // The window drag is handled by pywebview's built-in drag-region
     // mechanism: <header class="integrated-appbar pywebview-drag-region">
