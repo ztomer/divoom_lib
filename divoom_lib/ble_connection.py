@@ -79,6 +79,18 @@ class ConnectResult:
         return REASON_MESSAGE.get(self.reason, REASON_MESSAGE[FailureReason.UNKNOWN])
 
 
+def derive_connection_state(active) -> ConnectionState:
+    """BLE Hardening P6: map a device/wall's HONEST liveness to one
+    ConnectionState for the UI dot. DEGRADED = reports connected but a write/
+    drop just failed (``is_alive`` False) — surfaced instead of a misleading
+    solid 'connected'. ``active`` is the owned device, wall, or None."""
+    if active is None or not getattr(active, "is_connected", False):
+        return ConnectionState.DISCONNECTED
+    if getattr(active, "is_alive", True):
+        return ConnectionState.CONNECTED
+    return ConnectionState.DEGRADED
+
+
 def classify_connect_error(exc: BaseException) -> FailureReason:
     """Map a connect/verify exception to a typed, actionable reason."""
     if isinstance(exc, asyncio.TimeoutError):

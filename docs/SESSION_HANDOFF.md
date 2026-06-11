@@ -18,22 +18,26 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **BLE HARDENING P1–P3 + daemon-socket SHIPPED (2026-06-11).** Plan
-  `docs/PLANNING_BLE_HARDENING.md` (P1/P2/P3 marked SHIPPED inline). Commits
-  156857bd (P1), be12e0dc (P2), d7036cf1 (P3), 516995fb (daemon-socket).
-  Honest typed connect (`divoom_lib/ble_connection.py`, never a dead handle,
-  actionable reason); OS `disconnected_callback` + `is_alive` honest liveness;
-  live-job + wall self-heal; per-loop connect lock (no connect-storm); wall
-  per-slot typed results (partial-ok, names the failed screen). Daemon socket:
-  `serve_forever` binds+listens on a local socket before publishing `_server`
-  (killed the "NoneType…listen"/"Connection refused" startup race); client
-  retries a transient connect refusal <1s, liveness probes fast-fail. Full
-  suite **1369 passed / 75 skipped**. HW-verified on Ditoo (connect 2.4s + push).
-  **Open threads (next phases, see plan):** P4 adapter/permission preflight
-  (CBManagerState → "BT off"/"grant permission"); P5 `get_*` read-back
-  hardening (task #20 — name/alarms/brightness reads time out); P6 connection
-  state-machine consolidation + `device_status` observability. Wall self-heal
-  is HW-untested (needs 2+ devices); single-device paths HW-verified.
+- **BLE HARDENING P1–P6 + daemon-socket SHIPPED (2026-06-11).** Plan
+  `docs/PLANNING_BLE_HARDENING.md` (all phases marked SHIPPED inline). Commits
+  156857bd (P1), be12e0dc (P2), d7036cf1 (P3), 516995fb (daemon-socket),
+  a815eed9 (P4), 4ff73ec9 (P5), +P6. New modules: `ble_connection.py`
+  (honest typed connect, never a dead handle; per-loop connect lock;
+  `derive_connection_state`), `ble_preflight.py` (P4 permission preflight →
+  typed cause for empty scan), `ble_reads.py` (P5 `read_with_retry` + last-good
+  cache + typed unknown). P2 OS `disconnected_callback` + `is_alive`; P3 wall
+  per-slot typed results + self-heal; P6 `device_status.connection_state`
+  (DISCONNECTED/CONNECTED/DEGRADED) + transition logging; extracted
+  `OwnerNotifyMixin`. Daemon socket: bind+listen-before-publish race fix +
+  client connect-retry. Full suite **1398 passed / 75 skipped**. HW-verified on
+  Ditoo (connect 2.4s + push).
+  **Open follow-ups (deferred, not blocking):** (a) task #20 root cause — WHY
+  the 0x42/0x46/0x13 query frame is unanswered on some models (HW iteration; P5
+  resilience layer degrades gracefully meanwhile); (b) GUI consumes
+  `connection_state` to render a DEGRADED/amber dot; (c) wall self-heal is
+  HW-untested (needs 2+ devices); (d) P6 physical flag-consolidation is cleanup,
+  not correctness (flags already honest). Remaining `get_*` reads can adopt
+  `read_with_retry` the same way.
 
 - **R43 SHIPPED (2026-06-10) — Permissions Dialog, Settings Backup/Restore, Preset Files, and Wall Split Cache.** Plan+outcome
   `docs/PLANNING_ROUND43.md`. Highlights: macOS Notification Permissions step-by-step instructions popup and red status indicator; unified settings Backup & Restore (export/import entire configurations, presets, alarms to/from JSON files); Virtual Wall presets save/load file buttons and immediate sync dropdown behavior; downscale, crop, split, and cache quadrants under `~/.config/divoom-control/cache_wall/` to prevent redundant resizing and fix routing target crash; Custom Art empty screen race condition fix in `custom_art.js` (element check bootstrap); custom art push/query unawaited coroutine warning fixes.

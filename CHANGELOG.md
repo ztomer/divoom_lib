@@ -5,7 +5,7 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
-## BLE Hardening & Foolproofing — 2026-06-11 (Phases 1–3 + daemon-socket)
+## BLE Hardening & Foolproofing — 2026-06-11 (Phases 1–6 + daemon-socket)
 
 Make every Bluetooth (and daemon-socket) interaction honest, self-healing, and
 specifically diagnosed — no lying "connected" state, no silent stale frame, no
@@ -28,12 +28,27 @@ generic "timed out"/"Connection refused" dead-ends. Plan: `docs/PLANNING_BLE_HAR
   results (which screen failed and why), stays usable on partial success, raises
   only on total failure; `show_image()` self-heals a dropped slot before its push
   so one dead screen doesn't freeze the rest.
+- **P4 — adapter/permission preflight**: new `divoom_lib/ble_preflight.py` runs
+  before scan/connect and maps CoreBluetooth `authorization()` → the typed
+  `PERMISSION` reason, so an empty scan / blocked connect carries a CAUSE instead
+  of a silent "no devices". The live `CBManagerState` power probe is opt-in only
+  (run-loop pumping crashes off the main thread); radio-off stays covered by the
+  connect path's typed `ADAPTER_OFF`.
+- **P5 — get_* read-back resilience**: new `divoom_lib/ble_reads.py`
+  (`read_with_retry` + `ReadCache` + typed `ReadResult`); a flaky read retries
+  then degrades to the last-good cached value (or a typed unknown the UI renders
+  as "—"), wired into `get_brightness` / `get_device_name`. (Root-cause query
+  framing on some models deferred to HW.)
+- **P6 — connection-state observability**: `ble_connection.derive_connection_state`
+  + `device_status.connection_state` (DISCONNECTED / CONNECTED / DEGRADED) so the
+  GUI dot can show a connected-but-dead link; one-line transition logging.
+  Extracted `OwnerNotifyMixin` to keep `device_owner.py` under budget.
 - **daemon-socket flake fix** (same UX impact): `serve_forever` now binds+listens
   on a local socket before publishing `self._server` (kills a startup race where
   a concurrent `stop()` nulled it mid-setup → "Connection refused"); the client
   retries a transient connect refusal over <1s while liveness probes fast-fail.
-- +37 fault-injected tests (fake-BLE double + socket round-trips); full suite
-  1369 passed / 75 skipped.
+- +80 fault-injected tests (fake-BLE double + socket round-trips); full suite
+  1398 passed / 75 skipped.
 
 ## Round 43 — 2026-06-10 (Permissions Dialog, Settings Backup/Restore, Preset Files, and Wall Split Cache)
 

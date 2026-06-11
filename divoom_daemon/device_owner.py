@@ -11,6 +11,7 @@ from typing import Callable, Optional
 
 from divoom_daemon.owner_art import OwnerArtMixin
 from divoom_daemon.owner_live import OwnerLiveMixin
+from divoom_daemon.owner_notify import OwnerNotifyMixin
 
 logger = logging.getLogger("divoom_daemon.device_owner")
 
@@ -28,7 +29,7 @@ def _json_safe(value):
     return str(value)
 
 
-class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
+class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
     """Single owner of the BLE/LAN device connection and wall (R17 P5).
     Provides command handlers for device lifecycle and a send_notification
     method used by NotificationService."""
@@ -52,6 +53,7 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
         self._cmd_queue = None                  # CommandQueue, created with loop
         self._hot_progress: dict = {"phase": "idle"}
         self._hot_progress_lock = threading.Lock()
+        self._last_conn_state = None             # P6: last observed ConnectionState
         OwnerLiveMixin.__init__(self)
 
     # ── device loop ──────────────────────────────────────────────────────
@@ -80,12 +82,9 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
 
     def _run_device(self, coro, *, token=None):
         """Run a coroutine through the command queue, blocking for the result.
-
-        All device access goes through the queue (FIFO, exclusive-mode
-        support).  This is the only path that touches the device event loop.
-        ``CommandQueue.submit()`` is thread-safe and returns a
-        ``concurrent.futures.Future`` — we block on ``.result()`` here.
-        """
+        All device access goes through the queue (FIFO + exclusive-mode); it's
+        the only path that touches the device loop. submit() is thread-safe and
+        returns a concurrent.futures.Future — we block on .result()."""
         if self._cmd_queue is None:
             self._device_loop()
         return self._cmd_queue.submit(coro, token=token).result()
@@ -93,6 +92,19 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
     def _device_connected(self) -> bool:
         d = self._device
         return bool(d is not None and getattr(d, "is_connected", False))
+
+    def _connection_state(self) -> str:
+        """P6: the honest dot state + a one-line transition log (a connection
+        timeline in the daemon log). See ble_connection.derive_connection_state."""
+        from divoom_lib.ble_connection import derive_connection_state
+        active = self._device if self._device is not None else self._wall
+        state = derive_connection_state(active)
+        if state != self._last_conn_state:
+            logger.info("connection state: %s -> %s (mac=%s)",
+                        getattr(self._last_conn_state, "value", "none"),
+                        state.value, self.mac)
+            self._last_conn_state = state
+        return state.value
 
     async def _ensure_device_async(self, mac: Optional[str] = None):
         # BLE Hardening P1: a failed reconnect raises a typed reason, never a
@@ -162,43 +174,13 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin):
         d = self._device
         return {
             "connected": self._device_connected(),
+            "connection_state": self._connection_state(),   # P6: honest dot state
             "mac": self.mac,
             "lan_ip": self._lan_ip,
             "wall": self._wall is not None,
         }
 
-    # ── notification sender (for NotificationService) ────────────────────
-    def send_notification(self, app_type: int, text: str) -> None:
-        if self._device_sender is not None:
-            self._device_sender(app_type, text)
-            return
-        self._send_to_device_ble(app_type, text)
-
-    def _send_to_device_ble(self, app_type: int, text: str) -> None:
-        import asyncio
-        from divoom_lib.divoom import Divoom
-        from divoom_lib.utils import discovery
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            if not getattr(self, "_device", None) or not self._device.is_connected:
-                mac = self.mac
-                if not mac:
-                    from divoom_daemon.daemon_config import load_daemon_config
-                    devs = loop.run_until_complete(discovery.discover_all_divoom_devices(
-                        timeout=load_daemon_config().reconnect_scan_timeout))
-                    if not devs:
-                        return
-                    mac = devs[0]["address"]
-                self._device = Divoom(mac=mac, logger=logger, use_ios_le_protocol=False)
-                loop.run_until_complete(self._device.connect())
-            if text:
-                loop.run_until_complete(self._device.notification.show_notification_text(int(app_type), text))
-            else:
-                loop.run_until_complete(self._device.notification.show_notification(int(app_type)))
-        finally:
-            loop.close()
+    # send_notification / _send_to_device_ble live in OwnerNotifyMixin.
 
     # ── command handlers ─────────────────────────────────────────────────
     def device_call(self, args: dict) -> dict:

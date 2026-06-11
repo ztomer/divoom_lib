@@ -173,7 +173,24 @@ way. Original spec below.
 - Investigate the framing mismatch (query 0x42/0x46/0x13) against the APK once
   more — may be a per-model command variant.
 
-### Phase 6 — State-machine consolidation + observability (W7)
+### Phase 6 — State consolidation + observability — **SHIPPED (observability)** (W7)
+Done: a single pure `ble_connection.derive_connection_state(active)` maps the
+device/wall's HONEST liveness (is_connected + is_alive, which already fold in
+the P2 OS-drop callback + write-failure inference) to one `ConnectionState` —
+DISCONNECTED / CONNECTED / DEGRADED. The daemon exposes it on `device_status`
+as `connection_state` (so the GUI dot can show DEGRADED — connected-but-link-
+dead — not just on/off) and logs a one-line transition (a connection timeline
+in `/tmp/divoom_daemon.log`). Housekeeping: extracted `OwnerNotifyMixin`
+(`owner_notify.py`) to keep `device_owner.py` under 500 LOC. +10 tests.
+
+DEFERRED: physically folding the scattered flags (`is_connected`,
+`_connection_likely_broken`, `_notifications_started`) into one state object is
+a larger refactor of the hot write path; P1–P3 already made those flags HONEST
+and `derive_connection_state` now reads them through one funnel, so the
+remaining consolidation is cleanup, not correctness. GUI-side: consuming
+`connection_state` to render a DEGRADED (amber) dot is a small follow-up.
+Original spec below.
+
 - Fold the scattered flags into the `ConnectionState` owner; expose it on
   `device_status` so the GUI dot reflects CONNECTING/DEGRADED, not just
   on/off. Structured connection logging (one line per state transition) to
