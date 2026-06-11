@@ -39,7 +39,10 @@ logger = logging.getLogger("divoom_gui")
 
 
 def _client_alive(client: DaemonClient) -> bool:
-    reply = client.send_command("device_status")
+    # Liveness probe: fast-fail (connect_retries=0) so ensure_daemon's readiness
+    # poll and daemon_alive() don't each sit through the device-traffic retry
+    # budget when no daemon is up.
+    reply = client.send_command("device_status", connect_retries=0)
     return bool(reply.get("success", False)) or ("connected" in reply)
 
 

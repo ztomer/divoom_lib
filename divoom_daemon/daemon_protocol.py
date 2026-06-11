@@ -19,10 +19,21 @@ import base64
 import json
 import os
 import socket
+import time
 from typing import Any, Callable, Iterable
 
 DEFAULT_SOCKET_PATH = "/tmp/divoom.sock"
 DEFAULT_TCP_PORT = 9009
+
+# BLE Hardening (daemon-socket): a transient connection refusal — the daemon is
+# mid-(re)start, the socket isn't accepting yet, or its listen backlog briefly
+# filled — should be retried, not surfaced as a hard "Connection refused" that
+# aborts the user's action. Real device traffic retries the *connect* a few
+# times over a fraction of a second; liveness probes opt out (retries=0) so
+# ensure_daemon's readiness poll stays fast when no daemon is up.
+DEFAULT_CONNECT_RETRIES = 4
+CONNECT_RETRY_BASE_DELAY = 0.06   # grows 0.06, 0.12, 0.24, 0.48 (~0.9s worst case)
+CONNECT_RETRY_MAX_DELAY = 0.5
 
 # Env overrides so any DaemonClient (incl. the GUI) can target a remote daemon
 # instead of the local Unix socket.
@@ -139,27 +150,54 @@ class DaemonClient:
         return s
 
     def send_command(self, command: str, args: dict | None = None,
-                     *, read_timeout: float | None = None) -> dict:
+                     *, read_timeout: float | None = None,
+                     connect_retries: int = DEFAULT_CONNECT_RETRIES) -> dict:
         """One-shot request/response. Returns the daemon's reply dict, or
         ``{"success": False, "error": ...}`` if the daemon isn't reachable.
 
         ``read_timeout`` overrides the socket read timeout for this call — needed
         for long-running commands (e.g. ``scan``, whose reply only arrives after
-        the full BLE scan duration, which usually exceeds the default timeout)."""
-        try:
-            with self._connect() as s:
-                s.settimeout(read_timeout if read_timeout is not None else self.timeout)
-                s.sendall(encode_message(make_request(command, args, self.token)))
-                buf = b""
-                while b"\n" not in buf:
-                    chunk = s.recv(4096)
-                    if not chunk:
-                        break
-                    buf += chunk
-                msgs, _ = iter_messages(buf)
-                return msgs[0] if msgs else {"success": False, "error": "no reply"}
-        except (OSError, ValueError) as e:
-            return {"success": False, "error": str(e)}
+        the full BLE scan duration, which usually exceeds the default timeout).
+
+        ``connect_retries`` — how many extra times to retry *establishing* the
+        connection on a transient refusal (daemon mid-(re)start). Only the
+        connect is retried; once connected, a read error/timeout is returned as
+        is (it may be a legit slow op, not a connection problem). Liveness
+        probes pass 0 to fast-fail."""
+        last_err: Exception | None = None
+        for attempt in range(connect_retries + 1):
+            try:
+                s = self._connect()
+            except (ConnectionRefusedError, FileNotFoundError,
+                    ConnectionResetError, ConnectionAbortedError, BlockingIOError) as e:
+                # Transient: socket not accepting yet / daemon restarting. Retry.
+                last_err = e
+                if attempt < connect_retries:
+                    delay = min(CONNECT_RETRY_MAX_DELAY,
+                                CONNECT_RETRY_BASE_DELAY * (2 ** attempt))
+                    time.sleep(delay)
+                    continue
+                return {"success": False, "error": str(e)}
+            except (OSError, ValueError) as e:
+                # Non-transient connect failure (bad address, perms, …) — no retry.
+                return {"success": False, "error": str(e)}
+
+            try:
+                with s:
+                    s.settimeout(read_timeout if read_timeout is not None else self.timeout)
+                    s.sendall(encode_message(make_request(command, args, self.token)))
+                    buf = b""
+                    while b"\n" not in buf:
+                        chunk = s.recv(4096)
+                        if not chunk:
+                            break
+                        buf += chunk
+                    msgs, _ = iter_messages(buf)
+                    return msgs[0] if msgs else {"success": False, "error": "no reply"}
+            except (OSError, ValueError) as e:
+                return {"success": False, "error": str(e)}
+        return {"success": False,
+                "error": str(last_err) if last_err else "daemon unreachable"}
 
     def device_call(self, method: str, args: list | None = None,
                     kwargs: dict | None = None, *, target: str = "device",

@@ -148,10 +148,16 @@ class SocketServer:
                 os.remove(self.socket_path)
             except OSError:
                 pass
-        self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self._server.bind(self.socket_path)
-        self._server.listen(8)
-        self._listeners = [self._server]
+        # Bind + listen on a LOCAL socket first, then publish it. A concurrent
+        # stop() (e.g. a test that calls d.stop() while this setup is still in
+        # flight on the daemon thread) could otherwise null self._server between
+        # bind and listen → "NoneType has no attribute 'listen'", the socket
+        # never comes up, and clients get "Connection refused" (flaky CI).
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(self.socket_path)
+        server.listen(8)
+        self._server = server
+        self._listeners = [server]
         self._running = True
         logger.info(f"Divoom daemon listening on {self.socket_path}")
 
