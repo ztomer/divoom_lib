@@ -45,10 +45,25 @@ class _Server:
 
     def __enter__(self):
         self.t.start()
-        for _ in range(200):
+        # Wait for real ACCEPT-readiness, not just the socket FILE: the file
+        # appears at bind() but a connect between bind() and listen() gets
+        # ECONNREFUSED (seen flaky in CI under load). Probe with an actual
+        # connect until it succeeds.
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
             if os.path.exists(self.path):
-                break
-            time.sleep(0.01)
+                try:
+                    probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    probe.settimeout(1.0)
+                    probe.connect(self.path)
+                    probe.close()
+                    # let the probe's handler thread finish + release its
+                    # connection-semaphore slot before the cap tests run.
+                    time.sleep(0.05)
+                    break
+                except OSError:
+                    pass
+            time.sleep(0.02)
         return self
 
     def __exit__(self, *a):
@@ -61,10 +76,21 @@ class _Server:
                 pass
 
     def raw(self):
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(3.0)
-        s.connect(self.path)
-        return s
+        # Short connect-retry so a transient refusal under CI load (listen
+        # backlog momentarily full) doesn't flake the raw-socket tests.
+        deadline = time.monotonic() + 3.0
+        last = None
+        while time.monotonic() < deadline:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(3.0)
+            try:
+                s.connect(self.path)
+                return s
+            except OSError as e:
+                last = e
+                s.close()
+                time.sleep(0.02)
+        raise last
 
 
 def _recv_reply(s):
