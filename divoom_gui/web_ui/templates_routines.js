@@ -1,9 +1,11 @@
-/* templates_routines.js — Routines panel (Schedule + Time) */
+/* templates_routines.js — Schedule panel (Auto-Sync + Time); R45 #5 rename
+   (was "Routines"; the inner "Schedule" tab is now "Auto-Sync" to avoid a
+   Schedule > Schedule collision). Code identifiers (routines-*) unchanged. */
 window.DivoomTemplates = window.DivoomTemplates || {};
 window.DivoomTemplates.routines = `
         <div class="tabs-section" style="width:100%; box-sizing:border-box;">
-        <div class="tabs-row" role="tablist" aria-label="Routines">
-            <button class="tab-btn active" data-routines-tab="routines-schedule" data-tab="routines-schedule" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8L8 11L12 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Schedule</button>
+        <div class="tabs-row" role="tablist" aria-label="Schedule">
+            <button class="tab-btn active" data-routines-tab="routines-schedule" data-tab="routines-schedule" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8L8 11L12 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Auto-Sync</button>
             <button class="tab-btn" data-routines-tab="routines-time" data-tab="routines-time" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Time</button>
         </div>
         </div>

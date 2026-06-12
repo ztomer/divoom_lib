@@ -171,17 +171,17 @@ document.addEventListener("DOMContentLoaded", () => {
         { value: 4, name: "No Mosquitto" }
     ];
     const AMBIENT_PREVIEWS = {
-        0: `<div class="ambient-preview plain" style="background:#00ffcc; height:60px; border-radius:4px; box-shadow: 0 0 10px rgba(0,255,204,0.3);"></div>`,
-        1: `<div class="ambient-preview love" style="height:60px; border-radius:4px; animation:love-color-cycle 12s linear infinite;"></div>`,
-        2: `<svg class="ambient-preview plants" viewBox="0 0 16 16" preserveAspectRatio="none" style="height:60px; width:100%; border-radius:4px; image-rendering:pixelated; display:block;">
+        0: `<div class="ambient-preview plain" style="background:#00ffcc; height:90px; border-radius:4px; box-shadow: 0 0 10px rgba(0,255,204,0.3);"></div>`,
+        1: `<div class="ambient-preview love" style="height:90px; border-radius:4px; animation:love-color-cycle 12s linear infinite;"></div>`,
+        2: `<svg class="ambient-preview plants" viewBox="0 0 16 16" preserveAspectRatio="none" style="height:90px; width:100%; border-radius:4px; image-rendering:pixelated; display:block;">
                 <rect width="16" height="16" fill="#ff0000"/>
                 <rect x="0" y="0" width="1" height="16" fill="#0000ff"/>
                 <rect x="4" y="0" width="1" height="16" fill="#0000ff"/>
                 <rect x="8" y="0" width="1" height="16" fill="#0000ff"/>
                 <rect x="12" y="0" width="1" height="16" fill="#0000ff"/>
             </svg>`,
-        3: `<div class="ambient-preview sleeping" style="background:#33cc33; height:60px; border-radius:4px;"></div>`,
-        4: `<div class="ambient-preview mosquito" style="background:rgba(255, 165, 0, 0.4); height:60px; border-radius:4px;"></div>`
+        3: `<div class="ambient-preview sleeping" style="background:#33cc33; height:90px; border-radius:4px;"></div>`,
+        4: `<div class="ambient-preview mosquito" style="background:rgba(255, 165, 0, 0.4); height:90px; border-radius:4px;"></div>`
     };
 
     let selectedAmbientMode = 0;

@@ -149,9 +149,9 @@ def test_settings_subtabs_use_tabs_row() -> None:
 def test_routines_subtabs_use_tabs_row() -> None:
     src = ROUTINES_JS.read_text()
     assert re.search(
-        r'<div class="tabs-row"[^>]*aria-label="Routines"',
+        r'<div class="tabs-row"[^>]*aria-label="Schedule"',
         src,
-    ), "Routines sub-tab row is missing the .tabs-row wrapper"
+    ), "Schedule (ex-Routines) sub-tab row is missing the .tabs-row wrapper"
 
 
 def test_theme_buttons_use_tabs_row() -> None:

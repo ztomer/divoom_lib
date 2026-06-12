@@ -66,15 +66,7 @@
 }
 
 .channel-panel.active {
-    /* The panels container is stretched tall to give the Design panel its
-       full-height scroll area; the SHORT panels (clock / EQ / VJ / ambient /
-       scoreboard / text) used to cram their content at the top with a large
-       void below. Center the content so each reads as balanced, not unfinished.
-       (#panel-design.active overrides this with its own flex-column layout.) */
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 100%;
+    display: block;
 }
 
 /* R11 item 1a: the Custom Art panel is a flex column so its scroll area
@@ -173,12 +165,11 @@
 
 .selector-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-    gap: 8px;
-}
-
-#clock-faces-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    /* R45 #4: one consistent, larger cell size across every channel grid
+       (clock / EQ / VJ) so the panels read uniform and fill their space —
+       replaces the per-grid 96px/140px split + the centering experiment. */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
 }
 
 .selector-cell {
@@ -294,11 +285,12 @@
     color: var(--primary);
 }
 
-/* APK EQ and VJ icons styling */
+/* APK EQ and VJ icons styling — R45 #4: sized to match the clock-face preview
+   (90px) so every channel grid cell has the same visual weight. */
 .apk-preview-container {
-    width: 48px;
-    height: 48px;
-    margin: 4px auto 6px auto;
+    width: 100%;
+    height: 90px;
+    margin: 2px auto 6px auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -306,8 +298,8 @@
 }
 
 .apk-preview-img {
-    width: 48px;
-    height: 48px;
+    width: 90px;
+    height: 90px;
     object-fit: contain;
     image-rendering: pixelated;
     transition: transform 0.15s ease;
