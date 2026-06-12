@@ -210,6 +210,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     const success = typeof res === "object" ? res.success : !!res;
                     if (success) {
                         window.showToast("Synchronized display wall", "success", " BLE");
+                        // R45 #3: show each screen's DOWNSCALED crop (exactly what
+                        // the device renders) in the arranger preview — the daemon
+                        // already returns them as {mac: dataURI}; we just dropped them.
+                        const previews = (res && typeof res === "object" && res.previews) || {};
+                        let any = false;
+                        Object.keys(previews).forEach(mac => {
+                            const slot = window.DivoomState.assignedSlots[mac];
+                            if (slot) { slot.preview = previews[mac]; any = true; }
+                        });
+                        if (any && window.renderArrangerCanvas) window.renderArrangerCanvas();
                     }
                 });
             }
