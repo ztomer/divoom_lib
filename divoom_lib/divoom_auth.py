@@ -241,23 +241,28 @@ def get_credentials(force_refresh: bool = False) -> DivoomCredentials:
         if cached:
             return cached
 
-    # Fail fast inside the cooldown window so a down/changed cloud API can't be
-    # hammered once per poll.
-    since_fail = time.time() - _last_auth_fail_at
-    if since_fail < _AUTH_FAIL_COOLDOWN:
-        raise RuntimeError(
-            f"Divoom cloud auth unavailable (retry in "
-            f"{int(_AUTH_FAIL_COOLDOWN - since_fail)}s)"
-        )
-
     email, password = _load_config()
-    if email and password:
+    since_fail = time.time() - _last_auth_fail_at
+    in_cooldown = since_fail < _AUTH_FAIL_COOLDOWN
+
+    # R45 #2: a configured account is ALWAYS allowed to re-submit its stored
+    # email/password on a genuine token expiry (force_refresh) — the creds don't
+    # change, only the token does. The cooldown below only protects the guest
+    # fallback / polled callers from hammering a down/changed cloud.
+    if email and password and (force_refresh or not in_cooldown):
         try:
             creds = _login_email(email, password)
             _save_cache(creds)
             return creds
         except Exception as e:
             print_wrn(f"Email login failed: {e} — falling back to guest")
+
+    # Fail fast inside the cooldown window so a down cloud can't be hammered.
+    if in_cooldown:
+        raise RuntimeError(
+            f"Divoom cloud auth unavailable (retry in "
+            f"{int(_AUTH_FAIL_COOLDOWN - since_fail)}s)"
+        )
 
     try:
         creds = _login_guest()

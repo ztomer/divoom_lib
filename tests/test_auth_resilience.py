@@ -64,3 +64,41 @@ def test_valid_cache_short_circuits_even_in_cooldown(monkeypatch):
     monkeypatch.setattr(divoom_auth, "_load_cache", lambda: good)
     # A valid cached token is returned regardless of the cooldown.
     assert divoom_auth.get_credentials() is good
+
+
+def test_force_refresh_with_account_relogins_even_in_cooldown(monkeypatch):
+    """R45 #2: a genuine token expiry (force_refresh) on a CONFIGURED account
+    re-submits the stored email/password even inside the failure cooldown — the
+    cooldown only gates the guest fallback / polled callers."""
+    monkeypatch.setattr(divoom_auth, "_last_auth_fail_at", 9e18, raising=False)  # in cooldown
+    monkeypatch.setattr(divoom_auth, "_load_config", lambda: ("user@example.com", "pw"))
+    good = divoom_auth.DivoomCredentials(token=1, user_id=2)
+    calls = {"email": 0, "guest": 0}
+
+    def _email(email, pw):
+        calls["email"] += 1
+        return good
+
+    def _guest():
+        calls["guest"] += 1
+        raise RuntimeError("should not reach guest")
+
+    monkeypatch.setattr(divoom_auth, "_login_email", _email)
+    monkeypatch.setattr(divoom_auth, "_login_guest", _guest)
+
+    out = divoom_auth.get_credentials(force_refresh=True)
+    assert out is good
+    assert calls["email"] == 1 and calls["guest"] == 0
+
+
+def test_cooldown_still_gates_account_without_force_refresh(monkeypatch):
+    """Without force_refresh, a polled caller in cooldown must NOT re-hit the
+    network even with an account configured (no hammering)."""
+    monkeypatch.setattr(divoom_auth, "_last_auth_fail_at", 9e18, raising=False)  # in cooldown
+    monkeypatch.setattr(divoom_auth, "_load_config", lambda: ("user@example.com", "pw"))
+    calls = {"email": 0}
+    monkeypatch.setattr(divoom_auth, "_login_email",
+                        lambda e, p: calls.__setitem__("email", calls["email"] + 1))
+    with pytest.raises(RuntimeError):
+        divoom_auth.get_credentials()           # force_refresh defaults False
+    assert calls["email"] == 0                   # cooldown gated it
