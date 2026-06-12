@@ -131,6 +131,11 @@ class BLETransport(DeviceTransport):
             return
 
         if not is_mock:
+            # One connection per address: evict any other in-process transport
+            # holding this MAC first, or CoreBluetooth refuses the second connect
+            # (single↔wall switch). See divoom_lib/ble_registry.
+            from . import ble_registry
+            await ble_registry.evict(self.mac, self)
             if not self.client or getattr(self.client, "address", None) != self.mac:
                 from .divoom import BleakClient
                 self.client = BleakClient(self.mac, disconnected_callback=self._on_os_disconnect)
@@ -142,6 +147,9 @@ class BLETransport(DeviceTransport):
             except Exception as e:
                 self.logger.error(f"Failed to connect to {self.mac}: {e}")
                 raise DeviceConnectionError(f"Failed to connect to {self.mac}: {e}")
+        if not is_mock:
+            from . import ble_registry
+            ble_registry.register(self.mac, self)
 
         if self.NOTIFY_CHARACTERISTIC_UUID:
             if self._notifications_started:
@@ -197,6 +205,8 @@ class BLETransport(DeviceTransport):
             self._expected_response_command = None
 
     async def disconnect(self) -> None:
+        from . import ble_registry
+        ble_registry.unregister(self.mac, self)
         if self.client and self.client.is_connected:
             try:
                 await self.client.disconnect()
