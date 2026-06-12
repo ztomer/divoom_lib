@@ -127,6 +127,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // R42 §3: the loader is loadCustomArtCacheGrid (loadCachedGallery
             // never existed) — without it the library showed "No cached gallery
             // files" even with a full cache.
+            // R45 #1: also (re)build the slot grid — it can be missing if init
+            // raced the template injection at startup.
+            if (window.buildCustomArtSlots) setTimeout(window.buildCustomArtSlots, 30);
             if (window.loadCustomArtCacheGrid) setTimeout(window.loadCustomArtCacheGrid, 50);
             if (window.customArtSyncLibrary) setTimeout(window.customArtSyncLibrary, 100);
         }

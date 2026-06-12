@@ -265,6 +265,23 @@
     });
   }
 
+  // R45 #1: force a (re)build of the slot grid. Exposed so the pixel sub-tab
+  // nav and the startup safety net below can GUARANTEE the slots exist even if
+  // a prior init() ran before the pixel-art template was injected, or the
+  // panel's innerHTML was replaced after init. (Symptom: only the sub-tabs
+  // render — the 12 slots + library are missing — when the app lands directly
+  // on Pixel Art with no tab-change event.)
+  window.buildCustomArtSlots = function () {
+    const panel = document.getElementById("panel-design");
+    if (!panel) return;
+    initialized = true;
+    initPageTabs(panel);
+    buildSlotGrid(panel);
+    initLibraryClicks(panel);
+    initPushButton(panel);
+    renderSlots();
+  };
+
   // Self-heal on tab changes to make sure initialization happens if
   // templates were loaded after DOMContentLoaded.
   window.addEventListener("tab-changed", (e) => {
@@ -273,10 +290,26 @@
     }
   });
 
+  function bootstrap() {
+    init();
+    // If init() bailed earlier (panel not yet injected) the slots can be empty
+    // and no later tab-change fires when Pixel Art is the LANDING tab — rebuild
+    // directly, and kick the library load that the nav normally triggers.
+    const grid = document.getElementById("custom-art-slot-grid");
+    if (grid && grid.querySelectorAll(".custom-art-slot").length === 0 &&
+        document.getElementById("panel-design")) {
+      window.buildCustomArtSlots();
+    }
+    if (document.getElementById("pixel-art")?.classList.contains("active") &&
+        window.loadCustomArtCacheGrid) {
+      setTimeout(window.loadCustomArtCacheGrid, 60);
+    }
+  }
+
   // Bootstrap
   if (document.getElementById("panel-design")) {
-    init();
+    bootstrap();
   } else {
-    document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", bootstrap);
   }
 })();
