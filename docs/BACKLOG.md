@@ -30,6 +30,20 @@ round's planning doc.
 - `VERIFY` **Scan devices** — root cause is macOS TCC, NOT a Python/3.14 bug: BLE crashes/denies based on the *responsible process's* Bluetooth grant + `NSBluetoothAlwaysUsageDescription`. **Verified via System Settings > Privacy > Bluetooth: `python3.14` and the user's terminal (Ghostty) are already GRANTED; there is no `Divoom` entry.** So: (1) the R17 cutover broke scan by spawning the daemon DETACHED -> own unattributed process -> crash/deny; the non-detached spawn fix makes it inherit the launching terminal's grant. (2) The `Divoom.app` bundle (scripts/make_app_bundle.sh) was a wrong turn for this: it re-attributes BLE to a NEW `com.divoom.control` identity that isn't granted, and a background daemon can't raise the grant prompt -> empty scan. **Current fix: `run_gui.sh` launches the GUI directly (attributed to the granted python3.14/terminal) + non-detached daemon.** Must be verified by the USER (launch from the granted terminal, devices powered on) - can't be tested from the Claude harness (its process tree isn't a granted Bluetooth context). make_app_bundle.sh kept for distribution/double-click (would need its own one-time grant).
 
 ### Device / protocol
+- `VERIFY` **Tivoo-Max flaky connectivity** (HW-investigated 2026-06-13). NOT
+  reproducible in controlled tests over BLE: 6/6 connect cycles (avg 3.5s), 5/5
+  rapid reconnect+push, and a 40s sustained connection with a push every 4s — 0
+  failures, 0 spontaneous OS-disconnects, on par with the Ditoo. So it's not a
+  daemon/BLE-path bug. Two leads: (a) the Tivoo is a BT speaker — likely
+  environmental (2.4GHz/RF range, audio-vs-BLE contention, long-idle wake); (b)
+  a latent code hazard: `bt_spp_transport` (Bluetooth Classic SPP) has a known
+  "macOS Tahoe SPP reconnection bug", and it's selected for a tivoo whenever
+  `use_ios_le_protocol` is falsy — the reconnect-from-scratch
+  (`_ensure_device_async`) and notification-sender paths hardcode
+  `use_ios_le_protocol=False`, so a Tivoo routed through them flips to the buggy
+  SPP transport. Main GUI connect uses BLE (True) and is reliable. NEEDS the
+  user's reproduction condition (flakes on connect? mid-session? after the phone
+  app? farther away?) to fix the right thing.
 - `DONE` **Custom Art / Design channel switch** (HW-investigated 2026-06-11 on
   Tivoo-Max + Ditoo). The suspected "0x45 rejected after a draw" does NOT
   reproduce — `current_light_effect_mode` (read via 0x46) cleanly tracks every
