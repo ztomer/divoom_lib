@@ -5,6 +5,23 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## E2E UX-feedback suite + restored appbar status dot (2026-06-13)
+
+- **E2E "no knowledge gap" suite** (`tests/test_e2e_ux_feedback.py`, Playwright):
+  drives the real web_ui with a mock daemon API and asserts the UI surfaces
+  visible feedback at every state transition — scanning (indicator), connecting
+  (toast + pulse), connected (toast + active dot + banner), failed (the daemon's
+  actionable reason, banner reset), no-device guard, scan failure, a degraded
+  link, streaming vs degraded device dots, and the wall button + screen count.
+- **Bug it caught + fixed: the appbar connection dot was missing.** R32 removed
+  the appbar connectivity pill, but the active-device `connection_state` heartbeat
+  (`refreshConnectionState`) and `connectDevice` still target `#global-status-dot`
+  — which no longer existed in the markup (CSS + JS referenced a ghost element).
+  So a mid-session DEGRADED or dropped active link had no visible indicator
+  anywhere. Restored a minimal `#global-status-dot` to the appbar; the heartbeat
+  now actually shows connecting / active / degraded / disconnected.
+
+---
 ## Permission priming + Virtual Wall button (2026-06-13)
 
 - **All macOS permissions primed up front.** The album-art live widget controls

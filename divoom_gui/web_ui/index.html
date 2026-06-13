@@ -62,6 +62,15 @@
             <span id="appbar-volume-value">7/15</span>
         </div>
 
+        <!-- Active-device connection state — connecting / active / degraded /
+             dropped. Restored to the appbar so a mid-session drop or a DEGRADED
+             link is always visible (the per-device sidebar dots cover the
+             selector, but the connection_state heartbeat reports the ACTIVE
+             link's honest state here). Updated by connectDevice + the P6
+             refreshConnectionState heartbeat. -->
+        <span id="global-status-dot" class="transport-dot inactive"
+              title="Disconnected" role="img" aria-label="Connection status"></span>
+
         <!-- R32: Settings moved out of the sidebar into a round glass pill here,
              to the right of the brightness + volume bars. Opens the Settings tab. -->
         <button id="appbar-settings-btn" class="appbar-gear" data-tab="settings" title="Settings" aria-label="Open settings">
