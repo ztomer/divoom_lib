@@ -275,8 +275,12 @@ def _spawn_menubar_agent() -> None:
             logger.info("Menu-bar agent already running; not spawning another.")
             return
         repo_root = Path(__file__).resolve().parents[1]
+        # In a py2app .app, sys.executable is the GUI stub — use the bundled
+        # python so `-m divoom_lib.cli` resolves.
+        from divoom_daemon.daemon_client import bundle_python
+        menubar_py = bundle_python() or sys.executable
         subprocess.Popen(
-            [sys.executable, "-m", "divoom_lib.cli", "menubar"],
+            [menubar_py, "-m", "divoom_lib.cli", "menubar"],
             cwd=str(repo_root),
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
             start_new_session=True,

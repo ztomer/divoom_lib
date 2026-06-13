@@ -5,6 +5,27 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## v0.15.0 — packaging: self-contained app + Homebrew cask (2026-06-13)
+
+First packaged release. The app now ships as a self-contained `Divoom.app` in a
+`.dmg`, installed via the Homebrew cask (`ztomer/homebrew-tap`).
+
+- `setup_app.py` (py2app) builds `Divoom.app` bundling Python + deps (bleak,
+  aiohttp, Pillow, pywebview, pyobjc), the runtime packages, `web_ui/`, fonts, and
+  the native dylib. The Info.plist declares the Bluetooth usage so the bundle is
+  its own TCC-responsible process. **The decompiled APK / `references/` never
+  ship** — only the four runtime packages are bundled, and `build_release.sh`
+  hard-fails if any `*smali*`/`references`/`*.apk` is found in the bundle.
+- Bundle-aware spawn: in a `.app`, `sys.executable` is the GUI stub, so the
+  daemon + menu-bar agent are spawned with the bundled `Contents/MacOS/python`
+  (`daemon_client.bundle_python()`) and WITHOUT the TCC-disclaim (the `.app` is
+  already the BT-responsible process). Dev-from-source path is unchanged.
+- `scripts/build_release.sh` (native dylib → py2app → `.dmg` → sha256) and
+  `docs/RELEASING.md` runbook. Version bumped to 0.15.0.
+- Built + verified on Python 3.14 (py2app 0.28.10): `Divoom-v0.15.0.dmg`, 44 MB,
+  no reference/APK leak. +2 spawn tests.
+
+---
 ## Architecture gap scan #2 — A1–A4 (2026-06-13)
 
 Second scan (`docs/ARCH_GAP_SCAN_2_2026-06.md`) — persistence, GUI RPC, daemon

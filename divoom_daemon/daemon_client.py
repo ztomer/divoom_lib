@@ -27,6 +27,7 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 from divoom_daemon.daemon_protocol import (
@@ -36,6 +37,19 @@ from divoom_daemon.daemon_protocol import (
 )
 
 logger = logging.getLogger("divoom_gui")
+
+
+def bundle_python() -> str | None:
+    """In a py2app ``.app``, the path to the bundled interpreter that can run
+    ``-m divoom_lib.cli`` — ``sys.executable`` there is the GUI app stub
+    (``Contents/MacOS/Divoom``), not a python. Returns None when running from
+    source. The sibling ``Contents/MacOS/python`` is a real interpreter with the
+    bundle's modules on its path (verified: it imports divoom_lib and runs the
+    daemon/menubar entry points)."""
+    if getattr(sys, "frozen", None) != "macosx_app":
+        return None
+    cand = Path(sys.executable).resolve().parent / "python"
+    return str(cand) if cand.exists() else None
 
 
 def _client_alive(client: DaemonClient) -> bool:
@@ -136,8 +150,13 @@ def spawn_daemon(
 
     Caller waits until the socket is live (see :func:`ensure_daemon`).
     """
-    cmd = [python or sys.executable, "-m", "divoom_lib.cli", "daemon",
-           "--socket", socket_path]
+    # In a py2app .app, sys.executable is the GUI stub — use the bundled python
+    # so `-m divoom_lib.cli` resolves; and DON'T disclaim, because the .app is
+    # already the BT-responsible process (its Info.plist declares the usage), so
+    # the daemon inherits a correct, granted responsibility.
+    bundle_py = bundle_python()
+    exe = bundle_py or python or sys.executable
+    cmd = [exe, "-m", "divoom_lib.cli", "daemon", "--socket", socket_path]
     if mac:
         cmd += ["--mac", mac]
     log_path = os.environ.get("DIVOOM_DAEMON_LOG", "/tmp/divoom_daemon.log")
@@ -147,7 +166,7 @@ def spawn_daemon(
     except OSError:
         pass
 
-    if sys.platform == "darwin":
+    if sys.platform == "darwin" and bundle_py is None:
         try:
             pid = _spawn_disclaimed_macos(cmd, log_path)
             logger.info("Spawned daemon (TCC-disclaimed, granted python identity) pid=%s", pid)

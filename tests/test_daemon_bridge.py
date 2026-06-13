@@ -420,3 +420,21 @@ def test_ensure_daemon_spawns_then_connects(live_daemon, monkeypatch):
     # absent path: spawn called, but it never becomes alive → None
     assert ensure_daemon(fake_path, wait_timeout=0.3) is None
     assert calls["n"] == 1
+
+
+def test_bundle_python_none_from_source():
+    """Release: bundle_python() is None when running from source (not a .app)."""
+    assert daemon_bridge.bundle_python() is None
+
+
+def test_bundle_python_resolves_in_frozen_app(monkeypatch, tmp_path):
+    """In a py2app .app, bundle_python() points at the sibling `python` stub of
+    the GUI executable (sys.executable is the app stub, not a python)."""
+    macos = tmp_path / "Divoom.app" / "Contents" / "MacOS"
+    macos.mkdir(parents=True)
+    (macos / "Divoom").write_text("")        # the GUI app stub
+    py = macos / "python"
+    py.write_text("")                        # the bundled interpreter
+    monkeypatch.setattr(sys, "frozen", "macosx_app", raising=False)
+    monkeypatch.setattr(sys, "executable", str(macos / "Divoom"))
+    assert daemon_bridge.bundle_python() == str(py)

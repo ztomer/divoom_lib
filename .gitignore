@@ -46,3 +46,7 @@ build/
 dist/
 
 Divoom.app/
+# release build (scripts/build_release.sh)
+.buildvenv/
+.pyproject.toml.hidden
+*.dmg

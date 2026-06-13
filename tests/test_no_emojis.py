@@ -23,7 +23,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXTS = {".py", ".js", ".css", ".html", ".md", ".txt", ".toml", ".cfg", ".ini", ".sh", ".yml", ".yaml"}
 EXEMPT_DIRS = {"references", ".git", "__pycache__", "node_modules",
-               ".venv", "venv", "divoom_lib.egg-info"}
+               ".venv", "venv", "divoom_lib.egg-info",
+               # transient release-build artifacts (py2app output, build venv)
+               "build", "dist", ".buildvenv"}
 
 # Standard emoji Unicode blocks. Keep this list narrow — false
 # positives are better than misses. A char is an "emoji" if its
