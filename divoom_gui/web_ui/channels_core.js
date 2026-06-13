@@ -2,35 +2,12 @@
 /* channels.js — Control Center channels layout and swatch elements */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // ── 1. AMBIENT LIGHT SWATCHES ──
-    const colorSwatches = document.querySelectorAll(".color-swatch");
-    const customColorInput = document.getElementById("custom-color-input");
-    
-    colorSwatches.forEach(swatch => {
-        swatch.addEventListener("click", () => {
-            colorSwatches.forEach(s => s.classList.remove("active"));
-            swatch.classList.add("active");
-            window.DivoomState.selectedColor = swatch.getAttribute("data-color");
-        });
-    });
-    
-    if (customColorInput) {
-        customColorInput.addEventListener("input", (e) => {
-            colorSwatches.forEach(s => s.classList.remove("active"));
-            window.DivoomState.selectedColor = e.target.value.replace("#", "");
-        });
-    }
-    
-    // Brightness Slider
-    const brightnessSlider = document.getElementById("brightness-slider");
-    const brightnessVal = document.getElementById("brightness-val");
-    if (brightnessSlider) {
-        brightnessSlider.addEventListener("input", (e) => {
-            brightnessVal.textContent = e.target.value;
-        });
-    }
-    
-    // ── 2. CHANNEL CARDS NAVIGATION (R15 §1+§7: `.channel-card` → `.tab-btn`) ──
+    // Ambient swatches + custom color picker + brightness now live in
+    // channels_grids.js (ids: ambient-color-input / global-brightness-slider).
+    // The old handlers here targeted removed ids (.color-swatch /
+    // custom-color-input / brightness-slider) and were dead — removed.
+
+    // ── CHANNEL CARDS NAVIGATION (R15 §1+§7: `.channel-card` → `.tab-btn`) ──
     const channelCards = document.querySelectorAll(".tab-btn[data-channel]");
     const channelPanels = document.querySelectorAll(".channel-panel");
 

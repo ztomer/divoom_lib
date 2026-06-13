@@ -18,11 +18,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ── 1. CLOUD GALLERY FETCH ──
     function readTargetSize() {
-        const bannerResText = document.getElementById("banner-device-res")?.textContent || "16x16";
-        if (bannerResText.includes("64")) return 64;
-        if (bannerResText.includes("32")) return 32;
-        return 16;
+        // `banner-device-res` was moved to Settings → Devices, so reading it here
+        // ALWAYS hit the "16x16" fallback — the gallery fetched 16px art for every
+        // device, even a 64px Pixoo. Derive the panel size from the active device
+        // name instead (the same heuristic connectDevice uses for the preview).
+        const name = (document.getElementById("banner-device-name")?.textContent || "").trim();
+        const size = (window.getDeviceDimensions && name && name !== "None")
+            ? (window.getDeviceDimensions(name).size || 16) : 16;
+        return size === 64 ? 64 : (size === 32 ? 32 : 16);
     }
+    window.readGalleryTargetSize = readTargetSize;   // exposed for the e2e test
 
     function loadGallery() {
         const classifyTabs = document.getElementById("gallery-classify-tabs");

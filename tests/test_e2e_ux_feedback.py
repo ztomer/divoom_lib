@@ -254,6 +254,31 @@ async def test_degraded_link_shows_distinct_state():
 
 
 @pytest.mark.asyncio
+async def test_gallery_requests_the_active_device_resolution():
+    """Regression: the community gallery must fetch art at the active device's
+    panel size — not always 16px. (banner-device-res moved to Settings, so the old
+    reader always hit the 16x16 fallback, shipping 16px art to a 64px Pixoo.)"""
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            await page.wait_for_function("() => typeof window.readGalleryTargetSize === 'function'")
+            sizes = await page.evaluate("""() => {
+                const banner = document.getElementById('banner-device-name');
+                const out = {};
+                banner.textContent = 'Pixoo64'; out.pixoo64 = window.readGalleryTargetSize();
+                banner.textContent = 'Ditoo';   out.ditoo   = window.readGalleryTargetSize();
+                return out;
+            }""")
+            assert sizes["pixoo64"] == 64    # was always 16 before the fix
+            assert sizes["ditoo"] == 16
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
 async def test_wall_button_communicates_screen_count():
     """The Virtual Wall affordance only appears when a wall is configured and tells
     the user how many screens it drives."""

@@ -5,6 +5,25 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Deep dive: ghost-reference audit (2026-06-13)
+
+Static audit for "dead references" — JS targeting DOM ids / API methods / daemon
+commands that no longer exist (the class the appbar status dot belonged to).
+
+- **Bug: the community gallery always fetched 16px art.** `gallery.readTargetSize`
+  read `banner-device-res` for the device resolution, but that element was moved
+  to Settings → Devices — so it always hit the `"16x16"` fallback and a 64px Pixoo
+  got 16px artwork. Now derives the panel size from the active device name
+  (`getDeviceDimensions`), same as the preview. +1 e2e test.
+- **Dead code removed:** `channels_core.js` still wired ambient swatches, a custom
+  color input, and a brightness slider against removed ids (`.color-swatch` /
+  `custom-color-input` / `brightness-slider`) — superseded by `channels_grids.js`.
+  Removed.
+- **Clean:** after these, the ghost-element scan is empty, and every `api.X()` JS
+  call maps to a defined GUI api method, and every client command maps to a
+  registered daemon command — no ghosts in either layer.
+
+---
 ## E2E UX-feedback suite + restored appbar status dot (2026-06-13)
 
 - **E2E "no knowledge gap" suite** (`tests/test_e2e_ux_feedback.py`, Playwright):
