@@ -281,6 +281,8 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
             return {"success": False, "error": str(e)}
 
     def disconnect(self) -> dict:
+        # G1: forget the leaving device's activity (no ghost tile/dot after disconnect).
+        self.forget_device_activity(self.mac or (self._lan_ip and f"LAN:{self._lan_ip}"))
         d = self._device
         if d is not None and hasattr(d, "disconnect"):
             try:
@@ -342,6 +344,8 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
             except Exception as e:
                 logger.debug(f"wall teardown disconnect: {e}")
         self._wall = None
+        # G1: drop the wall's activity tile so it doesn't linger after teardown.
+        self.forget_device_activity("MatrixWall")
 
     def wall_configure(self, args: dict) -> dict:
         slots = args.get("slots") or {}

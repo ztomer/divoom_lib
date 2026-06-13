@@ -46,7 +46,43 @@ class OwnerLiveMixin:
         return existing.get("name")
 
     def get_device_activity(self, _args: dict) -> dict:
+        self._prune_device_activity()
         return {"success": True, "activity": getattr(self, "_device_activity", {}) or {}}
+
+    # G1: keep the registry honest. Without teardown an entry survives disconnect /
+    # wall tear-down / stop-all, so the R47 selector + menubar keep showing a
+    # device that's no longer owned ("ghost"). forget on a hard drop; idle on a
+    # soft stop; TTL-prune anything stale that's neither active nor streaming.
+    _ACTIVITY_TTL = 600  # seconds; an idle, non-active, job-less entry older than
+                         # this is stale (the device left and never came back).
+
+    def forget_device_activity(self, mac) -> None:
+        act = getattr(self, "_device_activity", None)
+        if act and mac:
+            act.pop(mac, None)
+
+    def _idle_device_activity(self, mac) -> None:
+        if mac:
+            self.set_device_activity({"mac": mac, "kind": "idle"})
+
+    def _prune_device_activity(self) -> None:
+        import time
+        act = getattr(self, "_device_activity", None)
+        if not act:
+            return
+        now = time.time()
+        active = getattr(self, "mac", None)
+        lan_ip = getattr(self, "_lan_ip", None)
+        active_lan = f"LAN:{lan_ip}" if lan_ip else None
+        live_macs = {m for (m, _k) in getattr(self, "_live_tasks", {})}
+        for mac in list(act.keys()):
+            # Never prune the active device or a mac with a running live job —
+            # a long-running widget sets `at` once at start, so age alone lies.
+            if mac in (active, active_lan) or mac in live_macs:
+                continue
+            entry = act.get(mac) or {}
+            if now - entry.get("at", now) >= self._ACTIVITY_TTL:
+                act.pop(mac, None)
 
     def live_job_start(self, args: dict) -> dict:
         mac = args.get("mac")
@@ -142,11 +178,16 @@ class OwnerLiveMixin:
     def stop_all_live_jobs(self) -> None:
         if not getattr(self, "_live_tasks", None):
             return
+        macs = {m for (m, _k) in self._live_tasks}
         for key, task in list(self._live_tasks.items()):
             self._loop.call_soon_threadsafe(task.cancel)
         self._live_tasks.clear()
         for mac in list(getattr(self, "_live_devices", {})):
             self._release_live_device_if_idle(mac)
+        # G1: the screens are no longer streaming — mark idle so the menubar /
+        # selector stop showing them as live (the active one stays selectable).
+        for mac in macs:
+            self._idle_device_activity(mac)
         logger.info("Stopped all background live jobs.")
 
     async def get_live_device(self, mac: str, params: dict):

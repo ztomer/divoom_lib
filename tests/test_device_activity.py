@@ -91,6 +91,63 @@ def test_resolve_name_absent_leaves_no_name():
     assert "name" not in o.get_device_activity({})["activity"]["ZZ"]
 
 
+def test_forget_device_activity_removes_entry():
+    """G1: a disconnected device is forgotten (no ghost tile/dot)."""
+    o = _Owner()
+    o.set_device_activity({"mac": "AA", "kind": "clock", "name": "Ditoo"})
+    o.forget_device_activity("AA")
+    assert "AA" not in o.get_device_activity({})["activity"]
+
+
+def test_prune_drops_stale_idle_entry():
+    """G1: an idle, non-active, job-less entry older than the TTL is pruned."""
+    o = _Owner()
+    o.set_device_activity({"mac": "AA", "kind": "idle"})
+    o._device_activity["AA"]["at"] -= (o._ACTIVITY_TTL + 1)
+    assert "AA" not in o.get_device_activity({})["activity"]
+
+
+def test_prune_keeps_active_device():
+    """G1: the active device is never pruned even if its `at` is old."""
+    o = _Owner()
+    o.mac = "AA"
+    o.set_device_activity({"mac": "AA", "kind": "clock"})
+    o._device_activity["AA"]["at"] -= (o._ACTIVITY_TTL + 1)
+    assert "AA" in o.get_device_activity({})["activity"]
+
+
+def test_prune_keeps_streaming_mac():
+    """G1: a long-running widget sets `at` once at start, so a mac with a live
+    job is never pruned on age alone."""
+    o = _Owner()
+
+    class _Task:
+        def cancel(self): pass
+
+    o._live_tasks = {("BB", "sysmon"): _Task()}
+    o.set_device_activity({"mac": "BB", "kind": "sysmon"})
+    o._device_activity["BB"]["at"] -= (o._ACTIVITY_TTL + 1)
+    assert "BB" in o.get_device_activity({})["activity"]
+
+
+def test_stop_all_live_jobs_idles_activity():
+    """G1: stopping all jobs marks the screens idle (not still 'streaming')."""
+    o = _Owner()
+
+    class _Task:
+        def cancel(self): pass
+
+    class _Loop:
+        def call_soon_threadsafe(self, fn, *a): pass
+
+    o._loop = _Loop()
+    o._live_devices = {}
+    o._live_tasks = {("AA", "sysmon"): _Task()}
+    o.set_device_activity({"mac": "AA", "kind": "sysmon"})
+    o.stop_all_live_jobs()
+    assert o.get_device_activity({})["activity"]["AA"]["kind"] == "idle"
+
+
 def test_stop_one_of_two_jobs_keeps_activity():
     o = _Owner()
 
