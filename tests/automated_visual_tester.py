@@ -10,6 +10,7 @@ import sys
 import time
 import subprocess
 import threading
+import tempfile
 from pathlib import Path
 import json
 
@@ -30,7 +31,16 @@ def print_err(message):
 class HeadlessGuiTester:
     def __init__(self):
         self.api = DivoomGuiAPI()
-        self.screenshots_dir = Path(__file__).parent.parent / "test_reports" / "screenshots"
+        # Screenshots are large + transient (and may show account/cloud info), so
+        # they live in a temp dir — never in the repo. Recreated fresh each run.
+        # Override with DIVOOM_TEST_REPORTS if you want them elsewhere.
+        import os
+        import shutil
+        base = Path(os.environ.get("DIVOOM_TEST_REPORTS",
+                                   Path(tempfile.gettempdir()) / "divoom_test_reports"))
+        self.reports_dir = base
+        self.screenshots_dir = base / "screenshots"
+        shutil.rmtree(base, ignore_errors=True)   # clean up on every run
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
         self.test_success = True
         self.results = []
@@ -216,7 +226,7 @@ class HeadlessGuiTester:
         webview.start()
         
         # Write JSON Test outcomes report
-        report_file = Path(__file__).parent.parent / "test_reports" / "visual_test_report.json"
+        report_file = self.reports_dir / "visual_test_report.json"
         report_file.parent.mkdir(parents=True, exist_ok=True)
         report_file.write_text(json.dumps({
             "test_success": self.test_success,
