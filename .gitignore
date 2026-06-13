@@ -50,3 +50,6 @@ Divoom.app/
 .buildvenv/
 .pyproject.toml.hidden
 *.dmg
+
+# local-only reference material (reverse-engineered APK + third-party refs) — never track/publish
+references/
