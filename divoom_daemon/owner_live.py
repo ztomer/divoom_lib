@@ -23,12 +23,27 @@ class OwnerLiveMixin:
         if getattr(self, "_device_activity", None) is None:
             self._device_activity = {}
         entry = self._device_activity.get(mac, {})
-        if args.get("name"):
-            entry["name"] = args["name"]
+        name = args.get("name") or self._resolve_device_name(mac)
+        if name:
+            entry["name"] = name
         entry["kind"] = args.get("kind") or entry.get("kind") or "idle"
         entry["at"] = time.time()
         self._device_activity[mac] = entry
         return {"success": True}
+
+    def _resolve_device_name(self, mac):
+        """Best-effort friendly name for a mac from the devices the daemon owns
+        (so a live job started without a name still shows 'Ditoo', not the raw
+        MAC, in the menubar / GUI)."""
+        if mac == getattr(self, "mac", None) and getattr(self, "_device", None) is not None:
+            nm = getattr(self._device, "device_name", None)
+            if nm:
+                return nm
+        bg = getattr(self, "_live_devices", {}).get(mac)
+        if bg is not None and getattr(bg, "device_name", None):
+            return bg.device_name
+        existing = getattr(self, "_device_activity", {}).get(mac, {})
+        return existing.get("name")
 
     def get_device_activity(self, _args: dict) -> dict:
         return {"success": True, "activity": getattr(self, "_device_activity", {}) or {}}

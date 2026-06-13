@@ -162,7 +162,14 @@
                 <span id="banner-device-name" style="display: none;">No Connected Screen</span>
                 <span id="banner-device-mac" style="display: none;">-</span>
             </div>
-            <!-- R33: device switch dots live outside the glass panel, below it. -->
+            <!-- R47: scan-in-progress indicator, visible from the main UI (the
+                 Scan button lives in Settings, so a scan was otherwise silent). -->
+            <div id="scan-indicator" class="scan-indicator" hidden aria-live="polite">
+                <span class="spinner"></span> Scanning for screens…
+            </div>
+            <!-- R33: device switch dots live outside the glass panel, below it.
+                 device-dots stays the sidebar's last element (asserted by
+                 test_appbar_sidebar). -->
             <div id="device-dots" class="device-dots" role="tablist" aria-label="Switch device"></div>
             <!-- R32: the Settings nav button was removed from the sidebar — it
                  now lives as a gear pill in the appbar. The device panel above
@@ -510,6 +517,7 @@
     <script src="templates_settings.js"></script>
     <script src="templates_device_settings.js"></script>
     <script src="app_globals.js"></script>
+    <script src="device_selector.js"></script>
     <script src="app_init.js"></script>
     <script src="channels_core.js"></script>
     <script src="channels_grids.js"></script>

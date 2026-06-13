@@ -5,6 +5,33 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R47: daemon-owned devices stay selectable + scan indication (2026-06-13)
+
+The problem: a device the daemon OWNS (the active link, or a background
+live-widget job) is connected, so it stops advertising and a BLE scan never
+sees it. It showed as "connected" in the appbar but had no selector dot — you
+couldn't switch to it or stop its widget ("connected but can't do anything").
+The menubar tiles also showed raw MACs because activity carried no name.
+
+- **Daemon resolves a friendly name** for an activity entry — `set_device_activity`
+  now fills `name` via `_resolve_device_name(mac)` (active `self._device`, else a
+  cached background live device, else the existing entry). Menubar tiles and the
+  GUI selector now read "Ditoo", not the MAC. (`divoom_daemon/owner_live.py`)
+- **GUI surfaces owned devices** — new `get_device_activity` GUI api
+  (`scanner_mixin.py`); `device_selector.js` `refreshOwnedDevices()` unions the
+  daemon's owned macs into `discoveredDevices` (with name + activity kind) on a
+  4 s heartbeat, so a streaming device is ALWAYS in the selector. A daemon-owned
+  device gets a breathing ring (`.transport-dot.streaming`) — "busy, click to
+  take it over / stop its widget".
+- **Scan indication** — `#scan-indicator` ("Scanning for screens…") in the
+  sidebar, toggled by `setScanning()` around `runBleScan` (the Scan button lives
+  in Settings, so a scan was otherwise silent in the main UI).
+- Split the device-dots/selector logic out of `app_globals.js` into
+  `device_selector.js` to stay under the 500-LOC cap.
+- Tests: +3 name-resolution tests (`tests/test_device_activity.py`, 8 total).
+  Full suite green (1461 passed / 75 skipped). GUI/menubar HW pass pending.
+
+---
 ## Channel switch vs. live widget (HW, 2026-06-11)
 
 HW investigation of the long-standing "channel switch doesn't reliably change

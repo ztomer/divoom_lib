@@ -52,6 +52,20 @@ class ScannerMixin:
             logger.debug(f"set_device_activity failed: {e}")
             return False
 
+    def get_device_activity(self) -> str:
+        """R47: what each device the daemon owns is doing — JSON
+        ``{mac: {name, kind, at}}``. Lets the GUI surface daemon-owned /
+        streaming devices in the selector even when a scan missed them (they're
+        connected, hence not advertising)."""
+        try:
+            client = self._client()
+            if client is None:
+                return "{}"
+            return json.dumps(client.get_device_activity().get("activity", {}) or {})
+        except Exception as e:
+            logger.debug(f"get_device_activity failed: {e}")
+            return "{}"
+
     def get_connection_state(self) -> str:
         """BLE Hardening P6: the daemon's honest connection_state for the active
         device, for the appbar heartbeat. Returns JSON

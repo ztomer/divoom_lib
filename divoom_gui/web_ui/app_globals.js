@@ -187,57 +187,9 @@ window.markActiveDeviceFrame = function(src) {
         window.setDeviceActivity(mac, "image", { src: src });
 };
 
-// R46 #5: a re-scan replaced discoveredDevices wholesale, so a device the
-// daemon is busy STREAMING to (connected → not advertising → scan misses it)
-// vanished from the selector. Union the fresh scan with the known devices by
-// address (fresh data wins) so an in-use device stays selectable.
-window.mergeDiscoveredDevices = function(fresh) {
-    const byAddr = {};
-    (window.DivoomState.discoveredDevices || []).forEach(d => {
-        if (d && d.address) byAddr[d.address] = d;
-    });
-    (fresh || []).forEach(d => {
-        if (d && d.address) byAddr[d.address] = Object.assign(byAddr[d.address] || {}, d);
-    });
-    window.DivoomState.discoveredDevices = Object.values(byAddr);
-    return window.DivoomState.discoveredDevices;
-};
-
-// ── R32 §C3: per-device switch dots overlaid on the preview ───────────
-window.renderDeviceDots = function() {
-    const host = document.getElementById("device-dots");
-    if (!host) return;
-    const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
-    const entries = [];
-    (window.DivoomState.discoveredDevices || []).forEach(d => {
-        if (d.address) entries.push({ value: d.address, name: d.name || "Bluetooth Screen" });
-    });
-    (window.DivoomState.registeredLanDevices || []).forEach(d => {
-        if (d.ip) entries.push({ value: `LAN:${d.ip}`, name: `Wi-Fi: ${d.ip}` });
-    });
-    if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) {
-        entries.push({ value: "MatrixWall", name: "Virtual Wall" });
-    }
-    host.innerHTML = "";
-    entries.forEach(e => {
-        const isActive = e.value === activeMac;
-        const dot = document.createElement("span");
-        // Recycle the connectivity-dot class so the look (size, glow, inactive
-        // dimming) stays identical; color comes from the per-device hue. The
-        // glow uses currentColor, so set both background and color.
-        dot.className = "transport-dot " + (isActive ? "active" : "inactive");
-        const color = window.deviceColor(e.value);
-        dot.style.background = color;
-        dot.style.color = color;
-        // R34 §2: lets connectDevice find this dot and pulse it while connecting.
-        dot.dataset.value = e.value;
-        dot.title = e.name;
-        dot.setAttribute("role", "tab");
-        dot.setAttribute("aria-selected", isActive ? "true" : "false");
-        dot.addEventListener("click", () => window.connectDevice(e.name, e.value));
-        host.appendChild(dot);
-    });
-};
+// R47: device-dots / selector logic (mergeDiscoveredDevices, refreshOwnedDevices,
+// renderDeviceDots, setScanning) lives in device_selector.js to keep this file
+// under the 500-LOC cap.
 
 window.getDeviceDimensions = function(name) {
     const n = (name || "").toLowerCase();
@@ -368,6 +320,10 @@ window.refreshConnectionState = function() {
 window.startConnectionHeartbeat = function() {
     if (window._connHeartbeat) return;
     window._connHeartbeat = setInterval(window.refreshConnectionState, 4000);
+    // R47: keep daemon-owned devices in the selector even when this GUI didn't
+    // start them (a widget persisted from a prior session, or another client).
+    window.refreshOwnedDevices();
+    window._ownedHeartbeat = setInterval(window.refreshOwnedDevices, 4000);
 };
 
 window.updateDeviceSelectorDropdown = function() {

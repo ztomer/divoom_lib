@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R47 SHIPPED (2026-06-13): daemon-owned devices stay selectable + scan
+  indication.** Fixes "device shows connected but I can't do anything with it":
+  a daemon-owned/streaming device doesn't advertise, so a scan missed it and it
+  had no selector dot. Now the daemon resolves a friendly `name` for activity
+  (`owner_live._resolve_device_name`), the GUI pulls `get_device_activity` on a
+  4 s heartbeat (`device_selector.refreshOwnedDevices`) and unions owned macs
+  into the selector with a breathing "streaming" ring, and a `#scan-indicator`
+  shows scans in the main UI. Selector logic split into `device_selector.js`
+  (500-LOC cap). Suite 1461 passed / 75 skipped. **Open:** live GUI + menubar
+  visual pass (names resolve only while the daemon owns the device; SF Symbols
+  need macOS 11+).
+
 - **SOCKET INTERFACE HARDENING SHIPPED (2026-06-11).** Plan
   `docs/PLANNING_SOCKET_HARDENING.md`. The daemon socket is a privilege boundary
   (owns BLE + reads notifications). Landed: Unix socket `chmod 0600`; max

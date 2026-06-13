@@ -58,6 +58,39 @@ def test_live_job_start_sets_activity_and_stop_reverts_to_idle():
     assert o.get_device_activity({})["activity"]["AA"]["kind"] == "idle"
 
 
+def test_resolve_name_from_active_device():
+    """R47: a live job set without a name still shows the friendly name, resolved
+    from the active device the daemon owns (not the raw MAC)."""
+    o = _Owner()
+
+    class _Dev:
+        device_name = "Ditoo"
+
+    o.mac = "AA"
+    o._device = _Dev()
+    o.set_device_activity({"mac": "AA", "kind": "sysmon"})   # no name given
+    assert o.get_device_activity({})["activity"]["AA"]["name"] == "Ditoo"
+
+
+def test_resolve_name_from_background_live_device():
+    """R47: name resolves from a cached BACKGROUND live device for a non-active mac."""
+    o = _Owner()
+
+    class _Dev:
+        device_name = "Pixoo-1"
+
+    o._live_devices = {"BB": _Dev()}
+    o.set_device_activity({"mac": "BB", "kind": "weather"})
+    assert o.get_device_activity({})["activity"]["BB"]["name"] == "Pixoo-1"
+
+
+def test_resolve_name_absent_leaves_no_name():
+    """R47: an unknown mac with no name stays nameless (the GUI shows a fallback)."""
+    o = _Owner()
+    o.set_device_activity({"mac": "ZZ", "kind": "clock"})
+    assert "name" not in o.get_device_activity({})["activity"]["ZZ"]
+
+
 def test_stop_one_of_two_jobs_keeps_activity():
     o = _Owner()
 

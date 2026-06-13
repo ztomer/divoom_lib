@@ -261,6 +261,23 @@
 }
 .device-dots:empty { display: none; }
 
+/* R47: scan-in-progress indicator under the device dots. */
+.scan-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 11px;
+    color: var(--text-muted, rgba(255,255,255,0.6));
+    margin: 0 auto 8px auto;
+}
+.scan-indicator[hidden] { display: none; }
+.scan-indicator .spinner {
+    width: 12px;
+    height: 12px;
+    border-width: 2px;
+}
+
 /* R46 #1: bigger hit target so the device dots are easy to click (were 8px). */
 .device-dots .transport-dot {
     width: 16px;
@@ -273,6 +290,19 @@
 .device-dots .transport-dot:hover { transform: scale(1.2); }
 .device-dots .transport-dot.inactive { opacity: 0.35; box-shadow: none; }
 .device-dots .transport-dot.active { opacity: 1; box-shadow: 0 0 6px currentColor; }
+
+/* R47: a daemon-owned device streaming a live widget — not the active
+   selection, but connected and busy. Brighter than .inactive (it IS live) with
+   a slow breathing ring so it reads as "busy, click to take over". */
+.device-dots .transport-dot.streaming {
+    opacity: 0.85;
+    box-shadow: 0 0 0 2px var(--card-bg, #14151a), 0 0 0 3px currentColor;
+    animation: streamRing 2.4s ease-in-out infinite;
+}
+@keyframes streamRing {
+    0%, 100% { box-shadow: 0 0 0 2px var(--card-bg, #14151a), 0 0 0 3px currentColor; }
+    50%      { box-shadow: 0 0 0 2px var(--card-bg, #14151a), 0 0 5px 3px currentColor; }
+}
 
 /* Tooltip opens upward, centred over the dot. Always light text — the
    semi-transparent dark background is legible in both light and dark themes. */

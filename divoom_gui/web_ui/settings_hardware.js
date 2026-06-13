@@ -141,13 +141,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (scanSpinner) scanSpinner.style.display = "inline-block";
         if (scanBtn) scanBtn.disabled = true;
-        
+        window.setScanning?.(true);
+
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.scan_devices(timeout, limit)
                 .then(devicesJson => {
                     if (scanSpinner) scanSpinner.style.display = "none";
                     if (scanBtn) scanBtn.disabled = false;
-                    
+                    window.setScanning?.(false);
+
                     const devices = JSON.parse(devicesJson);
                     // R46 #5: merge (don't replace) so a device busy streaming a
                     // live widget — connected, hence not advertising, hence missed
@@ -165,12 +167,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     // leave the spinner stuck — re-enable + surface the error.
                     if (scanSpinner) scanSpinner.style.display = "none";
                     if (scanBtn) scanBtn.disabled = false;
+                    window.setScanning?.(false);
                     window.showToast("Scan failed (device backend unavailable). See logs.", "error");
                     console.error("scan_devices failed:", err);
                 });
         } else {
             if (scanSpinner) scanSpinner.style.display = "none";
             if (scanBtn) scanBtn.disabled = false;
+            window.setScanning?.(false);
             window.showToast("Web interface API unavailable.", "error");
         }
     }
