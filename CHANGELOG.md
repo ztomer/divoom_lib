@@ -5,6 +5,14 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## v0.15.1 — GUI/UX reliability (2026-06-13)
+
+Packaged release bundling the fixes below since v0.15.0: music/album-art widget
+permission priming, the always-visible appbar connection dot, the gallery
+resolution fix, the distinct Virtual Wall button, and the E2E UX-feedback suite +
+ghost-reference cleanup.
+
+---
 ## Deep dive: ghost-reference audit (2026-06-13)
 
 Static audit for "dead references" — JS targeting DOM ids / API methods / daemon
