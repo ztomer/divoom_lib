@@ -126,3 +126,87 @@ def test_connect_to_a_wall_member_drops_the_wall(monkeypatch):
     r = o.connect({"lan_ip": "1.2.3.4"})
     assert r["success"] is True
     assert wall.disconnects == 1 and o._wall is None and o._wall_slots == {}
+
+
+# ── G7: delta reconfigure — keep shared screens, swap only the delta ─────────
+
+
+class _Slot:
+    def __init__(self, dev):
+        self.device = dev
+
+
+class _WallDev:
+    def __init__(self, mac):
+        self.mac = mac
+        self.is_connected = True
+        self.disconnects = 0
+    async def disconnect(self):
+        self.disconnects += 1
+
+
+def _slot(x):
+    return {"x": x, "y": 0, "size": 16}
+
+
+def test_wall_delta_reuses_shared_screens(monkeypatch):
+    """Reconfiguring {A,B} -> {A,C} keeps A connected (transplanted, not rebuilt),
+    drops B, and only the new wall connects (A fast-verifies)."""
+    built = []
+
+    class _NewWall:
+        is_connected = True
+        def __init__(self, configs, custom_logger=None):
+            self.devices = [_Slot(_WallDev(c["mac"])) for c in configs]
+            self.connected = 0
+            built.append(self)
+        async def connect(self):
+            self.connected += 1
+
+    devA, devB = _WallDev("A"), _WallDev("B")
+
+    class _OldWall:
+        devices = [_Slot(devA), _Slot(devB)]
+
+    o = _owner(_OldWall(), {"A": _slot(0), "B": _slot(1)})
+    o._device = None
+    o.mac = None
+    o._lan_ip = None
+    monkeypatch.setattr("divoom_lib.wall.DivoomWall", _NewWall)
+
+    r = o.wall_configure({"slots": {"A": _slot(0), "C": _slot(1)}})
+    assert r == {"success": True, "wall": True}
+    new = built[-1]
+    by_mac = {s.device.mac: s.device for s in new.devices}
+    assert by_mac["A"] is devA          # shared screen reused (no reconnect)
+    assert by_mac["C"] is not devA      # added screen is fresh
+    assert devB.disconnects == 1        # removed screen released
+    assert new.connected == 1           # only the new wall connects
+    assert o._wall is new
+    assert "C" in o._wall_slots and "B" not in o._wall_slots
+
+
+def test_wall_no_overlap_falls_back_to_full_rebuild(monkeypatch):
+    """A disjoint layout {A,B} -> {C,D} has no shared screen, so it tears down the
+    old wall fully and builds fresh."""
+    built = []
+
+    class _NewWall:
+        is_connected = True
+        def __init__(self, configs, custom_logger=None):
+            self.devices = [_Slot(_WallDev(c["mac"])) for c in configs]
+            built.append(self)
+        async def connect(self):
+            pass
+
+    old = _FakeWall()
+    o = _owner(old, {"A": _slot(0), "B": _slot(1)})
+    o._device = None
+    o.mac = None
+    o._lan_ip = None
+    monkeypatch.setattr("divoom_lib.wall.DivoomWall", _NewWall)
+
+    r = o.wall_configure({"slots": {"C": _slot(0), "D": _slot(1)}})
+    assert r == {"success": True, "wall": True}
+    assert old.disconnects == 1         # old wall torn down fully (no overlap)
+    assert {s.device.mac for s in built[-1].devices} == {"C", "D"}

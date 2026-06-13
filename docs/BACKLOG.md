@@ -28,11 +28,12 @@ round's planning doc.
 - `DONE HW` **G5** background `_live_devices` health is now stamped onto the
   activity entry; selector dot shows an amber "reconnecting" ring. Happy path
   HW-verified; degraded path unit-tested.
-- `OPEN` **G6** scan indicator covers only the Settings button, not reconnect /
-  auto-discovery scans.
-- `OPEN` **G7** (found during G4 HW) `wall_configure` rebuilds the entire wall on
-  every change, so a reconfigure reconnects ALL members (adding a 3rd screen took
-  ~14 s on HW). Optimization: diff slots and only (dis)connect the delta.
+- `WONTFIX` **G6** scan indicator covers only the Settings button. The only other
+  scan path (daemon auto-discovery in `_ensure_device_async`, no-mac connect) is
+  never triggered by the GUI (always passes a mac) — not worth event-plumbing.
+- `DONE HW` **G7** `wall_configure` rebuilt the entire wall on every change
+  (~14 s to add a 3rd screen). Now reconfigures by delta — transplant shared
+  connected screens, only (dis)connect the delta. HW: ADD 3.9 s, REMOVE 0.0 s.
 
 ### Regressions reported 2026-06-08 — root-caused
 - `DONE` **Clock / EQ / Custom Art / Ambient panels were empty** (and VJ "missing").

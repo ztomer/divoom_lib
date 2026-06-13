@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **ARCH GAP SCAN COMPLETE (2026-06-13).** All of `docs/ARCH_GAP_SCAN_2026-06.md`
+  resolved: G1–G5 + G7 shipped, G6 closed won't-fix. **G7 (HW-verified)**:
+  `wall_configure` now reconfigures by delta — transplant the connected screens
+  shared with the old layout (fast-verify), only (dis)connect the delta; disjoint
+  layouts still full-rebuild. HW (Ditoo/Pixoo/Timoo): ADD a 3rd screen **3.9 s
+  (was ~14 s)**, REMOVE **0.0 s**, wall lit throughout, removed screen freed.
+  Wall ownership extracted to `divoom_daemon/owner_wall.py` (device_owner.py now
+  430 LOC). G6 = won't-fix (the no-mac auto-discovery scan path the indicator
+  would cover is never triggered by the GUI). Still want a real HW pass for G2
+  (scan during streaming) + the G3 exclusive force-release path.
+
 - **ARCH GAP FIXES G4–G5 SHIPPED + HW-VERIFIED (2026-06-13).** **G4**: active
   device + wall could double-own one MAC → daemon kept a dead `_device` handle
   that timed out ~5s and FAILED on every active call. Fixed —

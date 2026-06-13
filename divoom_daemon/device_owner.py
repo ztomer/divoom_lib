@@ -13,6 +13,7 @@ from divoom_daemon.owner_art import OwnerArtMixin
 from divoom_daemon.owner_live import OwnerLiveMixin
 from divoom_daemon.owner_loop import OwnerLoopMixin
 from divoom_daemon.owner_notify import OwnerNotifyMixin
+from divoom_daemon.owner_wall import OwnerWallMixin
 
 logger = logging.getLogger("divoom_daemon.device_owner")
 
@@ -30,7 +31,8 @@ def _json_safe(value):
     return str(value)
 
 
-class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixin):
+class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixin,
+                  OwnerWallMixin):
     """Single owner of the BLE/LAN device connection and wall (R17 P5).
     Provides command handlers for device lifecycle and a send_notification
     method used by NotificationService."""
@@ -310,80 +312,9 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
             logger.warning(f"scan failed: {e}")
             return {"success": False, "error": str(e), "devices": []}
 
-    def _drop_current_wall(self) -> None:
-        """Disconnect + drop the current wall's BLE links. Without this, clearing
-        or RECONFIGURING a wall leaked every screen's connection (HW-confirmed:
-        the next build then times out reconnecting devices the daemon still
-        held)."""
-        w = self._wall
-        if w is not None and hasattr(w, "disconnect"):
-            try:
-                self._run_device(w.disconnect())
-            except Exception as e:
-                logger.debug(f"wall teardown disconnect: {e}")
-        self._wall = None
-        self.forget_device_activity("MatrixWall")  # G1: drop wall tile after teardown
-
-    def _active_key(self):
-        ip = getattr(self, "_lan_ip", None)
-        return getattr(self, "mac", None) or (ip and f"LAN:{ip}")
-
-    def _relinquish_active_if_in(self, slots: dict) -> None:
-        """G4: a screen is owned by the active link OR the wall, not both. If the
-        active mac is also a wall slot, drop it — else the wall takes the BLE link
-        and the orphaned handle wastes a ~5s reconnect-timeout on every call."""
-        key = self._active_key()
-        if not key or key not in slots:
-            return
-        d = getattr(self, "_device", None)
-        if d is not None and hasattr(d, "disconnect"):
-            try:
-                self._run_device(d.disconnect())
-            except Exception as e:
-                logger.debug(f"relinquish active disconnect: {e}")
-        self._device = self.mac = self._lan_ip = None
-        self.forget_device_activity(key)
-        logger.info("relinquished active device %s — claimed by the wall", key)
-
-    def wall_configure(self, args: dict) -> dict:
-        slots = args.get("slots") or {}
-        cell = int(args.get("cell_size", 16) or 16)
-        if not slots:
-            self._drop_current_wall()
-            self._wall_slots = {}
-            return {"success": True, "wall": False}
-        if (self._wall is not None and slots == self._wall_slots
-                and getattr(self._wall, "is_connected", False)):
-            return {"success": True, "wall": True}
-        self._drop_current_wall()    # release the old wall before rebuilding
-        self._relinquish_active_if_in(slots)   # G4: don't double-own a slot mac
-        self._wall_slots = slots
-
-        async def _build():
-            from divoom_lib.wall import DivoomWall
-            configs = []
-            for mac, s in slots.items():
-                cfg = {
-                    "mac": mac,
-                    "x": int(s.get("x", 0)), "y": int(s.get("y", 0)),
-                    "size": int(s.get("size", cell)),
-                }
-                if "width" in s:
-                    cfg["width"] = int(s["width"])
-                if "height" in s:
-                    cfg["height"] = int(s["height"])
-                configs.append(cfg)
-            wall = DivoomWall(configs, custom_logger=logger)
-            await wall.connect()
-            return wall
-
-        try:
-            self._wall = self._run_device(_build())
-            return {"success": True, "wall": True}
-        except Exception as e:
-            logger.warning(f"wall_configure failed: {e}")
-            self._wall = None
-            return {"success": False, "error": str(e), "wall": False}
+    # ── wall ──────────────────────────────────────────────────────────────
+    # _drop_current_wall / _active_key / _relinquish_active_if_in /
+    # wall_configure / _wall_delta live in OwnerWallMixin.
 
     def sync_artwork(self, args: dict) -> dict:
         file_id = args.get("file_id")

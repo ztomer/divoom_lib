@@ -5,6 +5,27 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Architecture gap fix G7 + G6 resolution (2026-06-13)
+
+- **G7 — wall delta reconfigure (HW-verified).** `wall_configure` rebuilt the
+  WHOLE wall on any change, so a reconfigure reconnected every member (HW: adding
+  a 3rd screen took ~14 s). It now reconfigures by delta when the new layout
+  overlaps the current wall: the connected shared screens are transplanted into
+  the new wall (`ensure_connected` short-circuits on a live link → fast-verify
+  ~0 s), only added screens connect, and removed screens disconnect. Disjoint
+  layouts still fall back to a clean full rebuild. HW (Ditoo/Pixoo/Timoo): **ADD a
+  3rd screen 3.9 s (was ~14 s); REMOVE a screen 0.0 s**; wall lit throughout; the
+  removed screen released and connectable solo. Wall ownership extracted into
+  `owner_wall.py` (OwnerWallMixin) — `device_owner.py` down to 430 LOC.
+  (`owner_wall.py`, `device_owner.py`)
+- **G6 — won't-fix (no real trigger).** The scan indicator covering only the
+  Settings button is harmless in practice: the only non-button scan path is the
+  daemon's auto-discovery in `_ensure_device_async` when connecting with NO mac,
+  which the GUI never does (it always passes a mac). Closed as won't-fix rather
+  than add event-plumbing for a path that doesn't fire.
+- Tests: +2 G7 (`test_wall_lifecycle.py`). Suite green.
+
+---
 ## Architecture gap fixes G4–G5 (2026-06-13)
 
 From the architecture scan (`docs/ARCH_GAP_SCAN_2026-06.md`). Both HW-verified.
