@@ -33,9 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             devPrev.src = info.preview;
                             devPrev.style.display = "inline-block";
                             // R46 #2: cover art is the device's last-active element.
-                            const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
-                            if (selectedWidget === "music" && mac && mac !== "None" && window.setDeviceActivity)
-                                window.setDeviceActivity(mac, "image", { src: info.preview });
+                            if (selectedWidget === "music") window.markActiveDeviceFrame?.(info.preview);
                         }
                     }
                 }
@@ -143,9 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
             img.src = dataUrl;
             img.style.display = "inline-block";
             // R46 #2: the stock ticker is the device's last-active element.
-            const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
-            if ((selectedWidget === "stock" || selectedWidget === "stocks") && mac && mac !== "None" && window.setDeviceActivity)
-                window.setDeviceActivity(mac, "image", { src: dataUrl });
+            if (selectedWidget === "stock" || selectedWidget === "stocks") window.markActiveDeviceFrame?.(dataUrl);
         }
     }
 
@@ -175,21 +171,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
                 // R44 §7: when System Monitor is the active widget, mirror its
                 // frame into the lower-left device screen overlay too.
-                if (r.preview && selectedWidget === "sysmon") {
-                    const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
-                    // R46 #2: record as the device's last-active element (image frame).
-                    if (mac && mac !== "None" && window.setDeviceActivity)
-                        window.setDeviceActivity(mac, "image", { src: r.preview });
-                }
+                // R46 #2: mirror the sysmon frame as the device's last-active element.
+                if (r.preview && selectedWidget === "sysmon") window.markActiveDeviceFrame?.(r.preview);
             } catch (e) { /* ignore */ }
         });
     }
 
     // R40 §4: the "Push to Device" button was removed — the Live (5s) header
     // toggle is the single control (on = stream sysmon to the device).
-
-    // (The duplicate sysmonDisplayBtn block at the old line ~407 was
-    //  removed — it redeclared the same `const` and broke the whole script.)
 
     // (Duplicate sysmonDisplayBtn block was removed; the wiring below at
     //  line ~403 was the second declaration of the same const. The first

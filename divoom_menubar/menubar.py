@@ -16,7 +16,30 @@ import objc
 from AppKit import (
     NSApplication, NSStatusBar, NSVariableStatusItemLength, NSMenu, NSMenuItem,
     NSColor, NSForegroundColorAttributeName, NSBackgroundColorAttributeName,
+    NSImage,
 )
+
+# R46 #3: per-device activity → (SF Symbol, friendly label) for the menubar
+# tiles. Glyph-only for now (the daemon supplies the kind; real-frame thumbnails
+# are a follow-up). Unknown kinds fall back to a generic dot.
+_ACTIVITY_GLYPH = {
+    "clock": ("clock", "Clock"),
+    "visualizer": ("waveform", "EQ visualizer"),
+    "eq": ("waveform", "EQ visualizer"),
+    "vj": ("sparkles", "VJ effects"),
+    "scoreboard": ("sportscourt", "Scoreboard"),
+    "text": ("textformat", "Text"),
+    "ambient": ("lightbulb", "Ambient"),
+    "design": ("square.grid.2x2", "Custom art"),
+    "custom": ("square.grid.2x2", "Custom art"),
+    "music": ("music.note", "Now playing"),
+    "stocks": ("chart.line.uptrend.xyaxis", "Stocks"),
+    "stock": ("chart.line.uptrend.xyaxis", "Stocks"),
+    "sysmon": ("cpu", "System monitor"),
+    "weather": ("cloud.sun", "Weather"),
+    "idle": ("moon.zzz", "Idle"),
+}
+_DEVICE_ITEM_TAG = 4600   # device rows + their trailing separator
 
 # App brand accent (web_ui/style.css --primary "Braun Tuner Orange"). The menu-bar
 # item uses the same orange background + white text as the app's active controls
@@ -59,6 +82,52 @@ class DivoomMenuBarAgent(NSObject):
         self.performSelectorOnMainThread_withObject_waitUntilDone_(
             "updateStatusTitle:", None, False
         )
+
+    # R46 #3: rebuild the per-device tiles right before the menu opens (NSMenu
+    # delegate). One row per device: an SF Symbol glyph for what it's showing +
+    # "Name — Activity". Pulled fresh from the daemon so it reflects reality even
+    # when the dashboard is closed.
+    def menuNeedsUpdate_(self, menu):
+        try:
+            self._rebuild_device_section(menu)
+        except Exception as e:
+            logger.debug("device section rebuild failed: %s", e)
+
+    def _rebuild_device_section(self, menu):
+        # Drop the previous device rows + their separator.
+        for item in list(menu.itemArray()):
+            if item.tag() == _DEVICE_ITEM_TAG:
+                menu.removeItem_(item)
+        activity = {}
+        try:
+            activity = self.client.device_activity()
+        except Exception:
+            activity = {}
+        if not activity:
+            return
+        # Insert at the top (above Launch Dashboard), newest activity first.
+        rows = sorted(activity.items(), key=lambda kv: kv[1].get("at", 0), reverse=True)
+        idx = 0
+        for mac, info in rows:
+            kind = (info.get("kind") or "idle").lower()
+            symbol, label = _ACTIVITY_GLYPH.get(kind, ("circle.dashed", kind.title() or "—"))
+            name = info.get("name") or mac
+            row = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                f"{name} — {label}", None, "")
+            row.setTag_(_DEVICE_ITEM_TAG)
+            row.setEnabled_(False)
+            try:
+                img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol, label)
+                if img is not None:
+                    row.setImage_(img)
+            except Exception:
+                pass
+            menu.insertItem_atIndex_(row, idx)
+            idx += 1
+        if idx > 0:
+            sep = NSMenuItem.separatorItem()
+            sep.setTag_(_DEVICE_ITEM_TAG)
+            menu.insertItem_atIndex_(sep, idx)
 
     # Cocoa status item actions
     def updateStatusTitle_(self, sender):
@@ -215,6 +284,9 @@ def main():
     # Create the popup menu
     menu = NSMenu.alloc().init()
     agent.menu = menu
+    # R46 #3: the agent is the menu delegate so menuNeedsUpdate_ can refresh the
+    # per-device tiles each time the menu opens.
+    menu.setDelegate_(agent)
 
     # 1. Launch Dashboard option
     launch_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(

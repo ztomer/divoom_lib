@@ -7,6 +7,31 @@ class OwnerLiveMixin:
     def __init__(self):
         self._live_tasks = {}    # (mac, kind) -> asyncio.Task
         self._live_devices = {}  # mac -> connected Divoom/DivoomWall (background jobs)
+        self._device_activity = {}  # R46 #3: mac -> {name, kind, at} (menubar previews)
+
+    # ── R46 #3: per-device activity registry (for the menubar previews) ──────
+    def set_device_activity(self, args: dict) -> dict:
+        """Record what a device is currently showing (kind: clock / eq / vj /
+        scoreboard / ambient / text / design / sysmon / stocks / weather /
+        music / idle). The GUI pushes this from its setDeviceActivity; the
+        daemon also sets it from its own live jobs (below). The menubar pulls
+        get_device_activity to render one tile per device."""
+        import time
+        mac = args.get("mac")
+        if not mac:
+            return {"success": False, "error": "set_device_activity requires 'mac'"}
+        if getattr(self, "_device_activity", None) is None:
+            self._device_activity = {}
+        entry = self._device_activity.get(mac, {})
+        if args.get("name"):
+            entry["name"] = args["name"]
+        entry["kind"] = args.get("kind") or entry.get("kind") or "idle"
+        entry["at"] = time.time()
+        self._device_activity[mac] = entry
+        return {"success": True}
+
+    def get_device_activity(self, _args: dict) -> dict:
+        return {"success": True, "activity": getattr(self, "_device_activity", {}) or {}}
 
     def live_job_start(self, args: dict) -> dict:
         mac = args.get("mac")
@@ -35,6 +60,7 @@ class OwnerLiveMixin:
             logger.info(f"Started live job '{kind}' for {mac}")
 
         asyncio.run_coroutine_threadsafe(_start(), self._loop).result()
+        self.set_device_activity({"mac": mac, "kind": kind, "name": params.get("device_name")})
         return {"success": True}
 
     def live_job_stop(self, args: dict) -> dict:
@@ -49,6 +75,9 @@ class OwnerLiveMixin:
             self._loop.call_soon_threadsafe(task.cancel)
             logger.info(f"Cancelled live job '{kind}' for {mac}")
             self._release_live_device_if_idle(mac)
+            # R46 #3: no more jobs of this kind — mark idle unless another job runs.
+            if not any(m == mac for (m, _k) in self._live_tasks):
+                self.set_device_activity({"mac": mac, "kind": "idle"})
             return {"success": True, "stopped": True}
 
         return {"success": True, "stopped": False}

@@ -344,6 +344,15 @@ class DaemonClient:
         clobber it on its next tick."""
         return self.send_command("live_jobs_stop_for", {"mac": mac})
 
+    def set_device_activity(self, mac: str, kind: str, name: str | None = None) -> dict:
+        """R46 #3: record what a device is showing (for the menubar previews)."""
+        return self.send_command("set_device_activity",
+                                 {"mac": mac, "kind": kind, "name": name})
+
+    def get_device_activity(self) -> dict:
+        """R46 #3: {mac: {name, kind, at}} of what each device is showing."""
+        return self.send_command("get_device_activity", {})
+
     def sync_artwork(self, file_id: str, *, default_size: int = 16,
                      target: str = "device") -> dict:
         """Ask the daemon to download a gallery asset and stream it to the owned

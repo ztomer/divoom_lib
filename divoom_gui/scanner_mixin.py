@@ -40,6 +40,18 @@ class ScannerMixin:
         connect (empty if none / last connect succeeded)."""
         return getattr(self, "_last_connect_error", "") or ""
 
+    def set_device_activity(self, mac: str, kind: str, name: str = "") -> bool:
+        """R46 #3: tell the daemon what a device is showing so the menubar can
+        render a per-device tile. Best-effort (a missing daemon is fine)."""
+        try:
+            client = self._client()
+            if client is None:
+                return False
+            return bool(client.set_device_activity(mac, kind, name or None).get("success"))
+        except Exception as e:
+            logger.debug(f"set_device_activity failed: {e}")
+            return False
+
     def get_connection_state(self) -> str:
         """BLE Hardening P6: the daemon's honest connection_state for the active
         device, for the appbar heartbeat. Returns JSON

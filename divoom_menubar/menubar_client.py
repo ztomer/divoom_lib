@@ -120,6 +120,14 @@ class MenubarClient:
         if self._subscribe_thread and self._subscribe_thread.is_alive():
             self._subscribe_thread.join(timeout=1.0)
 
+    def device_activity(self) -> dict:
+        """R46 #3: {mac: {name, kind, at}} of what each device is showing, for the
+        per-device menubar tiles. Best-effort — returns {} if the daemon is down."""
+        try:
+            return (self._client.get_device_activity() or {}).get("activity", {}) or {}
+        except Exception:
+            return {}
+
     def _run_subscribe(self):
         import threading
         t = threading.Thread(target=self._subscribe_loop, daemon=True)

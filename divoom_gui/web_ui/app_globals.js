@@ -163,10 +163,28 @@ window.setDeviceActivity = function(mac, kind, opts) {
     window.DivoomState.deviceActivity[mac] = { kind: kind, src: src, at: Date.now() };
     try { localStorage.setItem("divoomDeviceActivity", JSON.stringify(window.DivoomState.deviceActivity)); } catch (e) {}
     window.setDevicePreview(mac, src);
+    // R46 #3: push the CHANNEL kind to the daemon so the menubar can show a
+    // per-device tile. Live-widget image content is skipped here — the daemon
+    // already sets that kind itself (sysmon/stocks/weather/music) on
+    // live_job_start, so we'd only clobber it with "image".
+    if (kind !== "image" && window.pywebview?.api?.set_device_activity) {
+        const dev = (window.DivoomState.discoveredDevices || []).find(d => d.address === mac);
+        const name = (dev && dev.name) || (mac === window._activeDeviceMac()
+            ? (document.getElementById("banner-device-name")?.textContent || "").trim() : "");
+        try { window.pywebview.api.set_device_activity(mac, kind, name || ""); } catch (e) {}
+    }
 };
 
 window._activeDeviceMac = function() {
     return (document.getElementById("banner-device-mac")?.textContent || "").trim();
+};
+
+// R46 #2: mirror the active widget's pushed frame to its device's last-active
+// preview (used by the sysmon/music/stocks pollers).
+window.markActiveDeviceFrame = function(src) {
+    const mac = window._activeDeviceMac();
+    if (mac && mac !== "None" && src && window.setDeviceActivity)
+        window.setDeviceActivity(mac, "image", { src: src });
 };
 
 // R46 #5: a re-scan replaced discoveredDevices wholesale, so a device the
