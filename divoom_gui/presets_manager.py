@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 import configparser
 from divoom_lib import divoom_auth
+from divoom_lib.utils.atomic_io import atomic_write_text, atomic_write_config  # A1
 
 logger = logging.getLogger("divoom_gui")
 
@@ -45,8 +46,8 @@ class PresetsManagerMixin:
             if password_changed:
                 cfg["divoom"]["password"] = password
 
-            with open(config_file, "w") as f:
-                cfg.write(f)
+            # A1 atomic + A4 0600: config.ini holds the cloud password.
+            atomic_write_config(config_file, cfg, mode=0o600)
 
             # Only invalidate the cached token + force re-auth when we actually
             # have a new password to log in with. Otherwise keep the working cache
@@ -145,12 +146,10 @@ class PresetsManagerMixin:
                 except Exception:
                     pass
             presets[name] = json.loads(slots_json)
-            # R42 §5: atomic write — a crash mid-write must not corrupt the
+            # R42 §5 / A1: atomic write — a crash mid-write must not corrupt the
             # shared presets file (a corrupt file used to cascade into
             # update_wall_slots wiping every saved preset).
-            tmp = presets_file.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(presets, indent=2), encoding="utf-8")
-            tmp.replace(presets_file)
+            atomic_write_text(presets_file, json.dumps(presets, indent=2))
             return True
         except Exception as e:
             logger.error(f"Failed to save preset: {e}")
@@ -218,7 +217,7 @@ class PresetsManagerMixin:
             if not any(d.get("ip") == ip for d in devices):
                 devices.append({"ip": ip, "token": token})
             presets["lan_devices"] = devices
-            presets_file.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+            atomic_write_text(presets_file, json.dumps(presets, indent=2))
             return True
         except Exception as e:
             logger.error(f"Failed to add LAN device: {e}")
@@ -237,7 +236,7 @@ class PresetsManagerMixin:
             devices = presets.get("lan_devices", [])
             devices = [d for d in devices if d.get("ip") != ip]
             presets["lan_devices"] = devices
-            presets_file.write_text(json.dumps(presets, indent=2), encoding="utf-8")
+            atomic_write_text(presets_file, json.dumps(presets, indent=2))
             return True
         except Exception as e:
             logger.error(f"Failed to delete LAN device: {e}")
@@ -311,7 +310,7 @@ class PresetsManagerMixin:
                 except Exception as e:
                     logger.warning(f"Failed to read notification_routing.json for export: {e}")
 
-            Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
+            atomic_write_text(Path(path), json.dumps(data, indent=2))
             logger.info("Export completed successfully.")
             return True
         except Exception as e:
@@ -352,28 +351,28 @@ class PresetsManagerMixin:
             
             # Restore presets.json
             if "presets" in backup_data:
-                presets_file = config_dir / "presets.json"
-                presets_file.write_text(json.dumps(backup_data["presets"], indent=2), encoding="utf-8")
-                
-            # Restore config.ini
+                atomic_write_text(config_dir / "presets.json",
+                                  json.dumps(backup_data["presets"], indent=2))
+
+            # Restore config.ini (holds the cloud password → 0600)
             if "config_ini" in backup_data:
-                config_file = config_dir / "config.ini"
-                config_file.write_text(backup_data["config_ini"], encoding="utf-8")
-                
+                atomic_write_text(config_dir / "config.ini",
+                                  backup_data["config_ini"], mode=0o600)
+
             # Restore alarms.json
             if "alarms" in backup_data:
-                alarms_file = config_dir / "alarms.json"
-                alarms_file.write_text(json.dumps(backup_data["alarms"], indent=2), encoding="utf-8")
-                
+                atomic_write_text(config_dir / "alarms.json",
+                                  json.dumps(backup_data["alarms"], indent=2))
+
             # Restore hotchannel.json
             if "hotchannel" in backup_data:
-                hotchannel_file = config_dir / "hotchannel.json"
-                hotchannel_file.write_text(json.dumps(backup_data["hotchannel"], indent=2), encoding="utf-8")
-                
+                atomic_write_text(config_dir / "hotchannel.json",
+                                  json.dumps(backup_data["hotchannel"], indent=2))
+
             # Restore notification_routing.json
             if "notification_routing" in backup_data:
-                routing_file = config_dir / "notification_routing.json"
-                routing_file.write_text(json.dumps(backup_data["notification_routing"], indent=2), encoding="utf-8")
+                atomic_write_text(config_dir / "notification_routing.json",
+                                  json.dumps(backup_data["notification_routing"], indent=2))
                 
             logger.info("Import completed successfully.")
             return True
@@ -403,7 +402,7 @@ class PresetsManagerMixin:
                 "type": "divoom_preset",
                 "slots": json.loads(slots_json)
             }
-            Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
+            atomic_write_text(Path(path), json.dumps(data, indent=2))
             return True
         except Exception as e:
             logger.error(f"Failed to save preset to file: {e}")

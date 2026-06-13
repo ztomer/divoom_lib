@@ -244,11 +244,9 @@ def save_routing_table(
     # Re-validate on the way out so a save() can't persist garbage.
     clean = _validate_rules([list(r) for r in rules])
     clean.sort(key=lambda r: r[0])
-    tmp = p.with_suffix(p.suffix + ".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        _json.dump([list(r) for r in clean], f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    tmp.replace(p)
+    from divoom_lib.utils.atomic_io import atomic_write_text
+    atomic_write_text(p, _json.dumps([list(r) for r in clean],
+                                     indent=2, ensure_ascii=False) + "\n")
     return p
 
 

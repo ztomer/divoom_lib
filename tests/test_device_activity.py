@@ -148,6 +148,44 @@ def test_stop_all_live_jobs_idles_activity():
     assert o.get_device_activity({})["activity"]["AA"]["kind"] == "idle"
 
 
+def test_live_jobs_persist_and_rehydrate(tmp_path, monkeypatch):
+    """A2: a started live job is persisted; on a fresh owner, rehydrate restarts
+    it. A user-stopped job is removed from the persisted set."""
+    import json
+
+    class _Task:
+        def cancel(self): pass
+
+    class _Loop:
+        def call_soon_threadsafe(self, fn, *a): pass
+
+    jobs_file = tmp_path / "live_jobs.json"
+
+    o = _Owner()
+    monkeypatch.setattr(o, "_live_jobs_path", lambda: jobs_file)
+    o._loop = _Loop()
+    o._live_devices = {}
+    # Simulate a started job (live_job_start's task creation is HW-path; here we
+    # record params + persist directly via the same hooks).
+    o._live_tasks = {("AA", "sysmon"): _Task()}
+    o._live_params = {("AA", "sysmon"): {"size": 16}}
+    o._save_live_jobs()
+    assert json.loads(jobs_file.read_text()) == [
+        {"mac": "AA", "kind": "sysmon", "params": {"size": 16}}]
+
+    # Fresh owner rehydrates from the file.
+    started = []
+    o2 = _Owner()
+    monkeypatch.setattr(o2, "_live_jobs_path", lambda: jobs_file)
+    monkeypatch.setattr(o2, "live_job_start", lambda args: started.append(args) or {"success": True})
+    o2.rehydrate_live_jobs()
+    assert started == [{"mac": "AA", "kind": "sysmon", "params": {"size": 16}}]
+
+    # A user stop removes it from the persisted set.
+    o.live_job_stop({"mac": "AA", "kind": "sysmon"})
+    assert json.loads(jobs_file.read_text()) == []
+
+
 def test_live_health_stamped_onto_activity():
     """G5: a background live device's honest state is stamped onto its activity
     entry so the selector dot can show streaming vs degraded."""

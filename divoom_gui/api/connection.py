@@ -77,8 +77,8 @@ class ConnectionApi(ApiBase):
                 cfg["lan"] = {}
             cfg["lan"]["device_ip"] = device_ip
             cfg["lan"]["local_token"] = str(local_token)
-            with open(config_file, "w") as f:
-                cfg.write(f)
+            from divoom_lib.utils.atomic_io import atomic_write_config
+            atomic_write_config(config_file, cfg, mode=0o600)  # config.ini holds creds
             return True
         except Exception as e:
             logger.error(f"Failed to save LAN config: {e}")

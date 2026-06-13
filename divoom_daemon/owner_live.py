@@ -8,6 +8,46 @@ class OwnerLiveMixin:
         self._live_tasks = {}    # (mac, kind) -> asyncio.Task
         self._live_devices = {}  # mac -> connected Divoom/DivoomWall (background jobs)
         self._device_activity = {}  # R46 #3: mac -> {name, kind, at} (menubar previews)
+        self._live_params = {}   # A2: (mac, kind) -> params, persisted for rehydration
+
+    # ── A2: persist + rehydrate live jobs across a daemon restart ────────────
+    # The daemon is the single owner; if it crashes/restarts, in-memory live jobs
+    # were lost and streaming widgets silently stopped. Persist the desired set so
+    # the daemon resumes them on boot.
+    def _live_jobs_path(self):
+        from pathlib import Path
+        return Path.home() / ".config" / "divoom-control" / "live_jobs.json"
+
+    def _save_live_jobs(self) -> None:
+        import json
+        from divoom_lib.utils.atomic_io import atomic_write_text
+        try:
+            jobs = [{"mac": m, "kind": k, "params": p}
+                    for (m, k), p in getattr(self, "_live_params", {}).items()]
+            atomic_write_text(self._live_jobs_path(), json.dumps(jobs, indent=2))
+        except Exception as e:
+            logger.debug(f"persist live jobs failed: {e}")
+
+    def rehydrate_live_jobs(self) -> None:
+        """Restart the live jobs persisted before the last shutdown/crash."""
+        import json
+        path = self._live_jobs_path()
+        if not path.exists():
+            return
+        try:
+            jobs = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning(f"could not read persisted live jobs: {e}")
+            return
+        for j in jobs or []:
+            mac, kind = j.get("mac"), j.get("kind")
+            if not mac or not kind:
+                continue
+            try:
+                self.live_job_start({"mac": mac, "kind": kind, "params": j.get("params") or {}})
+                logger.info("rehydrated live job %s for %s", kind, mac)
+            except Exception as e:
+                logger.warning("rehydrate %s/%s failed: %s", kind, mac, e)
 
     # ── R46 #3: per-device activity registry (for the menubar previews) ──────
     def set_device_activity(self, args: dict) -> dict:
@@ -130,6 +170,10 @@ class OwnerLiveMixin:
 
         asyncio.run_coroutine_threadsafe(_start(), self._loop).result()
         self.set_device_activity({"mac": mac, "kind": kind, "name": params.get("device_name")})
+        if getattr(self, "_live_params", None) is None:
+            self._live_params = {}
+        self._live_params[(mac, kind)] = params   # A2: remember for rehydration
+        self._save_live_jobs()
         return {"success": True}
 
     def live_job_stop(self, args: dict) -> dict:
@@ -144,6 +188,11 @@ class OwnerLiveMixin:
             self._loop.call_soon_threadsafe(task.cancel)
             logger.info(f"Cancelled live job '{kind}' for {mac}")
             self._release_live_device_if_idle(mac)
+            # A2: a user-stopped widget is no longer desired — drop it from the
+            # persisted set so it doesn't resurrect on the next daemon start.
+            if getattr(self, "_live_params", None) is not None:
+                self._live_params.pop(key, None)
+                self._save_live_jobs()
             # R46 #3: no more jobs of this kind — mark idle unless another job runs.
             if not any(m == mac for (m, _k) in self._live_tasks):
                 self.set_device_activity({"mac": mac, "kind": "idle"})

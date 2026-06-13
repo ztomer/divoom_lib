@@ -70,9 +70,8 @@ def save_config(cfg: dict) -> bool:
             merged[k] = cfg[k]
     merged = _normalize(merged)
     try:
-        path = _config_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+        from divoom_lib.utils.atomic_io import atomic_write_text
+        atomic_write_text(_config_path(), json.dumps(merged, indent=2))
         return True
     except OSError:
         return False

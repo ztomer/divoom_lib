@@ -171,14 +171,16 @@ def _login_guest() -> DivoomCredentials:
 # ── Cache ─────────────────────────────────────────────────────────────────────
 
 def _save_cache(creds: DivoomCredentials) -> None:
-    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE_FILE.write_text(json.dumps({
+    from divoom_lib.utils.atomic_io import atomic_write_text
+    # A1 atomic + A4 0600: the token cache is a secret — never world-readable,
+    # never half-written.
+    atomic_write_text(CACHE_FILE, json.dumps({
         "token":    creds.token,
         "user_id":  creds.user_id,
         "email":    creds.email,
         "utc":      creds.utc,
         "saved_at": int(time.time()),
-    }, indent=2), encoding="utf-8")
+    }, indent=2), mode=0o600)
     print_info(f"Credentials cached to {CACHE_FILE}")
 
 

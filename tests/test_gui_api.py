@@ -611,37 +611,50 @@ class TestDivoomGuiAPI(unittest.TestCase):
             mock_render.assert_called_with("AAPL", mock_data, size=16)
 
     def test_lan_device_operations(self):
-        """Test adding, loading, and deleting LAN devices with mock preset file storage."""
-        mock_presets_data = {}
-        def mock_read_text(*args, **kwargs):
-            return json.dumps(mock_presets_data)
-        def mock_write_text(content, *args, **kwargs):
-            nonlocal mock_presets_data
-            mock_presets_data = json.loads(content)
-            return len(content)
-            
-        with patch("pathlib.Path.exists", return_value=True), \
-             patch("pathlib.Path.read_text", side_effect=mock_read_text), \
-             patch("pathlib.Path.write_text", side_effect=mock_write_text):
-                 
-            # Add device
-            success = self.api.add_lan_device("192.168.1.100", 123)
-            self.assertTrue(success)
-            
-            # Load devices
-            devices_json = self.api.load_lan_devices()
-            devices = json.loads(devices_json)
-            self.assertEqual(len(devices), 1)
-            self.assertEqual(devices[0]["ip"], "192.168.1.100")
-            self.assertEqual(devices[0]["token"], 123)
-            
-            # Delete device
-            del_success = self.api.delete_lan_device("192.168.1.100")
-            self.assertTrue(del_success)
-            
-            # Load again to check empty
-            devices_json2 = self.api.load_lan_devices()
-            self.assertEqual(json.loads(devices_json2), [])
+        """Add / load / delete LAN devices against a real temp presets file (the
+        writers are atomic — temp-file + os.replace — so a write_text mock would
+        be bypassed; use real storage instead)."""
+        import tempfile
+        # This test needs a real file on disk, so drop setUp's global
+        # Path.exists/Path.home patches for its duration.
+        self.presets_patcher.stop()
+        self.home_patcher.stop()
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                presets = Path(d) / "presets.json"
+                with patch.object(self.api, "_get_presets_file", return_value=presets):
+                    # Add device
+                    self.assertTrue(self.api.add_lan_device("192.168.1.100", 123))
+
+                    # Load devices
+                    devices = json.loads(self.api.load_lan_devices())
+                    self.assertEqual(len(devices), 1)
+                    self.assertEqual(devices[0]["ip"], "192.168.1.100")
+                    self.assertEqual(devices[0]["token"], 123)
+
+                    # Delete device
+                    self.assertTrue(self.api.delete_lan_device("192.168.1.100"))
+
+                    # Load again to check empty
+                    self.assertEqual(json.loads(self.api.load_lan_devices()), [])
+        finally:
+            # Restore so tearDown's stop() calls match.
+            self.presets_patcher.start()
+            self.home_patcher.start()
+
+    def test_run_async_times_out_instead_of_hanging(self):
+        """A3: a wedged async chain must not block the JS-API thread forever — it
+        raises after the timeout instead."""
+        async def _hang():
+            await asyncio.sleep(5)
+        with self.assertRaises(RuntimeError):
+            self.api._run_async(_hang(), timeout=0.2)
+
+    def test_run_async_returns_result(self):
+        async def _quick():
+            return 42
+        self.assertEqual(self.api._run_async(_quick(), timeout=5), 42)
+
 
 if __name__ == "__main__":
     unittest.main()

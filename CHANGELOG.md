@@ -5,6 +5,34 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Architecture gap scan #2 — A1–A4 (2026-06-13)
+
+Second scan (`docs/ARCH_GAP_SCAN_2_2026-06.md`) — persistence, GUI RPC, daemon
+lifecycle.
+
+- **A1 — atomic config writes.** Only `save_preset` was crash-safe (R42 §5); every
+  other writer wrote in place, so a crash mid-write truncated the file and lost
+  that config (credentials, wall slots, alarms, presets, hotchannel, lifecycle,
+  daemon_config, routing, device cache). New `divoom_lib/utils/atomic_io.py`
+  (`atomic_write_text` + `atomic_write_config`: temp-in-same-dir + fsync +
+  `os.replace`) applied across all of them.
+- **A4 — secrets `0o600`.** `config.ini` (cloud password) and `auth_token.json`
+  (token) are now written owner-only via the atomic writer's `mode` arg, instead
+  of world/group-readable plaintext.
+- **A3 — bounded GUI async.** `gui_api._run_async` had no timeout, so a wedged
+  chain hung the pywebview JS-API thread forever. Now 120 s (beyond any legit op);
+  on expiry it cancels + raises so the GUI shows an error instead of freezing.
+- **A2 — live widgets survive a daemon restart (HW-verified).** The single-owner
+  daemon lost all live jobs on a crash/restart. The desired set (mac/kind/params)
+  is now persisted to `live_jobs.json` on start + user-stop; the daemon
+  `rehydrate_live_jobs()` on boot. A teardown doesn't clear the file (clean
+  restart resumes); only a user-stop removes a job. HW: started sysmon on the
+  Ditoo, killed the daemon, respawned — the widget resumed streaming.
+- Tests: +6 `test_atomic_io.py`, +2 `test_gui_api.py` (timeout + result), +1
+  `test_device_activity.py` (persist/rehydrate); `test_lan_device_operations`
+  rewritten to real-FS (the atomic writer bypasses a `write_text` mock).
+
+---
 ## Architecture gap fix G7 + G6 resolution (2026-06-13)
 
 - **G7 — wall delta reconfigure (HW-verified).** `wall_configure` rebuilt the

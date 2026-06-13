@@ -81,9 +81,20 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
             self._daemon_client = ensure_daemon()
         return self._daemon_client
 
-    def _run_async(self, coro):
+    def _run_async(self, coro, *, timeout: float = 120.0):
+        # A3: bound the wait. Without a timeout a wedged async chain (a daemon
+        # that stopped answering, a hung device op) blocked the pywebview JS-API
+        # thread FOREVER — a frozen button with no error. 120s is well beyond any
+        # legit op (a 60s scan, a slow BLE push); on expiry we cancel + raise so
+        # the GUI surfaces an error instead of hanging.
+        import concurrent.futures
         future = asyncio.run_coroutine_threadsafe(coro, self.loop_thread.loop)
-        return future.result()
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            logger.error("GUI async op timed out after %.0fs", timeout)
+            raise RuntimeError(f"Operation timed out after {timeout:.0f}s")
 
     def get_transport_status(self) -> str:
         return self.connection.get_transport_status()

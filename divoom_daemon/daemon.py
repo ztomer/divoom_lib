@@ -159,6 +159,11 @@ def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH,
                           host=host, port=port, token=token)
     # Auto-start the notification listener on launch (best-effort; idle on non-mac).
     daemon._notifier.start()
+    # A2: resume any live widgets that were running before the last restart/crash.
+    try:
+        daemon._device_owner.rehydrate_live_jobs()
+    except Exception as e:
+        logger.warning("live-job rehydrate failed: %s", e)
     try:
         daemon.serve_forever()
     except KeyboardInterrupt:

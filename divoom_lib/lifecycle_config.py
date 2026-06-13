@@ -43,8 +43,8 @@ def set_keep_daemon_alive(value: bool, path: Path = CONFIG_FILE) -> bool:
         if not cfg.has_section(SECTION):
             cfg.add_section(SECTION)
         cfg.set(SECTION, KEY, "true" if value else "false")
-        with open(path, "w") as f:
-            cfg.write(f)
+        from divoom_lib.utils.atomic_io import atomic_write_config
+        atomic_write_config(path, cfg)
         return True
     except (configparser.Error, OSError) as e:
         logger.warning("keep_daemon_alive write failed (%s)", e)

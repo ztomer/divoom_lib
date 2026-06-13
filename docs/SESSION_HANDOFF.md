@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **ARCH GAP SCAN #2 SHIPPED (2026-06-13)** — `docs/ARCH_GAP_SCAN_2_2026-06.md`,
+  A1–A4. **A1**: shared `divoom_lib/utils/atomic_io.py` (atomic_write_text /
+  atomic_write_config) applied across ALL config writers — only `save_preset` was
+  crash-safe before. **A4**: `config.ini` + `auth_token.json` now `0o600`.
+  **A3**: `gui_api._run_async` bounded at 120 s (was unbounded → frozen GUI on a
+  wedged op). **A2 (HW-verified)**: live jobs persist to `live_jobs.json` and the
+  daemon `rehydrate_live_jobs()` on boot — a killed daemon's streaming widgets
+  resume (HW: sysmon on Ditoo survived a daemon kill+respawn). Teardown keeps the
+  file (clean restart resumes); user-stop removes a job.
+
 - **ARCH GAP SCAN COMPLETE (2026-06-13).** All of `docs/ARCH_GAP_SCAN_2026-06.md`
   resolved: G1–G5 + G7 shipped, G6 closed won't-fix. **G7 (HW-verified)**:
   `wall_configure` now reconfigures by delta — transplant the connected screens

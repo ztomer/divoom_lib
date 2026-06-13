@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 from divoom_lib import divoom_auth
 from divoom_lib import media_decoder
+from divoom_lib.utils.atomic_io import atomic_write_config
 
 logger = logging.getLogger("divoom_gui")
 
@@ -443,8 +444,7 @@ class GallerySyncMixin(GalleryHotApiMixin):
             if "gallery" not in cfg:
                 cfg["gallery"] = {}
             cfg["gallery"][key] = str(int(classify))
-            with open(path, "w") as f:
-                cfg.write(f)
+            atomic_write_config(path, cfg, mode=0o600)  # config.ini holds creds
             return True
         except Exception as e:
             logger.warning(f"set_gallery_style failed: {e}")
@@ -477,8 +477,7 @@ class GallerySyncMixin(GalleryHotApiMixin):
                 cfg["gallery"] = {}
             cfg["gallery"]["gallery_sort"] = str(int(sort))
             cfg["gallery"]["gallery_file_size"] = str(int(file_size))
-            with open(path, "w") as f:
-                cfg.write(f)
+            atomic_write_config(path, cfg, mode=0o600)  # config.ini holds creds
             return True
         except Exception as e:
             logger.warning(f"set_gallery_filter failed: {e}")

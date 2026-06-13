@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 
 from divoom_gui.daemon_bridge import DaemonDeviceProxy
+from divoom_lib.utils.atomic_io import atomic_write_text, atomic_write_config
 
 logger = logging.getLogger("divoom_gui")
 
@@ -28,8 +29,7 @@ class ScannerMixin:
                 cfg["gui"] = {}
             cfg["gui"]["timeout"] = str(int(timeout))
             cfg["gui"]["limit"] = str(int(limit))
-            with open(config_file, "w") as f:
-                cfg.write(f)
+            atomic_write_config(config_file, cfg, mode=0o600)  # holds creds
             return True
         except Exception as e:
             logger.warning(f"Failed to save scan config: {e}")
@@ -135,8 +135,8 @@ class ScannerMixin:
         try:
             cfg_dir = Path.home() / ".config" / "divoom-control"
             cfg_dir.mkdir(parents=True, exist_ok=True)
-            (cfg_dir / "discovered_devices.json").write_text(
-                json.dumps(results, indent=2), encoding="utf-8")
+            atomic_write_text(cfg_dir / "discovered_devices.json",
+                              json.dumps(results, indent=2))
             import configparser
             config_file = cfg_dir / "config.ini"
             cfg = configparser.ConfigParser()
@@ -145,8 +145,7 @@ class ScannerMixin:
             if "gui" not in cfg:
                 cfg["gui"] = {}
             cfg["gui"]["last_detected_count"] = str(len(results))
-            with open(config_file, "w") as f:
-                cfg.write(f)
+            atomic_write_config(config_file, cfg, mode=0o600)  # holds creds
         except Exception as ce:
             logger.warning(f"Failed to cache discovered devices/count: {ce}")
 
@@ -240,8 +239,7 @@ class ScannerMixin:
             if "gui" not in cfg:
                 cfg["gui"] = {}
             cfg["gui"]["last_connected_device"] = address
-            with open(config_file, "w") as f:
-                cfg.write(f)
+            atomic_write_config(config_file, cfg, mode=0o600)  # holds creds
             logger.info(f"Saved last active connection: {address}")
         except Exception as save_err:
             logger.warning(f"Failed to persist active connection: {save_err}")

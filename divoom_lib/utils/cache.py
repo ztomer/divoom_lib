@@ -26,5 +26,5 @@ def load_device_cache(cache_dir: str, device_id: str) -> dict | None:
 def save_device_cache(cache_dir: str, device_id: str, data: dict) -> None:
     ensure_cache_dir(cache_dir)
     p = device_cache_path(cache_dir, device_id)
-    with open(p, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, indent=2)
+    from divoom_lib.utils.atomic_io import atomic_write_text
+    atomic_write_text(p, json.dumps(data, indent=2))

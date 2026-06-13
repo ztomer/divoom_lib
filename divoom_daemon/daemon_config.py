@@ -107,8 +107,8 @@ def _coerce(field_type, raw, fallback):
 
 def _write_default(path: Path, defaults: DaemonConfig) -> None:
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(_DEFAULT_FILE.format(**defaults.__dict__), encoding="utf-8")
+        from divoom_lib.utils.atomic_io import atomic_write_text
+        atomic_write_text(path, _DEFAULT_FILE.format(**defaults.__dict__))
         logger.info("Wrote default daemon config to %s", path)
     except OSError as e:
         logger.warning("Could not write default daemon config (%s)", e)
