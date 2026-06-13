@@ -149,10 +149,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (scanBtn) scanBtn.disabled = false;
                     
                     const devices = JSON.parse(devicesJson);
-                    window.DivoomState.discoveredDevices = devices;
-                    populateDeviceSelectors(devices);
+                    // R46 #5: merge (don't replace) so a device busy streaming a
+                    // live widget — connected, hence not advertising, hence missed
+                    // by this scan — stays selectable.
+                    const merged = window.mergeDiscoveredDevices
+                        ? window.mergeDiscoveredDevices(devices) : devices;
+                    populateDeviceSelectors(merged);
                     window.showToast(`Discovered ${devices.length} screens!`, "success");
                     window.renderArrangerCanvas();
+                    if (window.renderDeviceDots) window.renderDeviceDots();
                 })
                 .catch(err => {
                     // The scan runs in the daemon, which can die mid-scan (e.g. a

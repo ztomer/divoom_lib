@@ -201,6 +201,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_solid_light) {
             window.pywebview.api.set_solid_light(color, brightness, modeType).then(res => {
                 window.showToast(res ? "Ambient mode applied" : "Failed to apply ambient", res ? "success" : " BLE");
+                if (res && window.setDeviceActivity)
+                    window.setDeviceActivity(window._activeDeviceMac(), "ambient", { color });
             });
         }
     }

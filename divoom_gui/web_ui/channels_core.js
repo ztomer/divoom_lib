@@ -53,9 +53,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (["ambient", "text", "sessions"].includes(window.DivoomState.activeChannel)) return;
             if (!window.requireDevice()) return;
             if (window.pywebview && window.pywebview.api && window.pywebview.api.switch_channel) {
-                window.pywebview.api.switch_channel(window.DivoomState.activeChannel).then(res => {
-                    if (res) window.showToast("Switched channel", "success", " BLE");
-                    else window.showToast("Failed to switch channel", "error");
+                const ch = window.DivoomState.activeChannel;
+                window.pywebview.api.switch_channel(ch).then(res => {
+                    if (res) {
+                        window.showToast("Switched channel", "success", " BLE");
+                        // R46 #2: reflect the channel on the device preview.
+                        if (window.setDeviceActivity) window.setDeviceActivity(window._activeDeviceMac(), ch);
+                    } else window.showToast("Failed to switch channel", "error");
                 });
             }
         });
@@ -79,6 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (window.pywebview?.api?.push_text) {
                 window.pywebview.api.push_text(text, color, 1, speed, isNaN(effect) ? 1 : effect).then(res => {
                     window.showToast(res ? "Text pushed to device" : "Failed to push text", res ? "success" : "error", " BLE");
+                    if (res && window.setDeviceActivity) window.setDeviceActivity(window._activeDeviceMac(), "text");
                 });
             }
         });
@@ -100,6 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_scoreboard) {
             window.pywebview.api.set_scoreboard(1, red, blue).then(res => {
                 window.showToast(res ? `Score: ${red}–${blue}` : "Failed to set scoreboard", res ? "success" : " BLE");
+                if (res && window.setDeviceActivity) window.setDeviceActivity(window._activeDeviceMac(), "scoreboard");
             });
         }
     }

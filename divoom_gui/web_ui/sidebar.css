@@ -253,23 +253,24 @@
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    gap: 7px;
-    padding: 5px 10px;
+    gap: 11px;
+    padding: 6px 10px;
     margin: 4px auto 8px auto;
     max-width: 100%;
     box-sizing: border-box;
 }
 .device-dots:empty { display: none; }
 
+/* R46 #1: bigger hit target so the device dots are easy to click (were 8px). */
 .device-dots .transport-dot {
-    width: 8px;
-    height: 8px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     cursor: pointer;
     position: relative;
     transition: opacity 0.2s, box-shadow 0.2s, transform 0.2s;
 }
-.device-dots .transport-dot:hover { transform: scale(1.25); }
+.device-dots .transport-dot:hover { transform: scale(1.2); }
 .device-dots .transport-dot.inactive { opacity: 0.35; box-shadow: none; }
 .device-dots .transport-dot.active { opacity: 1; box-shadow: 0 0 6px currentColor; }
 

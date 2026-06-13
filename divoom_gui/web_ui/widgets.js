@@ -32,6 +32,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (devPrev && info.preview) {
                             devPrev.src = info.preview;
                             devPrev.style.display = "inline-block";
+                            // R46 #2: cover art is the device's last-active element.
+                            const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+                            if (selectedWidget === "music" && mac && mac !== "None" && window.setDeviceActivity)
+                                window.setDeviceActivity(mac, "image", { src: info.preview });
                         }
                     }
                 }
@@ -138,6 +142,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (img && dataUrl) {
             img.src = dataUrl;
             img.style.display = "inline-block";
+            // R46 #2: the stock ticker is the device's last-active element.
+            const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+            if ((selectedWidget === "stock" || selectedWidget === "stocks") && mac && mac !== "None" && window.setDeviceActivity)
+                window.setDeviceActivity(mac, "image", { src: dataUrl });
         }
     }
 
@@ -167,9 +175,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (img && r.preview) { img.src = r.preview; img.style.display = "inline-block"; }
                 // R44 §7: when System Monitor is the active widget, mirror its
                 // frame into the lower-left device screen overlay too.
-                if (r.preview && selectedWidget === "sysmon" && window.setDevicePreview) {
+                if (r.preview && selectedWidget === "sysmon") {
                     const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
-                    if (mac && mac !== "None") window.setDevicePreview(mac, r.preview);
+                    // R46 #2: record as the device's last-active element (image frame).
+                    if (mac && mac !== "None" && window.setDeviceActivity)
+                        window.setDeviceActivity(mac, "image", { src: r.preview });
                 }
             } catch (e) { /* ignore */ }
         });
