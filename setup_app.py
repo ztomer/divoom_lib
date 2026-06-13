@@ -21,6 +21,8 @@ from setuptools import setup
 VERSION = "0.15.0"
 BT_DESC = ("Divoom Control uses Bluetooth to discover and control your Divoom "
            "pixel display.")
+AE_DESC = ("Divoom Control reads the now-playing track from Music and Spotify to "
+           "show album art on your screen.")
 
 APP = ["divoom_gui/gui_main.py"]
 
@@ -51,6 +53,7 @@ OPTIONS = {
         "LSUIElement": False,
         "NSBluetoothAlwaysUsageDescription": BT_DESC,
         "NSBluetoothPeripheralUsageDescription": BT_DESC,
+        "NSAppleEventsUsageDescription": AE_DESC,
     },
 }
 

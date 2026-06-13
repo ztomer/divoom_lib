@@ -5,6 +5,26 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Permission priming + Virtual Wall button (2026-06-13)
+
+- **All macOS permissions primed up front.** The album-art live widget controls
+  Music/Spotify via AppleScript (Apple Events / Automation), and that osascript
+  ran inside the HEADLESS daemon — so the consent dialog had no visible owner, the
+  Apple Event was denied, and the widget silently got no track (the device channel
+  never changed while the GUI preview showed a local placeholder). Now
+  `divoom_gui/permissions.prime_permissions()` triggers the prompt at GUI startup
+  from the foreground app (visible; granted once; the daemon inherits it), and the
+  Info.plist declares `NSAppleEventsUsageDescription` (setup_app.py +
+  make_app_bundle.sh). Only pokes a player that's already running, so it never
+  launches Music/Spotify just to ask.
+- **Virtual Wall is now a distinct button, not a device dot.** It's a composite of
+  screens, so rendering it as an identical dot read as "just another screen." It
+  now has its own labeled button with a 2x2 grid glyph + screen count, in a row
+  below the device dots (Rams: honest + minimal, shown only when a wall is
+  configured; Kare: the grid glyph reads as "a wall of screens").
+  (`device_selector.js`, `index.html`, `sidebar.css`)
+
+---
 ## v0.15.0 — packaging: self-contained app + Homebrew cask (2026-06-13)
 
 First packaged release. The app now ships as a self-contained `Divoom.app` in a

@@ -83,9 +83,9 @@ window.renderDeviceDots = function() {
     (window.DivoomState.registeredLanDevices || []).forEach(d => {
         if (d.ip) entries.push({ value: `LAN:${d.ip}`, name: `Wi-Fi: ${d.ip}` });
     });
-    if (Object.keys(window.DivoomState.assignedSlots || {}).length > 0) {
-        entries.push({ value: "MatrixWall", name: "Virtual Wall" });
-    }
+    // The Virtual Wall is NOT a device — it's a composite of screens. It used to
+    // sit here as an identical dot, which read as "just another screen". It now
+    // has its own distinct button in a row below (renderWallButton).
     host.innerHTML = "";
     entries.forEach(e => {
         const isActive = e.value === activeMac;
@@ -110,6 +110,38 @@ window.renderDeviceDots = function() {
         dot.addEventListener("click", () => window.connectDevice(e.name, e.value));
         host.appendChild(dot);
     });
+    if (window.renderWallButton) window.renderWallButton();
+};
+
+// The Virtual Wall gets a distinct affordance, not a device dot: it drives many
+// screens as one, so it reads as a labeled button with a 2x2 grid glyph, in its
+// own row below the dots. Shown only when a wall is configured (Rams: as little
+// as possible — no empty control).
+window.renderWallButton = function() {
+    const host = document.getElementById("wall-button");
+    if (!host) return;
+    const slots = window.DivoomState.assignedSlots || {};
+    const n = Object.keys(slots).length;
+    host.innerHTML = "";
+    host.hidden = n === 0;
+    if (n === 0) return;
+    const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
+    const isActive = activeMac === "MatrixWall";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "wall-button" + (isActive ? " active" : "");
+    btn.dataset.value = "MatrixWall";
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+    btn.title = `Virtual Wall — drive ${n} screen${n === 1 ? "" : "s"} as one display`;
+    btn.innerHTML =
+        '<svg class="wall-button-glyph" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">' +
+        '<rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>' +
+        '<rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>' +
+        '<span class="wall-button-label">Virtual Wall</span>' +
+        `<span class="wall-button-count">${n}</span>`;
+    btn.addEventListener("click", () => window.connectDevice("Virtual Wall", "MatrixWall"));
+    host.appendChild(btn);
 };
 
 // R47: surface a scan in progress in the main UI (the Scan button is buried in

@@ -200,6 +200,14 @@ def main():
         except Exception as e:
             logger.warning(f"eager daemon spawn failed: {e}")
     _spawn_menubar_agent()
+    # Prime TCC prompts up front from the foreground app — esp. Automation
+    # (AppleScript control of Music/Spotify) for the cover-art widget, whose
+    # prompt was otherwise raised invisibly by the headless daemon.
+    try:
+        from divoom_gui.permissions import prime_permissions
+        prime_permissions()
+    except Exception as e:
+        logger.debug(f"permission priming skipped: {e}")
     # R40 §9: follow the daemon down if it shuts down while we're open AND the
     # lifecycles are shared (keep-alive off) — e.g. the menu bar's 'Quit Divoom'.
     _start_shutdown_follower(window)

@@ -19,6 +19,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 APP="${REPO_ROOT}/Divoom.app"
 PYTHON="$(command -v python3)"
 BT_DESC="Divoom Control uses Bluetooth to discover and control your Divoom pixel display."
+AE_DESC="Divoom Control reads the now-playing track from Music and Spotify to show album art on your screen."
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "make_app_bundle.sh is macOS-only (the .app bundle is a macOS TCC artifact)." >&2
@@ -47,6 +48,7 @@ cat > "${APP}/Contents/Info.plist" <<PLIST
     <key>NSHighResolutionCapable</key>            <true/>
     <key>NSBluetoothAlwaysUsageDescription</key>  <string>${BT_DESC}</string>
     <key>NSBluetoothPeripheralUsageDescription</key><string>${BT_DESC}</string>
+    <key>NSAppleEventsUsageDescription</key>      <string>${AE_DESC}</string>
 </dict>
 </plist>
 PLIST

@@ -167,10 +167,11 @@
             <div id="scan-indicator" class="scan-indicator" hidden aria-live="polite">
                 <span class="spinner"></span> Scanning for screens…
             </div>
-            <!-- R33: device switch dots live outside the glass panel, below it.
-                 device-dots stays the sidebar's last element (asserted by
-                 test_appbar_sidebar). -->
+            <!-- R33: device switch dots live outside the glass panel, below it. -->
             <div id="device-dots" class="device-dots" role="tablist" aria-label="Switch device"></div>
+            <!-- The Virtual Wall is a composite of screens, not a device — its own
+                 distinct button sits in a row below the device dots. -->
+            <div id="wall-button" class="wall-button-row" hidden></div>
             <!-- R32: the Settings nav button was removed from the sidebar — it
                  now lives as a gear pill in the appbar. The device panel above
                  is pinned to the bottom (margin-top:auto) so it occupies the
