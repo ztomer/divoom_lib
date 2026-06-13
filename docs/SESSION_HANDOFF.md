@@ -18,6 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **ARCH GAP FIXES G1–G3 SHIPPED (2026-06-13).** From the architecture scan
+  `docs/ARCH_GAP_SCAN_2026-06.md`. **G1**: prune `_device_activity` (forget on
+  disconnect/wall-teardown, idle on stop-all, 10-min TTL skipping active +
+  live-job macs) — kills R47 ghost devices. **G3**: command-queue
+  `exclusive_timeout` (30 s on the device queue) auto-releases a dead client's
+  exclusive session so one crashed push can't wedge the device forever; deadline
+  re-arms on owner progress. **G2**: BLE scan runs on the device loop
+  (`_run_on_loop`) instead of the serialized command queue, so a 60 s scan no
+  longer freezes live widgets / hangs user actions. Extracted device-loop
+  plumbing → `divoom_daemon/owner_loop.py` (OwnerLoopMixin) to keep
+  `device_owner.py` < 500 LOC. **Open:** G4 (registry eviction vs wall same-MAC),
+  G5 (background live-device health), G6 (scan indicator on reconnect scans) —
+  still `OPEN` in BACKLOG. HW pass pending for G2 + the G3 force-release.
+
 - **R47 SHIPPED (2026-06-13): daemon-owned devices stay selectable + scan
   indication.** Fixes "device shows connected but I can't do anything with it":
   a daemon-owned/streaming device doesn't advertise, so a scan missed it and it

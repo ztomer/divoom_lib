@@ -177,10 +177,19 @@ class CommandQueue:
     """
 
     def __init__(self, loop: asyncio.AbstractEventLoop, *,
-                 maxsize: int = 0, item_timeout: float | None = None) -> None:
+                 maxsize: int = 0, item_timeout: float | None = None,
+                 exclusive_timeout: float | None = None) -> None:
         self._loop = loop
         self._maxsize = maxsize
         self._item_timeout = item_timeout
+        # G3: max seconds an exclusive session may go WITHOUT dequeuing one of its
+        # own items before it's force-released. A client that dies between
+        # exclusive_start and exclusive_end would otherwise leave the owner token
+        # set forever — and _dequeue then only ever dispatches that token, so
+        # every other caller (and every future command) hangs/times out until the
+        # daemon restarts. None = no auto-release (legacy behaviour).
+        self._exclusive_timeout = exclusive_timeout
+        self._exclusive_deadline: float | None = None
         self._pending = _Ring(maxsize)
         self._cond = asyncio.Condition()
         self._worker: asyncio.Task[None] | None = None
@@ -344,12 +353,24 @@ class CommandQueue:
     async def acquire(self, token: Any) -> None:
         async with self._cond:
             self._exclusive_owner = token
+            self._arm_exclusive_deadline()
+            self._cond.notify_all()
 
     async def release(self, token: Any) -> None:
         async with self._cond:
             if self._exclusive_owner == token:
                 self._exclusive_owner = None
+                self._exclusive_deadline = None
                 self._cond.notify_all()
+
+    def _arm_exclusive_deadline(self) -> None:
+        """(Re)set the auto-release deadline for the current exclusive session.
+        Called on acquire and whenever the owner makes progress (dequeues one of
+        its items), so an actively-working session is never force-released."""
+        if self._exclusive_timeout is not None and self._exclusive_owner is not None:
+            self._exclusive_deadline = time.monotonic() + self._exclusive_timeout
+        else:
+            self._exclusive_deadline = None
 
     def exclusive(self, token: Any):
         return _ExclusiveCtx(self, token)
@@ -391,7 +412,27 @@ class CommandQueue:
                 if self._exclusive_owner is not None:
                     idx = self._find(self._exclusive_owner)
                     if idx is not None:
+                        self._arm_exclusive_deadline()   # owner made progress
                         return self._pending.pop(idx)
+                    # G3: no item for the owner. If the session has gone idle past
+                    # its deadline, assume the client died and force-release so the
+                    # rest of the queue can drain instead of hanging forever.
+                    if self._exclusive_deadline is not None:
+                        remaining = self._exclusive_deadline - time.monotonic()
+                        if remaining <= 0:
+                            logger.warning(
+                                "exclusive session %r timed out (>%.0fs idle); "
+                                "force-releasing", self._exclusive_owner,
+                                self._exclusive_timeout)
+                            self._exclusive_owner = None
+                            self._exclusive_deadline = None
+                            self._cond.notify_all()
+                            continue
+                        try:
+                            await asyncio.wait_for(self._cond.wait(), timeout=remaining)
+                        except asyncio.TimeoutError:
+                            pass
+                        continue
                     await self._cond.wait()
                     continue
                 return self._pending.popleft()

@@ -11,6 +11,7 @@ from typing import Callable, Optional
 
 from divoom_daemon.owner_art import OwnerArtMixin
 from divoom_daemon.owner_live import OwnerLiveMixin
+from divoom_daemon.owner_loop import OwnerLoopMixin
 from divoom_daemon.owner_notify import OwnerNotifyMixin
 
 logger = logging.getLogger("divoom_daemon.device_owner")
@@ -29,7 +30,7 @@ def _json_safe(value):
     return str(value)
 
 
-class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
+class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixin):
     """Single owner of the BLE/LAN device connection and wall (R17 P5).
     Provides command handlers for device lifecycle and a send_notification
     method used by NotificationService."""
@@ -57,37 +58,7 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
         OwnerLiveMixin.__init__(self)
 
     # ── device loop ──────────────────────────────────────────────────────
-    def _device_loop(self):
-        """A dedicated asyncio loop so the BLE connection persists across calls."""
-        with self._device_lock:
-            if self._loop is not None:
-                return self._loop
-            import asyncio
-            from divoom_daemon.command_queue import CommandQueue
-            loop = asyncio.new_event_loop()
-            ready = threading.Event()
-
-            def _run():
-                asyncio.set_event_loop(loop)
-                ready.set()
-                loop.run_forever()
-
-            self._loop_thread = threading.Thread(target=_run, daemon=True, name="device-loop")
-            self._loop_thread.start()
-            ready.wait(2.0)
-            self._loop = loop
-            self._cmd_queue = CommandQueue(loop)
-            self._cmd_queue.start()
-            return self._loop
-
-    def _run_device(self, coro, *, token=None):
-        """Run a coroutine through the command queue, blocking for the result.
-        All device access goes through the queue (FIFO + exclusive-mode); it's
-        the only path that touches the device loop. submit() is thread-safe and
-        returns a concurrent.futures.Future — we block on .result()."""
-        if self._cmd_queue is None:
-            self._device_loop()
-        return self._cmd_queue.submit(coro, token=token).result()
+    # _device_loop / _run_device / _run_on_loop live in OwnerLoopMixin.
 
     def _device_connected(self) -> bool:
         d = self._device
@@ -281,8 +252,7 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
             return {"success": False, "error": str(e)}
 
     def disconnect(self) -> dict:
-        # G1: forget the leaving device's activity (no ghost tile/dot after disconnect).
-        self.forget_device_activity(self.mac or (self._lan_ip and f"LAN:{self._lan_ip}"))
+        self.forget_device_activity(self.mac or (self._lan_ip and f"LAN:{self._lan_ip}"))  # G1: no ghost
         d = self._device
         if d is not None and hasattr(d, "disconnect"):
             try:
@@ -326,7 +296,10 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
             return results[:limit] if limit > 0 else results
 
         try:
-            results = self._run_device(_scan())
+            # G2: scan off the command queue — it uses the central manager, not the
+            # connected peripheral, so it must not serialize behind (and freeze)
+            # device I/O / live-widget pushes for the scan's whole duration.
+            results = self._run_on_loop(_scan())
             return {"success": True, "devices": _json_safe(results)}
         except Exception as e:
             logger.warning(f"scan failed: {e}")
@@ -344,8 +317,7 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerNotifyMixin):
             except Exception as e:
                 logger.debug(f"wall teardown disconnect: {e}")
         self._wall = None
-        # G1: drop the wall's activity tile so it doesn't linger after teardown.
-        self.forget_device_activity("MatrixWall")
+        self.forget_device_activity("MatrixWall")  # G1: drop wall tile after teardown
 
     def wall_configure(self, args: dict) -> dict:
         slots = args.get("slots") or {}

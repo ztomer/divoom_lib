@@ -5,8 +5,9 @@ the GUI/menubar clients, the quit path), done after R47. Most of the surface is
 solid; six gaps stand out. Several are the same "owns the device but the
 bookkeeping disagrees" class as R47 (daemon-owned-device visibility).
 
-Status: **analysis only — nothing implemented.** Priorities and fix sketches
-below; suggested sequencing at the end.
+Status: **G1 shipped; G2 + G3 shipped (HW pass pending); G4–G6 open.** See
+CHANGELOG "Architecture gap fixes G1–G3 (2026-06-13)". Priorities and fix
+sketches below; suggested sequencing at the end.
 
 ---
 

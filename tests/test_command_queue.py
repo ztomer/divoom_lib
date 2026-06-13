@@ -167,6 +167,45 @@ async def test_exclusive_token_none_with_exclusive_active(loop, queue):
     assert history == ["x1", "x2", "none"], f"Got {history}"
 
 
+# ── G3: exclusive auto-release (orphaned owner) ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_orphaned_exclusive_session_auto_releases(loop):
+    """A client that acquires exclusive then dies (never releases) must not wedge
+    the queue forever — the idle owner is force-released after exclusive_timeout."""
+    q = CommandQueue(loop, exclusive_timeout=0.3)
+    q.start()
+    try:
+        history = []
+        # Simulate the dead client: acquire the token, never release it.
+        asyncio.run_coroutine_threadsafe(q.acquire("dead"), loop).result(timeout=2)
+        # Without auto-release this free item hangs forever.
+        fut = q.submit(_record(history, "free"))
+        await asyncio.wait_for(asyncio.wrap_future(fut), timeout=2.0)
+        assert history == ["free"]
+    finally:
+        q.stop()
+
+
+@pytest.mark.asyncio
+async def test_exclusive_with_timeout_still_defers_free_items(loop):
+    """With a timeout configured, a normal (fast) exclusive block still serialises
+    its token's items ahead of free ones — no spurious early release."""
+    q = CommandQueue(loop, exclusive_timeout=5.0)
+    q.start()
+    try:
+        history = []
+        async with q.exclusive(token="X"):
+            await q.submit_async(_record(history, "x1"), token="X")
+            free_fut = q.submit_async(_record(history, "free"))
+            await q.submit_async(_record(history, "x2"), token="X")
+        await free_fut
+        assert history == ["x1", "x2", "free"], f"Got {history}"
+    finally:
+        q.stop()
+
+
 # ── concurrent submissions from multiple tasks ────────────────────────────
 
 

@@ -5,6 +5,36 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Architecture gap fixes G1–G3 (2026-06-13)
+
+From the architecture scan (`docs/ARCH_GAP_SCAN_2026-06.md`).
+
+- **G1 — activity registry pruning (no ghost devices).** R47 surfaced
+  daemon-owned devices from `_device_activity` but never removed entries, so a
+  device kept showing as owned after disconnect / wall teardown / stop-all.
+  Now `forget_device_activity` fires on disconnect (active mac or LAN key) and
+  wall teardown; `stop_all_live_jobs` marks each mac idle; `get_device_activity`
+  TTL-prunes (10 min) entries that are neither the active device nor backed by a
+  running live job. (`owner_live.py`, `device_owner.py`)
+- **G3 — exclusive sessions can't wedge the device forever.** The command queue
+  gained an `exclusive_timeout`: an exclusive owner that goes idle past the
+  deadline (client died between `exclusive_start`/`exclusive_end`) is
+  force-released so the rest of the queue drains. The deadline re-arms each time
+  the owner makes progress, so a legit slow push is never killed. The daemon
+  device queue opts in at 30 s. Previously a crashed push left the owner token
+  set forever and every subsequent command hung. (`command_queue.py`,
+  `device_owner.py`)
+- **G2 — a scan no longer freezes live widgets.** BLE discovery used the central
+  manager but was routed through the device command queue, so a 60 s scan
+  blocked every queued device call + live-widget push behind it. Scans now run
+  directly on the device loop (`_run_on_loop`), concurrent with device I/O. Also
+  extracted the device-loop plumbing into `owner_loop.py` (OwnerLoopMixin) to
+  keep `device_owner.py` under the 500-LOC cap. (`owner_loop.py`,
+  `device_owner.py`)
+- Tests: +6 G1 (`test_device_activity.py`), +2 G3 (`test_command_queue.py`).
+  HW pass pending for G2 (scan while a widget streams) and the G3 force-release.
+
+---
 ## R47: daemon-owned devices stay selectable + scan indication (2026-06-13)
 
 The problem: a device the daemon OWNS (the active link, or a background

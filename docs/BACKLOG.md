@@ -14,12 +14,14 @@ round's planning doc.
 ## Open
 
 ### Architecture gaps (scan 2026-06-13) — see `docs/ARCH_GAP_SCAN_2026-06.md`
-- `OPEN` **G1** activity registry never pruned → ghost devices in selector/menubar
+- `DONE` **G1** activity registry never pruned → ghost devices in selector/menubar
   after disconnect / wall teardown / stop-all-live-jobs (the inverse of R47).
-- `OPEN` **G2** `scan()` serializes behind the device command queue → a 60 s scan
-  freezes live widgets + hangs user actions (`HW` to verify the fix).
-- `OPEN` **G3** leaked exclusive token wedges the device permanently (queue has no
-  `item_timeout` / no auto-release on client disconnect).
+- `VERIFY HW` **G2** `scan()` serializes behind the device command queue → a 60 s
+  scan freezes live widgets + hangs user actions. Fixed (`_run_on_loop`); HW pass
+  pending (scan while a widget streams).
+- `VERIFY HW` **G3** leaked exclusive token wedges the device permanently. Fixed
+  (command-queue `exclusive_timeout`, 30 s on the device queue); HW pass pending
+  for the force-release path.
 - `OPEN` **G4 `HW`** registry eviction silently kills the active device when a wall
   slot reuses its MAC (single↔wall ping-pong).
 - `OPEN` **G5** background `_live_devices` health is invisible (connection_state
