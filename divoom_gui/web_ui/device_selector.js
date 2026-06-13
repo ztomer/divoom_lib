@@ -36,13 +36,14 @@ window.refreshOwnedDevices = function() {
             if (mac === "MatrixWall") return;   // the wall has its own dot
             const info = act[mac] || {};
             const kind = info.kind || "";
+            const state = info.state || "";   // G5: daemon-owned device health
             const streaming = kind && kind !== "idle";
             const known = (window.DivoomState.discoveredDevices || [])
                 .find(d => d.address === mac);
             if (!known) {
                 window.DivoomState.discoveredDevices.push({
                     address: mac, name: info.name || "Screen",
-                    daemonOwned: true, activityKind: kind,
+                    daemonOwned: true, activityKind: kind, activityState: state,
                 });
                 changed = true;
             } else {
@@ -51,6 +52,9 @@ window.refreshOwnedDevices = function() {
                 }
                 if (known.activityKind !== kind) {
                     known.activityKind = kind; changed = true;
+                }
+                if (known.activityState !== state) {
+                    known.activityState = state; changed = true;
                 }
                 if (streaming && !known.daemonOwned) {
                     known.daemonOwned = true; changed = true;
@@ -72,6 +76,8 @@ window.renderDeviceDots = function() {
             value: d.address, name: d.name || "Bluetooth Screen",
             streaming: !!(d.daemonOwned && d.activityKind && d.activityKind !== "idle"),
             kind: d.activityKind || "",
+            // G5: an owned device whose link degraded/dropped (self-healing).
+            degraded: d.activityState === "degraded" || d.activityState === "disconnected",
         });
     });
     (window.DivoomState.registeredLanDevices || []).forEach(d => {
@@ -96,7 +102,9 @@ window.renderDeviceDots = function() {
         // R47: a daemon-owned (streaming) device gets a ring so it reads as
         // "busy but selectable" — click it to take it over / stop its widget.
         if (e.streaming && !isActive) dot.classList.add("streaming");
-        dot.title = e.streaming ? `${e.name} — ${e.kind}` : e.name;
+        if (e.degraded) dot.classList.add("degraded");
+        dot.title = e.degraded ? `${e.name} — ${e.kind} (reconnecting)`
+                  : e.streaming ? `${e.name} — ${e.kind}` : e.name;
         dot.setAttribute("role", "tab");
         dot.setAttribute("aria-selected", isActive ? "true" : "false");
         dot.addEventListener("click", () => window.connectDevice(e.name, e.value));

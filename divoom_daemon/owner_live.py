@@ -47,7 +47,25 @@ class OwnerLiveMixin:
 
     def get_device_activity(self, _args: dict) -> dict:
         self._prune_device_activity()
+        self._stamp_live_health()
         return {"success": True, "activity": getattr(self, "_device_activity", {}) or {}}
+
+    def _stamp_live_health(self) -> None:
+        """G5: a background live-widget device that drops gets self-healed but its
+        health was invisible (connection_state only watches the ACTIVE device).
+        Stamp each owned device's honest state onto its activity entry so the
+        R47 selector dot can show a degraded/streaming device."""
+        act = getattr(self, "_device_activity", None)
+        if not act:
+            return
+        from divoom_lib.ble_connection import derive_connection_state
+        for mac, dev in (getattr(self, "_live_devices", {}) or {}).items():
+            if mac in act:
+                act[mac]["state"] = derive_connection_state(dev).value
+        # the active device's own state (if it's tracked as an activity entry)
+        active = getattr(self, "_active_key", lambda: None)()
+        if active and active in act and getattr(self, "_device", None) is not None:
+            act[active]["state"] = derive_connection_state(self._device).value
 
     # G1: keep the registry honest. Without teardown an entry survives disconnect /
     # wall tear-down / stop-all, so the R47 selector + menubar keep showing a

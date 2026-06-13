@@ -5,6 +5,40 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## Architecture gap fixes G4–G5 (2026-06-13)
+
+From the architecture scan (`docs/ARCH_GAP_SCAN_2026-06.md`). Both HW-verified.
+
+- **G4 — a screen is owned by the active link OR the wall, not both.**
+  HW-confirmed: configuring a wall whose slot reused the active device's MAC left
+  the daemon holding a dead `_device` handle that timed out ~5s and FAILED on
+  every active-device call (the wall took the one allowed BLE connection).
+  `wall_configure` now relinquishes the active device when its mac is a wall slot;
+  `connect()` drops the wall when the target mac is a current slot. HW: after the
+  fix the ownership transfers cleanly both directions, all calls fast (0.0s vs the
+  old 5s-timeout-and-fail). Extracted nothing new; `device_owner.py` stays < 500
+  via the G2 `owner_loop.py` split. (`device_owner.py`)
+- **G5 — background live-device health is visible.** `connection_state` only
+  watched the active device/wall, so a background streaming screen that dropped
+  (and was being self-healed) showed no signal. `get_device_activity` now stamps
+  each owned device's honest state (`_stamp_live_health` → `derive_connection_state`)
+  onto its activity entry; the R47 selector dot shows an amber "reconnecting" ring
+  when a streaming device is degraded/disconnected. HW: a background sysmon job on
+  the Ditoo reports `state: connected` live. (`owner_live.py`, `device_selector.js`,
+  `sidebar.css`)
+- Tests: +3 G4 (`test_wall_lifecycle.py`), +1 G5 (`test_device_activity.py`).
+- **HW matrix (all 4 screens — Ditoo, Pixoo-1, Timoo-light-4, Tivoo-Max).**
+  Solo connect + push: all OK (2–3 s, no Tivoo-Max flakiness this run). Wall
+  add/remove (answering "can we still remove a device from the wall?"): built
+  `{Ditoo,Pixoo}`, added Timoo, **removed Pixoo** → `{Ditoo,Timoo}` — every step
+  lit, and the removed Pixoo was immediately connectable solo (released cleanly).
+  A non-member (Pixoo) connected solo alongside an existing wall without dropping
+  it. G4 same-MAC active→wall→active transferred cleanly, all calls fast.
+  Quirk noted (not a regression): `wall_configure` rebuilds the whole wall, so a
+  reconfigure reconnects ALL members (adding a 3rd took ~14 s) — future delta
+  optimization.
+
+---
 ## Architecture gap fixes G1–G3 (2026-06-13)
 
 From the architecture scan (`docs/ARCH_GAP_SCAN_2026-06.md`).

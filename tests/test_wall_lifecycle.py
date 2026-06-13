@@ -73,3 +73,56 @@ def test_reconfigure_releases_old_wall_before_rebuild(monkeypatch):
     assert r["success"] is True
     assert old.disconnects == 1           # old wall released first
     assert built["n"] == 1                # new wall built + connected
+
+
+# ── G4: a screen is owned by the active link OR the wall, not both ───────────
+
+
+class _FakeDev:
+    def __init__(self):
+        self.disconnects = 0
+    async def disconnect(self):
+        self.disconnects += 1
+
+
+def test_relinquish_active_when_its_mac_is_a_wall_slot():
+    """HW-confirmed: a wall reusing the active device's MAC left a dead handle
+    that timed out ~5s on every active call. The active device must be dropped."""
+    o = _owner(None)
+    o._device = _FakeDev()
+    o.mac = "AA"
+    o._lan_ip = None
+    o._relinquish_active_if_in({"AA": {"x": 0, "y": 0, "size": 16}})
+    assert o._device is None and o.mac is None
+    assert o._lan_ip is None
+
+
+def test_keep_active_when_its_mac_is_not_a_wall_slot():
+    o = _owner(None)
+    dev = _FakeDev()
+    o._device = dev
+    o.mac = "AA"
+    o._lan_ip = None
+    o._relinquish_active_if_in({"BB": {}})
+    assert o._device is dev and o.mac == "AA"
+
+
+def test_connect_to_a_wall_member_drops_the_wall(monkeypatch):
+    """Taking a current wall slot as the active device relinquishes the wall so
+    they don't both claim the same MAC."""
+    wall = _FakeWall()
+    o = _owner(wall, {"LAN:1.2.3.4": {"x": 0, "y": 0, "size": 16}})
+    o._device = None
+    o.mac = None
+    o._lan_ip = None
+
+    async def _fake_build(args):
+        o._device = object()
+        o._lan_ip = "1.2.3.4"
+        return o._device
+
+    o._build_device_async = _fake_build
+    monkeypatch.setattr(o, "_status_fields", lambda: {"connected": True})
+    r = o.connect({"lan_ip": "1.2.3.4"})
+    assert r["success"] is True
+    assert wall.disconnects == 1 and o._wall is None and o._wall_slots == {}

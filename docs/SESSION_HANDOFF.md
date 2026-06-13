@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **ARCH GAP FIXES G4–G5 SHIPPED + HW-VERIFIED (2026-06-13).** **G4**: active
+  device + wall could double-own one MAC → daemon kept a dead `_device` handle
+  that timed out ~5s and FAILED on every active call. Fixed —
+  `wall_configure` relinquishes the active device when its mac is a wall slot;
+  `connect()` drops the wall when the target is a current slot. HW: clean
+  ownership transfer both ways, all calls fast (vs old 5s-fail). **G5**: background
+  live-device health now stamped onto the activity entry
+  (`owner_live._stamp_live_health`); selector dot shows an amber "reconnecting"
+  ring when a streaming device is degraded. HW: background sysmon on Ditoo reports
+  `state: connected`. Only **G6** (scan indicator on reconnect/auto-discovery
+  scans) remains open from the arch scan. G2 + G3 still want their HW pass.
+
 - **ARCH GAP FIXES G1–G3 SHIPPED (2026-06-13).** From the architecture scan
   `docs/ARCH_GAP_SCAN_2026-06.md`. **G1**: prune `_device_activity` (forget on
   disconnect/wall-teardown, idle on stop-all, 10-min TTL skipping active +

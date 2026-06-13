@@ -241,6 +241,11 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
                 logger.warning("connect blocked by preflight: %s", pf.reason.value)
                 return {"success": False, "error": pf.message,
                         "reason": pf.reason.value, "message": pf.message}
+        # G4: taking a wall member as active — relinquish the wall first.
+        tgt = args.get("mac") or (args.get("lan_ip") and f"LAN:{args.get('lan_ip')}")
+        if tgt and tgt in (getattr(self, "_wall_slots", None) or {}):
+            self._drop_current_wall()
+            self._wall_slots = {}
         try:
             self._run_device(self._build_device_async(args))
             return {"success": True, **self._status_fields()}
@@ -319,6 +324,27 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
         self._wall = None
         self.forget_device_activity("MatrixWall")  # G1: drop wall tile after teardown
 
+    def _active_key(self):
+        ip = getattr(self, "_lan_ip", None)
+        return getattr(self, "mac", None) or (ip and f"LAN:{ip}")
+
+    def _relinquish_active_if_in(self, slots: dict) -> None:
+        """G4: a screen is owned by the active link OR the wall, not both. If the
+        active mac is also a wall slot, drop it — else the wall takes the BLE link
+        and the orphaned handle wastes a ~5s reconnect-timeout on every call."""
+        key = self._active_key()
+        if not key or key not in slots:
+            return
+        d = getattr(self, "_device", None)
+        if d is not None and hasattr(d, "disconnect"):
+            try:
+                self._run_device(d.disconnect())
+            except Exception as e:
+                logger.debug(f"relinquish active disconnect: {e}")
+        self._device = self.mac = self._lan_ip = None
+        self.forget_device_activity(key)
+        logger.info("relinquished active device %s — claimed by the wall", key)
+
     def wall_configure(self, args: dict) -> dict:
         slots = args.get("slots") or {}
         cell = int(args.get("cell_size", 16) or 16)
@@ -330,6 +356,7 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
                 and getattr(self._wall, "is_connected", False)):
             return {"success": True, "wall": True}
         self._drop_current_wall()    # release the old wall before rebuilding
+        self._relinquish_active_if_in(slots)   # G4: don't double-own a slot mac
         self._wall_slots = slots
 
         async def _build():

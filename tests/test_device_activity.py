@@ -148,6 +148,24 @@ def test_stop_all_live_jobs_idles_activity():
     assert o.get_device_activity({})["activity"]["AA"]["kind"] == "idle"
 
 
+def test_live_health_stamped_onto_activity():
+    """G5: a background live device's honest state is stamped onto its activity
+    entry so the selector dot can show streaming vs degraded."""
+    o = _Owner()
+
+    class _Dev:
+        def __init__(self, alive):
+            self.is_connected = True
+            self.is_alive = alive
+
+    o._live_devices = {"AA": _Dev(True), "BB": _Dev(False)}
+    o.set_device_activity({"mac": "AA", "kind": "sysmon"})
+    o.set_device_activity({"mac": "BB", "kind": "weather"})
+    act = o.get_device_activity({})["activity"]
+    assert act["AA"]["state"] == "connected"
+    assert act["BB"]["state"] == "degraded"   # reports connected but is_alive False
+
+
 def test_stop_one_of_two_jobs_keeps_activity():
     o = _Owner()
 

@@ -304,6 +304,14 @@
     50%      { box-shadow: 0 0 0 2px var(--card-bg, #14151a), 0 0 5px 3px currentColor; }
 }
 
+/* G5: an owned device whose link degraded/dropped (daemon is self-healing it) —
+   amber ring overrides the per-device hue so it reads as "reconnecting". */
+.device-dots .transport-dot.degraded {
+    color: #ffc864;
+    opacity: 1;
+    animation: streamRing 1.1s ease-in-out infinite;
+}
+
 /* Tooltip opens upward, centred over the dot. Always light text — the
    semi-transparent dark background is legible in both light and dark themes. */
 .device-dots .transport-dot:hover::after {

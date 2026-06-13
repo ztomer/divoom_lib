@@ -22,12 +22,17 @@ round's planning doc.
 - `VERIFY HW` **G3** leaked exclusive token wedges the device permanently. Fixed
   (command-queue `exclusive_timeout`, 30 s on the device queue); HW pass pending
   for the force-release path.
-- `OPEN` **G4 `HW`** registry eviction silently kills the active device when a wall
-  slot reuses its MAC (single↔wall ping-pong).
-- `OPEN` **G5** background `_live_devices` health is invisible (connection_state
-  only watches the active device/wall).
+- `DONE HW` **G4** active device + wall double-owned the same MAC → dead handle,
+  ~5s-timeout-and-fail on every active call. Fixed (wall_configure relinquishes
+  the active device; connect drops the wall) + HW-verified.
+- `DONE HW` **G5** background `_live_devices` health is now stamped onto the
+  activity entry; selector dot shows an amber "reconnecting" ring. Happy path
+  HW-verified; degraded path unit-tested.
 - `OPEN` **G6** scan indicator covers only the Settings button, not reconnect /
   auto-discovery scans.
+- `OPEN` **G7** (found during G4 HW) `wall_configure` rebuilds the entire wall on
+  every change, so a reconfigure reconnects ALL members (adding a 3rd screen took
+  ~14 s on HW). Optimization: diff slots and only (dis)connect the delta.
 
 ### Regressions reported 2026-06-08 — root-caused
 - `DONE` **Clock / EQ / Custom Art / Ambient panels were empty** (and VJ "missing").
