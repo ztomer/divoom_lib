@@ -5,6 +5,16 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## v0.15.2 — UI/UX polish (2026-06-14)
+
+Packaged release bundling the R49–R52 work below since v0.15.1: named device
+chips, the flat face-on device preview with real PNG transparency, specific
+clock/ambient channel previews, real device-face menu-bar thumbnails, the
+distinct Virtual Wall glyph, the bottom-pinned scan indicator + corner connection
+dot + roomier Auto-Sync list, and a clean app quit (no shutdown cascade / lingering
+host). `docs/release_notes_v0.15.2.md`.
+
+---
 ## R52: GUI exits cleanly (the long-open app-quit bug) (2026-06-14)
 
 The GUI didn't terminate cleanly on quit — the logs showed a "Daemon shut down →

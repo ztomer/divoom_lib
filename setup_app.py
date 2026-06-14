@@ -18,7 +18,7 @@ for the background.
 """
 from setuptools import setup
 
-VERSION = "0.15.1"
+VERSION = "0.15.2"
 BT_DESC = ("Divoom Control uses Bluetooth to discover and control your Divoom "
            "pixel display.")
 AE_DESC = ("Divoom Control reads the now-playing track from Music and Spotify to "
