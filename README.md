@@ -1,5 +1,7 @@
 # divoom-control
 
+![preview](docs/assets/image.png)
+
 Control Divoom pixel-display devices (Pixoo / Tivoo / Timebox / Ditoo …) as a
 **Python library**, a **headless daemon** (local or over the network), and a
 **desktop Control Center app**.
