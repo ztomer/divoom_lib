@@ -9,6 +9,7 @@ actions to control the notification listener and open the GUI.
 """
 import sys
 import os
+import base64
 import subprocess
 import logging
 from pathlib import Path
@@ -18,6 +19,26 @@ from AppKit import (
     NSColor, NSForegroundColorAttributeName, NSBackgroundColorAttributeName,
     NSImage,
 )
+from Foundation import NSData, NSMakeSize
+
+
+def _menu_thumbnail(data_url, size=18):
+    """R50: decode a PNG data URL (the GUI's rasterized device preview) into a
+    small NSImage for a menubar tile. Returns None on any failure so the caller
+    falls back to the SF Symbol glyph — so this can only improve the tile, never
+    regress it."""
+    try:
+        if not data_url or "base64," not in data_url:
+            return None
+        raw = base64.b64decode(data_url.split("base64,", 1)[1])
+        data = NSData.dataWithBytes_length_(raw, len(raw))
+        img = NSImage.alloc().initWithData_(data)
+        if img is None:
+            return None
+        img.setSize_(NSMakeSize(size, size))
+        return img
+    except Exception:
+        return None
 
 # R46 #3: per-device activity → (SF Symbol, friendly label) for the menubar
 # tiles. Glyph-only for now (the daemon supplies the kind; real-frame thumbnails
@@ -116,12 +137,19 @@ class DivoomMenuBarAgent(NSObject):
                 f"{name} — {label}", None, "")
             row.setTag_(_DEVICE_ITEM_TAG)
             row.setEnabled_(False)
-            try:
-                img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol, label)
-                if img is not None:
+            # R50: prefer the actual device-face thumbnail; fall back to the SF
+            # Symbol glyph when there's no preview (or it fails to decode).
+            img = _menu_thumbnail(info.get("preview"))
+            if img is None:
+                try:
+                    img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol, label)
+                except Exception:
+                    img = None
+            if img is not None:
+                try:
                     row.setImage_(img)
-            except Exception:
-                pass
+                except Exception:
+                    pass
             menu.insertItem_atIndex_(row, idx)
             idx += 1
         if idx > 0:

@@ -40,14 +40,17 @@ class ScannerMixin:
         connect (empty if none / last connect succeeded)."""
         return getattr(self, "_last_connect_error", "") or ""
 
-    def set_device_activity(self, mac: str, kind: str, name: str = "") -> bool:
-        """R46 #3: tell the daemon what a device is showing so the menubar can
-        render a per-device tile. Best-effort (a missing daemon is fine)."""
+    def set_device_activity(self, mac: str, kind: str, name: str = "",
+                            preview: str = "") -> bool:
+        """R46 #3 / R50: tell the daemon what a device is showing so the menubar
+        can render a per-device tile. ``preview`` is an optional PNG data URL for
+        the tile thumbnail. Best-effort (a missing daemon is fine)."""
         try:
             client = self._client()
             if client is None:
                 return False
-            return bool(client.set_device_activity(mac, kind, name or None).get("success"))
+            return bool(client.set_device_activity(
+                mac, kind, name or None, preview or None).get("success"))
         except Exception as e:
             logger.debug(f"set_device_activity failed: {e}")
             return False

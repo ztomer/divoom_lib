@@ -66,7 +66,17 @@ class OwnerLiveMixin:
         name = args.get("name") or self._resolve_device_name(mac)
         if name:
             entry["name"] = name
-        entry["kind"] = args.get("kind") or entry.get("kind") or "idle"
+        # An empty kind means "thumbnail-only update" (a live frame whose
+        # semantic kind the daemon's own live job already set) — keep that kind.
+        kind = args.get("kind")
+        if kind:
+            entry["kind"] = kind
+        elif not entry.get("kind"):
+            entry["kind"] = "idle"
+        # R50: optional rasterized PNG thumbnail (data URL) for the menubar tile.
+        preview = args.get("preview")
+        if preview:
+            entry["preview"] = preview
         entry["at"] = time.time()
         self._device_activity[mac] = entry
         return {"success": True}

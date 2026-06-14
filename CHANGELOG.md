@@ -5,6 +5,33 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R50: specific previews — device panel + menubar tiles (2026-06-14)
+
+Three preview-fidelity fixes (from a live-UI review of the sidebar + menubar).
+
+- **Device preview shows the SPECIFIC channel face, not a generic glyph.**
+  Picking a clock face (e.g. "With Box") called `set_clock` but never refreshed
+  the preview, so it stayed a generic clock icon (or a stale frame). Now
+  `_channelPreviewSVG` renders the exact face the user picked — all 6 clock
+  styles (full-screen, rainbow, with-box, analog-square, neg, analog-round) — in
+  the chosen color, and `applyClockStyle` refreshes the preview on apply. The
+  selected style is tracked on `DivoomState` so a plain channel-switch renders it.
+- **Dropped the redundant device-name label.** The R49 name under the preview
+  duplicated the active (green) chip directly below it. It's now hidden when a
+  device is active — shown only as the "No screen connected" empty-state hint.
+- **Menubar tiles show the real device face.** R46 #3 shipped glyph-only tiles
+  (real-frame thumbnails were deferred). Now the GUI rasterizes each channel
+  preview to a small PNG and pushes it through `set_device_activity(..., preview)`;
+  the daemon stores it on the activity entry; the menubar decodes it
+  (`_menu_thumbnail`) into a per-device tile thumbnail, falling back to the SF
+  Symbol glyph if there's no preview or it fails to decode (so it can only
+  improve a tile, never regress it). An empty `kind` now means "thumbnail-only
+  update" so a live frame doesn't clobber the daemon's semantic kind.
+  Tests: daemon preview storage + empty-kind preservation; menubar PNG-decode +
+  garbage-rejection. **Native NSMenu tile rendering still wants a real menubar
+  smoke test** (can't be verified headless).
+
+---
 ## R49: sidebar device cluster redesign (2026-06-14)
 
 A Rams/Kare pass over the sidebar's device selector, Virtual Wall button, and

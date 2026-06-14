@@ -191,16 +191,42 @@ window.setDeviceActivity = function(mac, kind, opts) {
     window.DivoomState.deviceActivity[mac] = { kind: kind, src: src, at: Date.now() };
     try { localStorage.setItem("divoomDeviceActivity", JSON.stringify(window.DivoomState.deviceActivity)); } catch (e) {}
     window.setDevicePreview(mac, src);
-    // R46 #3: push the CHANNEL kind to the daemon so the menubar can show a
-    // per-device tile. Live-widget image content is skipped here — the daemon
-    // already sets that kind itself (sysmon/stocks/weather/music) on
-    // live_job_start, so we'd only clobber it with "image".
+    // R46 #3 / R50: push the CHANNEL kind + a PNG thumbnail to the daemon so the
+    // menubar can show a per-device tile with the actual face (not a generic
+    // glyph). Live-widget image content is skipped here — the daemon sets that
+    // kind itself (sysmon/stocks/weather/music) on live_job_start, so we'd only
+    // clobber it with "image".
     if (kind !== "image" && window.pywebview?.api?.set_device_activity) {
         const dev = (window.DivoomState.discoveredDevices || []).find(d => d.address === mac);
         const name = (dev && dev.name) || (mac === window._activeDeviceMac()
             ? (document.getElementById("banner-device-name")?.textContent || "").trim() : "");
-        try { window.pywebview.api.set_device_activity(mac, kind, name || ""); } catch (e) {}
+        // NSImage can't reliably decode SVG, so rasterize to a small PNG first.
+        window._rasterizeToPng(src, 36, function(png) {
+            try { window.pywebview.api.set_device_activity(mac, kind, name || "", png || ""); }
+            catch (e) {}
+        });
     }
+};
+
+// Rasterize an SVG/image data URL to a square PNG data URL (for the menubar
+// tile thumbnail, which NSImage renders from PNG). Async via Image.onload;
+// calls cb(null) on any failure so the caller falls back to the SF Symbol glyph.
+window._rasterizeToPng = function(src, size, cb) {
+    try {
+        const img = new Image();
+        img.onload = function() {
+            try {
+                const c = document.createElement("canvas");
+                c.width = c.height = size;
+                const ctx = c.getContext("2d");
+                ctx.imageSmoothingEnabled = false;   // keep pixels crisp
+                ctx.drawImage(img, 0, 0, size, size);
+                cb(c.toDataURL("image/png"));
+            } catch (e) { cb(null); }
+        };
+        img.onerror = function() { cb(null); };
+        img.src = src;
+    } catch (e) { cb(null); }
 };
 
 window._activeDeviceMac = function() {

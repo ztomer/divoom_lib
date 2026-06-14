@@ -344,10 +344,13 @@ class DaemonClient:
         clobber it on its next tick."""
         return self.send_command("live_jobs_stop_for", {"mac": mac})
 
-    def set_device_activity(self, mac: str, kind: str, name: str | None = None) -> dict:
-        """R46 #3: record what a device is showing (for the menubar previews)."""
+    def set_device_activity(self, mac: str, kind: str, name: str | None = None,
+                            preview: str | None = None) -> dict:
+        """R46 #3 / R50: record what a device is showing (for the menubar tiles).
+        ``preview`` is an optional rasterized PNG data URL for the tile thumbnail."""
         return self.send_command("set_device_activity",
-                                 {"mac": mac, "kind": kind, "name": name})
+                                 {"mac": mac, "kind": kind, "name": name,
+                                  "preview": preview})
 
     def get_device_activity(self) -> dict:
         """R46 #3: {mac: {name, kind, at}} of what each device is showing."""

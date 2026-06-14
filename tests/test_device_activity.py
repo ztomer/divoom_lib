@@ -38,6 +38,27 @@ def test_kind_update_preserves_name():
     assert act["AA"]["kind"] == "sysmon" and act["AA"]["name"] == "Ditoo"
 
 
+def test_preview_thumbnail_stored_and_returned():
+    """R50: a PNG data-URL preview is stored on the activity entry so the menubar
+    can render the actual device face as a tile thumbnail."""
+    o = _Owner()
+    png = "data:image/png;base64,iVBORw0KGgo="
+    o.set_device_activity({"mac": "AA", "kind": "clock", "name": "Ditoo", "preview": png})
+    act = o.get_device_activity({})["activity"]
+    assert act["AA"]["preview"] == png
+
+
+def test_empty_kind_is_thumbnail_only_update():
+    """R50: an empty kind means 'update the thumbnail, keep the kind' — a live
+    frame must not clobber the semantic kind the daemon's live job set."""
+    o = _Owner()
+    o.set_device_activity({"mac": "AA", "kind": "music", "name": "Ditoo"})
+    o.set_device_activity({"mac": "AA", "kind": "", "preview": "data:image/png;base64,Zm9v"})
+    act = o.get_device_activity({})["activity"]
+    assert act["AA"]["kind"] == "music"                       # not clobbered
+    assert act["AA"]["preview"] == "data:image/png;base64,Zm9v"
+
+
 def test_live_job_start_sets_activity_and_stop_reverts_to_idle():
     o = _Owner()
 

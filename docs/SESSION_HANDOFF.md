@@ -18,6 +18,22 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R50 SPECIFIC PREVIEWS SHIPPED (2026-06-14).** Three preview-fidelity fixes
+  on top of R49. **(1)** Device preview now renders the SPECIFIC channel face
+  (6 clock styles, in the chosen color) instead of a generic glyph —
+  `_channelPreviewSVG`/`_clockFaceSVG` + `applyClockStyle` refreshes on apply;
+  selected style tracked on `DivoomState.selectedClockStyle`. **(2)** Removed the
+  redundant device-name label under the preview (active chip carries it; label is
+  now empty-state-only). **(3)** Menubar tiles show the real device face: GUI
+  rasterizes the preview SVG→PNG (`_rasterizeToPng`), pushes it via
+  `set_device_activity(..., preview)`; daemon stores it; menubar `_menu_thumbnail`
+  decodes PNG→NSImage with SF-Symbol fallback (can't regress). Empty `kind` =
+  thumbnail-only update (don't clobber live-job kind). Tests added (daemon
+  storage + menubar decode). **OPEN: native NSMenu tile render needs a real
+  menubar smoke test** — verified the decode + rasterize + storage chain headless,
+  but not the on-screen `setImage_` result. NOTE: `app_globals.js` now 490 LOC
+  (cap 500) — next addition there needs an extraction.
+
 - **R49 SIDEBAR DEVICE CLUSTER REDESIGN SHIPPED (2026-06-14).** Rams/Kare pass
   over the device selector, Virtual Wall button, and preview (four-lens review →
   `docs/REVIEW_2026-06.md` not regenerated; design captured in CHANGELOG R49).

@@ -63,3 +63,34 @@ def test_hex_to_rgb01_invalid():
         assert False, "should raise"
     except ValueError:
         pass
+
+def _png_data_url(size=8, color=(94, 222, 145)):
+    """A real tiny PNG as a data URL (the shape the GUI sends)."""
+    import base64
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (size, size), color).save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def test_menu_thumbnail_decodes_png_data_url():
+    """R50: a PNG data URL decodes to a sized NSImage for the menubar tile."""
+    import pytest
+    pytest.importorskip("AppKit")
+    from divoom_menubar.menubar import _menu_thumbnail
+    img = _menu_thumbnail(_png_data_url(), size=18)
+    assert img is not None
+    assert round(img.size().width) == 18 and round(img.size().height) == 18
+
+
+def test_menu_thumbnail_rejects_non_png_and_garbage():
+    """R50: SVG/empty/garbage previews return None so the caller falls back to
+    the SF Symbol glyph (the thumbnail can only improve the tile, never regress)."""
+    import pytest
+    pytest.importorskip("AppKit")
+    from divoom_menubar.menubar import _menu_thumbnail
+    assert _menu_thumbnail(None) is None
+    assert _menu_thumbnail("") is None
+    assert _menu_thumbnail("data:image/svg+xml;utf8,<svg/>") is None        # no base64
+    assert _menu_thumbnail("data:image/png;base64,not-real-bytes") is None  # invalid
