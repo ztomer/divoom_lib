@@ -196,16 +196,11 @@
 /* ── Sidebar Connected Device Panel ─────────────────────────────────── */
 .sidebar-device-panel {
     /* R32: Settings left the sidebar (now an appbar gear), so the device panel
-       is pinned to the bottom — taking the spot the Settings button vacated. */
+       is pinned to the bottom — taking the spot the Settings button vacated.
+       R51: this is a transparent layout container only — the bezel below is the
+       single framed element (the old card around it was a redundant second box). */
     margin-top: auto;
-    /* R24 #6: trim the card — less (esp. horizontal) padding + a smaller preview
-       make it shorter so it sits higher; margin-bottom adds breathing room above
-       the Settings button. */
     margin-bottom: 12px;
-    padding: 10px 8px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -214,17 +209,19 @@
     box-sizing: border-box;
 }
 
-/* R49: flat face-on screen panel — a neutral bezel around a square screen that
-   shows the live frame straight (no 3/4 product photo, no per-model rect). */
+/* R49/R51: flat face-on screen — a neutral bezel around a square screen that
+   shows the live frame straight (no 3/4 product photo, no per-model rect). R51:
+   fills the sidebar column (was a small 104px box inside a second card) so the
+   preview is as large as the space allows. */
 .sidebar-device-preview {
-    width: 104px;
-    height: 104px;
+    width: 100%;
+    aspect-ratio: 1 / 1;
     margin: 0 auto 8px auto;
-    padding: 7px;
+    padding: 8px;
     box-sizing: border-box;
     background: #202026;
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 14px;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
                 0 2px 6px rgba(0, 0, 0, 0.3);
 }
