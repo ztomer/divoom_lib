@@ -62,6 +62,23 @@ both are held to the same correctness tests (see *Testing*).
 
 ## Install
 
+### macOS app (Homebrew)
+
+The packaged Control Center app installs via the [`ztomer/tap`](https://github.com/ztomer/homebrew-tap)
+Homebrew tap — no Python setup required:
+
+```bash
+brew install --cask ztomer/tap/divoom-control
+# later:
+brew upgrade --cask ztomer/tap/divoom-control
+```
+
+This installs a self-contained `Divoom.app` (GUI + menu-bar agent + bundled
+daemon). The first scan prompts once for Bluetooth — grant it. Requires macOS 11
+(Big Sur) or later.
+
+### From source (library / daemon / dev)
+
 ```bash
 pip install -r requirements.txt        # or: pip install -e .
 # optional: build the native accelerator (Python fallback works without it)
