@@ -5,6 +5,26 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R51: preview rendering fixes + sidebar de-nest (2026-06-14)
+
+- **Clock-face previews were clipped/misaligned.** `_clockFaceSVG` rendered
+  "12:00" at font-size 18 monospace (~55px) — wider than the 64px canvas, and
+  the "With Box" border (46px) clipped the digits. Resized to font-size 13
+  (~39px), vertically centred, and the box now encloses the digits with padding.
+  Rainbow uses `<tspan>`s so the per-digit colors keep monospace spacing.
+- **Ambient preview showed the wrong mode.** `applyAmbientColor` only passed the
+  color, so the device preview was a flat fill regardless of the selected effect.
+  Now the mode is passed through and `_channelPreviewSVG` renders each mode's
+  palette (Love = pink, Plants = red + blue bars, Sleeping = green,
+  No-Mosquitto = amber, Plain = the picked color) — matching the channel tiles.
+- **Sidebar preview de-nested + enlarged.** The preview was an outer card around
+  an inner bezel around the screen (two frames, small screen). Removed the outer
+  card's framing; the bezel now fills the sidebar column (width:100% +
+  aspect-ratio:1) so the preview is a single, larger framed element.
+- Extracted the preview renderers to `channel_preview.js` (app_globals.js was
+  over the 500-LOC cap).
+
+---
 ## R50: specific previews — device panel + menubar tiles (2026-06-14)
 
 Three preview-fidelity fixes (from a live-UI review of the sidebar + menubar).

@@ -103,82 +103,8 @@ window.restoreDevicePreview = function(address, _fallbackSrc) {
 };
 
 // ── R46 #2: per-device "last active element" preview ──────────────────────
-// The device preview should show what each device is doing. Image content
-// (live widgets, custom art, cover art) supplies a real frame; channels render
-// on the device, so we draw a recognizable glyph for them.
-// R50: render the SPECIFIC clock face the user picked (6 styles), not a generic
-// clock glyph — mirrors the channel tiles (channels_grids.js CLOCK_FACES).
-window._clockFaceSVG = function(style, color) {
-    const c = color || "#ffffff";
-    const t = (txt, fill, extra) =>
-        `<text x="32" y="40" font-size="18" font-family="monospace" font-weight="bold"`
-        + ` fill="${fill}" text-anchor="middle"${extra || ""}>${txt}</text>`;
-    let inner, bg = "#0a0b10";
-    switch (Number(style)) {
-        case 1: // Rainbow — each glyph a different hue
-            inner = ["#ff5a5a", "#ffc864", "#5ede91", "#5aabff", "#c89bff"]
-                .map((h, i) => `<text x="${10 + i * 11}" y="40" font-size="16"`
-                    + ` font-family="monospace" font-weight="bold" fill="${h}">${"12:00"[i]}</text>`)
-                .join("");
-            break;
-        case 2: // With Box — time inside a rounded border
-            inner = `<rect x="9" y="24" width="46" height="20" rx="3" fill="none"`
-                  + ` stroke="${c}" stroke-width="2"/>` + t("12:00", c);
-            break;
-        case 3: // Analog Square
-            inner = `<rect x="14" y="14" width="36" height="36" rx="4" fill="none" stroke="${c}" stroke-width="2.5"/>`
-                  + `<line x1="32" y1="32" x2="32" y2="20" stroke="${c}" stroke-width="2.5" stroke-linecap="round"/>`
-                  + `<line x1="32" y1="32" x2="42" y2="32" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`;
-            break;
-        case 4: // Full Screen Neg — inverted: color fills the screen, dark digits
-            bg = c; inner = t("12:00", "#1a2318");
-            break;
-        case 5: // Analog Round
-            inner = `<circle cx="32" cy="32" r="19" fill="none" stroke="${c}" stroke-width="2.5"/>`
-                  + `<line x1="32" y1="32" x2="32" y2="18" stroke="${c}" stroke-width="2.5" stroke-linecap="round"/>`
-                  + `<line x1="32" y1="32" x2="42" y2="37" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`;
-            break;
-        default: // 0 Full Screen digital
-            inner = t("12:00", c);
-    }
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">`
-              + `<rect width="64" height="64" fill="${bg}"/>${inner}</svg>`;
-    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-};
-
-window._channelPreviewSVG = function(kind, opts) {
-    opts = opts || {};
-    const a = opts.color || "#00ffcc";
-    const k = (kind || "").toLowerCase();
-    let inner;
-    if (k === "clock") {
-        // R50: reflect the selected face + color (falls back to current state).
-        const style = (opts.style != null) ? opts.style
-                    : (window.DivoomState.selectedClockStyle ?? 0);
-        const color = opts.color
-                    || document.getElementById("clock-color-input")?.value || "#ffffff";
-        return window._clockFaceSVG(style, color);
-    } else if (k === "visualizer" || k === "eq") {
-        inner = `<rect x="13" y="36" width="8" height="16" fill="${a}"/><rect x="24" y="22" width="8" height="30" fill="${a}"/>`
-              + `<rect x="35" y="30" width="8" height="22" fill="${a}"/><rect x="46" y="16" width="8" height="36" fill="${a}"/>`;
-    } else if (k === "vj") {
-        inner = `<path d="M32 11 L38 27 L55 32 L38 37 L32 53 L26 37 L9 32 L26 27 Z" fill="${a}"/>`;
-    } else if (k === "scoreboard") {
-        inner = `<text x="32" y="42" font-size="20" font-family="monospace" font-weight="bold" fill="#fff" text-anchor="middle">0:0</text>`;
-    } else if (k === "text") {
-        inner = `<text x="32" y="44" font-size="34" font-family="sans-serif" font-weight="bold" fill="#fff" text-anchor="middle">T</text>`;
-    } else if (k === "ambient") {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="${a}"/></svg>`;
-        return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-    } else if (k === "design" || k === "custom") {
-        inner = `<rect x="16" y="16" width="14" height="14" fill="${a}"/><rect x="34" y="16" width="14" height="14" fill="#fff"/>`
-              + `<rect x="16" y="34" width="14" height="14" fill="#fff"/><rect x="34" y="34" width="14" height="14" fill="${a}"/>`;
-    } else {
-        inner = `<circle cx="32" cy="32" r="7" fill="#888"/>`;
-    }
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#0a0b10"/>${inner}</svg>`;
-    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-};
+// The channel-preview renderers (_clockFaceSVG / _channelPreviewSVG) live in
+// channel_preview.js to keep this file under the 500-LOC cap.
 
 // Set a device's "last active" preview: kind="image" uses opts.src (a real
 // frame); any channel kind draws its glyph. Persists via setDevicePreview and
