@@ -33,13 +33,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.pywebview && window.pywebview.api) {
             window.pywebview.api.set_clock(style, color).then(res => {
                 window.showToast(res ? "Clock style applied" : "Failed to apply clock", res ? "success" : " BLE");
+                // R50: reflect the SPECIFIC face + color on the device preview.
+                if (res && window.setDeviceActivity)
+                    window.setDeviceActivity(window._activeDeviceMac(), "clock", { style, color });
             });
         }
     }
 
-    let selectedClockStyle = 0;
+    window.DivoomState.selectedClockStyle = 0;
     window.buildSelectorGrid("clock-faces-grid", CLOCK_FACES, (v) => {
-        selectedClockStyle = v;
+        window.DivoomState.selectedClockStyle = v;
         applyClockStyle(v);
     }, 0, CLOCK_PREVIEWS);
 

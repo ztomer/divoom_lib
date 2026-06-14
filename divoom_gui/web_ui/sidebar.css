@@ -256,24 +256,21 @@
                 inset 0 0 10px rgba(94, 222, 145, 0.12);
 }
 
-/* R49: visible device-name label below the screen. */
+/* R49/R50: empty-state hint below the screen (hidden when a device is active —
+   the active chip carries the name, so repeating it here was redundant). */
 .device-name-label {
     font-family: var(--font-sans);
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text-main);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
     text-align: center;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     margin-bottom: 8px;
-    letter-spacing: -0.1px;
 }
-.device-name-label.is-empty {
-    color: var(--text-muted);
-    font-weight: 600;
-}
+.device-name-label[hidden] { display: none; }
 
 /* R48: device selector chips — named, self-labeling, click to switch.
    Replaces the unlabeled colored dots (Rams R4/R7; Kare affordance).
