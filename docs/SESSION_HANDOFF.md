@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R49 SIDEBAR DEVICE CLUSTER REDESIGN SHIPPED (2026-06-14).** Rams/Kare pass
+  over the device selector, Virtual Wall button, and preview (four-lens review →
+  `docs/REVIEW_2026-06.md` not regenerated; design captured in CHANGELOG R49).
+  **(1)** Device dots → **named chips** (color dot + name + state text); active =
+  green border, connecting = amber pulse, streaming = breathing dot, degraded =
+  amber + "reconnecting". `device_selector.js` + `sidebar.css`. **(2)** Wall glyph
+  was identical to the Pixel Art tab — now a distinct "joined panels" glyph, dashed
+  border, count in label ("Wall (3)"). **(3)** Device PNGs had the transparency
+  **checkerboard baked into RGB pixels** (asset-gen artifact) — re-keyed to real
+  RGBA transparency via border flood-fill (preserves interior detail). **(4)**
+  Device preview → **flat face-on screen panel**: the 3/4 product photos made
+  composited live frames land crooked; dropped the photo, the frame renders
+  straight in a neutral bezel (any model, no per-model rect — removed
+  `_DEVICE_SCREEN_RECTS`/`_applyDeviceScreenRect`), device name shown below.
+  Suite green (see CHANGELOG). Also: homebrew-tap README updated (divoom-control
+  added to the cask table + per-cask detail sections).
+
 - **ARCH GAP SCAN #2 SHIPPED (2026-06-13)** — `docs/ARCH_GAP_SCAN_2_2026-06.md`,
   A1–A4. **A1**: shared `divoom_lib/utils/atomic_io.py` (atomic_write_text /
   atomic_write_config) applied across ALL config writers — only `save_preset` was

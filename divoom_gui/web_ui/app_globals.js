@@ -50,48 +50,37 @@ window.deviceColor = function(key) {
     return `hsl(${h % 360}, 70%, 55%)`;
 };
 
-// ── R32 §C2 / R44 §7: last-pushed device preview ──────────────────────
+// ── R49: flat face-on screen preview ──────────────────────────────────
 // The device can't report its framebuffer, so we mirror the last frame this
-// app (or a daemon live job) pushed. R44 §7: the product PNG stays as the
-// device BODY; the frame is composited into the device's SCREEN region via the
-// #banner-device-screen overlay, so the preview shows what's on the device now.
-//
-// Per-model screen rectangle (percent of the product image). The matrix sits in
-// a different spot per model; tune here. Default covers the central LED area.
-window._DEVICE_SCREEN_RECTS = {
-    "tivoo-max": { x: 25, y: 20, w: 50, h: 44, r: 2 },
-    "tivoo":     { x: 22, y: 20, w: 56, h: 48, r: 2 },
-    "ditoo":     { x: 22, y: 27, w: 56, h: 45, r: 3 },
-    "timoo":     { x: 20, y: 20, w: 60, h: 56, r: 2 },
-    "timebox":   { x: 19, y: 19, w: 62, h: 62, r: 3 },
-    "pixoo64":   { x: 12, y: 12, w: 76, h: 76, r: 2 },
-    "pixoo":     { x: 15, y: 15, w: 70, h: 70, r: 2 },
-};
-
-window._applyDeviceScreenRect = function(name) {
-    const overlay = document.getElementById("banner-device-screen");
-    if (!overlay) return;
-    const n = (name || "").toLowerCase();
-    let rect = window._DEVICE_SCREEN_RECTS.pixoo;   // sensible default
-    for (const key of Object.keys(window._DEVICE_SCREEN_RECTS)) {
-        if (n.includes(key)) { rect = window._DEVICE_SCREEN_RECTS[key]; break; }
-    }
-    overlay.style.setProperty("--screen-x", rect.x + "%");
-    overlay.style.setProperty("--screen-y", rect.y + "%");
-    overlay.style.setProperty("--screen-w", rect.w + "%");
-    overlay.style.setProperty("--screen-h", rect.h + "%");
-    overlay.style.setProperty("--screen-radius", (rect.r || 2) + "px");
-};
+// app (or a daemon live job) pushed. R49: the product photos are 3/4
+// perspective renders, so compositing a frame onto them landed it crooked.
+// We now show the frame straight in a neutral bezel (#banner-device-screen) —
+// a face-on screen, aligned for any model, with no per-model rect to tune.
 
 window._setScreenOverlayFrame = function(src) {
-    const overlay = document.getElementById("banner-device-screen");
-    if (!overlay) return;
+    const screen = document.getElementById("banner-device-screen");
+    if (!screen) return;
     if (src) {
-        overlay.style.backgroundImage = `url("${src}")`;
-        overlay.classList.add("has-frame");
+        screen.style.backgroundImage = `url("${src}")`;
+        screen.classList.add("has-frame");
     } else {
-        overlay.style.backgroundImage = "";
-        overlay.classList.remove("has-frame");
+        screen.style.backgroundImage = "";
+        screen.classList.remove("has-frame");
+    }
+};
+
+// Visible device-name label below the screen. Keeps the canonical (hidden)
+// #banner-device-name as the data holder; this just renders friendly text.
+window._updateDeviceLabel = function(name) {
+    const label = document.getElementById("banner-device-label");
+    if (!label) return;
+    const n = (name || "").trim();
+    if (!n || n === "None" || n === "No Connected Screen") {
+        label.textContent = "No screen connected";
+        label.classList.add("is-empty");
+    } else {
+        label.textContent = n;
+        label.classList.remove("is-empty");
     }
 };
 
@@ -103,17 +92,13 @@ window.setDevicePreview = function(address, src) {
     } catch (e) { /* quota — non-fatal */ }
     const activeMac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
     if (activeMac === address) {
-        window._setScreenOverlayFrame(src);   // composite into the screen, not the whole body
+        window._setScreenOverlayFrame(src);
     }
 };
 
-window.restoreDevicePreview = function(address, fallbackSrc) {
-    const img = document.getElementById("banner-device-image");
-    if (!img) return;
-    // The product image is the device body; the live frame goes in the screen.
-    img.src = fallbackSrc || "assets/pixoo.png";
-    const name = (document.getElementById("banner-device-name")?.textContent || "").trim();
-    window._applyDeviceScreenRect(name);
+window.restoreDevicePreview = function(address, _fallbackSrc) {
+    // R49: no product photo anymore — just show this device's last frame in the
+    // flat screen (or the empty state when nothing has been pushed yet).
     window._setScreenOverlayFrame(window.DivoomState.devicePreviews[address] || null);
 };
 
@@ -234,6 +219,7 @@ window.connectDevice = function(name, address) {
                 
                 document.getElementById("banner-device-name").textContent = name;
                 document.getElementById("banner-device-mac").textContent = address;
+                window._updateDeviceLabel(name);
                 // R32 §C2: prefer the last-pushed preview; fall back to the
                 // product icon when this device hasn't been pushed to yet.
                 const dims = window.getDeviceDimensions(name);
@@ -266,6 +252,7 @@ window.connectDevice = function(name, address) {
                 if (window.renderDeviceDots) window.renderDeviceDots();
                 document.getElementById("banner-device-name").textContent = "None";
                 document.getElementById("banner-device-mac").textContent = "None";
+                window._updateDeviceLabel(null);
                 window.updateSidebarSpeakerIcon(false);
                 if (window.updateSyncTargetList) window.updateSyncTargetList();
                 if (window.updateChannelButtonsVisibility) window.updateChannelButtonsVisibility("None");

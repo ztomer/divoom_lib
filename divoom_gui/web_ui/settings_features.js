@@ -259,6 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (changed) {
                             const bannerName = document.getElementById("banner-device-name");
                             if (bannerName) bannerName.textContent = name;
+                            if (window._updateDeviceLabel) window._updateDeviceLabel(name);
                             if (window.updateDeviceSelectorDropdown) window.updateDeviceSelectorDropdown();
                             if (window.populateDeviceSelectors) window.populateDeviceSelectors(window.DivoomState.discoveredDevices);
                         }

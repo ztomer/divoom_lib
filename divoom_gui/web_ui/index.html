@@ -157,17 +157,20 @@
                  on the preview — color-coded, tooltipped, click to switch.
                  The <select> is kept hidden as the canonical selection state. -->
             <div class="sidebar-device-panel" id="connected-device-banner">
-                <!-- R44 §7: the product image is the device BODY; the live
-                     channel/widget/wall frame is composited into the screen
-                     overlay (positioned per model) so you see what's on the
-                     device right now, not a whole-image swap. -->
+                <!-- R49: a flat, face-on screen panel. The product photos are 3/4
+                     perspective renders, so a live frame composited onto them
+                     landed crooked. Instead we show the live frame straight in a
+                     neutral bezel — what's actually on the screen, aligned, for
+                     any model. The device name sits below. -->
                 <div class="sidebar-device-preview">
-                    <img id="banner-device-image" src="assets/pixoo.png" alt="Device Preview">
-                    <div id="banner-device-screen" class="device-screen-overlay" aria-hidden="true"></div>
+                    <div id="banner-device-screen" class="device-screen" aria-hidden="true"></div>
                 </div>
+                <div id="banner-device-label" class="device-name-label">No screen connected</div>
                 <select id="sidebar-device-select" class="sidebar-device-select" hidden>
                     <option value="">Select Screen…</option>
                 </select>
+                <!-- Canonical selection state (hidden data holders read across the
+                     UI — gallery resolution, active-mac checks). -->
                 <span id="banner-device-name" style="display: none;">No Connected Screen</span>
                 <span id="banner-device-mac" style="display: none;">-</span>
             </div>

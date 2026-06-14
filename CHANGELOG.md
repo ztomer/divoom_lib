@@ -5,6 +5,36 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R49: sidebar device cluster redesign (2026-06-14)
+
+A Rams/Kare pass over the sidebar's device selector, Virtual Wall button, and
+device preview (driven by a four-lens design review).
+
+- **Device selector → named chips.** Replaced the unlabeled 16px colored dots
+  with self-labeling chip rows: a small color dot + device name + right-aligned
+  state (the streaming kind, or "reconnecting" for a degraded link). Every device
+  is identifiable at a glance with no hover, and the list scales past 4 devices.
+  Active = green-tinted border; connecting = pulsing amber border; streaming =
+  breathing dot; degraded = amber dot. (`device_selector.js`, `sidebar.css`.)
+- **Virtual Wall glyph fixed.** The wall button's 2×2 filled-rect glyph was
+  identical to the Pixel Art nav-tab icon. Replaced with a distinct "joined
+  panels" glyph (bounding rect + vertical divider); dashed border marks it as a
+  composite, not a single screen; the count folds into the label ("Wall (3)")
+  instead of a competing accent badge.
+- **Device PNGs: real transparency.** The 5 product images were RGB with the
+  transparency-preview *checkerboard baked into the pixels* (an asset-gen
+  artifact) — so every device sat on a gray checkerboard. Re-keyed via border
+  flood-fill (neutral-gray only) so exterior + shadow background is removed while
+  interior detail survives by connectivity (ditoo joystick/keycaps, timoo white
+  speaker grille, tivoo-max chrome). Now RGBA with transparent corners.
+- **Device preview → flat face-on screen panel.** The product photos are 3/4
+  perspective renders, so a live frame composited onto them landed crooked (most
+  visible on the Ditoo). Dropped the photo from the live preview; the frame now
+  renders straight in a neutral bezel — aligned for any model, zero per-model
+  rects (removed `_DEVICE_SCREEN_RECTS` / `_applyDeviceScreenRect`). The device
+  name shows below the panel. Empty state is a subtle off-screen pixel grid.
+
+---
 ## v0.15.1 — GUI/UX reliability (2026-06-13)
 
 Packaged release bundling the fixes below since v0.15.0: music/album-art widget
