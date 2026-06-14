@@ -6,6 +6,7 @@ Launches the custom frameless PyWebView window.
 
 import os
 import sys
+import threading
 import logging
 import webview
 from pathlib import Path
@@ -212,31 +213,39 @@ def main():
     # lifecycles are shared (keep-alive off) — e.g. the menu bar's 'Quit Divoom'.
     _start_shutdown_follower(window)
 
-    def on_closing():
+    # R52: stop the daemon EXACTLY ONCE. Both the `closing` event and the
+    # post-start block (and, indirectly, the shutdown follower) used to each send
+    # a shutdown, so one quit produced a "shut down → close → shut down" cascade
+    # in the logs and re-triggered the follower. The guard collapses it to one.
+    _shutdown_sent = threading.Event()
+
+    def _stop_daemon_once(reason: str) -> None:
+        if _shutdown_sent.is_set():
+            return
+        _shutdown_sent.set()
         try:
             from divoom_lib.lifecycle_config import (
                 get_keep_daemon_alive, should_stop_daemon_on_dashboard_quit)
             if should_stop_daemon_on_dashboard_quit(get_keep_daemon_alive()):
                 from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
-                logger.info("Dashboard closing; stopping daemon (shared lifecycle).")
+                logger.info(f"{reason}; stopping daemon (shared lifecycle).")
                 DaemonClient(DEFAULT_SOCKET_PATH, timeout=1.0).shutdown()
         except Exception as e:
-            logger.debug(f"daemon shutdown on close failed: {e}")
+            logger.debug(f"daemon shutdown skipped: {e}")
 
-    window.events.closing += on_closing
+    window.events.closing += lambda: _stop_daemon_once("Dashboard closing")
     webview.start()
 
     # webview.start() blocks until the window closes. On close, when lifecycles
     # are shared, stop the daemon too (which broadcasts → the menu bar follows).
-    try:
-        from divoom_lib.lifecycle_config import (
-            get_keep_daemon_alive, should_stop_daemon_on_dashboard_quit)
-        if should_stop_daemon_on_dashboard_quit(get_keep_daemon_alive()):
-            from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
-            logger.info("Dashboard closed; stopping daemon (shared lifecycle).")
-            DaemonClient(DEFAULT_SOCKET_PATH, timeout=1.0).shutdown()
-    except Exception as e:
-        logger.debug(f"daemon shutdown on dashboard close skipped: {e}")
+    _stop_daemon_once("Dashboard closed")
+
+    # R52: the GUI is a thin client — the daemon (a separate process) owns the
+    # BLE connection and has already been told to stop. pywebview/WebKit can leave
+    # the host process alive after the window is destroyed (an in-flight js_api
+    # call, a lingering Cocoa run loop), so force a clean exit rather than hang.
+    logger.info("Dashboard exited; terminating GUI host.")
+    os._exit(0)
 
 
 def _start_shutdown_follower(window) -> None:
@@ -262,8 +271,7 @@ def _start_shutdown_follower(window) -> None:
         except Exception as e:
             logger.debug(f"shutdown follower stopped: {e}")
 
-    import threading
-    threading.Thread(target=_run, daemon=True).start()
+    threading.Thread(target=_run, daemon=True, name="shutdown-follower").start()
 
 
 def _spawn_menubar_agent() -> None:

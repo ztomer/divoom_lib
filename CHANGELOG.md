@@ -5,6 +5,26 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R52: GUI exits cleanly (the long-open app-quit bug) (2026-06-14)
+
+The GUI didn't terminate cleanly on quit — the logs showed a "Daemon shut down →
+closing dashboard → stopping daemon → Daemon shut down" cascade, and an in-flight
+connect surfaced a stray "device is NOT connected" error seconds after the window
+was gone. Two causes:
+
+- **Redundant shutdowns.** The window `closing` event AND the post-`webview.start()`
+  block each sent `daemon.shutdown()`, and the shutdown follower re-fired on the
+  second one. Collapsed to a single `_stop_daemon_once()` guarded by a
+  `threading.Event`, so one quit = one shutdown, no cascade.
+- **Host process lingered.** pywebview/WebKit can keep the host alive after the
+  window is destroyed (a lingering Cocoa run loop / an in-flight js_api call — the
+  late connect). The GUI is a thin client (the daemon, a separate process, owns
+  the BLE link and has already been told to stop), so `main()` now `os._exit(0)`s
+  after the shutdown handshake instead of waiting on webview internals. Keep-alive
+  mode is unaffected (it only governs the daemon; the GUI window closing always
+  exits the GUI).
+
+---
 ## R52: sidebar layout + appbar dot + auto-sync space + hot-preview check (2026-06-14)
 
 - **Scan indicator pinned to the very bottom of the sidebar** (below the wall
