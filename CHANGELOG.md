@@ -5,6 +5,28 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R52: sidebar layout + appbar dot + auto-sync space + hot-preview check (2026-06-14)
+
+- **Scan indicator pinned to the very bottom of the sidebar** (below the wall
+  button), and its row height is always reserved (`hidden` toggles visibility,
+  not display) — so starting/stopping a scan no longer reflows the preview above.
+- **Connection dot moved out of the appbar** to an unobtrusive lower-right corner
+  dot (was crowding the brightness/volume row). Same `#global-status-dot` element
+  and heartbeat — repositioned `fixed`, so the degraded/active/connecting states
+  are still surfaced.
+- **Auto-Sync Gallery device list given room** — `max-height` 160px → 60vh and
+  row padding 13px → 9px, so all known devices fit without scrolling on the tall
+  Auto-Sync tab.
+- **Hot-channel preview vs. send: verified consistent.** Both the preview
+  (`hot_update_preview`) and the actual update (`HotUpdate.update`) derive the
+  file set from `fetch_hot_manifest(DEVICE_TYPE_BY_SIZE[active_size])` using the
+  same `_active_device_size()` — so the preview can't silently show a different
+  manifest than what's sent (the "always-16" class of bug). Each tile also
+  converges to the real decoded CDN file via `get_animated_preview`. Locked with
+  `tests/test_hot_preview_consistency.py`. (One inherent gap, not a bug: a file
+  that fails download/sha1 at send time is previewed but not delivered.)
+
+---
 ## R51: preview rendering fixes + sidebar de-nest (2026-06-14)
 
 - **Clock-face previews were clipped/misaligned.** `_clockFaceSVG` rendered

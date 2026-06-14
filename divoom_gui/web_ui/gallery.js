@@ -191,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
         candidates.forEach(c => {
             const row = document.createElement("div");
             row.className = "sync-device-row";
-            row.style.cssText = "display:flex; flex-wrap:nowrap; align-items:center; gap:8px; padding:13px 0;";
+            row.style.cssText = "display:flex; flex-wrap:nowrap; align-items:center; gap:8px; padding:9px 0;";
 
             const color = window.deviceColor(c.address);
             const accent = document.createElement("span");

@@ -408,17 +408,20 @@
 }
 .wall-button-glyph { flex: none; }
 
-/* R47: scan-in-progress indicator under the device dots. */
+/* R47/R52: scan-in-progress indicator, pinned at the very bottom of the sidebar.
+   The row height is ALWAYS reserved — `hidden` toggles visibility, not display —
+   so starting/stopping a scan never reflows the preview + chips above it. */
 .scan-indicator {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 7px;
+    min-height: 18px;
     font-size: 11px;
     color: var(--text-muted, rgba(255,255,255,0.6));
-    margin: 0 auto 8px auto;
+    margin: 0 auto;
 }
-.scan-indicator[hidden] { display: none; }
+.scan-indicator[hidden] { visibility: hidden; }
 .scan-indicator .spinner {
     width: 12px;
     height: 12px;

@@ -22,15 +22,21 @@
 
 /* Active device selector moved to sidebar (see sidebar.css .sidebar-device-select) */
 
+/* R52: moved out of the appbar to an unobtrusive lower-right corner dot. */
 #global-status-dot {
+    position: fixed;
+    bottom: 12px;
+    right: 14px;
+    z-index: 200;
     width: 10px;
     height: 10px;
     border-radius: 50%;
     transition: background 0.3s, box-shadow 0.3s;
     background-color: #6b7280;
     box-shadow: none;
-    display: inline-block;
     flex-shrink: 0;
+    -webkit-app-region: no-drag;
+    pointer-events: none;
 }
 /* These ID+class selectors (specificity 1,1,0 / 1,2,0) already out-rank the
    base `#global-status-dot` rule and the `.transport-dot.*` rules in

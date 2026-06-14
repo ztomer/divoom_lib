@@ -62,15 +62,6 @@
             <span id="appbar-volume-value">7/15</span>
         </div>
 
-        <!-- Active-device connection state — connecting / active / degraded /
-             dropped. Restored to the appbar so a mid-session drop or a DEGRADED
-             link is always visible (the per-device sidebar dots cover the
-             selector, but the connection_state heartbeat reports the ACTIVE
-             link's honest state here). Updated by connectDevice + the P6
-             refreshConnectionState heartbeat. -->
-        <span id="global-status-dot" class="transport-dot inactive"
-              title="Disconnected" role="img" aria-label="Connection status"></span>
-
         <!-- R32: Settings moved out of the sidebar into a round glass pill here,
              to the right of the brightness + volume bars. Opens the Settings tab. -->
         <button id="appbar-settings-btn" class="appbar-gear" data-tab="settings" title="Settings" aria-label="Open settings">
@@ -174,16 +165,17 @@
                 <span id="banner-device-name" style="display: none;">No Connected Screen</span>
                 <span id="banner-device-mac" style="display: none;">-</span>
             </div>
-            <!-- R47: scan-in-progress indicator, visible from the main UI (the
-                 Scan button lives in Settings, so a scan was otherwise silent). -->
-            <div id="scan-indicator" class="scan-indicator" hidden aria-live="polite">
-                <span class="spinner"></span> Scanning for screens…
-            </div>
             <!-- R48: named device chips live outside the glass panel, below it. -->
             <div id="device-dots" class="device-chips" role="tablist" aria-label="Switch device"></div>
             <!-- The Virtual Wall is a composite of screens, not a device — its own
                  distinct button sits in a row below the device dots. -->
             <div id="wall-button" class="wall-button-row" hidden></div>
+            <!-- R52: scan-in-progress indicator pinned at the very bottom. Its row
+                 height is always reserved (visibility toggles, not display) so
+                 starting/stopping a scan never reflows the preview above it. -->
+            <div id="scan-indicator" class="scan-indicator" hidden aria-live="polite">
+                <span class="spinner"></span> Scanning for screens…
+            </div>
             <!-- R32: the Settings nav button was removed from the sidebar — it
                  now lives as a gear pill in the appbar. The device panel above
                  is pinned to the bottom (margin-top:auto) so it occupies the
@@ -520,6 +512,14 @@
         </main>
     </div>
     
+    <!-- R52: active-link connection state (connecting / active / degraded /
+         dropped) as an unobtrusive dot in the lower-right corner. The
+         connection_state heartbeat reports the ACTIVE link's honest state here,
+         so a mid-session drop or DEGRADED link is always visible without
+         crowding the appbar. Updated by connectDevice + refreshConnectionState. -->
+    <span id="global-status-dot" class="transport-dot inactive"
+          title="Disconnected" role="img" aria-label="Connection status"></span>
+
     <!-- Notification Overlay -->
     <div id="toast" class="toast"></div>
     

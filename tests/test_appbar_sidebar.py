@@ -46,11 +46,12 @@ async def test_settings_moved_to_appbar_gear():
             )
             assert not result["sidebarSettings"], "Settings nav button should be removed from the sidebar (R32)"
             assert result["hasGear"], "appbar must have a Settings gear pill with data-tab='settings'"
-            # R33: the device-selector cluster stays pinned to the bottom. The
-            # Virtual Wall button is a distinct row below the dots, so it (or the
-            # dots when no wall is configured) is the sidebar's last element.
-            assert result["lastId"] in ("device-dots", "wall-button"), \
-                "device-selector cluster (dots + wall button) should be the bottom of the sidebar (R33)"
+            # R33/R52: the device-selector cluster stays pinned to the bottom.
+            # The scan indicator is now the lowest element (its space is always
+            # reserved so a scan doesn't reflow the preview); the wall button and
+            # device dots sit just above it.
+            assert result["lastId"] in ("scan-indicator", "device-dots", "wall-button"), \
+                "device-selector cluster (dots / wall button / scan indicator) should be the bottom of the sidebar (R33/R52)"
         finally:
             await browser.close()
 
