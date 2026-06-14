@@ -216,7 +216,7 @@ window.connectDevice = function(name, address) {
     // own accent color (CSS var --dot-pulse-color, amber fallback for the
     // global dot). Cleared by re-render on success or explicitly on failure.
     const deviceDot = document.querySelector(
-        `#device-dots .transport-dot[data-value="${(window.CSS && CSS.escape) ? CSS.escape(address) : address}"]`);
+        `#device-dots [data-value="${(window.CSS && CSS.escape) ? CSS.escape(address) : address}"]`);
     if (deviceDot) {
         deviceDot.classList.add("connecting");
         // Pulse in the device's accent color (CSS var, fallback amber).

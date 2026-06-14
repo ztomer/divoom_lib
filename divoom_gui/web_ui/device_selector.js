@@ -21,7 +21,7 @@ window.mergeDiscoveredDevices = function(fresh) {
 
 // R47: a device the daemon OWNS (active link or a background live-widget job)
 // is connected, so it doesn't advertise and a BLE scan never sees it. Without
-// this it shows as "connected" in the appbar but has no selector dot — you
+// this it shows as "connected" in the appbar but has no selector chip — you
 // can't switch to it or stop its widget. Pull the daemon's activity registry
 // and union those macs into the selector so an owned device is ALWAYS
 // selectable, tagged with what it's streaming.
@@ -33,7 +33,7 @@ window.refreshOwnedDevices = function() {
         try { act = JSON.parse(raw) || {}; } catch (e) { return; }
         let changed = false;
         Object.keys(act).forEach(mac => {
-            if (mac === "MatrixWall") return;   // the wall has its own dot
+            if (mac === "MatrixWall") return;   // the wall has its own button
             const info = act[mac] || {};
             const kind = info.kind || "";
             const state = info.state || "";   // G5: daemon-owned device health
@@ -65,7 +65,9 @@ window.refreshOwnedDevices = function() {
     }).catch(() => {});
 };
 
-// ── R32 §C3: per-device switch dots overlaid on the preview ───────────
+// ── R48: per-device switch chips — named, self-labeling, click to switch ──
+// Replaces the unlabeled colored dots (Rams R4: understandable without hover;
+// Rams R7: works at 4+ devices; Kare: affordance is obvious at a glance).
 window.renderDeviceDots = function() {
     const host = document.getElementById("device-dots");
     if (!host) return;
@@ -83,40 +85,60 @@ window.renderDeviceDots = function() {
     (window.DivoomState.registeredLanDevices || []).forEach(d => {
         if (d.ip) entries.push({ value: `LAN:${d.ip}`, name: `Wi-Fi: ${d.ip}` });
     });
-    // The Virtual Wall is NOT a device — it's a composite of screens. It used to
-    // sit here as an identical dot, which read as "just another screen". It now
-    // has its own distinct button in a row below (renderWallButton).
     host.innerHTML = "";
     entries.forEach(e => {
         const isActive = e.value === activeMac;
-        const dot = document.createElement("span");
-        // Recycle the connectivity-dot class so the look (size, glow, inactive
-        // dimming) stays identical; color comes from the per-device hue. The
-        // glow uses currentColor, so set both background and color.
-        dot.className = "transport-dot " + (isActive ? "active" : "inactive");
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "device-chip" + (isActive ? " chip-active" : "");
+        // R47: streaming = daemon owns it (live widget); degraded = link struggling.
+        if (e.streaming && !isActive) chip.classList.add("chip-streaming");
+        if (e.degraded) chip.classList.add("chip-degraded");
+        // data-value: R34 §2 — connectDevice pulses this element while connecting.
+        chip.dataset.value = e.value;
+        chip.title = e.degraded ? `${e.name} — ${e.kind} (reconnecting)`
+                   : e.streaming ? `${e.name} — ${e.kind}` : e.name;
+        chip.setAttribute("role", "tab");
+        chip.setAttribute("aria-selected", isActive ? "true" : "false");
+
+        // Color dot — 8 px, same hue as before; currentColor drives the animation.
         const color = window.deviceColor(e.value);
-        dot.style.background = color;
-        dot.style.color = color;
-        // R34 §2: lets connectDevice find this dot and pulse it while connecting.
-        dot.dataset.value = e.value;
-        // R47: a daemon-owned (streaming) device gets a ring so it reads as
-        // "busy but selectable" — click it to take it over / stop its widget.
-        if (e.streaming && !isActive) dot.classList.add("streaming");
-        if (e.degraded) dot.classList.add("degraded");
-        dot.title = e.degraded ? `${e.name} — ${e.kind} (reconnecting)`
-                  : e.streaming ? `${e.name} — ${e.kind}` : e.name;
-        dot.setAttribute("role", "tab");
-        dot.setAttribute("aria-selected", isActive ? "true" : "false");
-        dot.addEventListener("click", () => window.connectDevice(e.name, e.value));
-        host.appendChild(dot);
+        const dotEl = document.createElement("span");
+        dotEl.className = "device-chip-dot";
+        dotEl.style.background = color;
+        dotEl.style.color = color;
+
+        const nameEl = document.createElement("span");
+        nameEl.className = "device-chip-name";
+        nameEl.textContent = e.name;
+
+        chip.appendChild(dotEl);
+        chip.appendChild(nameEl);
+
+        // Right-aligned state badge — only when non-idle (streaming or degraded).
+        if (e.degraded) {
+            const st = document.createElement("span");
+            st.className = "device-chip-state";
+            st.textContent = "reconnecting";
+            chip.appendChild(st);
+        } else if (e.streaming) {
+            const st = document.createElement("span");
+            st.className = "device-chip-state";
+            st.textContent = e.kind;
+            chip.appendChild(st);
+        }
+
+        chip.addEventListener("click", () => window.connectDevice(e.name, e.value));
+        host.appendChild(chip);
     });
     if (window.renderWallButton) window.renderWallButton();
 };
 
-// The Virtual Wall gets a distinct affordance, not a device dot: it drives many
-// screens as one, so it reads as a labeled button with a 2x2 grid glyph, in its
-// own row below the dots. Shown only when a wall is configured (Rams: as little
-// as possible — no empty control).
+// The Virtual Wall gets a distinct chip — same visual language as device chips
+// (named, self-labeling) but with a dashed border and a "joined panels" glyph
+// (two landscape rects sharing a surface) that is deliberately distinct from the
+// 2×2 filled-rects used by the Pixel Art nav tab. Count folded into the label.
+// Shown only when a wall is configured (Rams: no empty control).
 window.renderWallButton = function() {
     const host = document.getElementById("wall-button");
     if (!host) return;
@@ -134,12 +156,15 @@ window.renderWallButton = function() {
     btn.setAttribute("role", "tab");
     btn.setAttribute("aria-selected", isActive ? "true" : "false");
     btn.title = `Virtual Wall — drive ${n} screen${n === 1 ? "" : "s"} as one display`;
+    // Glyph: a wide bounding rect split by a vertical line = "multi-display span".
+    // Distinct from the 2×2 filled squares of the Pixel Art tab.
     btn.innerHTML =
-        '<svg class="wall-button-glyph" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">' +
-        '<rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>' +
-        '<rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>' +
-        '<span class="wall-button-label">Virtual Wall</span>' +
-        `<span class="wall-button-count">${n}</span>`;
+        '<svg class="wall-button-glyph" viewBox="0 0 16 11" width="14" height="10"' +
+        ' fill="none" stroke="currentColor" stroke-width="1.5"' +
+        ' stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="1" y="1" width="14" height="9" rx="1"/>' +
+        '<line x1="8" y1="1" x2="8" y2="10"/></svg>' +
+        `<span class="wall-button-label">Wall (${n})</span>`;
     btn.addEventListener("click", () => window.connectDevice("Virtual Wall", "MatrixWall"));
     host.appendChild(btn);
 };

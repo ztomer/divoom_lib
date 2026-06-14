@@ -89,7 +89,7 @@ async def test_connect_shows_connecting_then_connected():
             # Immediately: feedback that a connect is in flight.
             mid = await page.evaluate("""() => ({
                 toast: document.getElementById('toast').textContent,
-                connecting: !!document.querySelector('#device-dots .transport-dot.connecting')
+                connecting: !!document.querySelector('#device-dots .device-chip.connecting')
                           || (document.getElementById('global-status-dot')||{}).className
                              ?.includes('connecting')
             })""")
@@ -100,7 +100,7 @@ async def test_connect_shows_connecting_then_connected():
                 "() => window.DivoomState.appConnected === true", timeout=4000)
             done = await page.evaluate("""() => ({
                 toast: document.getElementById('toast').textContent,
-                active: !!document.querySelector('#device-dots .transport-dot.active'),
+                active: !!document.querySelector('#device-dots .device-chip.chip-active'),
                 banner: document.getElementById('banner-device-name').textContent
             })""")
             assert "Connected to Ditoo" in done["toast"]
@@ -182,20 +182,22 @@ async def test_streaming_and_degraded_devices_are_visibly_distinct():
                     address:'AA', name:'Ditoo', daemonOwned:true,
                     activityKind:'music', activityState:'connected'}];
                 window.renderDeviceDots();
-                const d = document.querySelector('#device-dots .transport-dot');
-                return { streaming: d.classList.contains('streaming'), title: d.title };
+                const d = document.querySelector('#device-dots .device-chip');
+                return { streaming: d.classList.contains('chip-streaming'),
+                         state: d.querySelector('.device-chip-state')?.textContent || '' };
             }""")
             assert streaming["streaming"] is True
-            assert "music" in streaming["title"]
+            assert "music" in streaming["state"]
 
             degraded = await page.evaluate("""() => {
                 window.DivoomState.discoveredDevices[0].activityState = 'degraded';
                 window.renderDeviceDots();
-                const d = document.querySelector('#device-dots .transport-dot');
-                return { degraded: d.classList.contains('degraded'), title: d.title };
+                const d = document.querySelector('#device-dots .device-chip');
+                return { degraded: d.classList.contains('chip-degraded'),
+                         state: d.querySelector('.device-chip-state')?.textContent || '' };
             }""")
             assert degraded["degraded"] is True
-            assert "reconnecting" in degraded["title"]
+            assert "reconnecting" in degraded["state"]
         finally:
             await browser.close()
 
@@ -303,7 +305,7 @@ async def test_wall_button_communicates_screen_count():
                          hasGlyph: !!host.querySelector('svg') };
             }""")
             assert shown["hidden"] is False
-            assert "Virtual Wall" in shown["text"] and "3" in shown["text"]
+            assert "Wall" in shown["text"] and "3" in shown["text"]
             assert shown["hasGlyph"] is True
         finally:
             await browser.close()
