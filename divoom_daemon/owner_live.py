@@ -278,11 +278,37 @@ class OwnerLiveMixin:
         if not getattr(self, "_live_tasks", None):
             return
         macs = {m for (m, _k) in self._live_tasks}
-        for key, task in list(self._live_tasks.items()):
-            self._loop.call_soon_threadsafe(task.cancel)
-        self._live_tasks.clear()
-        for mac in list(getattr(self, "_live_devices", {})):
-            self._release_live_device_if_idle(mac)
+
+        # R53.20: cancel AND AWAIT every poller, then disconnect the cached
+        # background devices — ALL on the loop thread in one shot. The old
+        # fire-and-forget `call_soon_threadsafe(task.cancel)` let a dying poller
+        # resurrect a device after release (the same bug R53.4 fixed for
+        # live_job_stop), and the fire-and-forget device disconnect could be
+        # killed by device_owner.stop()'s loop teardown before it ran (leaked
+        # OS-level connection). Awaiting here closes both windows.
+        async def _stop_all_on_loop():
+            tasks = list(self._live_tasks.values())
+            self._live_tasks.clear()
+            for t in tasks:
+                t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            devs = list(self._live_devices.values())
+            self._live_devices.clear()
+            for d in devs:
+                try:
+                    await d.disconnect()
+                except Exception:
+                    pass
+
+        if self._loop is not None:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    _stop_all_on_loop(), self._loop).result(timeout=10)
+            except Exception as e:
+                logger.warning("stop_all_live_jobs await-cancel failed: %s", e)
+                self._live_tasks.clear()
+        else:
+            self._live_tasks.clear()
         # G1: the screens are no longer streaming — mark idle so the menubar /
         # selector stop showing them as live (the active one stays selectable).
         for mac in macs:

@@ -166,21 +166,39 @@ def test_prune_keeps_streaming_mac():
 
 
 def test_stop_all_live_jobs_idles_activity():
-    """G1: stopping all jobs marks the screens idle (not still 'streaming')."""
+    """G1: stopping all jobs marks the screens idle (not still 'streaming').
+    R53.20: stop_all now cancel+AWAITs on the loop, so this needs a real loop+task."""
     o = _Owner()
-
-    class _Task:
-        def cancel(self): pass
-
-    class _Loop:
-        def call_soon_threadsafe(self, fn, *a): pass
-
-    o._loop = _Loop()
+    o._loop = _real_loop()
     o._live_devices = {}
-    o._live_tasks = {("AA", "sysmon"): _Task()}
+    task = _live_task(o._loop)
+    o._live_tasks = {("AA", "sysmon"): task}
     o.set_device_activity({"mac": "AA", "kind": "sysmon"})
     o.stop_all_live_jobs()
+    assert task.done() is True                       # actually cancelled+awaited
     assert o.get_device_activity({})["activity"]["AA"]["kind"] == "idle"
+    assert o._live_tasks == {}
+
+
+def test_stop_all_live_jobs_disconnects_cached_devices():
+    """R53.20: stop_all must AWAIT-disconnect cached background devices (not
+    fire-and-forget), so device_owner.stop()'s loop teardown can't leak them."""
+    o = _Owner()
+    o._loop = _real_loop()
+
+    class _Dev:
+        def __init__(self):
+            self.disconnected = False
+        async def disconnect(self):
+            self.disconnected = True
+
+    dev = _Dev()
+    o._live_devices = {"AA": dev}
+    o._live_tasks = {("AA", "sysmon"): _live_task(o._loop)}
+    o.set_device_activity({"mac": "AA", "kind": "sysmon"})
+    o.stop_all_live_jobs()
+    assert dev.disconnected is True                   # awaited, not fire-and-forget
+    assert o._live_devices == {}
 
 
 def test_live_jobs_persist_and_rehydrate(tmp_path, monkeypatch):

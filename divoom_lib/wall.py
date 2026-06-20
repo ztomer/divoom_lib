@@ -283,7 +283,14 @@ class DivoomWall:
                         if self.is_free_form:
                             cropped_frame = cropped_frame.resize((size, size), Image.NEAREST)
                         frames.append(cropped_frame)
-                    
+
+                    if not frames:
+                        # A truncated/corrupt GIF can report is_animated yet yield zero
+                        # frames — frames[0] would IndexError and abort the WHOLE wall
+                        # update (this loop isn't per-slot isolated). Skip this slot.
+                        self.logger.warning("wall slot %s: animated source yielded 0 frames; skipping",
+                                            getattr(divoom, "mac", "?"))
+                        continue
                     frames[0].save(
                         cached_file_path,
                         save_all=True,
