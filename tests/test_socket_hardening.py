@@ -243,3 +243,42 @@ def test_normal_request_roundtrip():
         c = DaemonClient(srv.path, timeout=2.0)
         r = c.send_command("device_status")
         assert r["success"] is True and r["echo"] == "device_status"
+
+
+# ── broadcast() must not freeze on a passive/wedged subscriber (R53.22) ──────
+
+def test_broadcast_drops_blocking_subscriber_keeps_healthy():
+    """A subscriber whose recv window is full makes sendall raise socket.timeout
+    (because the subscriber socket now has a bounded timeout, not None) — broadcast
+    must drop it and keep delivering to healthy subscribers, never blocking."""
+    from divoom_daemon.socket_server import SocketServer, SUBSCRIBER_IO_TIMEOUT
+    assert 0 < SUBSCRIBER_IO_TIMEOUT < 60   # bounded, not None
+
+    srv = SocketServer(
+        socket_path=_short_sock(),
+        command_handler=lambda c, a: {"success": True},
+        status_event_factory=lambda: {"type": "status"},
+    )
+
+    sent = {"good": 0}
+
+    class _Good:
+        def sendall(self, data):
+            sent["good"] += 1
+        def close(self):
+            pass
+
+    class _Wedged:
+        closed = False
+        def sendall(self, data):
+            raise socket.timeout("send buffer full")   # OSError subclass
+        def close(self):
+            self.closed = True
+
+    good, bad = _Good(), _Wedged()
+    srv._subscribers = [good, bad]
+    srv.broadcast({"type": "event"})                    # must return promptly
+
+    assert good in srv._subscribers                     # healthy kept
+    assert bad not in srv._subscribers                  # wedged dropped
+    assert sent["good"] == 1 and bad.closed is True

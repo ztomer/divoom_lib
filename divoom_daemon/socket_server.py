@@ -25,6 +25,9 @@ DEFAULT_MAX_MESSAGE_BYTES = 16 * 1024 * 1024   # 16 MiB
 DEFAULT_READ_DEADLINE = 30.0                   # total seconds to read ONE request
 DEFAULT_MAX_CONNECTIONS = 32                   # concurrent handler threads
 DEFAULT_MAX_SUBSCRIBERS = 16                   # concurrent event subscribers
+SUBSCRIBER_IO_TIMEOUT = 5.0                    # bounded send/recv on a subscriber
+                                               # socket — a passive (non-draining)
+                                               # subscriber must not block broadcast()
 
 
 class _RequestError(Exception):
@@ -181,12 +184,21 @@ class SocketServer:
             logger.warning("subscriber limit reached; rejecting subscribe")
             self._reply_safe(conn, {"success": False, "error": "subscriber limit reached"})
             return
-        conn.settimeout(None)
+        # Bounded (not None): broadcast() does sendall() on this socket while
+        # holding _sub_lock. A passive subscriber whose recv window fills would
+        # otherwise block that sendall FOREVER — freezing the whole event fan-out
+        # and notification routing. With a timeout, a wedged sendall raises
+        # socket.timeout (OSError) → broadcast drops it as dead. Here, recv
+        # timeouts just mean "idle", so we loop rather than disconnect.
+        conn.settimeout(SUBSCRIBER_IO_TIMEOUT)
         try:
             conn.sendall(encode_message(self._status_event_factory()))
             while self._running:
-                if not conn.recv(4096):
-                    break
+                try:
+                    if not conn.recv(4096):
+                        break                  # b"" → peer closed
+                except socket.timeout:
+                    continue                   # idle but alive
         except OSError:
             pass
         finally:

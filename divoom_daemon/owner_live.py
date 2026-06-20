@@ -244,7 +244,13 @@ class OwnerLiveMixin:
                     await dev.disconnect()
                 except Exception:
                     pass
-            asyncio.run_coroutine_threadsafe(_disc(), self._loop)
+            # AWAIT it (bounded) — fire-and-forget let device_owner.stop()'s loop
+            # teardown kill the disconnect before it ran, leaking the OS-level link
+            # (the same window R53.20 closed for stop_all_live_jobs).
+            try:
+                asyncio.run_coroutine_threadsafe(_disc(), self._loop).result(timeout=10)
+            except Exception as e:
+                logger.debug("release-device disconnect failed/timed out for %s: %s", mac, e)
 
     def live_jobs_stop_for(self, args: dict) -> dict:
         """Stop ALL live jobs for a device (default: the active device, ``self.mac``).
