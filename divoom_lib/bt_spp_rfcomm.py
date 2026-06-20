@@ -31,6 +31,11 @@ class BtSppNotification:
 
 
 class _SppRfcommMixin:
+    # Upper bound on a single iOS-LE frame length decoded from bytes 4-5. Real
+    # device notifications are tiny (acks, page lists); anything beyond this is a
+    # corrupt length field, not a real frame — used to resync the RX parser.
+    _MAX_IOS_LE_FRAME = 8192
+
     def _start_runloop(self) -> None:
         if self._runloop_thread is not None and self._runloop_thread.is_alive():
             return
@@ -156,6 +161,13 @@ class _SppRfcommMixin:
         ):
             length_field = int.from_bytes(self._rx_buf[4:6], "little")
             frame_len = length_field + 7
+            # A corrupt length (line noise in bytes 4-5) would otherwise make us
+            # wait FOREVER for bytes that never arrive — stalling all RX behind it.
+            # Bound it: an impossibly long frame means the "header" is bogus, so
+            # resync by dropping one byte (same recovery as a parse failure).
+            if frame_len > self._MAX_IOS_LE_FRAME:
+                del self._rx_buf[0]
+                continue
             if len(self._rx_buf) < frame_len:
                 break
             parsed = parse_ios_le_notification(bytes(self._rx_buf[:frame_len]))

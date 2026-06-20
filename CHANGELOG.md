@@ -5,6 +5,23 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 13: SPP send retries + corrupt-length parser resync (2026-06-20)
+
+Two more SPP transport robustness fixes (`bt_spp_transport.py` / `bt_spp_rfcomm.py`).
+
+- **`send_payload` now honours `max_retries`** (was accepted but ignored — one
+  transient write failure failed the whole op). Retries with a short escalating
+  backoff and bails early once disconnected (no point retrying a dead link).
+- **Corrupt iOS-LE length can no longer stall RX.** `_on_data` trusted the length
+  field in bytes 4-5; a corrupt value made it wait forever for bytes that never
+  arrive, wedging all inbound parsing behind it. Now bounded by `_MAX_IOS_LE_FRAME`
+  (8192) — an over-long "frame" is treated as a bad header and RESYNCS (drop a byte),
+  same recovery as a parse failure. Verified a real frame after a corrupt prefix is
+  still delivered.
+
+Tests: `test_spp_robustness.py`. Full suite green (1549 passed).
+
+---
 ## R53 round 12: SPP death-aware liveness + dead-code purge + split (2026-06-20)
 
 Medium-tier SPP transport hardening (`bt_spp_transport.py`).

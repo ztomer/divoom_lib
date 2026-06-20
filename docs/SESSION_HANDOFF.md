@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 13 — SPP SEND RETRIES + CORRUPT-LENGTH PARSER RESYNC SHIPPED (2026-06-20).**
+  `send_payload` now honours `max_retries` (bounded backoff, bails on a dead link) — was
+  accepted-but-ignored. `_on_data` bounds the iOS-LE frame length (`_MAX_IOS_LE_FRAME=8192`)
+  so a corrupt length RESYNCS (drop a byte) instead of stalling RX forever. Tests:
+  `test_spp_robustness.py`. Full suite green (1549 passed). SPP Medium tier essentially
+  done; only low-value SPP item left = no preflight/FailureReason for SPP connect. Next:
+  the remaining Low deferred items (discovery scan stop-on-first-match, registry-evict
+  swallow, `_connect_locks` reset on loop teardown, exclusive deadline re-arm-on-completion,
+  LAN per-request session reuse).
+
 - **R53 round 12 — SPP DEATH-AWARE LIVENESS + DEAD-CODE PURGE + SPLIT SHIPPED (2026-06-20).**
   Medium-tier SPP hardening. `_serial_read_loop` could die silently leaving
   `is_connected==True` forever; added an honest `is_alive` (parity with BLE, requires

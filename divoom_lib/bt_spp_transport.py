@@ -309,12 +309,24 @@ class BTSppTransport(_SppRfcommMixin, DeviceTransport):
         return await self.send_payload(payload_bytes)
 
     async def send_payload(self, payload_bytes: list, max_retries: int = 3, **kwargs) -> bool:
-        try:
-            await self.send(payload_bytes, framing=self.FRAMING_BASIC)
-            return True
-        except Exception as e:
-            self.logger.error(f"SPP send_payload error: {e}")
-            return False
+        # max_retries was accepted but ignored — a single transient write failure
+        # (busy channel, momentary EAGAIN) failed the whole op. Retry with a short
+        # backoff; bail early once disconnected (no point retrying a dead link).
+        attempts = max(1, int(max_retries))
+        for attempt in range(1, attempts + 1):
+            try:
+                await self.send(payload_bytes, framing=self.FRAMING_BASIC)
+                return True
+            except Exception as e:
+                if attempt >= attempts or not self.is_connected:
+                    self.logger.error(
+                        "SPP send_payload failed after %d attempt(s): %s", attempt, e)
+                    return False
+                self.logger.warning(
+                    "SPP send_payload attempt %d/%d failed: %s; retrying",
+                    attempt, attempts, e)
+                await asyncio.sleep(0.1 * attempt)
+        return False
 
     async def send_command_and_wait_for_response(self, command: int | str, args: list | None = None, timeout: float = 10.0) -> bytes | None:
         command_id = models.COMMANDS.get(command, command) if isinstance(command, str) else command

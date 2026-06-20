@@ -156,10 +156,14 @@ where a careless change can break working pushes — they deserve isolated round
   backend (`_start_runloop`/`_runloop_main`/`_discover_rfcomm_channel`/`_open_blocking`/
   `_on_data`) + `BtSppNotification` moved to `bt_spp_rfcomm.py` (`_SppRfcommMixin`);
   `bt_spp_transport.py` 500→363 LOC. Dead `spp_connection.read_spp_notifications_loop`
-  / `disconnect_spp` deleted. Tests: `test_spp_liveness.py`. STILL OPEN: `max_retries`
-  accepted but ignored; no preflight / no `FailureReason` classification; a corrupt
-  iOS-LE length field stalls the parser. (SPP can't be HW-validated with the current
-  all-BLE fleet — covered by unit tests.)
+  / `disconnect_spp` deleted. Tests: `test_spp_liveness.py`. **R53.13** then closed two
+  more: `send_payload` now honours `max_retries` (bounded backoff, bails on a dead
+  link) — was accepted-but-ignored; and `_on_data` bounds the iOS-LE frame length
+  (`_MAX_IOS_LE_FRAME=8192`) so a corrupt length field RESYNCS (drops a byte) instead
+  of stalling all RX forever waiting for bytes that never arrive
+  (`test_spp_robustness.py`). STILL OPEN (low value): no preflight / no `FailureReason`
+  classification for SPP connect. (SPP can't be HW-validated with the current all-BLE
+  fleet — covered by unit tests.)
 - **Discovery scans are unbounded/unstoppable** (`utils/discovery.py`): fixed 10 s
   `BleakScanner.discover` with no early-exit on match and no `try/finally` stop on
   cancellation. Fix: detection-callback + stop-on-first-match + guaranteed stop.
