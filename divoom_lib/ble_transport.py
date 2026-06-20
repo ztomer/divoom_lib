@@ -172,6 +172,13 @@ class BLETransport(BleNotifyMixin, DeviceTransport):
             from . import ble_registry
             ble_registry.register(self.mac, self)
 
+        # A freshly-(re)established OS-level link is NOT broken. Clear any stale
+        # drop flag from a prior _on_os_disconnect NOW, so is_alive reports the
+        # truth immediately after a reconnect — without waiting for the next
+        # successful send to clear it (else the link reads DEGRADED post-reconnect
+        # and live jobs treat it as dead → needless rebuild churn).
+        self._connection_likely_broken = False
+
         if self.NOTIFY_CHARACTERISTIC_UUID:
             if self._notifications_started:
                 self.logger.info(

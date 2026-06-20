@@ -125,3 +125,32 @@ def test_teardown_swallows_old_transport_error(monkeypatch):
     bad.disconnect.side_effect = RuntimeError("boom")
     conn._active_transport = bad
     _run(conn._teardown_outgoing_transport())   # must not raise
+
+
+def test_reconnect_clears_stale_os_drop_flag(monkeypatch):
+    """R53.17: after an OS drop sets _connection_likely_broken, a successful
+    RECONNECT must clear it so is_alive reports the truth immediately. On reconnect
+    `use_ios_le_protocol` is already known, so autoprobe is a no-op and never sends
+    — nothing else would clear the flag until the next successful payload."""
+    from unittest.mock import AsyncMock
+    t = _transport(monkeypatch)
+    # no real 1s settle wait
+    monkeypatch.setattr("divoom_lib.ble_transport.asyncio.sleep", AsyncMock())
+
+    state = {"connected": False}
+
+    async def _ok_connect():
+        state["connected"] = True
+
+    t.client.connect = _ok_connect
+    type(t.client).is_connected = property(lambda s: state["connected"])
+    t.client.start_notify = AsyncMock()
+    t.use_ios_le_protocol = False        # already known → autoprobe no-op (reconnect)
+
+    t._on_os_disconnect(None)            # simulate the OS drop
+    assert t._connection_likely_broken is True
+    assert t.is_alive is False           # honestly degraded while down
+
+    _run(t.connect())                    # reconnect
+    assert t._connection_likely_broken is False
+    assert t.is_alive is True            # truth restored without waiting for a send

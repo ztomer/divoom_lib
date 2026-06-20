@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 17 — RECONNECT CLEARS STALE OS-DROP FLAG SHIPPED (2026-06-20).** Fresh
+  adversarial re-read found a bug the original review missed: after an OS drop,
+  `_on_os_disconnect` sets `_connection_likely_broken=True`, but `connect()` never
+  cleared it on reconnect — and autoprobe is a no-op on reconnect (framing already
+  known → sends nothing), so `is_alive` lied `False` from reconnect until the next
+  successful send (false DEGRADED dot; live-jobs/wall treat the live link as dead →
+  rebuild churn). Fix: `connect()` clears the flag on a successful (re)connect. Test
+  with teeth (`test_reconnect_clears_stale_os_drop_flag`). Full suite green (1554);
+  HW-checked. This was a genuine NEW find — the BLE subsystem is now hardened beyond
+  the original review's scope. Only documented item left: SPP connect preflight (niche,
+  untestable with the all-BLE fleet).
+
 - **R53 round 16 — discover_device EARLY-EXIT SHIPPED (2026-06-20).** `discover_device`
   (live via `monthly_best_daemon` reconnect) waited the full 10s/3s `BleakScanner.discover`
   window even after the target appeared; rewrote it on the detection-callback + early-exit

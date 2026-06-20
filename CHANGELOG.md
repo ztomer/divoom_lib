@@ -5,6 +5,25 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 17: reconnect clears the stale OS-drop flag (2026-06-20)
+
+Found in a fresh adversarial re-read (beyond the original four-lens review). After
+an OS-level BLE drop, `_on_os_disconnect` sets `_connection_likely_broken = True`
+(so `is_alive` honestly reports the link down). But `connect()` never cleared it on
+a successful RECONNECT — and on a reconnect `autoprobe_protocol` is a no-op (the
+framing is already known, so it sends nothing), so NOTHING cleared the flag until
+the *next* successful payload send. In the window between reconnect and that send,
+`is_alive` lied `False`: connection_state read DEGRADED, and live jobs / wall
+self-heal (which consult `is_alive` before pushing) treated the freshly-reconnected
+link as dead → needless rebuild churn.
+
+`connect()` now clears `_connection_likely_broken` on a successful (re)connect — a
+freshly-established OS link is by definition not broken. Verified the new test
+fails without the fix. Test:
+`test_ble_timeout_hardening.test_reconnect_clears_stale_os_drop_flag`. Full suite
+green (1554 passed); HW-checked the connection_state stays honest across re-ensures.
+
+---
 ## R53 round 16: discover_device early-exit on first match (2026-06-20)
 
 `discover_device` (still live via the `monthly_best_daemon` reconnect path) used
