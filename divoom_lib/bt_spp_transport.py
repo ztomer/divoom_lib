@@ -167,7 +167,12 @@ class BTSppTransport(DeviceTransport):
 
         self._start_runloop()
         await asyncio.to_thread(self._open_blocking)
-        if not self._open_event.wait(timeout=self.OPEN_TIMEOUT_S):
+        # R53: the RFCOMM-open completion is a threading.Event set from the
+        # IOBluetooth delegate thread. Waiting on it directly froze the WHOLE
+        # asyncio loop (daemon dispatch, other devices, GUI bridge) for up to
+        # OPEN_TIMEOUT_S on every SPP connect — wait off-loop instead.
+        opened = await asyncio.to_thread(self._open_event.wait, self.OPEN_TIMEOUT_S)
+        if not opened:
             raise BtSppTransportError(
                 f"RFCOMM open to {self.mac_address} channel {self.channel_id} timed out. "
                 "Known macOS Tahoe SPP reconnection bug."

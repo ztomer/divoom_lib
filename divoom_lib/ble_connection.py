@@ -158,7 +158,11 @@ async def ensure_connected(
     works (a cheap round-trip); raising or returning False marks the attempt
     failed. ``sleep`` is injectable so tests don't actually wait.
     """
-    if getattr(device, "is_connected", False):
+    # R53: trust the HONEST liveness signal, not the cached is_connected. After an
+    # OS-level drop CoreBluetooth's is_connected lags True, but is_alive reflects
+    # the disconnect-callback flag — so this fast-path no longer hands back a dead
+    # handle. is_alive falls back to is_connected on transports that don't track it.
+    if getattr(device, "is_alive", getattr(device, "is_connected", False)):
         return ConnectResult(True, ConnectionState.CONNECTED)
 
     last = FailureReason.UNKNOWN

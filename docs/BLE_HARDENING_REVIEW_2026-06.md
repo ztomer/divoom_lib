@@ -43,6 +43,20 @@ Lenses: (1) connection lifecycle/reconnection, (2) async concurrency/cancellatio
 
 ---
 
+## SHIPPED in R53 round 2 (2026-06-14)
+
+- **`ensure_connected` fast-path now trusts `is_alive`, not cached `is_connected`**
+  (`ble_connection.py:161`). After an OS drop CoreBluetooth's `is_connected` lags
+  True; the fast-path early-returned success on that dead handle. Now it checks
+  `is_alive` (the disconnect-callback-driven signal, falling back to
+  `is_connected` on transports that don't track it). Test in `test_ble_connection`.
+- **SPP RFCOMM-open no longer freezes the asyncio loop** (`bt_spp_transport.py`).
+  The open-completion `threading.Event.wait()` ran directly on the loop, freezing
+  daemon dispatch / other devices / the GUI bridge for up to 8 s on every SPP
+  connect. Now awaited off-loop via `asyncio.to_thread`.
+
+---
+
 ## DEFERRED — real, but need their own tested surgery (do NOT rush)
 
 Ranked by value. Several touch the 0x8B animation handshake or task lifecycle
@@ -69,12 +83,6 @@ where a careless change can break working pushes — they deserve isolated round
   because nothing else runs via `_run_on_loop` — there is no guard preventing a
   future addition). Fix: per-operation response correlation (a `Future` keyed by
   command id) instead of one shared queue + scalar.
-- **`ensure_connected` fast-path trusts cached `is_connected`, not `is_alive`.**
-  It early-returns success on a handle whose link is dead but whose CoreBluetooth
-  bool still reads True (the lag the codebase documents). The OS-disconnect
-  callback only flips `_connection_likely_broken`, which the fast-path never
-  consults. Fix: check `is_alive` in the fast-path / `_ensure_device_async`.
-
 ### Medium
 - **Live-job stop is fire-and-forget.** `live_job_stop` schedules `task.cancel()`
   and returns "stopped" without awaiting death → a stopped poller can push one

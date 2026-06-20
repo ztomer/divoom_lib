@@ -62,6 +62,16 @@ def test_already_connected_is_a_noop():
     assert res.ok and dev.connect_calls == 1  # ensure_connected didn't reconnect
 
 
+def test_fast_path_uses_is_alive_not_lying_is_connected():
+    """R53: a device whose link dropped but whose cached is_connected still reads
+    True (the CoreBluetooth lag) must NOT short-circuit the fast-path — the honest
+    is_alive signal forces a real reconnect instead of handing back a dead handle."""
+    dev = FakeBleDevice(lie_connected=True)   # is_connected=True, is_alive=False
+    assert dev.is_connected is True and dev.is_alive is False
+    res = _run(ensure_connected(dev, sleep=_nosleep))
+    assert res.ok and dev.connect_calls == 1  # it actually reconnected, not a no-op
+
+
 def test_retries_then_succeeds():
     # fail twice (not-found), then succeed
     dev = FakeBleDevice(connect_results=[
