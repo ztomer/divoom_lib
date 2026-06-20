@@ -5,6 +5,19 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 16: discover_device early-exit on first match (2026-06-20)
+
+`discover_device` (still live via the `monthly_best_daemon` reconnect path) used
+`BleakScanner.discover(timeout=10.0)` for the name path / `3.0` for the address
+path, ALWAYS waiting the full window even after the target appeared. Rewrote it on
+the same detection-callback + early-exit + guaranteed-`stop()` pattern as
+`discover_all_divoom_devices` (R53.6): it now returns the instant the first
+name/address match is seen. Scan windows are module constants (`NAME_SCAN_TIMEOUT`,
+`ADDR_SCAN_TIMEOUT`) so callers/tests can tune them. This empties the BLE review's
+"discovery scans unbounded" finding. Tests: `test_discovery.py` (callback-based).
+Full suite green (1553 passed).
+
+---
 ## R53 round 15: exclusive deadline re-arms on completion (2026-06-20)
 
 The command queue's exclusive-session auto-release (G3 — frees a dead client's

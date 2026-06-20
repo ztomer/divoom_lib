@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 16 — discover_device EARLY-EXIT SHIPPED (2026-06-20).** `discover_device`
+  (live via `monthly_best_daemon` reconnect) waited the full 10s/3s `BleakScanner.discover`
+  window even after the target appeared; rewrote it on the detection-callback + early-exit
+  + guaranteed-stop pattern (same as `discover_all_divoom_devices` R53.6). Returns on first
+  name/address match. Scan windows are now module constants (`NAME_SCAN_TIMEOUT`/`ADDR_SCAN_TIMEOUT`).
+  Empties the "discovery scans unbounded" review finding. Full suite green (1553 passed).
+  **BLE review High+Medium fully done; Low down to ONE niche item:** SPP connect
+  preflight/FailureReason (untestable with the all-BLE fleet). The deferred list is
+  effectively exhausted — the BLE subsystem is as hardened as this review identified.
+
 - **R53 round 15 — EXCLUSIVE DEADLINE RE-ARMS ON COMPLETION SHIPPED (2026-06-20).**
   The command-queue exclusive auto-release re-armed its deadline only on dequeue; a
   long-running exclusive item (animation/custom-art push) or a gap before the next

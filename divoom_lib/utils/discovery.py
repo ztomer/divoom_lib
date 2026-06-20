@@ -31,47 +31,67 @@ def is_divoom_name(name: str | None) -> bool:
     return any(kw in lowered for kw in DIVOOM_NAME_KEYWORDS)
 
 
+# discover_device scan windows (module-level so callers/tests can tune them).
+NAME_SCAN_TIMEOUT = 10.0
+ADDR_SCAN_TIMEOUT = 3.0
+
+
+async def _find_first(match, timeout: float):
+    """Scan with a live detection callback, returning the FIRST device for which
+    ``match(device)`` is true, or None at ``timeout``. Early-exits the instant a
+    match is seen (vs ``BleakScanner.discover`` which always waits the full window),
+    with a guaranteed ``scanner.stop()`` in ``finally``."""
+    found: dict = {"dev": None}
+    done = asyncio.Event()
+
+    def _on_detect(device, _adv):
+        if found["dev"] is None and match(device):
+            found["dev"] = device
+            done.set()
+
+    scanner = BleakScanner(detection_callback=_on_detect)
+    try:
+        await asyncio.wait_for(scanner.start(), timeout=10.0)
+        try:
+            await asyncio.wait_for(done.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            pass
+    finally:
+        try:
+            await asyncio.wait_for(scanner.stop(), timeout=5.0)
+        except (asyncio.TimeoutError, BleakError, Exception) as e:
+            logger.warning("discover_device scanner stop failed: %s", e)
+    return found["dev"]
+
+
 async def discover_device(name_substring: str | None = None, address: str | None = None) -> tuple[BleakClient | str | None, str | None]:
     """
-    Discovers a BLE device by name substring or address.
-    Returns a tuple of (ble_device, device_id).
+    Discovers a BLE device by name substring or address. Early-exits on the first
+    match. Returns a tuple of (ble_device, device_id).
     """
-    ble_device = None
-    device_id = None
-
     if not address:
-        logger.info(f"Scanning for Bluetooth devices searching for name containing '{name_substring}' (timeout=10.0s)...")
-        devices = await BleakScanner.discover(timeout=10.0)
-        found = None
-        for d in devices:
-            if d.name and name_substring and name_substring.lower() in d.name.lower():
-                found = d
-                break
-        if not found:
-            logger.error(f"No Bluetooth device found with name containing '{name_substring}'.")
+        logger.info("Scanning for a device named like '%s' (early-exit, <=%.0fs)...",
+                    name_substring, NAME_SCAN_TIMEOUT)
+        ble_device = await _find_first(
+            lambda d: bool(d.name and name_substring and name_substring.lower() in d.name.lower()),
+            timeout=NAME_SCAN_TIMEOUT)
+        if not ble_device:
+            logger.error("No Bluetooth device found with name containing '%s'.", name_substring)
             return None, None
-        logger.info(f"Found device: {found.name} ({found.address}) — using this device.")
-        ble_device = found
+        logger.info("Found device: %s (%s) — using this device.", ble_device.name, ble_device.address)
     else:
-        logger.info(f"Resolving address {address} to BLEDevice (short scan)...")
-        devices = await BleakScanner.discover(timeout=3.0)
-        resolved = None
-        for d in devices:
-            if d.address == address or (d.name and address.lower() in d.name.lower()):
-                resolved = d
-                break
-        if resolved:
-            logger.info(f"Resolved address to BLEDevice: {resolved.name} ({resolved.address})")
-            ble_device = resolved
+        logger.info("Resolving address %s to BLEDevice (early-exit, <=%.0fs)...",
+                    address, ADDR_SCAN_TIMEOUT)
+        ble_device = await _find_first(
+            lambda d: d.address == address or bool(d.name and address.lower() in d.name.lower()),
+            timeout=ADDR_SCAN_TIMEOUT)
+        if ble_device:
+            logger.info("Resolved address to BLEDevice: %s (%s)", ble_device.name, ble_device.address)
         else:
             logger.warning("Could not resolve address to BLEDevice quickly; will attempt connect using raw address string.")
             ble_device = address
 
-    if hasattr(ble_device, "address"):
-        device_id = ble_device.address
-    else:
-        device_id = ble_device
-    
+    device_id = ble_device.address if hasattr(ble_device, "address") else ble_device
     return ble_device, device_id
 
 async def discover_characteristics(client: BleakClient) -> tuple[list, list, list]:

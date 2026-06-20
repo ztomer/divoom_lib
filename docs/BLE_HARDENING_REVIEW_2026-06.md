@@ -164,9 +164,14 @@ where a careless change can break working pushes — they deserve isolated round
   (`test_spp_robustness.py`). STILL OPEN (low value): no preflight / no `FailureReason`
   classification for SPP connect. (SPP can't be HW-validated with the current all-BLE
   fleet — covered by unit tests.)
-- **Discovery scans are unbounded/unstoppable** (`utils/discovery.py`): fixed 10 s
-  `BleakScanner.discover` with no early-exit on match and no `try/finally` stop on
-  cancellation. Fix: detection-callback + stop-on-first-match + guaranteed stop.
+- ~~**Discovery scans are unbounded/unstoppable** (`utils/discovery.py`): fixed 10 s
+  `BleakScanner.discover` with no early-exit on match and no `try/finally` stop.~~
+  **SHIPPED (R53.6 for `discover_all_divoom_devices`; R53.16 for `discover_device`).**
+  Both now use a detection callback with early-exit and a guaranteed `scanner.stop()`
+  in `finally`. R53.16: `discover_device` (still live via `monthly_best_daemon`
+  reconnect) returns on the FIRST name/address match instead of always waiting the
+  full 10 s/3 s window (timeouts are now the module constants `NAME_SCAN_TIMEOUT` /
+  `ADDR_SCAN_TIMEOUT`). Tests in `test_discovery.py` (callback-based).
 
 ### Low
 - ~~Registry `evict` swallows a disconnect failure but still pops.~~ **SHIPPED

@@ -32,45 +32,42 @@ def mock_bleak_client():
     client.services = [] # Initialize with empty services
     return client
 
+# discover_device now early-exits on first match via a detection callback (R53.16),
+# so these use the callback-based `fake_scanner` fixture (defined below).
+
 @pytest.mark.asyncio
-async def test_discover_device_by_name_success(mock_bleak_scanner_discover, mock_bleak_device):
-    """Test discover_device by name substring success."""
-    mock_bleak_scanner_discover.return_value = [mock_bleak_device]
-    
+async def test_discover_device_by_name_success(fake_scanner, mock_bleak_device):
+    """discover_device by name substring — returns on the first matching advert."""
+    fake_scanner.devices = [mock_bleak_device]
     device, device_id = await discovery.discover_device(name_substring="Divoom Mock")
-    assert device == mock_bleak_device
+    assert device is mock_bleak_device
     assert device_id == mock_bleak_device.address
-    mock_bleak_scanner_discover.assert_called_once_with(timeout=10.0)
+    assert fake_scanner.instances[0].stopped is True       # scanner always stopped
 
 @pytest.mark.asyncio
-async def test_discover_device_by_name_not_found(mock_bleak_scanner_discover):
-    """Test discover_device by name substring not found."""
-    mock_bleak_scanner_discover.return_value = []
-    
+async def test_discover_device_by_name_not_found(fake_scanner, monkeypatch):
+    """No match → None at the (here tiny) name-scan window."""
+    monkeypatch.setattr(discovery, "NAME_SCAN_TIMEOUT", 0.05)
+    fake_scanner.devices = []
     device, device_id = await discovery.discover_device(name_substring="NonExistent")
-    assert device is None
-    assert device_id is None
-    mock_bleak_scanner_discover.assert_called_once_with(timeout=10.0)
+    assert device is None and device_id is None
 
 @pytest.mark.asyncio
-async def test_discover_device_by_address_resolved(mock_bleak_scanner_discover, mock_bleak_device):
-    """Test discover_device by address when resolved."""
-    mock_bleak_scanner_discover.return_value = [mock_bleak_device]
-    
+async def test_discover_device_by_address_resolved(fake_scanner, mock_bleak_device):
+    """discover_device by address — early-exits on the first address match."""
+    fake_scanner.devices = [mock_bleak_device]
     device, device_id = await discovery.discover_device(address="AA:BB:CC:DD:EE:FF")
-    assert device == mock_bleak_device
+    assert device is mock_bleak_device
     assert device_id == mock_bleak_device.address
-    mock_bleak_scanner_discover.assert_called_once_with(timeout=3.0)
 
 @pytest.mark.asyncio
-async def test_discover_device_by_address_not_resolved(mock_bleak_scanner_discover):
-    """Test discover_device by address when not resolved quickly."""
-    mock_bleak_scanner_discover.return_value = [] # No device found in short scan
-    
+async def test_discover_device_by_address_not_resolved(fake_scanner, monkeypatch):
+    """Unresolved address falls back to the raw address string."""
+    monkeypatch.setattr(discovery, "ADDR_SCAN_TIMEOUT", 0.05)
+    fake_scanner.devices = []
     device, device_id = await discovery.discover_device(address="AA:BB:CC:DD:EE:FF")
-    assert device == "AA:BB:CC:DD:EE:FF" # Should return the address string
+    assert device == "AA:BB:CC:DD:EE:FF"                    # raw address string
     assert device_id == "AA:BB:CC:DD:EE:FF"
-    mock_bleak_scanner_discover.assert_called_once_with(timeout=3.0)
 
 @pytest.mark.asyncio
 async def test_discover_characteristics_success(mock_bleak_client):
