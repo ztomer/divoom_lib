@@ -18,6 +18,15 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 7 — EMPTY-TARGET CONNECT REJECT SHIPPED (2026-06-20).** Edge-probe
+  sweep over the daemon socket. Bug: `connect(mac="")` returned success and grabbed
+  an arbitrary/last device (`""` falsy → scan-first `devs[0]` fallback). `connect()`
+  now rejects an explicitly-empty `mac`/`lan_ip` (`reason=invalid_target`); `mac=None`
+  (absent) still = "use active". HW-verified clean in the same sweep: bogus MAC fails
+  bounded (16.4s, no hang) and doesn't poison the next connect; rapid re-grab ×5 on
+  the 0.0s fast-path; scan `limit=-1/999` degrade to no-cap. Test:
+  `test_daemon_connect_identity`. Pushed to main (3b61d86). Both R53.6+R53.7 on main.
+
 - **R53 round 6 — SCAN SPEED + CONNECTED-DEVICE VISIBILITY SHIPPED (2026-06-20).**
   HW-driven via the dev-daemon socket + a new stress loop
   (`scripts/hw_smoke.py --phase stress [--churn]`) that hammers connect/disconnect/
