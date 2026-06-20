@@ -126,3 +126,30 @@ async def test_stream_falls_back_when_device_never_acks():
     calls = [c for c in comm.send_command.await_args_list
              if c.args and c.args[0] == COMMANDS["app new send gif cmd"]]
     assert len(calls) == 3  # start + 2 data, no terminate (R35d), no retransmits
+
+
+@pytest.mark.asyncio
+async def test_stream_clears_expected_response_command_on_failure():
+    """R53.23: the 0x8B streamer sets communicator._expected_response_command before
+    START. On the device-ready-timeout + chunk-failure path it used to leave it
+    pinned to 0x8B, mis-routing the NEXT op's notifications (cross-talk). A
+    try/finally must always clear it."""
+    anim, comm = _make_anim()
+    comm._expected_response_command = None              # real BLE-path attribute
+    comm.wait_for_response = AsyncMock(return_value=None)   # device never ACKs ready
+    comm.send_command = AsyncMock(side_effect=[True, False])  # start ok, chunk fails
+    with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
+        ok = await anim.stream_animation_8b(bytes(300))
+    assert ok is False
+    assert comm._expected_response_command is None, "scalar leaked after failed stream"
+
+
+@pytest.mark.asyncio
+async def test_stream_clears_expected_response_command_on_success():
+    anim, comm = _make_anim()
+    comm._expected_response_command = None
+    comm.wait_for_response = AsyncMock(return_value=None)   # falls back to sleep
+    with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
+        ok = await anim.stream_animation_8b(bytes(300))
+    assert ok is True
+    assert comm._expected_response_command is None, "scalar leaked after successful stream"

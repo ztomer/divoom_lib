@@ -83,6 +83,36 @@ def test_wall_live_config_keeps_slots_without_height(monkeypatch):
     assert macs == {"AA", "BB", "CC"}, f"slots dropped: only got {macs}"
 
 
+def test_background_wall_live_device_is_cached(monkeypatch):
+    """R53.23: a background MatrixWall live job must REUSE its built wall, not
+    rebuild+reconnect (a full multi-device BLE connect storm) every tick."""
+    from divoom_daemon.owner_live import OwnerLiveMixin
+
+    builds = {"n": 0}
+
+    class _FakeWall:
+        def __init__(self, configs, **k):
+            builds["n"] += 1
+            self.is_alive = True            # drives the reuse gate
+        async def connect(self):
+            pass
+
+    monkeypatch.setattr("divoom_lib.wall.DivoomWall", _FakeWall)
+
+    o = OwnerLiveMixin.__new__(OwnerLiveMixin)
+    o._device = None
+    o._wall = None
+    o._live_devices = {}
+    o.mac = None
+    params = {"wall_slots": {"AA": {"x": 0, "y": 0, "height": 16}}}
+
+    w1 = _run(o.get_live_device("MatrixWall", params))
+    w2 = _run(o.get_live_device("MatrixWall", params))
+    assert w1 is w2, "wall was rebuilt instead of reused"
+    assert builds["n"] == 1, f"wall built {builds['n']}x (should cache after first)"
+    assert o._live_devices["MatrixWall"] is w1
+
+
 # ── 1. SPP reconnect no longer NameErrors on the isinstance check ───────────
 
 def test_spp_reconnect_does_not_nameerror(monkeypatch):

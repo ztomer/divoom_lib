@@ -170,47 +170,54 @@ class Animation(AnimationUserDefine):
         if is_ble and hasattr(self.communicator, '_expected_response_command'):
             self.communicator._expected_response_command = COMMANDS["app new send gif cmd"]
 
-        if not await self.app_new_send_gif_cmd(
-            control_word=ANSGC_CONTROL_START_SENDING, file_size=file_size
-        ):
-            self.logger.error("0x8B start phase failed")
+        try:
+            if not await self.app_new_send_gif_cmd(
+                control_word=ANSGC_CONTROL_START_SENDING, file_size=file_size
+            ):
+                self.logger.error("0x8B start phase failed")
+                return False
+
+            # APK: wait for the device's "ready, send it" reply to the start packet
+            # rather than guessing how long buffer allocation takes. Fall back to
+            # the legacy 0.5s sleep when no reply arrives.
+            if not (is_ble and await self._await_8b_device_ready(timeout=2.0)):
+                await asyncio.sleep(0.5)  # let the device allocate buffers
+
+            chunk_size = 256  # MUST match futpib/APK (hVar.q(256)); chunk N → byte N*256
+            offset_id = 0
+            for i in range(0, file_size, chunk_size):
+                chunk = list(blob[i:i + chunk_size])
+                if not await self.app_new_send_gif_cmd(
+                    control_word=ANSGC_CONTROL_SENDING_DATA,
+                    file_size=file_size,
+                    file_offset_id=offset_id,
+                    file_data=chunk,
+                    write_with_response=write_with_response,
+                ):
+                    self.logger.error(f"0x8B data chunk {offset_id} failed")
+                    return False
+                offset_id += 1
+                if delay > 0:
+                    await asyncio.sleep(delay)
+
+            # APK: the device may ask for dropped chunks to be re-sent; without
+            # this, one lost chunk = a permanently failed upload.
+            if is_ble:
+                await self._serve_8b_retransmits(blob, file_size, chunk_size,
+                                                 write_with_response)
+
+            # APK: no terminate packet (CW=2). Verified on 4 hardware devices
+            # (Timoo, Ditoo, Tivoo Max, Pixoo) — animation renders correctly
+            # without it.
+            return True
+        finally:
+            # ALWAYS clear the scalar we set before START. wait_for_response clears
+            # it on a match mid-stream, but on the device-ready-timeout or
+            # chunk-failure paths it would otherwise stay pinned to 0x8B and
+            # mis-route the NEXT op's notifications (cross-talk). The during-stream
+            # handshake is unchanged — this only guarantees cleanup on exit.
             if is_ble and hasattr(self.communicator, '_expected_response_command'):
                 self.communicator._expected_response_command = None
-            return False
-
-        # APK: wait for the device's "ready, send it" reply to the start packet
-        # rather than guessing how long buffer allocation takes. Fall back to
-        # the legacy 0.5s sleep when no reply arrives.
-        if not (is_ble and await self._await_8b_device_ready(timeout=2.0)):
-            await asyncio.sleep(0.5)  # let the device allocate buffers
-
-        chunk_size = 256  # MUST match futpib/APK (hVar.q(256)); chunk N → byte N*256
-        offset_id = 0
-        for i in range(0, file_size, chunk_size):
-            chunk = list(blob[i:i + chunk_size])
-            if not await self.app_new_send_gif_cmd(
-                control_word=ANSGC_CONTROL_SENDING_DATA,
-                file_size=file_size,
-                file_offset_id=offset_id,
-                file_data=chunk,
-                write_with_response=write_with_response,
-            ):
-                self.logger.error(f"0x8B data chunk {offset_id} failed")
-                return False
-            offset_id += 1
-            if delay > 0:
-                await asyncio.sleep(delay)
-
-        # APK: the device may ask for dropped chunks to be re-sent; without
-        # this, one lost chunk = a permanently failed upload.
-        if is_ble:
-            await self._serve_8b_retransmits(blob, file_size, chunk_size,
-                                             write_with_response)
-
-        # APK: no terminate packet (CW=2). Verified on 4 hardware devices
-        # (Timoo, Ditoo, Tivoo Max, Pixoo) — animation renders correctly
-        # without it.
-        return True
 
     async def _await_8b_device_ready(self, timeout: float = 3.0) -> bool:
         """Wait for the device's 0x8b response with ``payload[0] == 0`` —

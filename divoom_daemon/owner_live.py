@@ -357,9 +357,18 @@ class OwnerLiveMixin:
                 configs.append(cfg)   # once per slot — was wrongly nested under `if height`
             wall = DivoomWall(configs, custom_logger=logger)
             await wall.connect()
+            # Cache it: without this a background wall live job rebuilt + reconnected
+            # EVERY tick — a full multi-device BLE connect storm (the exact churn the
+            # cache exists to prevent). DivoomWall.is_alive drives the reuse gate above;
+            # _release_live_device_if_idle disconnects it on stop. (Only reached when
+            # self._wall is None, so this never aliases the ACTIVE wall.)
+            self._live_devices[mac] = wall
             return wall
 
-        # For LAN device
+        # For LAN device. NB: NOT cached — a LAN device is connectionless (per-request
+        # HTTP), so rebuilding the transport object each tick is cheap, and caching it
+        # would mis-report under the BLE is_alive/is_connected liveness model (it would
+        # read as degraded). Rebuild is the pragmatic choice for this niche path.
         if mac.startswith("LAN:"):
             from divoom_lib.lan_transport import LanTransport
             from divoom_lib.divoom import Divoom
