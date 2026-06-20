@@ -1,9 +1,7 @@
 # divoom_lib/spp_connection.py
 
-import asyncio
 import logging
 from typing import Any
-from . import models
 
 logger = logging.getLogger("divoom_lib")
 
@@ -36,44 +34,5 @@ def resolve_classic_mac(name: str, mac_or_uuid: str, log=None) -> str | None:
         log.warning(f"Failed to resolve Classic MAC address via IOBluetooth: {e}")
     return None
 
-async def read_spp_notifications_loop(conn: Any) -> None:
-    """SPP background loop to read incoming notifications."""
-    while conn.is_connected:
-        try:
-            notif = await conn._spp_client.read_notification(timeout=1.0)
-            response_payload = {
-                'command_id': notif.command_id,
-                'payload': bytearray(notif.payload)
-            }
-            expected_cmd = conn._expected_response_command
-            is_expected_response = expected_cmd is not None and notif.command_id == expected_cmd
-            is_generic_ack = expected_cmd is not None and notif.command_id == models.GENERIC_ACK_COMMAND_ID and expected_cmd in models.GENERIC_ACK_COMMANDS
-            
-            if is_expected_response or is_generic_ack:
-                conn.notification_queue.put_nowait(response_payload)
-                conn._expected_response_command = None
-            else:
-                conn.notification_queue.put_nowait(response_payload)
-        except asyncio.TimeoutError:
-            continue
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            conn.logger.error(f"Error in SPP notification loop: {e}")
-            break
-
-async def disconnect_spp(conn: Any) -> None:
-    """Cleanly disconnects the SPP client and cancels the notification loop."""
-    if hasattr(conn, "_spp_rx_task") and conn._spp_rx_task:
-        conn._spp_rx_task.cancel()
-        try:
-            await conn._spp_rx_task
-        except asyncio.CancelledError:
-            pass
-        conn._spp_rx_task = None
-    if conn._spp_client:
-        try:
-            await conn._spp_client.disconnect()
-            conn.logger.info("Disconnected from Divoom device via BT Classic SPP.")
-        except Exception as e:
-            conn.logger.error(f"Error disconnecting SPP: {e}")
+# read_spp_notifications_loop / disconnect_spp were dead (superseded by
+# BTSppTransport._rx_loop / .disconnect) — removed R53.12.

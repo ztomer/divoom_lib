@@ -5,6 +5,28 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 12: SPP death-aware liveness + dead-code purge + split (2026-06-20)
+
+Medium-tier SPP transport hardening (`bt_spp_transport.py`).
+
+- **Honest liveness.** The pyserial `_serial_read_loop` could die on a read error
+  WITHOUT closing the port or setting `_close_event`, so `is_connected` kept
+  returning True (the port stays `.is_open`) though no data would ever arrive
+  again. Added an `is_alive` property (parity with BLE) that also requires the
+  reader thread to be live on the serial path; the read loop now LOGS the error it
+  used to swallow silently. Test: `test_spp_liveness.py`.
+- **Dead code removed.** `spp_connection.read_spp_notifications_loop` /
+  `disconnect_spp` were superseded by `BTSppTransport._rx_loop` / `.disconnect` and
+  unreferenced — deleted (plus their now-unused imports).
+- **Split** (file was at the 500-LOC cap): the macOS IOBluetooth RFCOMM backend
+  (`_start_runloop`/`_runloop_main`/`_discover_rfcomm_channel`/`_open_blocking`/
+  `_on_data`) + `BtSppNotification` moved to `bt_spp_rfcomm.py` (`_SppRfcommMixin`);
+  `bt_spp_transport.py` 500→363 LOC. `BtSppNotification` re-exported for callers.
+
+Behavior-preserving (SPP is unhittable with the all-BLE test fleet — covered by
+unit tests). Import/MRO verified. Full suite green (1544 passed).
+
+---
 ## R53 round 11: BLE response-path lock + ble_notify split (2026-06-20)
 
 Closes the LAST High deferred BLE finding — the shared-response-path cross-talk.

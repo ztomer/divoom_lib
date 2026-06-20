@@ -5,17 +5,14 @@ import asyncio
 import logging
 import queue
 import threading
-from dataclasses import dataclass, field
 from typing import Optional, Any
 
 from . import models, framing
 from .transport_interface import DeviceTransport
-from .framing import (
-    encode_basic_payload,
-    encode_ios_le_payload,
-    parse_basic_protocol_frames,
-    parse_ios_le_notification,
-)
+from .framing import encode_basic_payload, encode_ios_le_payload
+# BtSppNotification + the IOBluetooth RFCOMM backend live in bt_spp_rfcomm (R53.12);
+# re-export BtSppNotification so existing `from .bt_spp_transport import ...` keeps working.
+from .bt_spp_rfcomm import _SppRfcommMixin, BtSppNotification
 
 DEFAULT_RFCOMM_CHANNEL_IDS: dict[str, int] = {
     "pixoo": 1,
@@ -26,18 +23,10 @@ DEFAULT_RFCOMM_CHANNEL_IDS: dict[str, int] = {
     "default": 2,
 }
 
-@dataclass
-class BtSppNotification:
-    command_id: int
-    payload: bytes
-    framing: str
-    packet_number: int = 0
-    raw: bytes = field(default=b"")
-
 class BtSppTransportError(RuntimeError):
     pass
 
-class BTSppTransport(DeviceTransport):
+class BTSppTransport(_SppRfcommMixin, DeviceTransport):
     """
     Async wrapper around macOS IOBluetooth RFCOMM SPP for Divoom devices.
     Implements the DeviceTransport interface.
@@ -91,6 +80,20 @@ class BTSppTransport(DeviceTransport):
         return self._channel is not None and not self._close_event.is_set()
 
     @property
+    def is_alive(self) -> bool:
+        """Honest liveness (parity with BLE's is_alive). `is_connected` lags True
+        after the serial read thread dies silently — the port stays `.is_open`
+        though no data will ever arrive again. On the serial path, also require the
+        reader thread to be alive; on the IOBluetooth path the channel (closed via
+        the rfcommChannelClosed_ delegate → _close_event) is the signal."""
+        if not self.is_connected:
+            return False
+        t = self._serial_read_thread
+        if self._serial_port is not None and t is not None:
+            return t.is_alive()
+        return True
+
+    @property
     def mtu(self) -> int:
         if self._serial_port is not None:
             return 200
@@ -116,6 +119,8 @@ class BTSppTransport(DeviceTransport):
         return None
 
     def _serial_read_loop(self) -> None:
+        # On exit (port closed OR read error) the thread dies; is_alive then reports
+        # False even while is_connected still lags True (the port stays .is_open).
         while not self._close_event.is_set():
             port = self._serial_port
             if not port or not port.is_open:
@@ -124,7 +129,9 @@ class BTSppTransport(DeviceTransport):
                 chunk = port.read(32)
                 if chunk:
                     self._on_data(chunk)
-            except Exception:
+            except Exception as e:
+                # Was swallowed silently — log so a dead reader is diagnosable.
+                self.logger.warning("SPP serial read loop exiting on error: %s", e)
                 break
 
     async def connect(self) -> None:
@@ -343,154 +350,9 @@ class BTSppTransport(DeviceTransport):
                 self.logger.debug(f"Received generic ACK for command 0x{command_id:02x}. Continuing to wait.")
         return None
 
-    def _start_runloop(self) -> None:
-        if self._runloop_thread is not None and self._runloop_thread.is_alive():
-            return
-        self._open_event.clear()
-        self._close_event.clear()
-        self._rx_queue = queue.Queue()
-        self._rx_buf = bytearray()
-        self._runloop_thread = threading.Thread(
-            target=self._runloop_main, name="bt-spp-runloop", daemon=True
-        )
-        self._runloop_thread.start()
-        for _ in range(50):
-            if self._runloop is not None:
-                return
-            import time as _t
-            _t.sleep(0.02)
-
-    def _runloop_main(self) -> None:
-        from Foundation import NSDate, NSRunLoop, NSRunLoopCommonModes
-        self._runloop = NSRunLoop.currentRunLoop()
-        while not self._close_event.is_set():
-            self._runloop.runMode_beforeDate_(
-                NSRunLoopCommonModes,
-                NSDate.dateWithTimeIntervalSinceNow_(0.05),
-            )
-
-    def _discover_rfcomm_channel(self, device) -> int | None:
-        try:
-            self.logger.debug(f"Performing SDP query for {self.mac_address}...")
-            device.performSDPQuery_(None)
-            import time
-            for _ in range(30):
-                services = device.services() or []
-                if services:
-                    break
-                time.sleep(0.1)
-            
-            def _get_chan(s):
-                try:
-                    rc, chan = s.getRFCOMMChannelID_(None)
-                    if rc == 0: return chan
-                except Exception:
-                    try:
-                        return s.getRFCOMMChannelID()
-                    except Exception:
-                        pass
-                return -1
-
-            for s in services:
-                name = getattr(s, "getServiceName", lambda: None)()
-                if name and "serial" in name.lower():
-                    c = _get_chan(s)
-                    if c > 0: return c
-            for s in services:
-                c = _get_chan(s)
-                if c > 0: return c
-        except Exception as e:
-            self.logger.warning(f"SDP query failed: {e}")
-        return None
-
-    def _open_blocking(self) -> None:
-        import objc
-        from IOBluetooth import IOBluetoothDevice
-        from Foundation import NSObject
-
-        outer = self
-
-        class _Delegate(NSObject):
-            def init(self):
-                self = objc.super(_Delegate, self).init()
-                self._self_ref = self
-                return self
-
-            def rfcommChannelOpenComplete_status_(self, ch, status):
-                status = int(status)
-                if status != 0:
-                    outer._last_error = f"open status={status} (0x{status & 0xFFFFFFFF:08X})"
-                outer._open_event.set()
-
-            def rfcommChannelData_data_length_(self, ch, data, length):
-                n = int(length) if length else 0
-                if n > 0:
-                    outer._on_data(bytes(data[:n]))
-
-            def rfcommChannelClosed_(self, ch):
-                outer._close_event.set()
-
-        try:
-            device = IOBluetoothDevice.deviceWithAddressString_(self.mac_address)
-            if device is None:
-                self._last_error = f"IOBluetoothDevice nil for {self.mac_address}"
-                self._open_event.set()
-                return
-            self._device = device
-
-            discovered_channel = self._discover_rfcomm_channel(device)
-            if discovered_channel is not None and discovered_channel != self.channel_id:
-                self.logger.info(f"SDP Query: Overriding RFCOMM channel {self.channel_id} with {discovered_channel}")
-                self.channel_id = discovered_channel
-
-            delegate = _Delegate.alloc().init()
-            delegate.retain()
-            self._delegate = delegate
-
-            rc, channel = device.openRFCOMMChannelAsync_withChannelID_delegate_(
-                None, self.channel_id, delegate
-            )
-            rc = int(rc)
-            if rc != 0:
-                self._last_error = f"openRFCOMMChannelAsync_ returned {rc}"
-                self._open_event.set()
-                return
-            self._channel = channel
-        except Exception as e:
-            self._last_error = f"exception in _open_blocking: {e!r}"
-            self._open_event.set()
-
-    def _on_data(self, chunk: bytes) -> None:
-        self._rx_buf.extend(chunk)
-        while (
-            len(self._rx_buf) >= models.IOS_LE_MIN_DATA_LENGTH
-            and bytes(self._rx_buf[:4]) == bytes(models.IOS_LE_HEADER)
-        ):
-            length_field = int.from_bytes(self._rx_buf[4:6], "little")
-            frame_len = length_field + 7
-            if len(self._rx_buf) < frame_len:
-                break
-            parsed = parse_ios_le_notification(bytes(self._rx_buf[:frame_len]))
-            if parsed is None:
-                del self._rx_buf[0]
-                continue
-            raw = bytes(self._rx_buf[:frame_len])
-            del self._rx_buf[:frame_len]
-            self._rx_queue.put(BtSppNotification(
-                command_id=parsed["command_id"], payload=parsed["payload"],
-                framing=self.FRAMING_IOS_LE, packet_number=parsed["packet_number"], raw=raw
-            ))
-        if self._rx_buf and (
-            len(self._rx_buf) < 4
-            or bytes(self._rx_buf[:4]) != bytes(models.IOS_LE_HEADER)
-        ):
-            msgs, remaining = parse_basic_protocol_frames(bytearray(self._rx_buf))
-            self._rx_buf = bytearray(remaining)
-            for m in msgs:
-                self._rx_queue.put(BtSppNotification(
-                    command_id=m["command_id"], payload=bytes(m["payload"]),
-                    framing=self.FRAMING_BASIC, raw=b""
-                ))
+    # _start_runloop / _runloop_main / _discover_rfcomm_channel / _open_blocking /
+    # _on_data (the IOBluetooth RFCOMM backend + shared RX framer) live in
+    # _SppRfcommMixin (bt_spp_rfcomm.py).
 
     async def __aenter__(self) -> BTSppTransport:
         await self.connect()

@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 12 — SPP DEATH-AWARE LIVENESS + DEAD-CODE PURGE + SPLIT SHIPPED (2026-06-20).**
+  Medium-tier SPP hardening. `_serial_read_loop` could die silently leaving
+  `is_connected==True` forever; added an honest `is_alive` (parity with BLE, requires
+  the reader thread live on the serial path) + logs the previously-swallowed read error.
+  Deleted dead `spp_connection.read_spp_notifications_loop`/`disconnect_spp`. Split the
+  macOS IOBluetooth RFCOMM backend + `BtSppNotification` into `bt_spp_rfcomm.py`
+  (`_SppRfcommMixin`); `bt_spp_transport.py` 500→363 LOC. SPP is unhittable with the
+  all-BLE fleet → unit-tested (`test_spp_liveness.py`). Full suite green (1544 passed).
+  Remaining SPP Medium items: `max_retries` ignored, no preflight/FailureReason, corrupt
+  iOS-LE length stalls the parser. Other remaining deferred: discovery scan
+  stop-on-first-match, registry-evict swallow, `_connect_locks` reset, exclusive deadline
+  re-arm-on-completion, LAN session reuse (all Low).
+
 - **R53 round 11 — BLE RESPONSE-PATH LOCK + ble_notify SPLIT SHIPPED (2026-06-20).**
   Closes the LAST High deferred BLE finding (shared-response cross-talk).
   `send_command_and_wait_for_response` now holds `_response_lock` across

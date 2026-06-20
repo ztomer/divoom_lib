@@ -148,14 +148,18 @@ where a careless change can break working pushes — they deserve isolated round
   loop). `stop_all_live_jobs` / `_release_live_device_if_idle` (shutdown path)
   still fire-and-forget — lower priority, tracked.
 - **SPP transport is weaker than BLE** (`bt_spp_transport.py`). PARTIALLY SHIPPED:
-  off-loop open (R53.2) and **teardown-on-failure (R53.5)** — a failed IOBluetooth
-  open no longer leaks the runloop thread; connect now `disconnect()`s on any
-  failure (test `test_failed_open_tears_down`); the serial-fallback path drops its
-  read-thread ref. STILL OPEN: `_serial_read_loop` swallows all errors and dies
-  silently while `is_connected` still reads True (no death-aware liveness);
-  `max_retries` accepted but ignored; no preflight / no `FailureReason`
-  classification; a corrupt iOS-LE length field stalls the parser. Dead code:
-  `spp_connection.read_spp_notifications_loop` / `disconnect_spp` are unused — delete.
+  off-loop open (R53.2), **teardown-on-failure (R53.5)**, and **death-aware liveness
+  + dead-code purge + module split (R53.12)**. R53.12: `_serial_read_loop` no longer
+  dies *silently* (it logs the read error), and a new honest `is_alive` property
+  (parity with BLE) requires the reader thread to be live on the serial path — so a
+  dead reader no longer reads `is_connected==True` forever. The IOBluetooth RFCOMM
+  backend (`_start_runloop`/`_runloop_main`/`_discover_rfcomm_channel`/`_open_blocking`/
+  `_on_data`) + `BtSppNotification` moved to `bt_spp_rfcomm.py` (`_SppRfcommMixin`);
+  `bt_spp_transport.py` 500→363 LOC. Dead `spp_connection.read_spp_notifications_loop`
+  / `disconnect_spp` deleted. Tests: `test_spp_liveness.py`. STILL OPEN: `max_retries`
+  accepted but ignored; no preflight / no `FailureReason` classification; a corrupt
+  iOS-LE length field stalls the parser. (SPP can't be HW-validated with the current
+  all-BLE fleet — covered by unit tests.)
 - **Discovery scans are unbounded/unstoppable** (`utils/discovery.py`): fixed 10 s
   `BleakScanner.discover` with no early-exit on match and no `try/finally` stop on
   cancellation. Fix: detection-callback + stop-on-first-match + guaranteed stop.
