@@ -5,6 +5,12 @@ from pathlib import Path
 from . import models
 from .native_lib import library_path
 
+# Upper bound on a single basic-protocol RX frame (header + 2-byte length). Real
+# device response frames are tiny; a larger decoded length means the length field
+# is corrupt, used to resync the parser instead of stalling. See
+# parse_basic_protocol_frames.
+MAX_BASIC_FRAME = 8192
+
 # Dynamically load native C shared library for fast payload escaping/framing if available
 lib = None
 try:
@@ -230,6 +236,15 @@ def parse_basic_protocol_frames(buf: bytearray) -> Tuple[list, bytearray]:
 
         length = int.from_bytes(buf[1:3], byteorder='little')
         total_message_len = 4 + length
+
+        # A corrupt 2-byte length (line noise / firmware glitch) would otherwise
+        # make us wait for up to ~64KB before the end-byte/checksum check could
+        # reject it — stalling all RX behind the bogus frame. Real response frames
+        # are tiny; anything over the bound is a bad header, so resync past this
+        # start byte instead of waiting. (Shared by BLE + SPP basic-protocol RX.)
+        if total_message_len > MAX_BASIC_FRAME:
+            del buf[0]
+            continue
 
         if len(buf) < total_message_len:
             break

@@ -18,6 +18,15 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 18 — BASIC-PROTOCOL RX PARSER BOUNDS THE LENGTH FIELD SHIPPED (2026-06-20).**
+  Second fresh-re-read find. `parse_basic_protocol_frames` (shared by BLE notify RX +
+  SPP `_on_data`) trusted the 2-byte length unboundedly → a corrupt length stalled all
+  RX waiting for ~64KB that never arrives. Bounded by `MAX_BASIC_FRAME=8192`: over-long
+  decoded length → resync (drop start byte). Mirrors the SPP iOS-LE bound (R53.13). Test
+  with teeth. Full suite green (1555 passed). 18 rounds total today; both fresh-re-read
+  rounds (R53.17, R53.18) found REAL bugs the original review missed. The two fresh
+  findings are recorded under a new "FRESH RE-READ FINDINGS" section in the review doc.
+
 - **R53 round 17 — RECONNECT CLEARS STALE OS-DROP FLAG SHIPPED (2026-06-20).** Fresh
   adversarial re-read found a bug the original review missed: after an OS drop,
   `_on_os_disconnect` sets `_connection_likely_broken=True`, but `connect()` never

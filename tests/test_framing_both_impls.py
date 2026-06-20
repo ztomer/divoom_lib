@@ -54,6 +54,17 @@ _PAYLOADS = [
 ]
 
 
+def test_basic_corrupt_length_resyncs_and_recovers():
+    """R53.18: a corrupt 2-byte length must not stall the parser waiting for ~64KB
+    that never arrives — it resyncs past the bad start byte and still recovers a
+    following valid frame. (Shared BLE + SPP basic-protocol RX path.)"""
+    good = bytes(framing.encode_basic_payload([0x44, 0x55], escape=False))
+    # start byte + a huge length (0xFFFF) + filler (no 0x01), then the real frame
+    bogus = bytes([models.MESSAGE_START_BYTE, 0xFF, 0xFF, 0xAA, 0xAA, 0xAA, 0xAA])
+    msgs, rest = framing.parse_basic_protocol_frames(bytearray(bogus + good))
+    assert any(m["command_id"] == 0x44 for m in msgs), "real frame lost after corrupt prefix"
+
+
 @pytest.mark.parametrize("payload", _PAYLOADS)
 def test_basic_no_escape_round_trips(fram, payload):
     """encode_basic_payload(escape=False) -> parse recovers command + payload."""

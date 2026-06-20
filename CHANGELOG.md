@@ -5,6 +5,21 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 18: basic-protocol RX parser bounds the length field (2026-06-20)
+
+Second fresh-re-read find. `parse_basic_protocol_frames` (the shared basic-protocol
+RX parser, used by BOTH the BLE notification path and SPP `_on_data`) trusted the
+2-byte length field unboundedly: a corrupt length made it wait for up to ~64KB —
+which a small BLE/SPP notification stream never delivers — before the end-byte /
+checksum check could reject the frame, stalling ALL inbound parsing behind it. Now
+bounded by `MAX_BASIC_FRAME` (8192): an over-long decoded length is treated as a bad
+header and the parser resyncs (drops the start byte), the same recovery as a bad
+checksum. Mirrors the SPP iOS-LE length bound from R53.13. A valid frame following a
+corrupt prefix is still recovered. Verified the test fails without the fix. Test:
+`test_framing_both_impls.test_basic_corrupt_length_resyncs_and_recovers`. Full suite
+green (1555 passed).
+
+---
 ## R53 round 17: reconnect clears the stale OS-drop flag (2026-06-20)
 
 Found in a fresh adversarial re-read (beyond the original four-lens review). After

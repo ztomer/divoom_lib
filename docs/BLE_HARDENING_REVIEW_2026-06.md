@@ -98,6 +98,20 @@ Real-device testing became possible via `scripts/make_dev_daemon_app.sh` (a thin
 
 ---
 
+## FRESH RE-READ FINDINGS (beyond the original four-lens review)
+
+- **R53.17 — reconnect left the stale OS-drop flag set.** `_on_os_disconnect` sets
+  `_connection_likely_broken=True`; `connect()` never cleared it on reconnect, and
+  autoprobe is a no-op on reconnect (sends nothing), so `is_alive` lied `False` from
+  reconnect until the next send (false DEGRADED; live-job/wall self-heal churned).
+  Fixed: `connect()` clears it on a successful (re)connect. Test with teeth.
+- **R53.18 — basic-protocol RX parser trusted the length field unboundedly.**
+  `parse_basic_protocol_frames` (shared by BLE + SPP RX) would wait for up to ~64KB
+  on a corrupt 2-byte length before the end-byte/checksum could reject it — stalling
+  all RX behind the bogus frame. Now bounded by `MAX_BASIC_FRAME` (8192): an over-long
+  decoded length resyncs (drop the start byte). Mirrors the SPP iOS-LE bound (R53.13).
+  Test `test_basic_corrupt_length_resyncs_and_recovers` (verified to fail without fix).
+
 ## DEFERRED — real, but need their own tested surgery (do NOT rush)
 
 Ranked by value. Several touch the 0x8B animation handshake or task lifecycle
