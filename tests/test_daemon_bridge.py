@@ -80,8 +80,12 @@ def live_daemon():
     d = DivoomDaemon(socket_path=sp, monitor=object(), device=dev)
     t = threading.Thread(target=d.serve_forever, daemon=True)
     t.start()
-    for _ in range(50):
-        if os.path.exists(sp):
+    # Wait until the daemon actually ANSWERS, not just until the socket file
+    # exists — under CI load the file appears before serve_forever is accepting,
+    # so a file-only wait yielded a not-yet-ready daemon and flaked
+    # ensure_daemon/daemon_alive consumers. ~5s budget.
+    for _ in range(250):
+        if os.path.exists(sp) and daemon_alive(sp):
             break
         time.sleep(0.02)
     try:
