@@ -57,6 +57,7 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
         self._hot_progress: dict = {"phase": "idle"}
         self._hot_progress_lock = threading.Lock()
         self._last_conn_state = None             # P6: last observed ConnectionState
+        self._scan_name_cache: dict = {}         # MAC(upper) -> friendly name, from scans
         OwnerLiveMixin.__init__(self)
 
     # ── device loop ──────────────────────────────────────────────────────
@@ -68,6 +69,25 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
         # `connection_state` (derive_connection_state → is_alive), not here.
         d = self._device
         return bool(d is not None and getattr(d, "is_connected", False))
+
+    def _owned_devices(self) -> list[dict]:
+        """Devices the daemon holds (active + live jobs). A connected BLE peripheral
+        stops advertising → scan can't see it → it vanishes from the selector; union
+        it back. Name: device_name | scan-cache | raw MAC. BLE only (LAN isn't scan)."""
+        def _name(dev, mac):
+            return (getattr(dev, "device_name", None)
+                    or self._scan_name_cache.get(mac.upper()) or mac)
+
+        owned: dict[str, dict] = {}
+        d = self._device
+        if d is not None and self.mac and not self._lan_ip:
+            owned[self.mac.upper()] = {
+                "name": _name(d, self.mac), "address": self.mac, "owned": True}
+        for mac, dev in (getattr(self, "_live_devices", None) or {}).items():
+            if mac and mac.upper() not in owned:
+                owned[mac.upper()] = {
+                    "name": _name(dev, mac), "address": mac, "owned": True}
+        return list(owned.values())
 
     def _current_target_key(self) -> Optional[str]:
         """Normalized identity of the device the owner currently holds (BLE mac or
@@ -337,7 +357,9 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
 
         async def _scan():
             from divoom_lib.utils import discovery
-            results = await discovery.discover_all_divoom_devices(timeout=timeout)
+            # early-exit once `limit` devices are seen (limit<=0 → full window)
+            results = await discovery.discover_all_divoom_devices(
+                timeout=timeout, expected=limit)
             return results[:limit] if limit > 0 else results
 
         try:
@@ -345,6 +367,16 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
             # connected peripheral, so it must not serialize behind (and freeze)
             # device I/O / live-widget pushes for the scan's whole duration.
             results = self._run_on_loop(_scan())
+            # Cache mac->name (so a non-advertising owned device keeps its name),
+            # then union-in owned devices absent from this scan. See _owned_devices.
+            for d in results:
+                addr, nm = (d.get("address") or "").upper(), d.get("name")
+                if addr and nm:
+                    self._scan_name_cache[addr] = nm
+            seen = {(d.get("address") or "").upper() for d in results}
+            for od in self._owned_devices():
+                if (od.get("address") or "").upper() not in seen:
+                    results.append(od)
             return {"success": True, "devices": _json_safe(results)}
         except Exception as e:
             logger.warning(f"scan failed: {e}")

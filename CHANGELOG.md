@@ -5,6 +5,37 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 6: scan speed + connected-device visibility (2026-06-20)
+
+HW-driven round (real 4-device fleet via the dev-daemon socket + a new
+`hw_smoke.py --phase stress [--churn]` loop that hammers connect/disconnect/
+evict and flags anomalies). 40-iteration eviction churn across all four devices:
+40/40 connects clean (incl. the historically flaky Timoo-light-4) — but it
+surfaced two real quirks, both fixed:
+
+- **Scan was always slow — it never early-exited.** `BleakScanner.discover(timeout)`
+  waits the *full* window even when every device shows up in the first 2s; the
+  `scan_limit` was applied *after*, so it did nothing for latency. Rewrote
+  `discover_all_divoom_devices` to use a **detection callback with early-exit**:
+  it returns the instant `expected` (the scan limit) devices are seen, with a
+  guaranteed `scanner.stop()` in `finally`. HW: a full 4-device scan **15.0s →
+  ~2s**. `expected<=0` keeps the full-window behavior.
+- **A connected device vanished from the selector ("should be 4, found 3").** A
+  connected BLE peripheral stops advertising, so a scan run while the daemon holds
+  a device can't see it — and the scan *replaced* the list, dropping it. The
+  daemon now **unions its owned devices** (active + background live jobs) back into
+  the scan result, resolving their friendly names from a `mac->name` cache
+  populated by prior scans (so a held device keeps its name, not its raw MAC).
+  HW: churn scans now report 4/4 with zero anomalies. BLE-only (a LAN device isn't
+  a scan result). Tests: `test_scan_owned_union.py`, `test_discovery.py`.
+- **`query_page` (0x8E) read-back is bounded (10s → 4s).** HW finding: Pixoo never
+  answers the 0x8E user-define read (3/3 reads hit the 10s default and returned
+  empty), wedging the serialized command queue for 10s each call. Now bounded to
+  `QUERY_TIMEOUT=4s`. Corollary: verification-via-`query_page` is NOT viable for
+  the deferred ACK≠success fix (0x8E is unreliable on real HW) — re-scoped in the
+  review doc. Test: `test_custom_art_push.TestQueryPage`.
+
+---
 ## R53: BLE transport hardening, round 1 (2026-06-14)
 
 A four-lens adversarial review of the ~2,400-LOC Bluetooth subsystem

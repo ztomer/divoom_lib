@@ -167,25 +167,52 @@ def pick_char_uuid(preferred_uuid: str | None, candidates: list, prefix_hint: st
     return candidates[0].uuid if candidates else None
 
 
-async def discover_all_divoom_devices(timeout: float = 5.0) -> list[dict]:
+async def discover_all_divoom_devices(timeout: float = 5.0, expected: int = 0) -> list[dict]:
     """
     Scans BLE devices and returns a list of discovered Divoom devices.
     Matches devices by known Divoom name prefixes.
+
+    Uses a live detection callback with **early-exit**: as soon as ``expected``
+    distinct Divoom devices have been seen it stops scanning and returns, instead
+    of always burning the full ``timeout`` (the old ``BleakScanner.discover(timeout)``
+    waited the whole window even when every device showed up in the first 2s).
+    ``expected<=0`` disables early-exit (scan the full window — used when the count
+    is unknown and we want to find as many as possible). The scanner is always
+    stopped in ``finally`` so a cancelled/early-exited scan never leaks the OS scan.
+
+    No fallback to "all named devices": a Divoom-only control app must not list
+    every random BLE peripheral (headphones, watches, etc.) in range. If a device
+    is missing, it's powered off, out of range, or *currently connected* (a
+    connected peripheral stops advertising) — or its name needs adding to
+    DIVOOM_NAME_KEYWORDS.
     """
-    logger.info(f"Scanning for all nearby Divoom Bluetooth devices (timeout={timeout}s)...")
-    devices = await BleakScanner.discover(timeout=timeout)
+    logger.info(
+        "Scanning for Divoom BLE devices (timeout=%.1fs, early-exit at %s)...",
+        timeout, expected if expected > 0 else "off")
 
-    results = []
-    for d in devices:
-        if d.name and is_divoom_name(d.name):
-            results.append({
-                "name": d.name,
-                "address": d.address,
-            })
+    found: dict[str, dict] = {}            # address -> {name, address}, deduped
+    done = asyncio.Event()
 
-    # No fallback to "all named devices": a Divoom-only control app must not list
-    # every random BLE peripheral (headphones, watches, etc.) in range. If a
-    # device is missing, it's powered off or out of range — or its name needs
-    # adding to DIVOOM_NAME_KEYWORDS below.
-    logger.info(f"Discovered {len(results)} Divoom BLE device(s).")
+    def _on_detect(device, _adv):
+        if device.name and is_divoom_name(device.name) and device.address not in found:
+            found[device.address] = {"name": device.name, "address": device.address}
+            logger.info("Found Divoom device: %s (%s)", device.name, device.address)
+            if expected > 0 and len(found) >= expected:
+                done.set()                 # early-exit: we have them all
+
+    scanner = BleakScanner(detection_callback=_on_detect)
+    try:
+        await asyncio.wait_for(scanner.start(), timeout=10.0)
+        try:
+            await asyncio.wait_for(done.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            pass                           # window elapsed — return whatever we found
+    finally:
+        try:
+            await asyncio.wait_for(scanner.stop(), timeout=5.0)
+        except (asyncio.TimeoutError, BleakError, Exception) as e:
+            logger.warning("scanner stop failed/timed out: %s", e)
+
+    results = list(found.values())
+    logger.info("Discovered %d Divoom BLE device(s).", len(results))
     return results

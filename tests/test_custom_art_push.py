@@ -334,6 +334,22 @@ class TestQueryPage:
         assert ids is None
 
     @pytest.mark.asyncio
+    async def test_query_passes_bounded_timeout(self, mock_divoom_with_response):
+        """0x8E read-back must use the bounded QUERY_TIMEOUT, not the 10s default —
+        a device that never answers (HW-verified: Pixoo) must not wedge the
+        serialized command queue for 10s. Default and explicit override both apply."""
+        from divoom_lib.tools.custom_art_push import QUERY_TIMEOUT
+        mock_divoom_with_response.send_command_and_wait_for_response.return_value = None
+        await query_page(mock_divoom_with_response, page=0)
+        _, kwargs = mock_divoom_with_response.send_command_and_wait_for_response.call_args
+        assert kwargs.get("timeout") == QUERY_TIMEOUT
+        assert QUERY_TIMEOUT < 10.0
+
+        await query_page(mock_divoom_with_response, page=0, timeout=1.5)
+        _, kwargs = mock_divoom_with_response.send_command_and_wait_for_response.call_args
+        assert kwargs.get("timeout") == 1.5
+
+    @pytest.mark.asyncio
     async def test_query_page_unexpected_type(self, mock_divoom_with_response):
         """type=0x03 (neither data nor end) → returns None."""
         response = bytes([0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])

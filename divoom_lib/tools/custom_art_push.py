@@ -25,6 +25,12 @@ SLOTS_PER_PAGE = 12
 CHUNK_SIZE = 256  # hVar.q(256) — matches APK n().q(256)
 INTER_CHUNK_DELAY = 0.04  # APK old-mode q.s().I(true) sleeps 40ms between sends
 
+# 0x8E page-query read-back: a responsive device answers sub-second; many
+# devices (e.g. Pixoo, HW-verified 2026-06) never reply at all. Bound it tight
+# so a non-answering device fails fast instead of wedging the serialized command
+# queue for the full 10s default — every other op for that device blocks behind it.
+QUERY_TIMEOUT = 4.0
+
 _CMD_OLD = COMMANDS["set user gif"]           # 0xB1
 _CMD_NEW = COMMANDS["app new user define"]     # 0x8C
 
@@ -195,7 +201,7 @@ async def push_slot(divoom, page: int, slot: int,
 
 # ── Page query (0x8E) ────────────────────────────────────────────────────
 
-async def query_page(divoom, page: int) -> list[int] | None:
+async def query_page(divoom, page: int, timeout: float = QUERY_TIMEOUT) -> list[int] | None:
     """Query device for filled slot IDs on a page via 0x8E.
 
     The device responds with type-1 (data) and type-2 (end-of-page)
@@ -204,12 +210,15 @@ async def query_page(divoom, page: int) -> list[int] | None:
     Args:
         divoom: connected Divoom instance
         page: page to query (0, 1, or 2)
+        timeout: read-back deadline (bounded — see QUERY_TIMEOUT). A device that
+            doesn't answer 0x8E returns None at the deadline rather than blocking
+            the serialized command queue for the full 10s default.
 
     Returns:
-        list of 4-byte LE slot IDs, or None on failure.
+        list of 4-byte LE slot IDs, or None on failure/timeout.
     """
     cmd = COMMANDS["app get user define info"]  # 0x8E
-    response = await divoom.send_command_and_wait_for_response(cmd, [page & 0xFF])
+    response = await divoom.send_command_and_wait_for_response(cmd, [page & 0xFF], timeout=timeout)
     if response is None or len(response) < 8:
         logger.warning("0x8E query returned short response (%s)", response.hex() if response else "None")
         return None

@@ -129,10 +129,120 @@ def cycles(c, devs: list) -> None:
         pass
 
 
+def _status(c) -> dict:
+    try:
+        return c.device_status() or {}
+    except Exception as e:
+        return {"_err": f"{type(e).__name__}: {e}"}
+
+
+def stress(c, devs: list, iterations: int, scan_every: int, fleet: int,
+           churn: bool = False) -> int:
+    """Hammer discover/connect/disconnect/switch in a tight loop to surface BLE
+    flakiness. Records anomalies (identity mismatch, degraded-but-connected lies,
+    duration spikes, reconnect failures, fleet-count drops, raised exceptions).
+
+    churn=True skips the clean disconnect so every connect EVICTS the previous
+    device (the single-owner re-grab path where the 16s-stall / wrong-device bugs
+    lived) — the harsher test.
+    Returns the anomaly count (0 == clean run)."""
+    section(f"Stress — {iterations} iterations")
+    targets = [(d.get("name"), d.get("address")) for d in devs
+               if isinstance(d, dict) and d.get("address")]
+    if not targets:
+        warn("no connectable devices; cannot stress"); return 0
+
+    anomalies: list[str] = []
+    # per-device tally: [attempts, oks, fails, dt_min, dt_max, dt_sum]
+    tally: dict[str, list] = {a: [0, 0, 0, 9e9, 0.0, 0.0] for _, a in targets}
+    SPIKE = 15.0   # connect slower than this = near-timeout/stall
+
+    def note(msg):
+        anomalies.append(msg); err(f"ANOMALY: {msg}")
+
+    for i in range(1, iterations + 1):
+        name, mac = targets[(i - 1) % len(targets)]
+        step(f"[{i}/{iterations}] → {name}")
+
+        # periodic scan to stress discovery + catch fleet-count drops
+        if scan_every and i % scan_every == 0:
+            t0 = time.monotonic()
+            try:
+                n = len((c.scan(timeout=8) or {}).get("devices") or [])
+                dt = time.monotonic() - t0
+                (ok if n >= fleet else warn)(f"scan #{i}: {n}/{fleet} in {dt:.1f}s")
+                if n < fleet:
+                    note(f"scan#{i} found {n} of {fleet} devices")
+            except Exception as e:
+                note(f"scan#{i} raised {type(e).__name__}: {e}")
+
+        # connect
+        t = tally[mac]; t[0] += 1
+        t0 = time.monotonic()
+        try:
+            r = c.connect_device(mac=mac)
+            dt = time.monotonic() - t0
+            t[3] = min(t[3], dt); t[4] = max(t[4], dt); t[5] += dt
+            good = bool(r.get("success") and r.get("connected"))
+            if not good:
+                t[2] += 1; note(f"connect {name} failed: {r.get('reason') or r.get('error')}")
+                continue
+            t[1] += 1
+            if dt > SPIKE:
+                note(f"connect {name} SLOW {dt:.1f}s (near timeout)")
+            # identity + liveness truth-check via status
+            s = _status(c)
+            got = (s.get("mac") or "").upper()
+            if got and got != mac.upper():
+                note(f"identity: asked {name}({mac[:8]}) got mac {got[:8]}")
+            if s.get("connected") and s.get("connection_state") == "degraded":
+                note(f"{name} reports connected but DEGRADED (is_alive False)")
+        except Exception as e:
+            dt = time.monotonic() - t0
+            t[2] += 1; note(f"connect {name} raised in {dt:.1f}s: {type(e).__name__}: {e}")
+            continue
+
+        time.sleep(0.3)   # brief dwell
+
+        if churn:
+            continue       # no disconnect — next connect must EVICT this device
+
+        # disconnect, then verify the daemon really released it
+        try:
+            c.disconnect_device()
+            s = _status(c)
+            if s.get("connected"):
+                note(f"{name} still 'connected' after disconnect (stale handle)")
+        except Exception as e:
+            note(f"disconnect {name} raised: {type(e).__name__}: {e}")
+
+    # summary
+    section("Stress summary")
+    for nm, addr in targets:
+        a, o, f, lo, hi, sm = tally[addr]
+        if a == 0:
+            continue
+        avg = sm / a if a else 0
+        line = f"{nm:<20} {o}/{a} ok"
+        line += f"  {_GRAY}{lo:.1f}/{avg:.1f}/{hi:.1f}s (min/avg/max){_RESET}"
+        (ok if f == 0 else warn)(line)
+    if anomalies:
+        err(f"{len(anomalies)} anomaly(ies):")
+        for m in anomalies:
+            step(f"{_RED}{m}{_RESET}")
+    else:
+        ok("no anomalies — clean stress run")
+    return len(anomalies)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--scan-timeout", type=float, default=12.0)
-    ap.add_argument("--phase", choices=["discover", "cycles", "all"], default="discover")
+    ap.add_argument("--phase", choices=["discover", "cycles", "stress", "all"], default="discover")
+    ap.add_argument("--iterations", type=int, default=20)
+    ap.add_argument("--scan-every", type=int, default=4, help="re-scan every N stress iters (0=off)")
+    ap.add_argument("--fleet", type=int, default=4, help="expected device count for scan checks")
+    ap.add_argument("--churn", action="store_true", help="evict instead of clean-disconnect (harsher)")
     args = ap.parse_args()
 
     section("Divoom HW smoke — daemon socket")
@@ -152,11 +262,14 @@ def main() -> int:
             warn(f"{name} unavailable: {e}")
 
     devs = discover(c, args.scan_timeout)
+    rc = 0
     if args.phase in ("cycles", "all"):
         cycles(c, devs)
+    if args.phase in ("stress", "all"):
+        rc = stress(c, devs, args.iterations, args.scan_every, args.fleet, args.churn)
     print()
-    ok("done.")
-    return 0
+    ok("done." if rc == 0 else f"done — {rc} anomaly(ies) flagged.")
+    return 1 if rc else 0
 
 
 if __name__ == "__main__":

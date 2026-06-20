@@ -200,26 +200,89 @@ def _dev(name, address):
     return d
 
 
+class _FakeScanner:
+    """A BleakScanner stand-in: fires the detection callback for a fixed device
+    list on start(), records that stop() was called. Lets us test the callback +
+    early-exit path without a real BLE adapter."""
+    instances = []
+
+    def __init__(self, detection_callback=None):
+        self._cb = detection_callback
+        self.started = False
+        self.stopped = False
+        _FakeScanner.instances.append(self)
+
+    async def start(self):
+        self.started = True
+        for d in self.devices:                 # class attr set by the fixture
+            self._cb(d, None)
+
+    async def stop(self):
+        self.stopped = True
+
+
+@pytest.fixture
+def fake_scanner():
+    """Patch BleakScanner with _FakeScanner; set `.devices` on the returned class
+    to control what the callback sees."""
+    _FakeScanner.instances = []
+    _FakeScanner.devices = []
+    with patch("divoom_lib.utils.discovery.BleakScanner", _FakeScanner):
+        yield _FakeScanner
+
+
 @pytest.mark.asyncio
-async def test_discover_all_filters_non_divoom(mock_bleak_scanner_discover):
+async def test_discover_all_filters_non_divoom(fake_scanner):
     """Only Divoom-named peripherals are returned — never the whole BLE list."""
-    mock_bleak_scanner_discover.return_value = [
+    fake_scanner.devices = [
         _dev("Ditoo-light-2", "AA:11"),
         _dev("AirPods Pro", "BB:22"),
         _dev("Pixoo64", "CC:33"),
         _dev(None, "DD:44"),  # unnamed
     ]
-    results = await discovery.discover_all_divoom_devices(timeout=1.0)
+    results = await discovery.discover_all_divoom_devices(timeout=0.05)
     addrs = {r["address"] for r in results}
     assert addrs == {"AA:11", "CC:33"}
+    assert fake_scanner.instances[0].stopped is True   # scanner always stopped
 
 
 @pytest.mark.asyncio
-async def test_discover_all_no_fallback_to_all_devices(mock_bleak_scanner_discover):
+async def test_discover_all_no_fallback_to_all_devices(fake_scanner):
     """When nothing matches, return an empty list — NOT every named device."""
-    mock_bleak_scanner_discover.return_value = [
+    fake_scanner.devices = [
         _dev("AirPods Pro", "BB:22"),
         _dev("Galaxy Watch", "EE:55"),
     ]
-    results = await discovery.discover_all_divoom_devices(timeout=1.0)
+    results = await discovery.discover_all_divoom_devices(timeout=0.05)
     assert results == []
+
+
+@pytest.mark.asyncio
+async def test_discover_all_dedupes_repeated_adverts(fake_scanner):
+    """A device that advertises several times is counted once."""
+    fake_scanner.devices = [
+        _dev("Pixoo-1", "AA:11"),
+        _dev("Pixoo-1", "AA:11"),   # repeat advert
+        _dev("Ditoo-2", "BB:22"),
+    ]
+    results = await discovery.discover_all_divoom_devices(timeout=0.05)
+    assert {r["address"] for r in results} == {"AA:11", "BB:22"}
+
+
+@pytest.mark.asyncio
+async def test_discover_all_early_exit_returns_before_timeout(fake_scanner):
+    """With `expected` set, the scan returns as soon as that many devices are
+    seen — it must NOT wait out the (long) timeout. A 30s timeout with all
+    devices delivered on start() must complete near-instantly."""
+    fake_scanner.devices = [
+        _dev("Pixoo-1", "AA:11"),
+        _dev("Ditoo-2", "BB:22"),
+        _dev("Timoo-3", "CC:33"),
+        _dev("Tivoo-4", "DD:44"),
+    ]
+    completed = await asyncio.wait_for(
+        discovery.discover_all_divoom_devices(timeout=30.0, expected=4),
+        timeout=5.0,     # would raise if it actually waited the 30s window
+    )
+    assert len(completed) == 4
+    assert fake_scanner.instances[0].stopped is True

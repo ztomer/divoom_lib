@@ -18,6 +18,26 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 6 — SCAN SPEED + CONNECTED-DEVICE VISIBILITY SHIPPED (2026-06-20).**
+  HW-driven via the dev-daemon socket + a new stress loop
+  (`scripts/hw_smoke.py --phase stress [--churn]`) that hammers connect/disconnect/
+  evict and flags anomalies (identity mismatch, degraded-but-connected, duration
+  spikes, fleet-count drops, stale-after-disconnect). **(1)** Scan is now
+  early-exit: `discover_all_divoom_devices` uses a detection callback + returns the
+  instant `expected` devices are seen (guaranteed `scanner.stop()` in `finally`) —
+  HW **15.0s → ~2s** for a 4-device scan. **(2)** A connected peripheral stops
+  advertising and was being dropped from the selector ("should be 4, found 3");
+  `device_owner.scan` now **unions owned devices** (active + live jobs) back in,
+  with names from a `mac->name` scan cache. Churn stress now 40/40 connects clean,
+  scans 4/4, zero anomalies. **(3)** `query_page` (0x8E) bounded 10s→4s (Pixoo
+  never answers it). Tests: `test_scan_owned_union.py`, `test_discovery.py` (now
+  callback-based), `test_custom_art_push.TestQueryPage`. Full suite green; files
+  ≤500 LOC (`device_owner.py` trimmed to exactly 500). **OPEN follow-ups:** when a
+  device is held, the scan can't early-exit (only N-1 advertise) so it waits the
+  full window (~8s) before unioning — could subtract owned-count from `expected`;
+  and the deferred ACK≠success fix must downgrade `success` honesty (NOT verify via
+  0x8E, which is unreliable on HW) — see `docs/BLE_HARDENING_REVIEW_2026-06.md`.
+
 - **R50 SPECIFIC PREVIEWS SHIPPED (2026-06-14).** Three preview-fidelity fixes
   on top of R49. **(1)** Device preview now renders the SPECIFIC channel face
   (6 clock styles, in the chosen color) instead of a generic glyph —

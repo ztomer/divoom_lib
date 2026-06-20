@@ -68,6 +68,22 @@ Real-device testing became possible via `scripts/make_dev_daemon_app.sh` (a thin
   via `connection_state`/DEGRADED); only the connect/reconnect *decisions* use
   is_alive.
 
+## SHIPPED in R53 round 6 — `query_page` (0x8E) fail-fast (HW-validated 2026-06-20)
+
+- **0x8E page-query read-back is bounded to 4s (`QUERY_TIMEOUT`), was 10s.**
+  HW finding: Pixoo **never answers** the 0x8E user-define read — three back-to-back
+  reads each timed out at exactly 10.06s and returned `ids: []`. Because the device
+  command queue is serialized, every other op for that device blocked behind the
+  10s wait. `query_page` now passes a bounded `timeout=QUERY_TIMEOUT` (4s) through
+  to `send_command_and_wait_for_response`; HW-validated 10.06s → 4.05s with no loss
+  (a responsive device answers sub-second; this one answers never). Test:
+  `test_custom_art_push.TestQueryPage.test_query_passes_bounded_timeout`.
+- **Consequence for the deferred ACK≠success item (below): verification-via-`query_page`
+  is NOT viable** — 0x8E is unreliable on real HW, so wiring it into `push_page`
+  would add 4s/push AND falsely report 0 slots. The honest fix must instead
+  *downgrade the reported `success`* to reflect "writes accepted, not device-confirmed"
+  rather than claim a verification the device won't support. Re-scoped below.
+
 ## SHIPPED in R53 round 2 (2026-06-14)
 
 - **`ensure_connected` fast-path now trusts `is_alive`, not cached `is_connected`**
