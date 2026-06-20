@@ -160,28 +160,34 @@ class BTSppTransport(DeviceTransport):
                 self.logger.warning(f"macOS: Serial connection failed: {e}. Trying IOBluetooth...")
                 if self._serial_port:
                     try:
-                        self._serial_port.close()
+                        self._serial_port.close()   # makes the read loop exit
                     except Exception:
                         pass
                     self._serial_port = None
+                self._serial_read_thread = None   # R53: closing the port exits it
 
-        self._start_runloop()
-        await asyncio.to_thread(self._open_blocking)
-        # R53: the RFCOMM-open completion is a threading.Event set from the
-        # IOBluetooth delegate thread. Waiting on it directly froze the WHOLE
-        # asyncio loop (daemon dispatch, other devices, GUI bridge) for up to
-        # OPEN_TIMEOUT_S on every SPP connect — wait off-loop instead.
-        opened = await asyncio.to_thread(self._open_event.wait, self.OPEN_TIMEOUT_S)
-        if not opened:
-            raise BtSppTransportError(
-                f"RFCOMM open to {self.mac_address} channel {self.channel_id} timed out. "
-                "Known macOS Tahoe SPP reconnection bug."
-            )
-        if self._last_error:
-            raise BtSppTransportError(f"RFCOMM open failed: {self._last_error}")
-            
-        self.logger.info(f"BT Classic SPP open: {self.mac_address} channel {self.channel_id}")
-        self._rx_task = asyncio.create_task(self._rx_loop())
+        # R53: tear everything down on ANY failure here, so a failed IOBluetooth
+        # open doesn't leak the runloop thread (only disconnect() sets _close_event).
+        try:
+            self._start_runloop()
+            await asyncio.to_thread(self._open_blocking)
+            # R53.2: the RFCOMM-open completion is a threading.Event set from the
+            # IOBluetooth delegate thread — wait off-loop so it can't freeze the
+            # whole asyncio loop for up to OPEN_TIMEOUT_S on every connect.
+            opened = await asyncio.to_thread(self._open_event.wait, self.OPEN_TIMEOUT_S)
+            if not opened:
+                raise BtSppTransportError(
+                    f"RFCOMM open to {self.mac_address} channel {self.channel_id} timed out. "
+                    "Known macOS Tahoe SPP reconnection bug."
+                )
+            if self._last_error:
+                raise BtSppTransportError(f"RFCOMM open failed: {self._last_error}")
+
+            self.logger.info(f"BT Classic SPP open: {self.mac_address} channel {self.channel_id}")
+            self._rx_task = asyncio.create_task(self._rx_loop())
+        except BaseException:
+            await self.disconnect()   # stop the runloop thread + close the channel
+            raise
 
     async def disconnect(self) -> None:
         self._close_event.set()

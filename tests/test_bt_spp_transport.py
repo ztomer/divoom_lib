@@ -210,6 +210,27 @@ class TestSendFraming:
             await t.send([0x45])
 
     @pytest.mark.asyncio
+    async def test_failed_open_tears_down(self, monkeypatch):
+        """R53: a failed IOBluetooth open must NOT leak the runloop thread — connect
+        tears everything down (disconnect) before propagating."""
+        t = BTSppTransport(mac_address="11-75-58-54-b9-13", channel_id=2)
+        t.OPEN_TIMEOUT_S = 0.05
+        monkeypatch.setattr(t, "_find_serial_port", lambda: None)   # skip serial path
+        monkeypatch.setattr(t, "_start_runloop", lambda: None)
+        monkeypatch.setattr(t, "_open_blocking", lambda: None)
+        disc = {"n": 0}
+        real = t.disconnect
+
+        async def _disc():
+            disc["n"] += 1
+            await real()
+        monkeypatch.setattr(t, "disconnect", _disc)
+
+        with pytest.raises(BtSppTransportError, match="timed out"):
+            await t.connect()
+        assert disc["n"] == 1   # failed connect cleaned up
+
+    @pytest.mark.asyncio
     async def test_send_raises_on_unknown_framing(self):
         t = BTSppTransport(mac_address="11-75-58-54-b9-13", channel_id=2)
         t._channel = _StubChannel()

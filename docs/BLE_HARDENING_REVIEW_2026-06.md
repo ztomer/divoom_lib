@@ -119,15 +119,15 @@ where a careless change can break working pushes — they deserve isolated round
   `test_device_activity.test_live_job_stop_awaits_task_death` (tests now use a real
   loop). `stop_all_live_jobs` / `_release_live_device_if_idle` (shutdown path)
   still fire-and-forget — lower priority, tracked.
-- **SPP transport is weaker than BLE across the board** (`bt_spp_transport.py`):
-  the `_open_event.wait()` blocks the *event loop* up to 8 s; a failed connect
-  leaks the runloop/read threads + serial port; `_serial_read_loop` swallows all
-  errors and dies silently while `is_connected` still reads True; `max_retries`
-  is accepted but ignored; no preflight / no `FailureReason` classification; a
-  corrupt iOS-LE length field stalls the parser. Fix: bring SPP to BLE parity
-  (off-loop open, teardown-on-failure, death-aware `is_connected`, classify
-  errors, bound frame length). Dead code: `spp_connection.read_spp_notifications_loop`
-  / `disconnect_spp` are unused — delete.
+- **SPP transport is weaker than BLE** (`bt_spp_transport.py`). PARTIALLY SHIPPED:
+  off-loop open (R53.2) and **teardown-on-failure (R53.5)** — a failed IOBluetooth
+  open no longer leaks the runloop thread; connect now `disconnect()`s on any
+  failure (test `test_failed_open_tears_down`); the serial-fallback path drops its
+  read-thread ref. STILL OPEN: `_serial_read_loop` swallows all errors and dies
+  silently while `is_connected` still reads True (no death-aware liveness);
+  `max_retries` accepted but ignored; no preflight / no `FailureReason`
+  classification; a corrupt iOS-LE length field stalls the parser. Dead code:
+  `spp_connection.read_spp_notifications_loop` / `disconnect_spp` are unused — delete.
 - **Discovery scans are unbounded/unstoppable** (`utils/discovery.py`): fixed 10 s
   `BleakScanner.discover` with no early-exit on match and no `try/finally` stop on
   cancellation. Fix: detection-callback + stop-on-first-match + guaranteed stop.
