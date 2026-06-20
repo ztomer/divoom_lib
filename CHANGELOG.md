@@ -5,6 +5,45 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53: BLE transport hardening, round 1 (2026-06-14)
+
+A four-lens adversarial review of the ~2,400-LOC Bluetooth subsystem
+(`docs/BLE_HARDENING_REVIEW_2026-06.md`). This round lands the highest-value,
+lowest-risk, fully-tested fixes; the deferred findings are tracked in that doc.
+
+- **Every raw bleak await is now bounded.** `ensure_connected` bounded the first
+  connect, but the internal reconnect path (`send_payload → connect`) bypasses it
+  and runs *while holding the write lock* — so a dead/asleep/held device hung the
+  whole transport forever. `BLETransport.connect/disconnect` now wrap
+  `client.connect()` (15 s), `start_notify()` (6 s), `stop_notify()` (3 s), and
+  `client.disconnect()` (5 s) in `asyncio.wait_for`, raising
+  `DeviceConnectionError` with the reason preserved.
+- **Notify-subscription leak fixed.** `disconnect()`'s comment claimed it called
+  `stop_notify` to release the OS subscription, but it never did — leaking it,
+  which made a later `start_notify` raise "already started". Now it actually does.
+- **A wedged BLE op can no longer hang a daemon RPC / socket-handler thread.** The
+  device command queue is now built with `item_timeout=240 s` (rejects an op left
+  waiting behind a stuck op) and `_run_device`/`_run_on_loop` use `.result()`
+  backstops (270 s / 90 s) that surface a clean `TimeoutError`. `hot_update` is
+  fire-and-forget so it's unaffected.
+- **Transport-swap registry leak fixed.** A BLE↔SPP transport-type switch replaced
+  `_active_transport` without tearing down the old one — leaking it in the
+  process-wide registry and keeping its CoreBluetooth link open while the new
+  transport connected to the same device. `_teardown_outgoing_transport()` now
+  disconnects+unregisters the outgoing transport before the swap (no-op on a
+  same-type reconnect).
+- Extracted the BLE framing auto-probe to `ble_probe.py` (500-LOC cap).
+- Tests: `tests/test_ble_timeout_hardening.py` (6) — bounded connect/notify/
+  disconnect, stop_notify-before-disconnect ordering, swap-teardown.
+
+**Deferred** (real, need isolated tested rounds — see the review doc): ACK≠success
+honesty in custom-art/hot-update pushes (likely tied to R45 #1), live-job ↔
+exclusive-push interleaving, shared notification-queue cross-talk, `ensure_connected`
+trusting cached `is_connected`, live-job stop not awaiting cancellation, and SPP
+transport parity (loop-blocking open, thread/port leaks on failed connect, silent
+dead-RX, ignored `max_retries`, no preflight/classification).
+
+---
 ## v0.15.2 — UI/UX polish (2026-06-14)
 
 Packaged release bundling the R49–R52 work below since v0.15.1: named device

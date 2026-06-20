@@ -96,6 +96,7 @@ class DivoomConnection(DeviceTransport):
                         device_kind = "tivoo"
                     
                     self.logger.info(f"Switching transport to BTSppTransport for {device_name}...")
+                    await self._teardown_outgoing_transport()
                     self._active_transport = bt_spp_transport.BTSppTransport(
                         mac_address=classic_mac,
                         device_kind=device_kind,
@@ -110,10 +111,26 @@ class DivoomConnection(DeviceTransport):
         if not use_spp:
             if self._use_spp or not isinstance(self._active_transport, BLETransport):
                 self.logger.info("Switching transport to BLETransport...")
+                await self._teardown_outgoing_transport()
                 self._active_transport = BLETransport(self.cfg, self.logger, divoom=self._divoom)
                 self._use_spp = False
 
         await self._active_transport.connect()
+
+    async def _teardown_outgoing_transport(self) -> None:
+        """R53: cleanly disconnect (and unregister) the outgoing transport BEFORE
+        a transport-type swap. Without this the old transport leaks in the BLE
+        registry and — on a BLE→SPP switch — keeps the CoreBluetooth link open
+        while the new transport tries to reach the same device, causing the
+        contention the registry exists to prevent. Only fires on a genuine type
+        change (a same-type reconnect reuses the transport, so this is a no-op)."""
+        old = getattr(self, "_active_transport", None)
+        if old is None:
+            return
+        try:
+            await old.disconnect()
+        except Exception as e:
+            self.logger.debug("outgoing transport teardown failed (continuing): %s", e)
 
     async def disconnect(self) -> None:
         await self._active_transport.disconnect()

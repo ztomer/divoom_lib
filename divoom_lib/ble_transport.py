@@ -21,6 +21,13 @@ class BLETransport(DeviceTransport):
     Bluetooth Low Energy (BLE) transport client for Divoom devices.
     Implements the DeviceTransport interface.
     """
+    # R53: bound every raw bleak await so a dead/asleep/held device can't hang the
+    # connection forever. ensure_connected bounds the FIRST connect, but the
+    # internal reconnect path (send_payload → connect) bypasses it — bound here.
+    CONNECT_TIMEOUT = 15.0
+    NOTIFY_TIMEOUT = 6.0
+    STOP_NOTIFY_TIMEOUT = 3.0
+    DISCONNECT_TIMEOUT = 5.0
     def __init__(self, cfg: models.DivoomConfig, logger: logging.Logger, divoom: Any = None) -> None:
         self.mac = cfg.mac
         self.device_name = cfg.device_name
@@ -142,8 +149,14 @@ class BLETransport(DeviceTransport):
 
         if not self.client.is_connected:
             try:
-                await self.client.connect()
+                # R53: bound the connect so a dead/asleep/held device can't hang
+                # the (possibly write-lock-holding) reconnect path forever.
+                await asyncio.wait_for(self.client.connect(), timeout=self.CONNECT_TIMEOUT)
                 self.logger.info(f"Connected to Divoom device at {self.mac}")
+            except asyncio.TimeoutError:
+                self.logger.error(f"Connect to {self.mac} timed out after {self.CONNECT_TIMEOUT}s")
+                raise DeviceConnectionError(
+                    f"Connect to {self.mac} timed out after {self.CONNECT_TIMEOUT}s")
             except Exception as e:
                 self.logger.error(f"Failed to connect to {self.mac}: {e}")
                 raise DeviceConnectionError(f"Failed to connect to {self.mac}: {e}")
@@ -159,7 +172,15 @@ class BLETransport(DeviceTransport):
                 )
             else:
                 cb = self._divoom.notification_handler if (self._divoom and hasattr(self._divoom, "notification_handler")) else self.notification_handler
-                await self.client.start_notify(self.NOTIFY_CHARACTERISTIC_UUID, cb)
+                # R53: bound start_notify too — a wedged GATT subscribe otherwise
+                # hangs connect() (and any write-lock-holding reconnect) forever.
+                try:
+                    await asyncio.wait_for(
+                        self.client.start_notify(self.NOTIFY_CHARACTERISTIC_UUID, cb),
+                        timeout=self.NOTIFY_TIMEOUT)
+                except asyncio.TimeoutError:
+                    raise DeviceConnectionError(
+                        f"start_notify timed out after {self.NOTIFY_TIMEOUT}s on {self.mac}")
                 self._notifications_started = True
                 self.logger.info(f"Enabled notifications for {self.NOTIFY_CHARACTERISTIC_UUID}")
         else:
@@ -167,56 +188,36 @@ class BLETransport(DeviceTransport):
 
         await asyncio.sleep(1.0)
 
-        # Dynamic Auto-Probing of BLE Protocol
-        if self.use_ios_le_protocol is None:
-            self.logger.info("use_ios_le_protocol not set. Probing BLE protocol format...")
-            self.use_ios_le_protocol = True
-            self.escapePayload = False
-            self._expected_response_command = 0x46
-            payload_bytes = [0x46]
-            
-            try:
-                if await self._send_ios_le_payload(payload_bytes, write_with_response=True):
-                    resp = await self.wait_for_response(0x46, timeout=1.5)
-                    if resp is not None:
-                        self.logger.info("Protocol probe succeeded: Detected iOS-LE Protocol BLE!")
-                        self._expected_response_command = None
-                        return
-            except Exception as e:
-                self.logger.debug(f"iOS-LE probe write raised: {e}")
-            
-            self.use_ios_le_protocol = False
-            self.escapePayload = False
-            self._expected_response_command = 0x46
-            
-            try:
-                if await self._send_basic_protocol_payload(payload_bytes, write_with_response=True):
-                    resp = await self.wait_for_response(0x46, timeout=1.5)
-                    if resp is not None:
-                        self.logger.info("Protocol probe succeeded: Detected Basic Protocol BLE!")
-                        self._expected_response_command = None
-                        return
-            except Exception as e:
-                self.logger.debug(f"Basic probe write raised: {e}")
-            
-            self.logger.info("Both BLE protocol probes failed. Defaulting to BLE Basic Protocol.")
-            self.use_ios_le_protocol = False
-            self.escapePayload = False
-            self._expected_response_command = None
+        # Dynamic auto-probe of the BLE framing (iOS-LE vs Basic) — see ble_probe.
+        from .ble_probe import autoprobe_protocol
+        await autoprobe_protocol(self)
 
     async def disconnect(self) -> None:
         from . import ble_registry
         ble_registry.unregister(self.mac, self)
         if self.client and self.client.is_connected:
+            # R53: actually release the OS-side notify subscription before
+            # disconnecting (the old comment claimed this happened, but no
+            # stop_notify was ever called — leaking the subscription, which made
+            # a later start_notify on a fresh client raise "already started").
+            if self._notifications_started and self.NOTIFY_CHARACTERISTIC_UUID:
+                try:
+                    await asyncio.wait_for(
+                        self.client.stop_notify(self.NOTIFY_CHARACTERISTIC_UUID),
+                        timeout=self.STOP_NOTIFY_TIMEOUT)
+                except Exception as e:
+                    self.logger.debug("stop_notify on %s failed (continuing): %s", self.mac, e)
             try:
-                await self.client.disconnect()
+                # R53: bound the disconnect so a wedged teardown can't hang.
+                await asyncio.wait_for(self.client.disconnect(), timeout=self.DISCONNECT_TIMEOUT)
                 self.logger.info("Disconnected from Divoom device at %s", self.mac)
+            except asyncio.TimeoutError:
+                self.logger.warning("Disconnect from %s timed out after %.0fs",
+                                    self.mac, self.DISCONNECT_TIMEOUT)
             except Exception as e:
                 self.logger.error("Error disconnecting from %s: %s", self.mac, e)
         # Reset the notification-subscription flag so a future connect()
-        # can re-subscribe cleanly. On macOS CoreBluetooth, stop_notify
-        # in disconnect() releases the OS-side subscription, so a
-        # subsequent start_notify on a new connection is valid.
+        # can re-subscribe cleanly.
         self._notifications_started = False
         # The "connection likely broken" flag was an inference from
         # write failures; a clean disconnect is the source of truth
