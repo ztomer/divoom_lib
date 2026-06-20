@@ -195,7 +195,14 @@ class DivoomWall:
         disconnect_tasks = []
         for slot in self.devices:
             disconnect_tasks.append(slot.device.disconnect())
-        await asyncio.gather(*disconnect_tasks)
+        # return_exceptions=True: a bare gather re-raises on the FIRST failing slot
+        # and abandons the rest, leaking those still-connected (and registry-held)
+        # devices — which then blocks the next single↔wall switch. Disconnect ALL.
+        results = await asyncio.gather(*disconnect_tasks, return_exceptions=True)
+        for slot, res in zip(self.devices, results):
+            if isinstance(res, Exception):
+                self.logger.warning("wall slot %s disconnect failed: %s",
+                                    getattr(slot.device, "mac", "?"), res)
         self.logger.info("All display wall devices disconnected.")
 
     @property

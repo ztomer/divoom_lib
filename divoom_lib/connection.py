@@ -80,7 +80,11 @@ class DivoomConnection(DeviceTransport):
 
         # 3. Instantiate and switch transport if needed
         if use_spp:
-            if not self._use_spp or not isinstance(self._active_transport, BTSppTransport):
+            # NB: qualify via the imported module — bare `BTSppTransport` is NOT bound
+            # in this module, so on an SPP *reconnect* (_use_spp already True, so the
+            # `not self._use_spp` short-circuit no longer saves us) the isinstance()
+            # raised NameError and crashed every second connect to an SPP device.
+            if not self._use_spp or not isinstance(self._active_transport, bt_spp_transport.BTSppTransport):
                 from . import spp_connection
                 classic_mac = spp_connection.resolve_classic_mac(device_name, mac, log=self.logger)
                 if classic_mac:

@@ -322,7 +322,7 @@ class OwnerLiveMixin:
                     cfg["width"] = int(s["width"])
                 if "height" in s:
                     cfg["height"] = int(s["height"])
-                    configs.append(cfg)
+                configs.append(cfg)   # once per slot — was wrongly nested under `if height`
             wall = DivoomWall(configs, custom_logger=logger)
             await wall.connect()
             return wall
