@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 10 — LIVE-JOB vs EXCLUSIVE-PUSH ANTI-CLOBBER SHIPPED (2026-06-20).**
+  Closed a High deferred BLE finding. During an exclusive push (animation/custom-art,
+  `proxy.exclusive(token)`) a live job's TOKENLESS frames queued (exclusive mode only
+  dispatches matching-token items) and burst out on release, clobbering the push.
+  `exclusive_start` now stops the active device's live jobs first (`live_jobs_stop_for({})`,
+  stop-before-acquire); background-device jobs survive. HW-verified both. Test:
+  `test_exclusive_stops_jobs.py`. Review doc item struck. Remaining High deferred BLE
+  item: shared notification_queue + scalar `_expected_response_command` cross-talk (only
+  safe today because nothing else runs via `_run_on_loop`). CI is green again after the
+  R53.9-era flaky-fixture fix (6a8512f).
+
 - **R53 round 9 — DISCONNECT STOPS ACTIVE LIVE JOBS SHIPPED (2026-06-20).** HW
   edge-probe: a sysmon job on the active device survived `disconnect()` as a live
   task (`done:false`), spinning on the released link (could resurrect it). `disconnect()`

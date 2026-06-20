@@ -5,6 +5,20 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 10: live-job vs exclusive-push anti-clobber (2026-06-20)
+
+Closes a High deferred BLE finding. An exclusive session (animation / custom-art
+push, `async with proxy.exclusive(token)`) takes over the screen, but a live job
+(sysmon/…) on the same device keeps submitting TOKENLESS frames. In exclusive
+mode the command queue only dispatches matching-token items, so those frames piled
+up and then **burst out FIFO the instant the session released — clobbering what
+was just pushed**. `exclusive_start` now stops the active device's live jobs first
+(`live_jobs_stop_for({})`, the same primitive the channel-switch path uses), before
+acquiring the token so a cancelled poller can't slip one more frame in. Background-
+device jobs (a different screen, no clobber) are left running. HW-verified both
+directions; test `test_exclusive_stops_jobs.py`. Full suite green (1536 passed).
+
+---
 ## R53 rounds 7-9: edge-case hardening + owner split (2026-06-20)
 
 Continued HW edge-probing of the daemon socket, plus a structural split.

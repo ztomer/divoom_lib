@@ -109,6 +109,16 @@ class DeviceOwner(OwnerArtMixin, OwnerConnectMixin, OwnerLiveMixin, OwnerLoopMix
             return {"success": False, "error": "exclusive_start requires 'token'"}
         if self._cmd_queue is None:
             self._device_loop()
+        # An exclusive session takes over the active screen (animation / custom-art
+        # push). Stop the active device's live jobs FIRST: their tokenless frames
+        # would queue behind the exclusive op while it runs, then BURST out FIFO on
+        # release and clobber what was just pushed. Stop before acquire so a
+        # cancelled poller can't slip one more frame in. Background-device jobs (a
+        # different screen) don't clobber and are left running.
+        try:
+            self.live_jobs_stop_for({})
+        except Exception as e:
+            logger.debug("stop live jobs on exclusive_start: %s", e)
         try:
             # Submit acquire WITH the token so it passes the exclusive-mode
             # gate on the queue's worker side.

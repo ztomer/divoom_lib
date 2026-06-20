@@ -112,12 +112,17 @@ where a careless change can break working pushes — they deserve isolated round
   success. Fix: verify via `query_page` (0x8E) after K0 / track per-file
   device confirmation and downgrade `success` when unconfirmed. **(Likely related
   to R45 #1 "Custom Art channel empty" — investigate together.)**
-- **Live-job push interleaves with a foreground exclusive 0x8B push.** Live-job
-  frames are submitted *tokenless*, so while a GUI exclusive push runs they queue
-  and then fire in a burst the instant it releases, clobbering it. Fix: have
-  `exclusive_start` call `live_jobs_stop_for(mac)` (the channel-switch path
-  already does this), or give live pushes a device-stable token treated as a
-  barrier.
+- ~~**Live-job push interleaves with a foreground exclusive 0x8B push.**~~
+  **SHIPPED R53.10 (HW-validated 2026-06-20).** Live-job frames are submitted
+  *tokenless*, so while a GUI exclusive push ran they queued (the queue only
+  dispatches matching-token items in exclusive mode) and then fired in a burst the
+  instant it released, clobbering it. `exclusive_start` now calls
+  `live_jobs_stop_for({})` (active device) BEFORE acquiring the token — same
+  primitive as the channel-switch path; stop-before-acquire so a cancelled poller
+  can't slip one more frame in. Background-device live jobs (a different screen,
+  no clobber) are left running. HW-verified both: active sysmon stopped by an
+  exclusive push (`jobs:[]`, no burst); a background-device sysmon survived an
+  exclusive push on the active device. Test: `test_exclusive_stops_jobs.py`.
 - **Shared `notification_queue` + scalar `_expected_response_command` cross-talk.**
   A concurrent `send_command_and_wait_for_response` can flush a 0x8B ready-ACK /
   retransmit frame out from under an in-flight animation push (only safe today
