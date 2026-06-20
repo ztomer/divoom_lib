@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 15 — EXCLUSIVE DEADLINE RE-ARMS ON COMPLETION SHIPPED (2026-06-20).**
+  The command-queue exclusive auto-release re-armed its deadline only on dequeue; a
+  long-running exclusive item (animation/custom-art push) or a gap before the next
+  owner item could let the deadline lapse mid-session → next `_dequeue` force-releases
+  an actively-working session. Worker now re-arms on item COMPLETION too. Test verified
+  to fail without the fix. LAN per-request aiohttp session reviewed → **WONTFIX** (async
+  with-scoped, no leak; reuse would couple session to loop lifecycle for marginal gain).
+  Full suite green (1553 passed). **BLE review deferred list is now down to 2 low/niche
+  items:** discovery `discover_device(address=...)` stop-on-first-match (legacy/maybe-unused
+  path), and SPP connect preflight/FailureReason (untestable with the all-BLE fleet). The
+  High+Medium tiers and nearly all Low are DONE across R53.1–15.
+
 - **R53 round 14 — REGISTRY EVICTION HONESTY + LOOP-TEARDOWN RESET SHIPPED (2026-06-20).**
   `ble_registry.evict` now WARNs on a failed disconnect (was silent debug → a failed
   eviction looked successful while the OS link survived → next-connect stall). And

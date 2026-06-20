@@ -206,6 +206,36 @@ async def test_exclusive_with_timeout_still_defers_free_items(loop):
         q.stop()
 
 
+@pytest.mark.asyncio
+async def test_exclusive_not_released_during_long_item(loop):
+    """R53.15: a single exclusive item that runs LONGER than exclusive_timeout must
+    not cause the active session to be force-released — the deadline re-arms on
+    completion. A free item genuinely PENDING behind it stays deferred until the
+    real release. (submit_async only enqueues when awaited, so ensure_future both
+    to get the free item actually queued while the slow item runs.)"""
+    q = CommandQueue(loop, exclusive_timeout=0.2)
+    q.start()
+    try:
+        history = []
+
+        async def _slow(tag):
+            await asyncio.sleep(0.4)            # > exclusive_timeout
+            history.append(tag)
+
+        await q.acquire("X")
+        slow_task = asyncio.ensure_future(q.submit_async(_slow("x-slow"), token="X"))
+        free_task = asyncio.ensure_future(q.submit_async(_record(history, "free")))
+        await asyncio.sleep(0.05)              # let both actually enqueue
+        await slow_task                        # ~0.4s, well past the 0.2 deadline
+        await asyncio.sleep(0.15)              # past where a lapsed deadline would fire
+        assert "free" not in history, f"session force-released mid-flight: {history}"
+        await q.release("X")
+        await free_task
+        assert history == ["x-slow", "free"], history
+    finally:
+        q.stop()
+
+
 # ── concurrent submissions from multiple tasks ────────────────────────────
 
 

@@ -181,9 +181,17 @@ where a careless change can break working pushes — they deserve isolated round
   transports bound to the dying loop), then nulls `_loop`/`_cmd_queue`/`_loop_thread`
   so `_device_loop()` rebuilds cleanly on a restart instead of returning the
   stopped loop. Tests `test_reset_clears_all_entries`, `test_forget_loop_*`.
-- Exclusive deadline only re-arms on *dequeue*; a single multi-minute exclusive
-  item could be force-released mid-flight. Re-arm on item completion too.
-- LAN `post` opens a fresh `aiohttp` session per request.
+- ~~Exclusive deadline only re-arms on *dequeue*; a single multi-minute exclusive
+  item could be force-released mid-flight.~~ **SHIPPED R53.15.** The worker now
+  re-arms the deadline on item COMPLETION too (not just dequeue), so a long-running
+  exclusive item — or a gap before the owner submits its next item — can't let the
+  deadline lapse mid-session and force-release an actively-progressing exclusive
+  block. Test `test_exclusive_not_released_during_long_item` (verified it fails
+  without the fix: logs the spurious `force-releasing`).
+- LAN `post` opens a fresh `aiohttp` session per request. **WONTFIX (intentional):**
+  it's `async with`-scoped (no leak); reusing a session would couple its lifecycle to
+  the device-loop lifecycle (stale-session-on-dead-loop failure mode) for a marginal
+  gain on the minority transport. Left simple + correct.
 
 ---
 

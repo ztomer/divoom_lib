@@ -227,6 +227,16 @@ class CommandQueue:
                         item.future.set_exception(exc)
                     if isinstance(exc, asyncio.CancelledError):
                         raise
+                # Re-arm the exclusive deadline on COMPLETION, not just at dequeue
+                # (_dequeue arms when it hands out an owner item). A single
+                # long-running exclusive item — or a gap before the owner submits
+                # its NEXT item — would otherwise let the deadline lapse during the
+                # session's own work, so the next _dequeue force-releases a session
+                # that's actively progressing. (CancelledError re-raised above, so
+                # we don't touch the lock while the worker is being torn down.)
+                if self._exclusive_owner is not None:
+                    async with self._cond:
+                        self._arm_exclusive_deadline()
 
         self._worker = asyncio.create_task(_run())
         await asyncio.sleep(0)

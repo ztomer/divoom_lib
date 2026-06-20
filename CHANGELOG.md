@@ -5,6 +5,24 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 15: exclusive deadline re-arms on completion (2026-06-20)
+
+The command queue's exclusive-session auto-release (G3 — frees a dead client's
+token after `exclusive_timeout`) only re-armed the deadline when it DEQUEUED an
+owner item. A single long-running exclusive item (a multi-frame animation / custom-
+art push), or a gap before the owner submitted its next item, could let the deadline
+lapse during the session's own work — so the next `_dequeue` force-released a session
+that was actively progressing, dropping the exclusivity guarantee mid-push.
+
+The worker now also re-arms the deadline on item COMPLETION, so an actively-working
+session is never force-released. Verified the new test fails without the fix (it logs
+the spurious `exclusive session ... force-releasing`). The LAN per-request aiohttp
+session was reviewed and deliberately left as-is (WONTFIX — see review doc).
+
+Test: `test_command_queue.test_exclusive_not_released_during_long_item`. Full suite
+green (1553 passed).
+
+---
 ## R53 round 14: registry eviction honesty + loop-teardown reset (2026-06-20)
 
 Two Low-tier BLE-registry / connect-lock lifecycle fixes.
