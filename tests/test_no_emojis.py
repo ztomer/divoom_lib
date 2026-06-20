@@ -53,12 +53,21 @@ def _is_emoji(ch: str) -> bool:
     return any(lo <= cp <= hi for lo, hi in EMOJI_RANGES)
 
 
+# Per-file exemptions: terminal tools that intentionally use the shared "kare"
+# status glyphs (arrow / middot / check / cross / warning, matching
+# ~/projects/scripts/_stylerc). These are functional TUI iconography, not
+# decorative emoji — the R14 section-6 ban targets the latter.
+EXEMPT_FILES = {"scripts/hw_smoke.py"}
+
+
 def _scannable_files() -> list[Path]:
     out: list[Path] = []
     for p in REPO_ROOT.rglob("*"):
         if not p.is_file() or p.suffix not in EXTS:
             continue
         if any(part in EXEMPT_DIRS for part in p.parts):
+            continue
+        if p.relative_to(REPO_ROOT).as_posix() in EXEMPT_FILES:
             continue
         out.append(p)
     return sorted(out)

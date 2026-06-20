@@ -63,8 +63,18 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
     # _device_loop / _run_device / _run_on_loop live in OwnerLoopMixin.
 
     def _device_connected(self) -> bool:
+        # P6 design: the legacy `connected` field reflects the raw is_connected;
+        # honest liveness (DEGRADED on a dead-but-cached link) is surfaced via
+        # `connection_state` (derive_connection_state → is_alive), not here.
         d = self._device
         return bool(d is not None and getattr(d, "is_connected", False))
+
+    def _current_target_key(self) -> Optional[str]:
+        """Normalized identity of the device the owner currently holds (BLE mac or
+        LAN key), so a connect to a DIFFERENT target can be detected."""
+        if self._lan_ip:
+            return f"LAN:{self._lan_ip}"
+        return (self.mac or "").upper() or None
 
     def _connection_state(self) -> str:
         """P6: the honest dot state + a one-line transition log (a connection
@@ -84,7 +94,11 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
         # dead handle the next command silently times out on.
         from divoom_lib.ble_connection import ensure_connected, BleConnectionError
         if self._device is not None:
-            if not getattr(self._device, "is_connected", False) and hasattr(self._device, "connect"):
+            # R53/HW: re-ensure on a dead-but-cached-connected link (is_alive is
+            # honest; is_connected lags True after an OS drop).
+            if not getattr(self._device, "is_alive",
+                           getattr(self._device, "is_connected", False)) \
+                    and hasattr(self._device, "connect"):
                 res = await ensure_connected(self._device)
                 if not res.ok:
                     raise BleConnectionError(res)
@@ -110,8 +124,32 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
     async def _build_device_async(self, args: dict):
         # BLE Hardening P1: honest connect (retry+backoff, verify, typed reason).
         from divoom_lib.ble_connection import ensure_connected, BleConnectionError
+        # R53/HW: if a DIFFERENT target is requested than the one we hold, tear the
+        # current one down first. Without this, connecting to device B while A is
+        # active silently returned A (and a cached-True is_connected made it look
+        # connected in 0.0s) — you could drive the wrong screen.
+        requested = args.get("mac") or (args.get("lan_ip") and f"LAN:{args.get('lan_ip')}")
+        requested_key = (requested or "").upper() or None
+        current_key = self._current_target_key()
+        # Only switch when we KNOW the current device's identity AND it differs.
+        # If current_key is None (e.g. an injected device with no tracked mac),
+        # reuse it rather than tearing it down + building a fresh real connection.
+        if self._device is not None and requested_key and current_key and requested_key != current_key:
+            logger.info("connect target changed (%s -> %s); releasing current device",
+                        current_key, requested_key)
+            try:
+                await self._device.disconnect()
+            except Exception as e:
+                logger.debug("release-on-switch disconnect failed (continuing): %s", e)
+            self._device = None
+            self._lan_ip = None
+            self.mac = None
         if self._device is not None:
-            if not getattr(self._device, "is_connected", False) and hasattr(self._device, "connect"):
+            # Same target (or a generic "use active" request): re-ensure if the
+            # link is not alive, else reuse.
+            if not getattr(self._device, "is_alive",
+                           getattr(self._device, "is_connected", False)) \
+                    and hasattr(self._device, "connect"):
                 res = await ensure_connected(self._device, attempts=2, attempt_timeout=8.0)
                 if not res.ok:
                     raise BleConnectionError(res)

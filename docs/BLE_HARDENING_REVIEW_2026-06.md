@@ -43,6 +43,31 @@ Lenses: (1) connection lifecycle/reconnection, (2) async concurrency/cancellatio
 
 ---
 
+## SHIPPED in R53 round 3 — validated on REAL hardware (2026-06-14)
+
+Real-device testing became possible via `scripts/make_dev_daemon_app.sh` (a thin
+`.app` wrapping the *source* daemon with `NSBluetoothAlwaysUsageDescription`,
+`open`-ed so LaunchServices grants it BLE) driven over the socket by
+`scripts/hw_smoke.py` (kare-styled). Devices: Pixoo-1 (solid), Timoo-light-4
+(OS-drops ~1s post-connect — genuine device flakiness).
+
+- **Device-identity bug (HW-found, serious).** `_build_device_async` returned the
+  CURRENT `self._device` ignoring the requested mac — so connecting to device B
+  while A was active (A's cached is_connected lying True after an OS drop) handed
+  back A as "B, connected" in 0.0s. You could drive the wrong screen. Fixed: when
+  a *different, known* target is requested, release the current device first
+  (`connect target changed (...); releasing current device`). Verified live: the
+  switch now does a real ~2.8s connect to the correct device. Tests:
+  `test_daemon_connect_identity.py`.
+- **R53 round-1 hardening confirmed live:** the `.result()` scan backstop fired
+  and recovered a scan that hung past its own timeout (`on-loop op (scan) exceeded
+  90s backstop`); the OS-disconnect callback + reconnect handled real drops; and
+  notifications re-enabled cleanly on every reconnect (the C3 stop_notify fix —
+  no "already started").
+- The `connected` status field stays the raw is_connected (P6 design — honesty is
+  via `connection_state`/DEGRADED); only the connect/reconnect *decisions* use
+  is_alive.
+
 ## SHIPPED in R53 round 2 (2026-06-14)
 
 - **`ensure_connected` fast-path now trusts `is_alive`, not cached `is_connected`**

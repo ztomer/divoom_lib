@@ -42,9 +42,14 @@ class TestDivoomWall(unittest.IsolatedAsyncioTestCase):
 
             async def _connect(_m=mc):
                 _m.is_connected = True
+                _m.is_alive = True
             mc.connect = AsyncMock(side_effect=_connect)
             mc.disconnect = AsyncMock(return_value=None)
             mc.is_connected = False
+            # R53: model is_alive honestly (a real device is not alive until
+            # connected) — else the is_alive-aware ensure_connected fast-path
+            # would treat the auto-truthy MagicMock attr as "already alive".
+            mc.is_alive = False
             mock_clients.append(mc)
 
         mock_divoom_class.side_effect = mock_clients
