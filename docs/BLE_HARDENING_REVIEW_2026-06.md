@@ -109,12 +109,16 @@ where a careless change can break working pushes — they deserve isolated round
   future addition). Fix: per-operation response correlation (a `Future` keyed by
   command id) instead of one shared queue + scalar.
 ### Medium
-- **Live-job stop is fire-and-forget.** `live_job_stop` schedules `task.cancel()`
-  and returns "stopped" without awaiting death → a stopped poller can push one
-  more frame; a double-start can momentarily run two pollers; `_live_tasks` is
-  mutated cross-thread. Fix: await cancellation to completion; confine
-  `_live_tasks` mutation to the loop thread. (Same applies to `stop_all_live_jobs`
-  / `_release_live_device_if_idle` in `device_owner.stop`.)
+- ~~**Live-job stop is fire-and-forget.**~~ **SHIPPED R53.4 (HW-validated).**
+  `live_job_stop` now cancels AND awaits the task on the loop thread (popping
+  inside the coroutine, bounded `.result(timeout=10)`), so a stopped poller can't
+  push another frame or resurrect a released device, and `live_job_start`'s
+  pre-stop can't leave two pollers running. Verified live: sysmon on Pixoo
+  started, `live_job_stop` returned `stopped` instantly, `live_job_list` → `[]`,
+  clean `Cancelled live job` with no resurrection. Test:
+  `test_device_activity.test_live_job_stop_awaits_task_death` (tests now use a real
+  loop). `stop_all_live_jobs` / `_release_live_device_if_idle` (shutdown path)
+  still fire-and-forget — lower priority, tracked.
 - **SPP transport is weaker than BLE across the board** (`bt_spp_transport.py`):
   the `_open_event.wait()` blocks the *event loop* up to 8 s; a failed connect
   leaks the runloop/read threads + serial port; `_serial_read_loop` swallows all

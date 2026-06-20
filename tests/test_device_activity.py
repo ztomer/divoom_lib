@@ -4,7 +4,9 @@ The daemon tracks what each device is showing — set by the GUI (channels) and 
 the daemon's own live jobs (sysmon/stocks/weather/music) — and the menubar pulls
 it to render one tile per device.
 """
+import asyncio
 import sys
+import threading
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -15,6 +17,25 @@ from divoom_daemon.owner_live import OwnerLiveMixin
 class _Owner(OwnerLiveMixin):
     def __init__(self):
         OwnerLiveMixin.__init__(self)
+
+
+def _real_loop():
+    """A real asyncio loop on a daemon thread — needed because R53's live_job_stop
+    cancels AND AWAITS the task on the loop (a fake loop would hang the await)."""
+    loop = asyncio.new_event_loop()
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+    return loop
+
+
+def _live_task(loop):
+    """A real, cancellable task on `loop` (a long sleep) standing in for a live
+    poller, so live_job_stop's cancel+await behaves like production."""
+    return asyncio.run_coroutine_threadsafe(
+        _ensure_future_on_loop(), loop).result(timeout=2)
+
+
+async def _ensure_future_on_loop():
+    return asyncio.ensure_future(asyncio.sleep(3600))
 
 
 def test_set_and_get_device_activity():
@@ -61,18 +82,11 @@ def test_empty_kind_is_thumbnail_only_update():
 
 def test_live_job_start_sets_activity_and_stop_reverts_to_idle():
     o = _Owner()
-
-    class _Task:
-        def cancel(self): pass
-
-    class _Loop:
-        def call_soon_threadsafe(self, fn, *a): pass
-
-    o._loop = _Loop()
+    o._loop = _real_loop()
     o._live_devices = {}
     # Simulate a started job (live_job_start's async create_task is exercised in
-    # the HW path; here we set the activity + task directly, then stop it).
-    o._live_tasks = {("AA", "sysmon"): _Task()}
+    # the HW path; here we set the activity + a real task directly, then stop it).
+    o._live_tasks = {("AA", "sysmon"): _live_task(o._loop)}
     o.set_device_activity({"mac": "AA", "kind": "sysmon", "name": "Ditoo"})
 
     o.live_job_stop({"mac": "AA", "kind": "sysmon"})
@@ -174,21 +188,15 @@ def test_live_jobs_persist_and_rehydrate(tmp_path, monkeypatch):
     it. A user-stopped job is removed from the persisted set."""
     import json
 
-    class _Task:
-        def cancel(self): pass
-
-    class _Loop:
-        def call_soon_threadsafe(self, fn, *a): pass
-
     jobs_file = tmp_path / "live_jobs.json"
 
     o = _Owner()
     monkeypatch.setattr(o, "_live_jobs_path", lambda: jobs_file)
-    o._loop = _Loop()
+    o._loop = _real_loop()
     o._live_devices = {}
     # Simulate a started job (live_job_start's task creation is HW-path; here we
     # record params + persist directly via the same hooks).
-    o._live_tasks = {("AA", "sysmon"): _Task()}
+    o._live_tasks = {("AA", "sysmon"): _live_task(o._loop)}
     o._live_params = {("AA", "sysmon"): {"size": 16}}
     o._save_live_jobs()
     assert json.loads(jobs_file.read_text()) == [
@@ -225,18 +233,28 @@ def test_live_health_stamped_onto_activity():
     assert act["BB"]["state"] == "degraded"   # reports connected but is_alive False
 
 
+def test_live_job_stop_awaits_task_death():
+    """R53: live_job_stop must AWAIT the task's cancellation (not fire-and-forget),
+    so a stopped poller can't push one more frame or resurrect a released device."""
+    o = _Owner()
+    o._loop = _real_loop()
+    o._live_devices = {}
+    task = _live_task(o._loop)
+    o._live_tasks = {("AA", "sysmon"): task}
+    o.set_device_activity({"mac": "AA", "kind": "sysmon"})
+
+    res = o.live_job_stop({"mac": "AA", "kind": "sysmon"})
+    assert res["stopped"] is True
+    assert task.done() is True                       # actually finished, not scheduled
+    assert ("AA", "sysmon") not in o._live_tasks
+
+
 def test_stop_one_of_two_jobs_keeps_activity():
     o = _Owner()
-
-    class _Task:
-        def cancel(self): pass
-
-    class _Loop:
-        def call_soon_threadsafe(self, fn, *a): pass
-
-    o._loop = _Loop()
+    o._loop = _real_loop()
     o._live_devices = {}
-    o._live_tasks = {("AA", "sysmon"): _Task(), ("AA", "weather"): _Task()}
+    o._live_tasks = {("AA", "sysmon"): _live_task(o._loop),
+                     ("AA", "weather"): _live_task(o._loop)}
     o.set_device_activity({"mac": "AA", "kind": "sysmon"})
 
     o.live_job_stop({"mac": "AA", "kind": "sysmon"})   # weather still runs

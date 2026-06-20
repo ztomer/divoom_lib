@@ -193,22 +193,44 @@ class OwnerLiveMixin:
             return {"success": False, "error": "live_job_stop requires 'mac' and 'kind'"}
 
         key = (mac, kind)
-        if key in self._live_tasks:
-            task = self._live_tasks.pop(key)
-            self._loop.call_soon_threadsafe(task.cancel)
-            logger.info(f"Cancelled live job '{kind}' for {mac}")
-            self._release_live_device_if_idle(mac)
-            # A2: a user-stopped widget is no longer desired — drop it from the
-            # persisted set so it doesn't resurrect on the next daemon start.
-            if getattr(self, "_live_params", None) is not None:
-                self._live_params.pop(key, None)
-                self._save_live_jobs()
-            # R46 #3: no more jobs of this kind — mark idle unless another job runs.
-            if not any(m == mac for (m, _k) in self._live_tasks):
-                self.set_device_activity({"mac": mac, "kind": "idle"})
-            return {"success": True, "stopped": True}
+        if self._loop is None or key not in self._live_tasks:
+            return {"success": True, "stopped": False}
 
-        return {"success": True, "stopped": False}
+        # R53: cancel AND AWAIT the task's death on the loop thread, before doing
+        # anything else. The old fire-and-forget cancel let a stopped poller push
+        # one more frame, let _release_live_device_if_idle run while the dying task
+        # could still resurrect the device, and let live_job_start momentarily run
+        # two pollers. Popping inside the coroutine also keeps _live_tasks mutation
+        # confined to the loop thread.
+        async def _stop_on_loop():
+            t = self._live_tasks.pop(key, None)
+            if t is None:
+                return False
+            t.cancel()
+            await asyncio.gather(t, return_exceptions=True)   # wait for it to die
+            return True
+
+        try:
+            stopped = asyncio.run_coroutine_threadsafe(
+                _stop_on_loop(), self._loop).result(timeout=10)
+        except Exception as e:
+            logger.warning("live_job_stop: await-cancel failed for %s/%s: %s", mac, kind, e)
+            self._live_tasks.pop(key, None)   # best effort
+            stopped = True
+        if not stopped:
+            return {"success": True, "stopped": False}
+
+        logger.info(f"Cancelled live job '{kind}' for {mac}")
+        self._release_live_device_if_idle(mac)   # safe now — the task is dead
+        # A2: a user-stopped widget is no longer desired — drop it from the
+        # persisted set so it doesn't resurrect on the next daemon start.
+        if getattr(self, "_live_params", None) is not None:
+            self._live_params.pop(key, None)
+            self._save_live_jobs()
+        # R46 #3: no more jobs of this kind — mark idle unless another job runs.
+        if not any(m == mac for (m, _k) in self._live_tasks):
+            self.set_device_activity({"mac": mac, "kind": "idle"})
+        return {"success": True, "stopped": True}
 
     def _release_live_device_if_idle(self, mac: str) -> None:
         """R44 §6: disconnect + drop a cached BACKGROUND device once no live

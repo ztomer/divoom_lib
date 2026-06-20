@@ -15,52 +15,64 @@ from divoom_gui.api.lighting import LightingApi
 
 
 # ── daemon: live_jobs_stop_for ─────────────────────────────────────────────
-
-class _Task:
-    def __init__(self):
-        self.cancelled = False
-    def cancel(self):
-        self.cancelled = True
+# R53: live_job_stop cancels AND AWAITS the task on the loop, so these need a real
+# asyncio loop + real tasks (a fake loop would hang the await).
+import asyncio
+import threading
 
 
-class _Loop:
-    def call_soon_threadsafe(self, fn, *a):
-        fn(*a)
+def _real_loop():
+    loop = asyncio.new_event_loop()
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+    return loop
 
 
-def _owner(tasks, mac="AA"):
+async def _mk():
+    return asyncio.ensure_future(asyncio.sleep(3600))
+
+
+def _owner(mac="AA"):
     o = DeviceOwner.__new__(DeviceOwner)
     o.mac = mac
-    o._loop = _Loop()
-    o._live_tasks = dict(tasks)
+    o._loop = _real_loop()
+    o._live_tasks = {}
     o._live_devices = {}
     return o
 
 
+def _add(o, key):
+    t = asyncio.run_coroutine_threadsafe(_mk(), o._loop).result(timeout=2)
+    o._live_tasks[key] = t
+    return t
+
+
 def test_stop_for_cancels_all_jobs_on_active_device():
-    t1, t2, other = _Task(), _Task(), _Task()
-    o = _owner({("AA", "sysmon"): t1, ("AA", "weather"): t2, ("BB", "stocks"): other})
+    o = _owner()
+    t1 = _add(o, ("AA", "sysmon"))
+    t2 = _add(o, ("AA", "weather"))
+    other = _add(o, ("BB", "stocks"))
     r = o.live_jobs_stop_for({})            # default mac = active (AA)
     assert r == {"success": True, "stopped": 2}
-    assert t1.cancelled and t2.cancelled
-    assert not other.cancelled              # a different device is untouched
+    assert t1.done() and t2.done()          # cancelled tasks are finished
+    assert not other.done()                 # a different device is untouched
     assert ("BB", "stocks") in o._live_tasks
 
 
 def test_stop_for_explicit_mac():
-    t = _Task()
-    o = _owner({("BB", "stocks"): t}, mac="AA")
+    o = _owner(mac="AA")
+    t = _add(o, ("BB", "stocks"))
     r = o.live_jobs_stop_for({"mac": "BB"})
-    assert r["stopped"] == 1 and t.cancelled
+    assert r["stopped"] == 1 and t.done()
 
 
 def test_stop_for_noop_when_no_jobs():
-    o = _owner({}, mac="AA")
+    o = _owner(mac="AA")
     assert o.live_jobs_stop_for({}) == {"success": True, "stopped": 0}
 
 
 def test_stop_for_noop_when_no_active_mac():
-    o = _owner({("AA", "sysmon"): _Task()}, mac=None)
+    o = _owner(mac=None)
+    _add(o, ("AA", "sysmon"))
     assert o.live_jobs_stop_for({}) == {"success": True, "stopped": 0}
 
 
