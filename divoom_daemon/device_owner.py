@@ -144,16 +144,13 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
     async def _build_device_async(self, args: dict):
         # BLE Hardening P1: honest connect (retry+backoff, verify, typed reason).
         from divoom_lib.ble_connection import ensure_connected, BleConnectionError
-        # R53/HW: if a DIFFERENT target is requested than the one we hold, tear the
-        # current one down first. Without this, connecting to device B while A is
-        # active silently returned A (and a cached-True is_connected made it look
-        # connected in 0.0s) — you could drive the wrong screen.
+        # R53/HW: if a DIFFERENT *known* target is requested than the one we hold,
+        # release the current one first — else connecting to B while A is active
+        # silently returned A (cached is_connected made it look connected in 0.0s),
+        # driving the wrong screen. current_key=None (untracked/injected) → reuse.
         requested = args.get("mac") or (args.get("lan_ip") and f"LAN:{args.get('lan_ip')}")
         requested_key = (requested or "").upper() or None
         current_key = self._current_target_key()
-        # Only switch when we KNOW the current device's identity AND it differs.
-        # If current_key is None (e.g. an injected device with no tracked mac),
-        # reuse it rather than tearing it down + building a fresh real connection.
         if self._device is not None and requested_key and current_key and requested_key != current_key:
             logger.info("connect target changed (%s -> %s); releasing current device",
                         current_key, requested_key)
@@ -189,11 +186,8 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
         mac = args.get("mac")
         if not mac:
             return await self._ensure_device_async(None)
-        dev = Divoom(
-            mac=mac, logger=logger,
-            use_ios_le_protocol=bool(args.get("use_ios_le_protocol", True)),
-            device_name=args.get("device_name"),
-        )
+        dev = Divoom(mac=mac, logger=logger, device_name=args.get("device_name"),
+                     use_ios_le_protocol=bool(args.get("use_ios_le_protocol", True)))
         res = await ensure_connected(dev, attempts=2, attempt_timeout=8.0)
         if not res.ok:
             raise BleConnectionError(res)   # don't keep a dead handle
@@ -292,6 +286,12 @@ class DeviceOwner(OwnerArtMixin, OwnerLiveMixin, OwnerLoopMixin, OwnerNotifyMixi
 
     def connect(self, args: dict) -> dict:
         from divoom_lib.ble_connection import BleConnectionError
+        # Reject an explicitly-empty target (mac="") — a UI bug must not silently
+        # grab an arbitrary/last device. mac=None (absent) still means "use active".
+        if any(v is not None and not str(v).strip()
+               for v in (args.get("mac"), args.get("lan_ip"))):
+            return {"success": False, "reason": "invalid_target",
+                    "error": "empty target", "message": "No device selected."}
         # BLE Hardening P4: a BLE connect (mac, not LAN) preflights adapter/
         # permission so a powered-off radio / missing grant fails fast with cause.
         if args.get("mac") and not args.get("lan_ip"):

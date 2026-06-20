@@ -34,6 +34,13 @@ surfaced two real quirks, both fixed:
   `QUERY_TIMEOUT=4s`. Corollary: verification-via-`query_page` is NOT viable for
   the deferred ACK≠success fix (0x8E is unreliable on real HW) — re-scoped in the
   review doc. Test: `test_custom_art_push.TestQueryPage`.
+- **Empty target rejected (edge-probe).** `connect(mac="")` silently grabbed an
+  arbitrary/last device — `""` is falsy so target resolution fell through to a
+  scan-first fallback (`devs[0]`). An explicitly-empty `mac`/`lan_ip` now returns
+  `reason=invalid_target`; `mac=None` (absent) still means "use active". HW-verified
+  alongside: a *bogus* MAC fails cleanly within the bound (16.4s, no hang) and does
+  not poison the next real connect; rapid same-device re-grab stays on the 0.0s
+  fast-path. Test: `test_daemon_connect_identity` (empty-target cases).
 
 ---
 ## R53: BLE transport hardening, round 1 (2026-06-14)

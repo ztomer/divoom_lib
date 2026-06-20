@@ -75,3 +75,46 @@ def test_same_mac_reuses_live_device(monkeypatch):
 
     res = _run(o._build_device_async({"mac": "AA:BB:CC:DD:EE:01"}))
     assert res is cur and cur.disconnected is False
+
+
+# ── empty-target reject (HW edge-probe) ─────────────────────────────────────
+# connect(mac="") silently grabbed an arbitrary/last device because "" is falsy
+# and target resolution fell through to a scan-first fallback. An explicitly-empty
+# target is now rejected; mac=None (key absent) still means "use active".
+
+def _no_preflight(monkeypatch):
+    from divoom_lib.ble_connection import ConnectResult, ConnectionState
+    monkeypatch.setattr("divoom_lib.ble_preflight.preflight_bluetooth",
+                        lambda **k: ConnectResult(True, ConnectionState.CONNECTED))
+
+
+def test_connect_empty_mac_rejected(monkeypatch):
+    _no_preflight(monkeypatch)
+    o = _owner()
+    # _build_device_async must NOT be reached for an empty target.
+    monkeypatch.setattr(o, "_run_device",
+                        lambda c: (_ for _ in ()).throw(AssertionError("must not build")),
+                        raising=False)
+    for bad in ("", "   "):
+        r = o.connect({"mac": bad})
+        assert r["success"] is False and r["reason"] == "invalid_target", bad
+
+
+def test_connect_empty_lan_ip_rejected(monkeypatch):
+    _no_preflight(monkeypatch)
+    o = _owner()
+    r = o.connect({"lan_ip": "  "})
+    assert r["success"] is False and r["reason"] == "invalid_target"
+
+
+def test_connect_mac_none_not_rejected(monkeypatch):
+    """mac=None (absent) is the legit 'use active' path — must NOT be rejected."""
+    _no_preflight(monkeypatch)
+    o = _owner()
+    reached = {"n": 0}
+    monkeypatch.setattr(o, "_run_device",
+                        lambda c: (reached.__setitem__("n", 1), c.close())[0],
+                        raising=False)
+    monkeypatch.setattr(o, "_status_fields", lambda: {"connected": False}, raising=False)
+    r = o.connect({"mac": None})
+    assert r.get("reason") != "invalid_target" and reached["n"] == 1
