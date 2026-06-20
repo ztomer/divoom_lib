@@ -123,12 +123,19 @@ where a careless change can break working pushes — they deserve isolated round
   no clobber) are left running. HW-verified both: active sysmon stopped by an
   exclusive push (`jobs:[]`, no burst); a background-device sysmon survived an
   exclusive push on the active device. Test: `test_exclusive_stops_jobs.py`.
-- **Shared `notification_queue` + scalar `_expected_response_command` cross-talk.**
-  A concurrent `send_command_and_wait_for_response` can flush a 0x8B ready-ACK /
-  retransmit frame out from under an in-flight animation push (only safe today
-  because nothing else runs via `_run_on_loop` — there is no guard preventing a
-  future addition). Fix: per-operation response correlation (a `Future` keyed by
-  command id) instead of one shared queue + scalar.
+- ~~**Shared `notification_queue` + scalar `_expected_response_command` cross-talk.**~~
+  **GUARDED R53.11 (HW-validated 2026-06-20).** A concurrent
+  `send_command_and_wait_for_response` could drain another op's frames and clobber
+  the `_expected_response_command` scalar (safe today only because the command
+  queue serializes device ops — nothing ENFORCED it). Rather than the full
+  per-command-id `Future` refactor (high risk to the working 0x8B path), added an
+  `asyncio.Lock` (`_response_lock`) held across drain→set-scalar→send→wait so the
+  response path is atomic per operation; a contended entry logs a warning so a
+  future off-queue regression is visible, not silent. Uncontended in the normal
+  (queue-serialized) path. The notification/response methods were also extracted
+  to `ble_notify.py` (`BleNotifyMixin`) — `ble_transport.py` 516→384 LOC. HW-verified
+  the response path (`query_page` 0x8E) still works post-split. Tests:
+  `test_ble_response_lock.py`.
 ### Medium
 - ~~**Live-job stop is fire-and-forget.**~~ **SHIPPED R53.4 (HW-validated).**
   `live_job_stop` now cancels AND awaits the task on the loop thread (popping

@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 11 — BLE RESPONSE-PATH LOCK + ble_notify SPLIT SHIPPED (2026-06-20).**
+  Closes the LAST High deferred BLE finding (shared-response cross-talk).
+  `send_command_and_wait_for_response` now holds `_response_lock` across
+  drain→set-scalar→send→wait so two callers can't drain each other's frames / clobber
+  `_expected_response_command`; contended entry logs a warning (future off-queue
+  regression visible, not silent). Chose the lock over a per-command-id Future refactor
+  to protect the working 0x8B path. Also split the notification/response methods into
+  `ble_notify.py` (`BleNotifyMixin`); `ble_transport.py` 516→384 LOC. HW-verified the
+  0x8E response path + a normal device call post-split. Test: `test_ble_response_lock.py`.
+  **The BLE review's entire High deferred list is now empty** — remaining deferred items
+  are Medium/Low (SPP weaknesses, discovery scan early-exit-on-match, registry evict
+  swallow, _connect_locks reset, exclusive deadline re-arm-on-completion, LAN session reuse).
+
 - **R53 round 10 — LIVE-JOB vs EXCLUSIVE-PUSH ANTI-CLOBBER SHIPPED (2026-06-20).**
   Closed a High deferred BLE finding. During an exclusive push (animation/custom-art,
   `proxy.exclusive(token)`) a live job's TOKENLESS frames queued (exclusive mode only

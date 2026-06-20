@@ -5,6 +5,28 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 11: BLE response-path lock + ble_notify split (2026-06-20)
+
+Closes the LAST High deferred BLE finding — the shared-response-path cross-talk.
+`send_command_and_wait_for_response` drains the `notification_queue` and sets the
+scalar `_expected_response_command`, then waits. Two concurrent callers would
+drain each other's frames and clobber the scalar; it was safe only because the
+command queue happens to serialize device ops, with nothing enforcing it.
+
+- Added `_response_lock` (asyncio.Lock) held across drain→set-scalar→send→wait so
+  the response path is atomic per operation. A contended entry logs a warning so a
+  future off-queue caller is visible, not a silent corruption. Chose the lock over
+  the full per-command-id `Future` refactor to avoid risk to the working 0x8B path.
+- Split the notification/response methods out of `ble_transport.py` into
+  `ble_notify.py` (`BleNotifyMixin`: the GATT callback, the iOS-LE / basic-protocol
+  frame parsers, and the wait/`send_command_and_wait_for_response` helpers).
+  `ble_transport.py` 516→384 LOC; behavior unchanged.
+
+HW-verified the response path (0x8E `query_page`, 4.05s bounded) + a normal device
+call still work post-split. Tests: `test_ble_response_lock.py`. Full suite green
+(1536 passed). This empties the BLE review's High deferred list.
+
+---
 ## R53 round 10: live-job vs exclusive-push anti-clobber (2026-06-20)
 
 Closes a High deferred BLE finding. An exclusive session (animation / custom-art
