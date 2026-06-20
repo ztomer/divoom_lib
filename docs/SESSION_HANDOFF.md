@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 9 — DISCONNECT STOPS ACTIVE LIVE JOBS SHIPPED (2026-06-20).** HW
+  edge-probe: a sysmon job on the active device survived `disconnect()` as a live
+  task (`done:false`), spinning on the released link (could resurrect it). `disconnect()`
+  now stops the active device's live jobs first (`live_jobs_stop_for({})`, like the
+  channel-switch path); background jobs on OTHER devices untouched — both HW-verified.
+  Test: `test_disconnect_stops_jobs.py`. ALSO **R53.8: split `device_owner.py`** (was
+  pinned at 500 LOC) → new `owner_connect.py` (OwnerConnectMixin: acquisition/discovery)
+  + `owner_util.py` (`_json_safe`); device_owner.py 500→239, no behavior change. Both
+  on main (latest c38455e + this round). OPEN: the deferred live-job↔exclusive 0x8B
+  interleave is still next on the BLE review list.
+
 - **R53 round 7 — EMPTY-TARGET CONNECT REJECT SHIPPED (2026-06-20).** Edge-probe
   sweep over the daemon socket. Bug: `connect(mac="")` returned success and grabbed
   an arbitrary/last device (`""` falsy → scan-first `devs[0]` fallback). `connect()`

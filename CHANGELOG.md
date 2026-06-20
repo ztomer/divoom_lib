@@ -5,6 +5,28 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 rounds 7-9: edge-case hardening + owner split (2026-06-20)
+
+Continued HW edge-probing of the daemon socket, plus a structural split.
+
+- **R53.7 — empty connect target rejected.** `connect(mac="")` returned success
+  and silently grabbed an arbitrary/last device (`""` falsy → scan-first `devs[0]`
+  fallback). Now returns `reason=invalid_target`; `mac=None` (absent) still = "use
+  active". Verified clean alongside: bogus MAC fails bounded (16.4s, no hang) and
+  doesn't poison the next connect; rapid re-grab ×5 on the 0.0s fast-path.
+- **R53.8 — split `device_owner.py`** (was pinned at exactly 500 LOC). Extracted
+  device acquisition/discovery into `owner_connect.py` (`OwnerConnectMixin`:
+  connect/disconnect/scan/device_status/probe_lan + build/ensure + honest-state
+  fields) and the shared `_json_safe` into `owner_util.py`. device_owner.py 500→239;
+  no behavior change; HW-verified.
+- **R53.9 — disconnect now stops the active device's live jobs.** HW edge-probe:
+  with a sysmon job on the active device, `disconnect()` released the device but
+  left the poller task alive (`done:false`) — it kept ticking on a dead link and
+  could rebuild/resurrect the connection the user just dropped. `disconnect()` now
+  calls `live_jobs_stop_for({})` first (active mac); background jobs on OTHER
+  devices are untouched (HW-verified both). Test: `test_disconnect_stops_jobs.py`.
+
+---
 ## R53 round 6: scan speed + connected-device visibility (2026-06-20)
 
 HW-driven round (real 4-device fleet via the dev-daemon socket + a new

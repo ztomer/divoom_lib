@@ -193,6 +193,13 @@ class OwnerConnectMixin:
             return {"success": False, "error": str(e)}
 
     def disconnect(self) -> dict:
+        # A user disconnect ENDS this device — stop its live jobs first so a poller
+        # can't keep ticking on (or resurrect) the link we're about to release.
+        # Defaults to the active mac; background jobs on OTHER devices are untouched.
+        try:
+            self.live_jobs_stop_for({})
+        except Exception as e:
+            logger.debug("stop live jobs on disconnect: %s", e)
         self.forget_device_activity(self.mac or (self._lan_ip and f"LAN:{self._lan_ip}"))  # G1: no ghost
         d = self._device
         if d is not None and hasattr(d, "disconnect"):
