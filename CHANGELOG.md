@@ -5,6 +5,26 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 14: registry eviction honesty + loop-teardown reset (2026-06-20)
+
+Two Low-tier BLE-registry / connect-lock lifecycle fixes.
+
+- **Failed eviction is no longer silent.** `ble_registry.evict` logged a disconnect
+  failure at debug and dropped the entry — so a failed eviction looked successful
+  while the OS-level link may survive and stall the next connect (the ~16s
+  double-connect the registry exists to prevent). Now a WARNING with the cause; we
+  still drop our record (best-effort — the new owner registers over it).
+- **Stale per-loop state is reset on device-loop teardown.** `_connect_locks` is
+  keyed by `id(loop)` and `_active` is process-global; both survived a loop restart,
+  and CPython reuses ids so a fresh loop could be handed a Lock bound to the dead
+  loop ("bound to a different event loop"). `device_owner.stop()` now calls
+  `ble_connection.forget_loop(loop)` + `ble_registry.reset()`, and nulls
+  `_loop`/`_cmd_queue`/`_loop_thread` so `_device_loop()` rebuilds cleanly instead of
+  handing back the stopped loop.
+
+Tests: `test_ble_registry.py` (+3). Full suite green (1552 passed).
+
+---
 ## R53 round 13: SPP send retries + corrupt-length parser resync (2026-06-20)
 
 Two more SPP transport robustness fixes (`bt_spp_transport.py` / `bt_spp_rfcomm.py`).

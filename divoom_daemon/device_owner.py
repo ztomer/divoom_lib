@@ -242,8 +242,23 @@ class DeviceOwner(OwnerArtMixin, OwnerConnectMixin, OwnerLiveMixin, OwnerLoopMix
                 self._cmd_queue.stop()
             except Exception:
                 pass
-        if self._loop is not None:
+        loop = self._loop
+        if loop is not None:
             try:
-                self._loop.call_soon_threadsafe(self._loop.stop)
+                loop.call_soon_threadsafe(loop.stop)
             except Exception:
                 pass
+        # Teardown the process-global BLE state tied to THIS loop, so a later
+        # restart can't be handed a stale per-loop connect lock (id(loop) reuse) or
+        # a registry entry pointing at a transport on the dead loop.
+        try:
+            from divoom_lib import ble_connection, ble_registry
+            ble_connection.forget_loop(loop)
+            ble_registry.reset()
+        except Exception as e:
+            logger.debug("loop-teardown state reset failed: %s", e)
+        # Null the refs so _device_loop() rebuilds a fresh loop/queue on next use
+        # instead of returning the now-stopped one.
+        self._loop = None
+        self._cmd_queue = None
+        self._loop_thread = None

@@ -86,3 +86,47 @@ def test_blank_address_is_ignored():
     ble_registry.register(None, t)
     assert ble_registry.owner(None) is None
     _run(ble_registry.evict(None, t))              # no-op, no raise
+
+
+def test_failed_eviction_warns(caplog):
+    """R53.14: a disconnect failure during eviction must be a WARNING (the OS link
+    may survive and stall the next connect), not a silent debug."""
+    import logging
+
+    class _Bad:
+        mac = "AA"
+        async def disconnect(self):
+            raise RuntimeError("BLE gone")
+    ble_registry.register("AA", _Bad())
+    with caplog.at_level(logging.WARNING, logger="divoom_lib.ble_registry"):
+        _run(ble_registry.evict("AA", _T("AA")))
+    assert any("FAILED" in r.message for r in caplog.records)
+    assert ble_registry.owner("AA") is None        # still dropped (best-effort)
+
+
+def test_reset_clears_all_entries():
+    """R53.14: device-loop teardown drops ALL registered transports (they were
+    bound to the dying loop)."""
+    ble_registry.register("AA", _T("AA"))
+    ble_registry.register("BB", _T("BB"))
+    ble_registry.reset()
+    assert ble_registry.owner("AA") is None and ble_registry.owner("BB") is None
+
+
+def test_forget_loop_drops_per_loop_connect_lock():
+    """R53.14: forget_loop pops the id(loop)-keyed lock so a reused id can't hand a
+    fresh loop a Lock bound to the dead loop."""
+    from divoom_lib import ble_connection
+
+    async def _make_lock():
+        return ble_connection._connect_lock()       # creates + registers for this loop
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_make_lock())
+        assert id(loop) in ble_connection._connect_locks
+        ble_connection.forget_loop(loop)
+        assert id(loop) not in ble_connection._connect_locks
+    finally:
+        loop.close()
+    ble_connection.forget_loop(None)                 # tolerates None

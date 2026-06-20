@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 round 14 — REGISTRY EVICTION HONESTY + LOOP-TEARDOWN RESET SHIPPED (2026-06-20).**
+  `ble_registry.evict` now WARNs on a failed disconnect (was silent debug → a failed
+  eviction looked successful while the OS link survived → next-connect stall). And
+  `device_owner.stop()` resets per-loop BLE state: `ble_connection.forget_loop(loop)`
+  (pops the `id(loop)`-keyed connect lock — id reuse hazard) + `ble_registry.reset()`,
+  then nulls `_loop`/`_cmd_queue`/`_loop_thread` so `_device_loop()` rebuilds cleanly.
+  Tests: `test_ble_registry.py` (+3). Full suite green (1552 passed). Remaining deferred
+  (all Low): discovery scan stop-on-first-match, exclusive-deadline re-arm-on-completion,
+  LAN per-request session reuse, SPP connect preflight/FailureReason.
+
 - **R53 round 13 — SPP SEND RETRIES + CORRUPT-LENGTH PARSER RESYNC SHIPPED (2026-06-20).**
   `send_payload` now honours `max_retries` (bounded backoff, bails on a dead link) — was
   accepted-but-ignored. `_on_data` bounds the iOS-LE frame length (`_MAX_IOS_LE_FRAME=8192`)

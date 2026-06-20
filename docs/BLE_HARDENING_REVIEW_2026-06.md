@@ -169,10 +169,18 @@ where a careless change can break working pushes — they deserve isolated round
   cancellation. Fix: detection-callback + stop-on-first-match + guaranteed stop.
 
 ### Low
-- Registry `evict` swallows a disconnect failure but still pops (a failed
-  eviction looks successful, old link survives → downstream connect timeout).
-- `_connect_locks` / a stale registry survive a daemon device-loop restart
-  (key on `id(loop)`; process-global `_active`). Reset on loop teardown.
+- ~~Registry `evict` swallows a disconnect failure but still pops.~~ **SHIPPED
+  R53.14.** A failed eviction disconnect now logs a WARNING (was silent debug) —
+  the OS link may survive and stall the next connect, so the failure is now a
+  breadcrumb; we still drop our record (best-effort, the new owner registers over
+  it). Test `test_failed_eviction_warns`.
+- ~~`_connect_locks` / a stale registry survive a daemon device-loop restart.~~
+  **SHIPPED R53.14.** `device_owner.stop()` now calls `ble_connection.forget_loop()`
+  (pops the `id(loop)`-keyed lock — CPython reuses ids, so a fresh loop could be
+  handed a Lock bound to the dead loop) and `ble_registry.reset()` (drops stale
+  transports bound to the dying loop), then nulls `_loop`/`_cmd_queue`/`_loop_thread`
+  so `_device_loop()` rebuilds cleanly on a restart instead of returning the
+  stopped loop. Tests `test_reset_clears_all_entries`, `test_forget_loop_*`.
 - Exclusive deadline only re-arms on *dequeue*; a single multi-minute exclusive
   item could be force-released mid-flight. Re-arm on item completion too.
 - LAN `post` opens a fresh `aiohttp` session per request.

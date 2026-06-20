@@ -39,12 +39,23 @@ async def evict(address: Any, keep: Any) -> None:
     if existing is None or existing is keep:
         return
     logger.info("BLE registry: evicting prior connection to %s before reconnect", key)
+    evicted = True
     try:
         await existing.disconnect()
     except Exception as e:
-        logger.debug("registry evict disconnect failed for %s: %s", key, e)
+        # The old OS-level link may still be half-open — a failed eviction is NOT
+        # successful. Surface it (was a silent debug): the next connect to this
+        # address may hit the ~16s double-connect timeout this registry exists to
+        # prevent, and this WARNING is the breadcrumb for it.
+        evicted = False
+        logger.warning("registry evict: disconnect of prior %s FAILED (%s); the OS "
+                       "link may survive and stall the next connect", key, e)
+    # Drop our record regardless (the new owner registers over it next); keeping a
+    # known-dead transport here would only mislead a later owner() lookup.
     if _active.get(key) is existing:
         _active.pop(key, None)
+    if not evicted:
+        logger.info("BLE registry: %s evict incomplete — proceeding (best-effort)", key)
 
 
 def register(address: Any, transport: Any) -> None:
@@ -64,6 +75,16 @@ def owner(address: Any) -> Any:
     return _active.get(_norm(address))
 
 
-def _reset() -> None:
-    """Clear the registry — test hook only."""
+def reset() -> None:
+    """Drop ALL registered connections. Called on device-loop teardown: every
+    registered transport was bound to the dying loop, so the entries are stale
+    bookkeeping that would mislead the next loop's eviction logic."""
+    if _active:
+        logger.info("BLE registry: reset (%d stale entr%s dropped)",
+                    len(_active), "y" if len(_active) == 1 else "ies")
     _active.clear()
+
+
+def _reset() -> None:
+    """Clear the registry — test hook (alias of reset())."""
+    reset()

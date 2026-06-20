@@ -139,6 +139,14 @@ def _connect_lock() -> asyncio.Lock:
     return lock
 
 
+def forget_loop(loop) -> None:
+    """Drop the per-loop connect lock when a device loop is torn down. The dict is
+    keyed by id(loop); CPython REUSES ids, so without this a fresh loop could be
+    handed a stale Lock bound to the dead loop → "bound to a different event loop"."""
+    if loop is not None:
+        _connect_locks.pop(id(loop), None)
+
+
 async def ensure_connected(
     device,
     *,
