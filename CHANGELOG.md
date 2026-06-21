@@ -5,6 +5,42 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 19: GUI-responsiveness root cause + concurrency hardening (2026-06-21)
+
+Four fixes (R53.31–34), each verified against the code, teeth-tested, full suite green
+(1592 passed, 75 skipped).
+
+- **R53.31 — proxy device_status short-TTL cache.** `DaemonDeviceProxy`'s introspection
+  attrs (`is_connected`/`lan`/`_conn`) each did a synchronous BLOCKING `device_status()`
+  socket RPC; one GUI operation reads several back-to-back → a separate round-trip each
+  (janky buttons; the GUI-responsiveness cluster's root cause). `_status()` now caches the
+  result for 0.25s so the back-to-back reads collapse to one RPC. The daemon's device_call
+  self-heals regardless of a slightly-stale GUI read, so no correctness risk.
+
+- **R53.32 — thread-safe live/activity registry.** The live-job dicts (`_live_devices`,
+  `_live_tasks`, `_device_activity`, `_live_params`) are mutated on the device LOOP thread
+  while the menubar polls `get_device_activity` / `_save_live_jobs` on RPC HANDLER threads.
+  Several reads iterated them with a bare Python for-loop / comprehension → "RuntimeError:
+  dictionary changed size during iteration" propagating out of the ~1/sec menubar RPC. Now
+  every such site iterates a point-in-time `list()`/`dict()` snapshot (single C call, atomic
+  under the GIL). The returned activity is a deep-ish snapshot so json.dumps can't race it.
+
+- **R53.33 — subscriber initial snapshot under `_sub_lock`.** `_serve_subscriber` registered
+  the socket then sent the initial status frame OUTSIDE the lock, racing `broadcast()`'s
+  locked sendall (notification-monitor thread) on the same fd → interleaved bytes → the
+  subscriber silently drops both the snapshot and the notification event. The initial frame
+  is now sent inside `_add_subscriber` while holding `_sub_lock`, before the socket joins the
+  set; an OSError there leaves it unregistered.
+
+- **R53.34 — restore the response-path lock on the router.** The R53.11 `_response_lock` lived
+  on BLETransport, but the live path routes through `DivoomConnection`, whose own
+  `send_command_and_wait_for_response` re-implemented the drain→set-scalar→send→wait inline
+  WITHOUT the lock — so the cross-talk protection was dead code. The router now holds its own
+  `asyncio.Lock` across that sequence (routing unchanged — still delegates send/wait to the
+  HW-tuned `_divoom` path). Defense-in-depth: the daemon CommandQueue already serializes
+  device access, but the intended invariant is restored and its contended-canary warning works.
+
+---
 ## R53 round 18: basic-protocol RX parser bounds the length field (2026-06-20)
 
 Second fresh-re-read find. `parse_basic_protocol_frames` (the shared basic-protocol

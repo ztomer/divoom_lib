@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 19 (2026-06-21): GUI-cluster root cause + concurrency
+  hardening.** 4 more real bugs fixed (R53.31–34, all on main, teeth-tested, suite 1592
+  green): (31) proxy `device_status` short-TTL cache de-fangs the blocking-RPC storm behind
+  `is_connected`/`lan`/`_conn` — the GUI-responsiveness cluster's ROOT CAUSE; (32) thread-safe
+  snapshots on the live/activity registry dicts (loop-thread mutation vs RPC-thread iteration
+  was raising "dict changed size during iteration" out of the menubar's ~1/sec poll); (33)
+  subscriber's initial status frame now sent under `_sub_lock` (was racing `broadcast()`'s
+  sendall on the same fd → corrupted NDJSON, dropped events); (34) restored the R53.11
+  response-path lock on the `DivoomConnection` router (its inline send/wait bypassed the
+  transport's lock — cross-talk protection was dead code). A fresh 3-agent adversarial pass
+  this round surfaced ONLY these (BLE/daemon/transport core otherwise clean). The proxy-cache
+  agent independently CLEARED the R53.31 staleness hypothesis (no 0.25s-stale read produces a
+  wrong connect/route decision). STILL DEFERRED (risk>reward, see review doc): live_job_start
+  double-poller, 0x8B retransmit-drop, custom-art ACK!=success. Remaining GUI cluster (lower
+  value, GUI-side): menubar `menuNeedsUpdate_` AppKit-thread RPC, ConnectionApi JS-thread RPCs,
+  get_alarms stale-as-success marker, get_weather throwaway loop.
+
 - **R53 ADVERSARIAL LOOP — BLE-CORE CONVERGED; GUI-RESPONSIVENESS CLUSTER REMAINS
   (2026-06-20).** 20 real bugs fixed across R53.19–29 (all on main, teeth-tested, suite
   1584 green). The last two passes found the BLE/daemon/transport/wall/live-job/IPC
