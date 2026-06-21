@@ -260,7 +260,22 @@ class _ProxyExclusiveCtx:
         return self._proxy._with_token(self._token)
 
     async def __aexit__(self, *exc: object) -> None:
-        self._proxy._client.exclusive_end(self._token)
+        # __aexit__ always runs (Python guarantees it once __aenter__ succeeded), so
+        # the token is always *attempted* to be released. But exclusive_end() returns
+        # a reply dict instead of raising; a non-success release (daemon mid-restart,
+        # socket blip past the retry budget) was silently dropped — the daemon then
+        # holds the exclusive token until the G3 idle auto-release (~30s), wedging
+        # every other caller's queue items meanwhile. We can't raise here (would mask
+        # a body exception), so log loudly for diagnosis.
+        try:
+            reply = self._proxy._client.exclusive_end(self._token)
+        except Exception as e:
+            logger.warning("exclusive_end raised for token %s: %s", self._token, e)
+            return
+        if not (reply or {}).get("success", False):
+            logger.warning("exclusive_end did not confirm release of token %s: %s "
+                           "(device wedged until the ~30s G3 auto-release)",
+                           self._token, (reply or {}).get("error"))
 
 
 class DaemonDeviceProxy:

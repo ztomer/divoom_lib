@@ -442,3 +442,51 @@ def test_bundle_python_resolves_in_frozen_app(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "frozen", "macosx_app", raising=False)
     monkeypatch.setattr(sys, "executable", str(macos / "Divoom"))
     assert daemon_bridge.bundle_python() == str(py)
+
+
+# ── R53.25: exclusive_end failure is logged, never raised, never silent ──────
+
+def test_exclusive_end_failure_is_logged_not_raised(caplog):
+    """A dropped exclusive release wedges the device ~30s (until G3 auto-release);
+    __aexit__ must surface it (can't raise — would mask a body exception)."""
+    import asyncio
+    import logging
+    from divoom_daemon.daemon_client import _ProxyExclusiveCtx
+
+    class _Client:
+        def exclusive_end(self, token):
+            return {"success": False, "error": "daemon mid-restart"}
+
+    class _Proxy:
+        _client = _Client()
+
+    ctx = _ProxyExclusiveCtx(_Proxy(), "tok-1")
+    loop = asyncio.new_event_loop()
+    try:
+        with caplog.at_level(logging.WARNING, logger="divoom_gui"):
+            loop.run_until_complete(ctx.__aexit__(None, None, None))   # must NOT raise
+    finally:
+        loop.close()
+    assert any("did not confirm release" in r.message for r in caplog.records)
+
+
+def test_exclusive_end_success_is_quiet(caplog):
+    import asyncio
+    import logging
+    from divoom_daemon.daemon_client import _ProxyExclusiveCtx
+
+    class _Client:
+        def exclusive_end(self, token):
+            return {"success": True}
+
+    class _Proxy:
+        _client = _Client()
+
+    ctx = _ProxyExclusiveCtx(_Proxy(), "tok-2")
+    loop = asyncio.new_event_loop()
+    try:
+        with caplog.at_level(logging.WARNING, logger="divoom_gui"):
+            loop.run_until_complete(ctx.__aexit__(None, None, None))
+    finally:
+        loop.close()
+    assert not any("tok-2" in r.message for r in caplog.records)
