@@ -18,6 +18,21 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 20 (2026-06-21): wall honesty + blob leak.** Fresh
+  3-agent pass over wall / animation+custom-art push / command-queue+exclusive core.
+  2 real bugs fixed (R53.35–36, on main, teeth-tested, suite 1596 green): (35) the four
+  DivoomWall fan-out methods (set_light/show_clock/show_effects/show_visualization) used a
+  bare gather → one slot's failure raised instead of degrading to False and abandoned the
+  siblings — now return_exceptions=True like the others; (36) DeviceOwner.device_call leaked
+  one /tmp/divoom_blob_* file per blob-based push (mkstemp, never unlinked) — now cleaned in
+  a finally. NEWLY-DOCUMENTED DEFERRALS (verified real, risk>reward/perf/low — see CHANGELOG
+  round 20): wall mixed-panel-size geometry slice; native image encoder buffer undersized so
+  the C dylib fast path is dead (perf-only, fallback is byte-correct; enabling it risks a
+  latent C/Python divergence needing HW parity); second exclusive_start slow-fails (270s)
+  instead of fast-fail; hot_update progress can stick at "starting" on a queue-expired
+  fire-and-forget item. The core (wall lifecycle, 0x8B framing, custom-art chunking, queue
+  gating/G3/deadline-rearm/drain-barrier) was otherwise CLEAN this pass.
+
 - **R53 ADVERSARIAL LOOP — ROUND 19 (2026-06-21): GUI-cluster root cause + concurrency
   hardening.** 4 more real bugs fixed (R53.31–34, all on main, teeth-tested, suite 1592
   green): (31) proxy `device_status` short-TTL cache de-fangs the blocking-RPC storm behind

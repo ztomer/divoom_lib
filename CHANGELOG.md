@@ -5,6 +5,40 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 20: wall partial-failure honesty + blob temp-file leak (2026-06-21)
+
+Fresh 3-agent adversarial pass over the wall, the animation/custom-art push paths,
+and the command-queue/exclusive-mode core. Two real bugs fixed (R53.35–36),
+teeth-tested, suite 1596 green:
+
+- **R53.35** — `DivoomWall.set_light/show_clock/show_effects/show_visualization`
+  used a bare `asyncio.gather`; one slot's BLE failure raised out of the method
+  instead of an honest degraded `False` and abandoned the sibling pushes. Now
+  `return_exceptions=True` + `all(res is True ...)`, matching the other wall
+  fan-out methods.
+- **R53.36** — `DeviceOwner.device_call` materialized base64 blobs to /tmp via
+  mkstemp but never unlinked them → one leaked file per blob-based push, forever.
+  Now unlinked in a `finally` (and on the bad-blob early-return).
+
+DEFERRED this round (verified real, but risk>reward / perf-only / low — tracked
+for a future targeted pass, not blocking "clean"):
+- Wall non-free-form geometry uses `grid_unit_size` (slot[0].size) for the canvas
+  but per-slot `size` for the crop → wrong slice if panels have MIXED sizes. Low
+  reachability (walls are uniform in practice); fix needs careful geometry + HW.
+- Native image encoder: the Python wrapper sizes the output buffer at 1bpp, but
+  the C `divoom_encode_animation_frame`/`_static` reject (return -1) unless the
+  buffer is 8bpp worst-case → the dylib fast path is DEAD, always falling back to
+  Python. Correctness is fine (byte-identical fallback); it's a silent PERF
+  regression. Deferred because enabling the C path could surface a latent
+  C/Python encoding divergence that needs empirical parity + on-device validation.
+- Second `exclusive_start` while a session is held blocks the RPC handler thread
+  up to the 270s result backstop instead of fast-failing "already held" (mutual
+  exclusion is preserved; just a slow-fail).
+- `hot_update` progress can stick at `"starting"` if its fire-and-forget queue
+  item is expired (240s) under a held exclusive session — a reporting-honesty gap
+  (no "error" transition), not a wedge.
+
+---
 ## R53 round 19: GUI-responsiveness root cause + concurrency hardening (2026-06-21)
 
 Four fixes (R53.31–34), each verified against the code, teeth-tested, full suite green
