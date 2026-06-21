@@ -39,7 +39,7 @@ The app sends these via `SPP_DIVOOM_EXTERN_CMD` (our `COMMANDS["set design"]`,
 | 33 / 0x21 | TOUCH | input event | no | n/a |
 | **35 / 0x23** | **SET_SCREEN_DIR_CFG** | **`[35, dir]`** (0xFF = query) | no | ** Pick A** |
 | **36 / 0x24** | **SET_SCREEN_MIRROR_CFG** | **`[36, on]`** (0xFF = query) | no | ** Pick A** |
-| **37 / 0x25** | **CLEAR_SYS_CFG** (factory reset) | **`[37, 1]`** | no | **️ Pick D (gated)** |
+| **37 / 0x25** | **CLEAR_SYS_CFG** (factory reset) | **`[37, 1]`** | no | **Pick D (gated)** |
 | 38 / 0x26 | SET_LANGUAGE | `[38, lang]` | **yes** | — |
 | 39 / 0x27 | SUPPORT_MORE_ANCS | `[39]` | no | with ANCS |
 | 47 / 0x2f | OPEN_SCREEN_CTRL (screen on/off) | `[47, on]` | check | maybe |

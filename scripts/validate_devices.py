@@ -319,7 +319,7 @@ async def main_async(args):
     for d in report["devices"]:
         fails = [s for s in d["steps"] if not s["ok"]]
         if fails or not d["connected"]:
-            print(f"  ️ {d['name'] or d['address']}: "
+            print(f"  → {d['name'] or d['address']}: "
                   + ("not connected" if not d["connected"] else f"{len(fails)} step(s) failed"))
             for s in fails:
                 print(f"      - {s['step']}: {s['error']}")

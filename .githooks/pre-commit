@@ -1,0 +1,9 @@
+#!/bin/bash
+# Pre-commit guard installed by init_repo.sh. Block disallowed emoji in STAGED files
+# (only the Kare icon set is permitted; emoji are a failure state).
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+
+python3 "$root/tools/check_no_emoji.py" --staged || {
+    echo "pre-commit: disallowed emoji in staged files — only → ✓ ✗ ⚠ ↔ ↑ ↓ are allowed." >&2
+    exit 1; }

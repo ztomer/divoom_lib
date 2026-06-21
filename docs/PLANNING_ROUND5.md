@@ -293,7 +293,7 @@ worse than B's (Settings). **Verdict:** D is rejected.
 └─────────────────────────────────────────────────────────────────────┘
    77% gallery                                              23% devices
 ┌──────────────────────┐
-│ Devices        [↻]   │
+│ Devices        [R]   │
 ├──────────────────────┤
 │  ● Timoo            │  ← 23% width = 235px
 │  ● Tivoo Max        │     [] 14px + 8px gap + ● 8px + 8px

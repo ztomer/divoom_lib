@@ -25,7 +25,7 @@ encoder reimplemented the packing bug independently**.
 | 32px encoder (`divoom_image_encode_32`) | reuses `encode_pixels`/`build_palette` |  fixed (shared) |
 | Monthly-best daemon | own 0x8B streamer |  fixed earlier (256/index) |
 | **Native C** (`image_encode.c` ×2, `image_encode_32.c`) | own C packing loop |  **fixed now** + dylib rebuilt |
-| Native C 0x8B chunker (`divoom_encode_animation_8b`) | byte-offset+256 | ️ **dormant** — no live caller (live 0x8B is Python `stream_animation_8b`); left as-is, flagged |
+| Native C 0x8B chunker (`divoom_encode_animation_8b`) | byte-offset+256 | **dormant** — no live caller (live 0x8B is Python `stream_animation_8b`); left as-is, flagged |
 
 **Native C fix:** all three C packing loops had the identical
 "reset accumulator per byte + mask to 8 bits → drop carry for nb_bits∉{1,2,4,8}"

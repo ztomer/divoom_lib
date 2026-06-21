@@ -7,7 +7,7 @@
 | Round 3 close |  448 passed / 73 skipped / 0 failed | C encoder parity + perf shipped |
 | 3 reference repos cloned |  | `references/divoom-refs/{futpib,hass-divoom,andreas-mausch}` |
 | Reference repos mined |  | see §1 below |
-| Round 4 plan | 🆕 this document | |
+| Round 4 plan | NEW this document | |
 
 ## 1. Reference Repos (cloned at `references/divoom-refs/`)
 

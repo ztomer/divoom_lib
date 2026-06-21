@@ -238,10 +238,10 @@ For each feature:
 
 | Feature        | Lib exists | Wire-correct | Semantics verified | UX feasible | **Decision**  |
 |----------------|------------|--------------|--------------------|-------------|---------------|
-| Timeplan       |          |            |  (mode/type unverified) | ️ requires task #20 | **DEFER**     |
+| Timeplan       |          |            |  (mode/type unverified) | requires task #20 | **DEFER**     |
 | SD card player |          |            |                  |  blocked on task #20 + device SD | **DEFER**     |
 | Game           |          |            |  (commands)      |  no host UX; device-specific buttons | **DEFER**     |
-| Drawing / sand |          | ️ (0x35 unconfirmed) |            |  non-trivial UI per mode | **DEFER**     |
+| Drawing / sand |          | (0x35 unconfirmed) |            |  non-trivial UI per mode | **DEFER**     |
 | Cloud HTTP     |          | n/a          | n/a                |  auth broken; new transport | **DEFER (own round)** |
 
 **Net result:** 0 features exposed this round, 0 features dropped. All 5 stay

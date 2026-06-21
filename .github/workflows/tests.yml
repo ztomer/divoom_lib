@@ -5,6 +5,18 @@ on:
   pull_request:
 
 jobs:
+  no-emoji:
+    # House style gate: emoji are a failure state — only the Kare icon set is
+    # permitted (tools/check_no_emoji.py). Fast, no build needed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check for disallowed emoji
+        run: python3 tools/check_no_emoji.py
+
   test:
     # macOS so clang builds the dylib and the native (C) encoder tests actually run.
     runs-on: macos-latest

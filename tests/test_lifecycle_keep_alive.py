@@ -45,7 +45,7 @@ def test_flag_read_tolerates_missing_and_garbage(tmp_path):
     assert c.getboolean("gui", "keep_daemon_alive") is True
 
 
-# ── pure decision helpers (shared lifecycle ⇔ NOT keep-alive) ──────────────
+# ── pure decision helpers (shared lifecycle ↔ NOT keep-alive) ──────────────
 
 @pytest.mark.parametrize("keep,expect", [(False, True), (True, False)])
 def test_decision_helpers(keep, expect):
