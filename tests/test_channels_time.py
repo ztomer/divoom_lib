@@ -6,10 +6,19 @@ from divoom_lib.models import TimeDisplayType
 
 @pytest.fixture
 def mock_divoom_instance():
-    """Fixture for a mock DivoomBase instance with color2HexString method."""
+    """Fixture for a mock DivoomBase instance.
+
+    R53.43: previously this monkeypatched ``color2HexString`` onto the mock,
+    which MASKED a real bug — TimeChannel called it as
+    ``self._divoom_instance.color2HexString`` but it is a module-level helper
+    in ``utils.converters``, not a method on Divoom. The test passed falsely.
+    The channel now imports the real converter, so the mock must NOT provide it
+    (re-adding it would re-mask the AttributeError regression). Note the real
+    ``color2HexString`` only accepts a clean 6-digit hex string (no ``#``),
+    unlike the old mock which stripped the ``#``.
+    """
     mock = AsyncMock(spec=DivoomBase)
     mock.send_command = AsyncMock()
-    mock.color2HexString = MagicMock(side_effect=lambda x: x.replace("#", ""))
     return mock
 
 @pytest.mark.asyncio
@@ -62,7 +71,7 @@ async def test_time_channel_update_message(mock_divoom_instance):
         "showWeather": False,
         "showTemp": True,
         "showCalendar": False,
-        "color": "#FF00FF"
+        "color": "FF00FF"
     })
 
     await channel._update_message()
@@ -73,11 +82,12 @@ async def test_time_channel_update_message(mock_divoom_instance):
     # showWeather = False -> 0
     # showTemp = True -> 1
     # showCalendar = False -> 0
-    # color = "#FF00FF" -> FF00FF (bytes.fromhex) -> [0xFF, 0x00, 0xFF]
+    # color = "FF00FF" -> real color2HexString -> "FF00FF" -> bytes [0xFF, 0x00, 0xFF]
     # Expected args: [0x00, 0x01, 0x02, 0x01, 0x00, 0x01, 0x00, 0xFF, 0x00, 0xFF]
+    # Asserting the real encoded bytes is the teeth: revert the channel to
+    # self._divoom_instance.color2HexString and this raises AttributeError.
     expected_args = [0x00, 0x01, TimeDisplayType.WithBox, 1, 0, 1, 0, 0xFF, 0x00, 0xFF]
     mock_divoom_instance.send_command.assert_called_once_with(0x45, expected_args)
-    mock_divoom_instance.color2HexString.assert_called_once_with("#FF00FF")
 
 @pytest.mark.asyncio
 async def test_time_channel_type_setter(mock_divoom_instance):

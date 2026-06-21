@@ -6,12 +6,20 @@ from divoom_lib.models import LightningType
 
 @pytest.fixture
 def mock_divoom_instance():
-    """Fixture for a mock DivoomBase instance with conversion methods."""
+    """Fixture for a mock DivoomBase instance.
+
+    R53.43: previously this monkeypatched ``color2HexString`` /
+    ``number2HexString`` / ``boolean2HexString`` onto the mock, which MASKED a
+    real bug — LightningChannel called them as
+    ``self._divoom_instance.<helper>`` but they are module-level helpers in
+    ``utils.converters``, not methods on Divoom. The test passed falsely. The
+    channel now imports the real converters, so the mock must NOT provide them
+    (re-adding any would re-mask the AttributeError regression). Note the real
+    ``color2HexString`` only accepts a clean 6-digit hex string (no ``#``),
+    unlike the old mock which stripped the ``#``.
+    """
     mock = AsyncMock(spec=DivoomBase)
     mock.send_command = AsyncMock()
-    mock.color2HexString = MagicMock(side_effect=lambda x: x.replace("#", ""))
-    mock.number2HexString = MagicMock(side_effect=lambda x: f"{x:02x}")
-    mock.boolean2HexString = MagicMock(side_effect=lambda x: "01" if x else "00")
     return mock
 
 @pytest.mark.asyncio
@@ -52,25 +60,23 @@ async def test_lightning_channel_show(mock_divoom_instance):
 @pytest.mark.asyncio
 async def test_lightning_channel_update_message(mock_divoom_instance):
     """Test _update_message sends the correct command with converted arguments."""
-    channel = LightningChannel(mock_divoom_instance, opts={"color": "#FF0000", "brightness": 75, "type": LightningType.Plants, "power": True})
+    channel = LightningChannel(mock_divoom_instance, opts={"color": "FF0000", "brightness": 75, "type": LightningType.Plants, "power": True})
 
     await channel._update_message()
 
     # Expected arguments based on _PACKAGE_PREFIX, color, brightness, type, power, _PACKAGE_SUFFIX
     # _PACKAGE_PREFIX = "4501" -> command_code = 0x45, first arg = 0x01
-    # color = "#FF0000" -> "FF0000"
-    # brightness = 75 -> "4b"
-    # type = LightningType.Plants (2) -> "02"
-    # power = True -> "01"
+    # color = "FF0000" -> real color2HexString -> "FF0000"
+    # brightness = 75 -> real number2HexString -> "4b"
+    # type = LightningType.Plants (2) -> real number2HexString -> "02"
+    # power = True -> real boolean2HexString -> "01"
     # _PACKAGE_SUFFIX = "000000"
     # Combined hex string: "01FF00004b0201000000"
     # List of bytes: [0x01, 0xFF, 0x00, 0x00, 0x4B, 0x02, 0x01, 0x00, 0x00, 0x00]
+    # Asserting the real encoded bytes is the teeth: revert any call site to
+    # self._divoom_instance.<helper> and this raises AttributeError.
     expected_args = [0x01, 0xFF, 0x00, 0x00, 0x4B, 0x02, 0x01, 0x00, 0x00, 0x00]
     mock_divoom_instance.send_command.assert_called_once_with(0x45, expected_args)
-    mock_divoom_instance.color2HexString.assert_called_once_with("#FF0000")
-    mock_divoom_instance.number2HexString.assert_any_call(75)
-    mock_divoom_instance.number2HexString.assert_any_call(LightningType.Plants)
-    mock_divoom_instance.boolean2HexString.assert_called_once_with(True)
 
 @pytest.mark.asyncio
 async def test_lightning_channel_type_setter(mock_divoom_instance):

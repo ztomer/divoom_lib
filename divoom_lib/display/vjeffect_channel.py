@@ -1,6 +1,10 @@
 # divoom_api/channels/vjeffect.py
 from ..divoom import Divoom as DivoomBase
 from ..models import VJEffectType
+# number2HexString is a module-level helper in utils.converters, NOT a method
+# on Divoom — calling it via self._divoom_instance.number2HexString raised
+# AttributeError at runtime (R53.43).
+from ..utils.converters import number2HexString
 from typing import Optional, Dict, Any
 
 class VJEffectChannel:
@@ -27,7 +31,7 @@ class VJEffectChannel:
         """
         Updates the message queue based on the parameters used.
         """
-        type_hex = self._divoom_instance.number2HexString(self._opts["type"])
+        type_hex = number2HexString(self._opts["type"])
 
         # The Node.js version constructs a string like:
         # _PACKAGE_PREFIX + number2HexString(this._opts.type)

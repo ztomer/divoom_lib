@@ -21,10 +21,13 @@ class TestTextFunctions(unittest.IsolatedAsyncioTestCase):
         """Set up a mock Divoom instance for testing."""
         self.mock_divoom_instance = AsyncMock(spec=DivoomBase)
         self.mock_divoom_instance.logger = logger
-        # Mock necessary methods/attributes from DivoomBase that DisplayText uses
+        # _int2hexlittle IS a real Divoom method, so it's legitimately mocked here.
         self.mock_divoom_instance._int2hexlittle = MagicMock(side_effect=lambda x: f"{x & 0xFF:02x}{((x >> 8) & 0xFF):02x}")
-        self.mock_divoom_instance.number2HexString = MagicMock(side_effect=lambda x: f"{x:02x}")
-        self.mock_divoom_instance.color2HexString = MagicMock(side_effect=lambda x: x.replace("#", "")) # Simple mock for color hex conversion
+        # R53.43: number2HexString / color2HexString are NOT methods on Divoom —
+        # they are module-level helpers in utils.converters. Monkeypatching them
+        # onto the mock previously MASKED the AttributeError bug. DisplayText now
+        # imports the real converters, so the mock must NOT provide them (re-adding
+        # either would re-mask the regression).
         self.mock_divoom_instance.send_command = AsyncMock(return_value=True) # Mock send_command
 
         self.display_text = DisplayText(self.mock_divoom_instance, opts={"text": "TEST"})
@@ -124,12 +127,21 @@ class TestTextFunctions(unittest.IsolatedAsyncioTestCase):
         self.mock_divoom_instance.send_command.reset_mock() # Clear calls from __init__
         
         await self.display_text.get_next_animation_frame()
-        
+
         self.mock_divoom_instance.send_command.assert_called_once()
         # Check command ID is 0x6c
         self.assertEqual(self.mock_divoom_instance.send_command.call_args[0][0], 0x6c)
-        # Check args are a list
-        self.assertIsInstance(self.mock_divoom_instance.send_command.call_args[0][1], list)
+        args = self.mock_divoom_instance.send_command.call_args[0][1]
+        self.assertIsInstance(args, list)
+        # R53.43 teeth: assert the ACTUAL encoded bytes produced by the real
+        # number2HexString. Default animFn is ANIM_STATIC_BACKGROUND → 256 zero
+        # pixels → number2HexString(0) == "00" each → 256 trailing zero bytes.
+        # anim_frame_hex (_int2hexlittle(0), mocked) = "0000" → [0x00, 0x00];
+        # the static middle header "0701aa070143000100" → 9 bytes.
+        expected_prefix = [0x00, 0x00, 0x07, 0x01, 0xAA, 0x07, 0x01, 0x43, 0x00, 0x01, 0x00]
+        self.assertEqual(len(args), len(expected_prefix) + 256)
+        self.assertEqual(args[:len(expected_prefix)], expected_prefix)
+        self.assertTrue(all(b == 0x00 for b in args[len(expected_prefix):]))
         # Check anim_frame increments
         self.assertEqual(self.display_text.frame, 1)
 

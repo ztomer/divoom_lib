@@ -1,5 +1,10 @@
 # divoom_api/drawing/text.py — migrated to display/display_text.py
 from ..sender_protocol import CommandSender
+# number2HexString / color2HexString are module-level helpers in
+# utils.converters, NOT methods on Divoom — calling them via
+# self._divoom_instance.<helper> raised AttributeError at runtime
+# (R53.43, same bug the weather/date_time shims already document/fixed).
+from ..utils.converters import number2HexString, color2HexString
 from typing import Optional, Dict, Any, List, Callable
 import asyncio
 import math
@@ -26,8 +31,8 @@ class DisplayText:
         await self._update_message()
 
     def PALETTE_TEXT_ON_BACKGROUND(self, text_color: str = "FFFFFF", background_color: str = "000000") -> List[str]:
-        back = self._divoom_instance.color2HexString(background_color)
-        front = self._divoom_instance.color2HexString(text_color)
+        back = color2HexString(background_color)
+        front = color2HexString(text_color)
         palette = [back] * 256
         for i in range(127, 256):
             palette[i] = front
@@ -38,9 +43,9 @@ class DisplayText:
         r, g, b = 255, 0, 255
         for i in range(0, 254, 2):
             palette.append(
-                self._divoom_instance.number2HexString(r) +
-                self._divoom_instance.number2HexString(g) +
-                self._divoom_instance.number2HexString(b)
+                number2HexString(r) +
+                number2HexString(g) +
+                number2HexString(b)
             )
             if i < 85:
                 b = max(0, b - 6)
@@ -62,7 +67,7 @@ class DisplayText:
         def sin_to_hex(i: int, phase: float) -> str:
             sin_val = math.sin(math.pi / size * 2 * i + phase)
             int_val = math.floor(sin_val * 127) + 128
-            return self._divoom_instance.number2HexString(int_val)
+            return number2HexString(int_val)
 
         for i in range(size):
             red = sin_to_hex(i, 0 * math.pi * 2 / 3)
@@ -120,7 +125,7 @@ class DisplayText:
         if len(pixels) != 256:
             raise ValueError('The animFn should always generate a 256 pixel array')
 
-        pixels_hex_string = "".join([self._divoom_instance.number2HexString(p) for p in pixels])
+        pixels_hex_string = "".join([number2HexString(p) for p in pixels])
 
         command_code_palette = int(self._PALETTE_HEADER[0:2], 16)
         args_hex_string_palette = self._PALETTE_HEADER[2:] + "".join(palette_hex_list) + pixels_hex_string
@@ -136,7 +141,7 @@ class DisplayText:
 
         pixel_string = ""
         for pixel in pixel_array:
-            pixel_string += self._divoom_instance.number2HexString(pixel)
+            pixel_string += number2HexString(pixel)
 
         command_code_anim = 0x6c
         anim_frame_hex = self._divoom_instance._int2hexlittle(self._anim_frame)
@@ -163,7 +168,7 @@ class DisplayText:
             raise ValueError('The paletteFn should always generate 256 colors')
         result: List[str] = []
         for color in palette:
-            result.append(self._divoom_instance.color2HexString(color))
+            result.append(color2HexString(color))
         return result
 
     @property

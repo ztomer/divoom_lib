@@ -1,6 +1,10 @@
 # divoom_api/channels/time.py
 from ..divoom import Divoom as DivoomBase
 from ..models import TimeDisplayType
+# color2HexString is a module-level helper in utils.converters, NOT a method
+# on Divoom — calling it via self._divoom_instance.color2HexString raised
+# AttributeError at runtime (R53.43).
+from ..utils.converters import color2HexString
 from typing import Optional, Dict, Any
 
 class TimeChannel:
@@ -32,7 +36,7 @@ class TimeChannel:
         """
         Updates the message queue based on the parameters used.
         """
-        color_hex = self._divoom_instance.color2HexString(self._opts["color"])
+        color_hex = color2HexString(self._opts["color"])
 
         command_code = int(self._PACKAGE_PREFIX[0:2], 16) # 0x45
         args = [

@@ -20,8 +20,11 @@ class TestTempWeatherFunctions(unittest.IsolatedAsyncioTestCase):
         """Set up a mock Divoom instance for testing."""
         self.mock_divoom_instance = AsyncMock(spec=DivoomBase)
         self.mock_divoom_instance.logger = logger
-        # Mock necessary methods/attributes from DivoomBase that TempWeatherCommand uses
-        self.mock_divoom_instance.number2HexString = MagicMock(side_effect=lambda x: f"{x:02x}")
+        # R53.43: the old TempWeatherCommand called self._divoom_instance.number2HexString
+        # (an AttributeError — it's a utils.converters helper, not a Divoom method). The
+        # shim now delegates to Weather, which encodes the temperature with pure math and
+        # never touches that helper, so monkeypatching it onto the mock is dead/misleading.
+        # Removed; the assertions below pin the real encoded bytes via send_command.
         self.mock_divoom_instance.send_command = AsyncMock(return_value=True) # Mock send_command
 
         # Instantiate TempWeatherCommand without triggering _update_message in __init__

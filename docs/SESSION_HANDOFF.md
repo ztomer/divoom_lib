@@ -18,6 +18,22 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 23 (2026-06-21): fix-or-delete the 5 latent *HexString builders.**
+  Closed the round-22 deferral. The same `self._divoom_instance.<helper>` AttributeError
+  bug that killed GUI "Sync Time" (R53.41) lived in 5 dead/latent builders
+  (display_text, display_animation, lightning/time/vjeffect_channel) — imported by
+  display/__init__ but never instantiated in prod, with tests that MASKED the bug by
+  monkeypatching the missing helpers onto a spec'd mock. Chose FIX over delete (faithful
+  node-divoom port, full test suites, same one-line pattern weather.py/date_time.py already
+  use): import number2HexString/color2HexString/boolean2HexString from utils.converters at
+  module level and call directly; `_int2hexlittle` left on self (it IS a real Divoom method).
+  De-masked all 5 test fixtures (kept the legit `_int2hexlittle` mock), pinned the real
+  encoded bytes, and switched two `"#RRGGBB"` inputs to clean 6-hex (real color2HexString
+  doesn't strip `#`). Teeth-checked: reverting any call site to the old pattern fails the
+  de-masked test with the prod AttributeError. On branch, suite 1603 passed / 75 skipped.
+  No remaining *HexString-as-method instances in the tree. Open: emoji-gate / Kare-TUI
+  house bootstrap is NOT installed in this repo (no tools/check_no_emoji.py, no hooksPath).
+
 - **R53 ADVERSARIAL LOOP — ROUND 22 (2026-06-21): menubar non-block + dead Sync Time + auth.**
   Implemented the R21-deferred menubar fix, then 2-agent sweep over display builders +
   config/lifecycle. 3 real bugs fixed (R53.40–42, on main, teeth-tested, suite 1602 green):

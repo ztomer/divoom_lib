@@ -1,6 +1,10 @@
 # divoom_api/channels/lightning.py
 from ..divoom import Divoom as DivoomBase
 from ..models import LightningType
+# color2HexString / number2HexString / boolean2HexString are module-level
+# helpers in utils.converters, NOT methods on Divoom — calling them via
+# self._divoom_instance.<helper> raised AttributeError at runtime (R53.43).
+from ..utils.converters import number2HexString, color2HexString, boolean2HexString
 from typing import Optional, Dict, Any
 
 class LightningChannel:
@@ -31,10 +35,10 @@ class LightningChannel:
         """
         Updates the message queue based on the parameters used.
         """
-        color_hex = self._divoom_instance.color2HexString(self._opts["color"])
-        brightness_hex = self._divoom_instance.number2HexString(self._opts["brightness"])
-        type_hex = self._divoom_instance.number2HexString(self._opts["type"])
-        power_hex = self._divoom_instance.boolean2HexString(self._opts["power"])
+        color_hex = color2HexString(self._opts["color"])
+        brightness_hex = number2HexString(self._opts["brightness"])
+        type_hex = number2HexString(self._opts["type"])
+        power_hex = boolean2HexString(self._opts["power"])
 
         # The Node.js version constructs a string like:
         # _PACKAGE_PREFIX + color2HexString(this._color) + brightness2HexString(this._opts.brightness) + number2HexString(this._opts.type) + boolean2HexString(this._opts.power) + this._PACKAGE_SUFFIX

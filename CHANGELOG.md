@@ -5,6 +5,41 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 23: fix-or-delete the 5 latent *HexString builders (2026-06-21)
+
+Closes the cleanup deferred at the end of round 22. The same
+`self._divoom_instance.number2HexString` / `.color2HexString` /
+`.boolean2HexString` AttributeError bug that killed GUI "Sync Time" (R53.41)
+existed in five OTHER display/channel builders. They are dead/latent — imported
+by `display/__init__.py` (DisplayText/DisplayAnimation) but never instantiated
+in production, and their unit tests MASKED the bug by monkeypatching the missing
+helpers onto a `spec`'d mock, so they passed falsely.
+
+Chose FIX over delete: the classes are a faithful port of node-divoom-timebox-evo,
+carry full test suites, and the fix is the same one-line-per-call-site pattern
+weather.py / date_time.py already document.
+
+- **R53.43** — imported the real module-level converters from
+  `divoom_lib.utils.converters` at module level and call them directly in:
+  `display_text.py` (number2HexString, color2HexString),
+  `display_animation.py` (number2HexString),
+  `lightning_channel.py` (number2HexString, color2HexString, boolean2HexString),
+  `time_channel.py` (color2HexString), `vjeffect_channel.py` (number2HexString).
+  `self._divoom_instance._int2hexlittle(...)` is left untouched — that IS a real
+  `Divoom` method.
+- **Tests de-masked** — removed the converter monkeypatches from all five test
+  fixtures/setups (kept the legit `_int2hexlittle` mock) so each test now
+  exercises the REAL converter, and pinned the actual encoded bytes. Two test
+  inputs were switched from `"#FF0000"`/`"#FF00FF"` to clean 6-hex, because the
+  real `color2HexString` (unlike the old mock) does not strip a leading `#`.
+  Teeth-checked: reverting any call site to the `self._divoom_instance.<helper>`
+  pattern fails the de-masked test with the production `AttributeError`. Suite
+  1603 passed / 75 skipped green.
+
+Lesson (reinforced from R53.41): a test that monkeypatches a non-existent method
+onto a `spec`'d mock can MASK an always-failing prod path — de-mask when reviewing.
+
+---
 ## R53 round 22: menubar non-block + dead Sync Time + auth honesty (2026-06-21)
 
 Fresh adversarial pass: implemented the previously-deferred menubar main-thread

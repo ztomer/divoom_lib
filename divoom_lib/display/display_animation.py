@@ -1,5 +1,10 @@
 # divoom_api/drawing/drawing.py — migrated to display/display_animation.py
 from ..sender_protocol import CommandSender
+# number2HexString is a module-level helper in utils.converters, NOT a method
+# on Divoom — calling it via self._divoom_instance.number2HexString raised
+# AttributeError at runtime (R53.43). _int2hexlittle below IS a real Divoom
+# method, so it stays on self._divoom_instance.
+from ..utils.converters import number2HexString
 from typing import Optional, Dict, Any, List, Union
 import asyncio
 import math
@@ -86,7 +91,7 @@ class DisplayAnimation:
         if is_animated:
             delay_hex = self._divoom_instance._int2hexlittle(frame_delay)
             reset_palette = "00"
-            nb_colors_hex = self._divoom_instance.number2HexString(nb_colors)
+            nb_colors_hex = number2HexString(nb_colors)
             color_string = "".join(colors_array)
 
             string_without_header = delay_hex + reset_palette + nb_colors_hex + color_string + pixel_hex_string
@@ -98,7 +103,7 @@ class DisplayAnimation:
             return [int(full_payload_hex[i:i+2], 16) for i in range(0, len(full_payload_hex), 2)]
 
         else:
-            nb_colors_hex = self._divoom_instance.number2HexString(nb_colors)
+            nb_colors_hex = number2HexString(nb_colors)
             color_string = "".join(colors_array)
 
             string_without_header = nb_colors_hex + color_string + pixel_hex_string

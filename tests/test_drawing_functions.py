@@ -22,10 +22,14 @@ class TestDrawingFunctions(unittest.IsolatedAsyncioTestCase):
         """Set up a mock Divoom instance for testing."""
         self.mock_divoom_instance = AsyncMock(spec=DivoomBase)
         self.mock_divoom_instance.logger = logger
-        # Mock necessary methods/attributes from DivoomBase that DisplayAnimation uses
+        # _int2hexlittle IS a real Divoom method, so it's legitimately mocked here.
         self.mock_divoom_instance._int2hexlittle = MagicMock(side_effect=lambda x: f"{x & 0xFF:02x}{((x >> 8) & 0xFF):02x}")
-        self.mock_divoom_instance.number2HexString = MagicMock(side_effect=lambda x: f"{x:02x}")
-        self.mock_divoom_instance.color2HexString = MagicMock(side_effect=lambda x: x.replace("#", "")) # Simple mock for color hex conversion
+        # R53.43: number2HexString is NOT a method on Divoom — it is a module-level
+        # helper in utils.converters. Monkeypatching it onto the mock previously
+        # MASKED the AttributeError bug. DisplayAnimation now imports the real
+        # converter, so the mock must NOT provide it (re-adding it would re-mask
+        # the regression). The _encode_image_data byte assertions below
+        # (nb_colors byte == encoded_data[6]) exercise the real converter.
 
         self.display_animation = DisplayAnimation(self.mock_divoom_instance)
 
