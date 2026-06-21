@@ -490,3 +490,43 @@ def test_exclusive_end_success_is_quiet(caplog):
     finally:
         loop.close()
     assert not any("tok-2" in r.message for r in caplog.records)
+
+
+# ── R53.31: proxy device_status short-TTL cache ─────────────────────────────
+
+def test_proxy_status_cache_dedupes_intra_op_reads():
+    """is_connected/lan/_conn read back-to-back in one op must share ONE
+    device_status() RPC, not fire three blocking round-trips."""
+    from divoom_daemon.daemon_client import DaemonDeviceProxy
+
+    calls = {"n": 0}
+
+    class _Client:
+        def device_status(self):
+            calls["n"] += 1
+            return {"connected": True, "lan_ip": None, "mac": "AA:BB"}
+
+    proxy = DaemonDeviceProxy(_Client())
+    _ = proxy.is_connected
+    _ = proxy.lan
+    _ = proxy._conn
+    assert calls["n"] == 1, f"expected 1 device_status RPC, got {calls['n']}"
+
+
+def test_proxy_status_cache_refetches_after_ttl():
+    """Once the short TTL lapses, a fresh read refetches (no permanent staleness)."""
+    from divoom_daemon.daemon_client import DaemonDeviceProxy
+
+    calls = {"n": 0}
+
+    class _Client:
+        def device_status(self):
+            calls["n"] += 1
+            return {"connected": True}
+
+    proxy = DaemonDeviceProxy(_Client())
+    _ = proxy.is_connected
+    # rewind the cache timestamp past the TTL (faster + deterministic vs sleeping)
+    object.__setattr__(proxy, "_status_cache_ts", proxy._status_cache_ts - 1.0)
+    _ = proxy.is_connected
+    assert calls["n"] == 2

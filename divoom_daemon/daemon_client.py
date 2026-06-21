@@ -293,12 +293,21 @@ class DaemonDeviceProxy:
     ``_conn``) are answered synchronously from ``device_status``.
     """
 
+    # Short-TTL cache for device_status() introspection. A single GUI operation
+    # reads is_connected/lan/_conn back-to-back, each previously firing its OWN
+    # blocking device_status() socket RPC; the cache collapses them to one. The TTL
+    # is short enough that staleness is negligible (and the daemon's device_call
+    # self-heals the connection regardless of a slightly-stale GUI read).
+    _STATUS_TTL = 0.25
+
     def __init__(self, client: DaemonClient, _path: str = "", *,
                  target: str = "device", _token: str | None = None) -> None:
         object.__setattr__(self, "_client", client)
         object.__setattr__(self, "_path", _path)
         object.__setattr__(self, "_target", target)
         object.__setattr__(self, "_token", _token)
+        object.__setattr__(self, "_status_cache", None)
+        object.__setattr__(self, "_status_cache_ts", 0.0)
 
     def _with_token(self, token: str) -> "DaemonDeviceProxy":
         return DaemonDeviceProxy(self._client, self._path,
@@ -359,7 +368,14 @@ class DaemonDeviceProxy:
         return _ProxyExclusiveCtx(self, token)
 
     def _status(self) -> dict:
-        return self._client.device_status()
+        import time
+        now = time.monotonic()
+        if self._status_cache is not None and (now - self._status_cache_ts) < self._STATUS_TTL:
+            return self._status_cache
+        st = self._client.device_status()
+        object.__setattr__(self, "_status_cache", st)
+        object.__setattr__(self, "_status_cache_ts", now)
+        return st
 
     def __getattr__(self, name: str) -> Any:
         # Root-level synthetic introspection reads (device only).
