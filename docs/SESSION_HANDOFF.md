@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HOUSE STANDARDS BOOTSTRAP (2026-06-21): emoji gate + Kare TUI lib + pre-commit hook.**
+  Ran `~/projects/scripts/init_repo.sh` (commit `79d432c`, on main): installed
+  `tools/check_no_emoji.py` (gate — only `→ ✓ ✗ ⚠ ↔ ↑ ↓` + Mac key glyphs permitted;
+  excludes `docs/divoom_docs/` vendor API samples), `tui/{lib.sh,lib.py,stylerc}` (Kare
+  style for scripts), `.githooks/pre-commit` (blocks staged emoji), and set
+  `core.hooksPath=.githooks` — **this is now active for ALL agents on this tree (opencode
+  too): commits with disallowed emoji will be blocked.** Added a fast `no-emoji` CI job.
+  Cleaned 12 pre-existing glyphs to make the tree pass (5 stray U+FE0F variation selectors;
+  U+1F195 NEW-badge to text; a refresh-arrow U+21BB in a UI mockup to `[R]`; a double-arrow
+  U+21D4 in a comment to the permitted U+2194). New scripts MUST source `tui/lib.sh` / import
+  `tui.lib` and use the
+  Kare helpers (info/ok/err/warn/section); never hand-roll ANSI colors or decorative emoji.
+
 - **R53 ADVERSARIAL LOOP — ROUND 24 (2026-06-21): device-loop fd leak + LAN ACK!=success.**
   2-agent pass over framing primitives (CLEAN) + LAN transport. 2 real bugs fixed (commit
   `0ef1d6a`, on main, teeth-tested, suite 1608 green): device asyncio loop never closed on
@@ -42,8 +55,8 @@ Claude) should read this on entry and **update it at the end of every round**
   encoded bytes, and switched two `"#RRGGBB"` inputs to clean 6-hex (real color2HexString
   doesn't strip `#`). Teeth-checked: reverting any call site to the old pattern fails the
   de-masked test with the prod AttributeError. On branch, suite 1603 passed / 75 skipped.
-  No remaining *HexString-as-method instances in the tree. Open: emoji-gate / Kare-TUI
-  house bootstrap is NOT installed in this repo (no tools/check_no_emoji.py, no hooksPath).
+  No remaining *HexString-as-method instances in the tree. [emoji-gate now installed —
+  see the house-standards entry at the top.]
 
 - **R53 ADVERSARIAL LOOP — ROUND 22 (2026-06-21): menubar non-block + dead Sync Time + auth.**
   Implemented the R21-deferred menubar fix, then 2-agent sweep over display builders +
