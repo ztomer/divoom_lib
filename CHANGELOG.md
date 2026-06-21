@@ -5,6 +5,37 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 22: menubar non-block + dead Sync Time + auth honesty (2026-06-21)
+
+Fresh adversarial pass: implemented the previously-deferred menubar main-thread
+fix, then 2-agent sweep over display command builders and config/lifecycle. Three
+real bugs fixed (R53.40–42), teeth-tested, suite 1602 green:
+
+- **R53.40** — menubar `device_activity()` did a synchronous `get_device_activity`
+  socket RPC on the AppKit main thread (menuNeedsUpdate_); while the daemon was
+  mid-BLE-op the menu froze up to the 2.0s read timeout. Now returns a cached
+  snapshot instantly and refreshes off-thread (cache primed in start(); reliable
+  now that R53.39 keeps the subscribe thread alive). [resolves the R21 deferral]
+- **R53.41 (HIGH)** — `DateTimeCommand` called `self._divoom_instance.number2HexString`,
+  but that's a module-level helper in `utils.converters`, NOT a Divoom method → it
+  raised AttributeError, swallowed by the GUI tool wrapper into a silent False. The
+  GUI "Sync Time" feature NEVER worked on a real device. Fixed to call the module
+  function (the weather shim already documents this exact bug); the masked test is
+  de-masked and pins the encoded payload.
+- **R53.42** — `get_credentials()` wrapped login AND token-cache-write in one
+  try/except, so a cache-write failure (disk full / read-only ~/.config) was
+  reported as "Email login failed — falling back to guest", silently dropping a
+  valid account to a guest token. Login and caching are now separated; a successful
+  login is always returned.
+
+DEFERRED / flagged: the same *HexString-as-method bug exists in five OTHER builders
+(display_text, display_animation, lightning/time/vjeffect_channel) but they're dead
+code (never instantiated in production) — flagged for a separate fix-or-delete
+cleanup. Also LOW: `device_owner.stop()` nulls the loop refs without join()/
+loop.close() → a thread+fd leak per stop/restart cycle (bounded; stop==exit
+normally).
+
+---
 ## R53 round 21: scan dict-race + GUI/menubar thread fixes (2026-06-21)
 
 Fresh 3-agent adversarial pass over the GUI api layer, the menubar, and the

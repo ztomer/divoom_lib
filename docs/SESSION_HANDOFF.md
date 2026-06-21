@@ -18,6 +18,22 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 22 (2026-06-21): menubar non-block + dead Sync Time + auth.**
+  Implemented the R21-deferred menubar fix, then 2-agent sweep over display builders +
+  config/lifecycle. 3 real bugs fixed (R53.40–42, on main, teeth-tested, suite 1602 green):
+  (40) menubar `device_activity()` now returns a cached snapshot + off-thread refresh instead
+  of a blocking get_device_activity RPC on the AppKit main thread (≤2s menu freeze gone);
+  (41) **HIGH** — GUI "Sync Time" was 100% DEAD: `DateTimeCommand` called
+  `self._divoom_instance.number2HexString` but that's a converters.py module function, not a
+  Divoom method → AttributeError swallowed into silent False; fixed + de-masked the test that
+  hid it; (42) `get_credentials()` dropped a valid email login to a guest token when the token
+  cache write failed (disk full / RO config) — login and caching now separated. FLAGGED (dead
+  code, separate cleanup): the same *HexString-as-method bug in 5 unused builders
+  (display_text/display_animation/lightning/time/vjeffect_channel) — spawn_task chip filed.
+  LOW deferred: `device_owner.stop()` doesn't join the loop thread / close the loop (fd+thread
+  leak per restart, bounded). Lesson: tests that monkeypatch a non-existent method onto a
+  spec'd mock can MASK an always-failing prod path — de-mask when reviewing.
+
 - **R53 ADVERSARIAL LOOP — ROUND 21 (2026-06-21): scan dict-race + GUI/menubar threads.**
   Fresh 3-agent pass over GUI api / menubar / discovery+scan. 3 real bugs fixed (R53.37–39,
   on main, teeth-tested, suite 1600 green): (37) `_owned_devices()` was the one `_live_devices`
