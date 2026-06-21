@@ -18,6 +18,27 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 28 (2026-06-21): fan-out honesty + C encoder aliasing.**
+  (Round 27 left for opencode, shared tree.) Fresh 3-agent sweep over BLE transport /
+  native encoder / wall+animation. 4 fixes (commits `d4910d6` + `921f1ba`, on main,
+  teeth-tested, suite 1652 green): (HIGH) `wall.show_image` 0-frame slot was skipped with a
+  bare continue → false wall success + result/device MISINDEX (self.devices[idx] by result
+  index) — now pairs task↔slot via zip and counts skips as failures; (MED) `game.send_gamecontrol`
+  overwrote key-down result with key-up → now `down_ok and up_ok`; (MED) `display.show_image`
+  0x49 fallback returned None not bool; (HIGH-but-LATENT) C image encoders aliased the index
+  scratch onto out_buf → pixel packer corrupted output (confirmed via dylib probe). Fixed all
+  3 C encoders (separate index buffer), rebuilt dylib, added `test_native_encoder_c_path.py`
+  that drives C directly with a worst-case buffer (the old parity test was a FALSE POSITIVE:
+  wrappers undersize → C rejects → Python-vs-Python). No live path hits the buggy C packer
+  today (live 0x8B = pure-Python; 0x49 C self-rejects → Python) — it was a landmine for the
+  perf deferral. DEFERRED this round (verified real, HW-sensitive / dead-path / low-reach):
+  BLE `_expected_response_command` scalar has multiple uncoordinated writers (iOS-LE callback
+  autonomous clear → false timeout; read-backs bypass the response lock); `bt_spp_transport`
+  redundant outer wait_for leaks an executor thread; C *static* encoder has a pre-existing
+  FORMAT divergence (dead path, needs APK/HW truth); 0x49 PACKET_NUM wraps >255 on >51KB blobs.
+  Lesson reinforced: a probe with an unlucky input (flat top/bottom split) can MASK a real
+  divergence — vary the pattern.
+
 - **HOUSE STANDARDS BOOTSTRAP (2026-06-21): emoji gate + Kare TUI lib + pre-commit hook.**
   Ran `~/projects/scripts/init_repo.sh` (commit `79d432c`, on main): installed
   `tools/check_no_emoji.py` (gate — only the Kare icon set: arrow/check/cross/warn/bi-arrow/

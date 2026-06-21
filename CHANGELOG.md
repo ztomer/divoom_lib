@@ -5,6 +5,47 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 28: fan-out honesty + C encoder aliasing corruption (2026-06-21)
+
+(Round 27 left for opencode's parallel work — shared tree.) Fresh 3-agent
+adversarial sweep over BLE transport, the native encoder pipeline, and wall +
+animation streaming. 4 fixes, each teeth-tested; suite 1652 passed / 78 skipped:
+
+- **HIGH (honesty + misindexing)** — `wall.show_image`: a slot whose animated
+  source yields 0 frames was skipped with a bare `continue` before its task was
+  appended, so it never counted against `all_ok` (wall reported full success
+  while a screen got nothing) AND the result loop indexed `self.devices[idx]` by
+  the result index, drifting out of alignment after any skip → errors named the
+  wrong device. Tasks are now paired with their slot (zip), skipped slots count
+  as failures.
+- **MEDIUM** — `game.send_gamecontrol` overwrote the key-DOWN result with the
+  key-UP result → a failed press + successful release reported True. Now
+  `down_ok and up_ok`.
+- **MEDIUM** — `display.show_image` 0x49 fallback could return None (annotated
+  bool) on an empty blob list. Now starts False, returns bool().
+- **HIGH-but-LATENT (C correctness)** — the C image encoders aliased the
+  per-pixel index scratch array onto `out_buf`; the pixel packer then overwrote
+  not-yet-consumed indices once `7+3*n < i`, corrupting output (C/Python
+  divergence, confirmed by a dylib probe — 32x32 nc=2 diverges at byte 14).
+  Fixed all three encoders to use a separate index buffer; rebuilt the dylib. No
+  live path executes the buggy packer today (live 0x8B uses pure-Python; 0x49 C
+  16x16 self-rejects on the undersized buffer → Python), but it was a landmine
+  for the perf deferral, and the existing parity test was a FALSE POSITIVE
+  (wrappers undersize → C rejects → Python-vs-Python). Added
+  `test_native_encoder_c_path.py` driving the C functions directly with a
+  worst-case buffer (fails 26 assertions pre-fix; all pass post-fix).
+
+BLE-transport findings (verified real but HW-sensitive / heavily-reviewed path,
+no HW validation available) DEFERRED: `_expected_response_command` scalar has
+multiple uncoordinated writers (iOS-LE callback clears it autonomously → a
+colliding frame can null it under a parked waiter → false timeout); read-back
+paths bypass the response lock; `bt_spp_transport` redundant outer `wait_for`
+leaks a blocked executor thread. Also DEFERRED (separate, dead path): the C
+*static* encoder has a pre-existing FORMAT divergence from Python static (needs
+APK/HW truth). And the 0x49 PACKET_NUM wraps past 255 on >51KB blobs (low
+reachability, superseded path).
+
+---
 ## R53 round 26: config/state persistence hardening (2026-06-21)
 
 (Round 25 is opencode's parallel scoreboard/lighting pass — shared tree.) Fresh
