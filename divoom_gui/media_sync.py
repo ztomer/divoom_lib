@@ -172,15 +172,12 @@ class MediaSyncMixin(GallerySyncMixin):
 
     def get_ticker_preview(self, symbol: str, size: int = 0) -> str:
         try:
-            # Auto-reconnect target check inside widgets preview triggers (ensures handshake is active)
-            dev = self.current_divoom
-            if dev and not dev.lan and not dev.is_connected:
-                logger.info("Stock Ticker: Attempting auto-reconnect before rendering...")
-                try:
-                    self._run_async(dev.connect())
-                except Exception:
-                    pass
-
+            # NB: this only RENDERS a local preview frame — it never pushes to the
+            # device — so it must NOT touch the connection. The old dev.lan /
+            # dev.is_connected / dev.connect() pre-check fired two blocking
+            # device_status()/device_call RPCs on the pywebview JS thread per
+            # render (freezing the preview button up to the 120s _run_async cap on
+            # a wedged connect), for no benefit. Removed (same class as R53.30).
             data = media_source.fetch_stock_ticker(symbol)
             if not data:
                 return json.dumps({"ok": False, "error": "no data"})

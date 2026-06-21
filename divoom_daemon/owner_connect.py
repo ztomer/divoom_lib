@@ -39,7 +39,13 @@ class OwnerConnectMixin:
         if d is not None and self.mac and not self._lan_ip:
             owned[self.mac.upper()] = {
                 "name": _name(d, self.mac), "address": self.mac, "owned": True}
-        for mac, dev in (getattr(self, "_live_devices", None) or {}).items():
+        # snapshot: the device-loop thread inserts into / pops _live_devices
+        # (get_live_device / _release_live_device_if_idle) while a scan runs this
+        # on an RPC thread (G2 runs scan off the queue). A bare .items() loop here
+        # raised "dict changed size during iteration" → swallowed by scan()'s
+        # except → a false empty "no devices found" exactly when streaming. (The
+        # one _live_devices read R53.32 missed.)
+        for mac, dev in list((getattr(self, "_live_devices", None) or {}).items()):
             if mac and mac.upper() not in owned:
                 owned[mac.upper()] = {
                     "name": _name(dev, mac), "address": mac, "owned": True}

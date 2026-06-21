@@ -167,9 +167,18 @@ class MenubarClient:
                 return
             if self._client.send_command("device_status").get("success"):
                 continue  # daemon is back — re-subscribe
-            if self._on_shutdown:
-                self._on_shutdown()
-            return
+            # Daemon probe failed → it's really gone. Follow it down (terminate
+            # via _on_shutdown) ONLY under the shared lifecycle. Under keep-alive
+            # we must NOT kill the reader thread: the daemon may restart and we
+            # have to re-subscribe — the old unconditional `return` left the
+            # menubar frozen forever after any daemon restart.
+            from divoom_lib.lifecycle_config import (
+                get_keep_daemon_alive, should_follow_daemon_shutdown)
+            if should_follow_daemon_shutdown(get_keep_daemon_alive()):
+                if self._on_shutdown:
+                    self._on_shutdown()
+                return
+            time.sleep(1.0)  # keep-alive: back off, then retry subscribe/reconnect
 
     def set_status_callback(self, cb: Callable[[dict], None]) -> None:
         self._on_status_change = cb
