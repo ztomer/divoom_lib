@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 24 (2026-06-21): device-loop fd leak + LAN ACK!=success.**
+  2-agent pass over framing primitives (CLEAN) + LAN transport. 2 real bugs fixed (commit
+  `0ef1d6a`, on main, teeth-tested, suite 1608 green): device asyncio loop never closed on
+  teardown (selector/fd leak per stop→restart — closed in owner_loop._run's finally); and
+  `LanTransport.post()` reported device-rejected commands as success (Divoom local API returns
+  HTTP 200 + non-zero `error_code` on rejection) — added `_validate_lan_response` + the first
+  LanTransport tests. DEFERRED (informational): iOS-LE RX checksum not verified (HW-tuned, left
+  alone). NOTE: commit labels collide cosmetically — both this device-loop fix and the parallel
+  latent-builders commit `abdfb63` reused "R53.43" (shared tree, harmless). [the latent-builders
+  cleanup landed via the spawn_task chip — see round 23 below]
+
 - **R53 ADVERSARIAL LOOP — ROUND 23 (2026-06-21): fix-or-delete the 5 latent *HexString builders.**
   Closed the round-22 deferral. The same `self._divoom_instance.<helper>` AttributeError
   bug that killed GUI "Sync Time" (R53.41) lived in 5 dead/latent builders

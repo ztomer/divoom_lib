@@ -5,6 +5,29 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 24: device-loop fd leak + LAN ACK!=success (2026-06-21)
+
+(Commit `0ef1d6a`; its two fixes were tagged R53.43/44 in the message, which
+collides cosmetically with the parallel latent-builders commit below that reused
+"R53.43" — same shared tree, harmless in history.) Fresh 2-agent pass over the
+framing primitives (CLEAN — length/checksum math, byte order, escape symmetry,
+resync and bounds all verified vs the C reference + 78 parity tests) and the LAN
+transport. Two real bugs fixed, teeth-tested, suite 1608 green:
+
+- **device-loop fd leak** — the dedicated device asyncio loop (`owner_loop._run`)
+  ran `loop.run_forever()` with no `loop.close()`, leaking the loop's selector/fds
+  on every stop→restart cycle in a long-lived (keep-alive) daemon. Closed in
+  `_run()`'s finally (dying loop thread, after run_forever returns).
+- **LAN ACK!=success** — `LanTransport.post()` returned the device's JSON without
+  checking HTTP status or `error_code`. The Divoom local API answers HTTP 200 with
+  `{"error_code": N}`; N != 0 = command rejected (bad LocalToken, out-of-range,
+  unsupported model). A rejected LAN `set_brightness`/`set_channel`/etc. was reported
+  as success, and `probe()` deemed any 200+JSON host reachable. Added a pure
+  `_validate_lan_response` raising on non-200 / non-JSON / non-zero error_code (first
+  LanTransport tests — the gap that hid it). DEFERRED (informational):
+  `parse_ios_le_notification` doesn't verify the RX checksum (HW-tuned path; left alone).
+
+---
 ## R53 round 23: fix-or-delete the 5 latent *HexString builders (2026-06-21)
 
 Closes the cleanup deferred at the end of round 22. The same
