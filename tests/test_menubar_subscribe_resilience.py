@@ -9,6 +9,8 @@ Teeth: restore the unconditional `return` and the keep-alive test sees only one
 subscribe attempt (reader died) instead of reconnecting.
 """
 import sys
+import threading
+import time
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -77,3 +79,35 @@ def test_follow_down_terminates_reader(monkeypatch):
 
     assert shutdown_calls == [1], "must follow the daemon down exactly once"
     assert client._client.subscribe_calls == 1, "reader must stop after following down"
+
+
+# ── R53.40: device_activity() must be non-blocking (cached snapshot) ─────────
+
+def test_device_activity_does_not_block_on_slow_rpc():
+    """menuNeedsUpdate_ (AppKit main thread) calls device_activity(); it must
+    return immediately from cache, never stalling on the socket RPC while the
+    daemon is mid-BLE-op."""
+    client = object.__new__(MenubarClient)
+    client._activity_cache = {}
+    client._activity_lock = threading.Lock()
+    client._activity_refresh_thread = None
+
+    gate = threading.Event()
+
+    class _Inner:
+        def get_device_activity(self):
+            gate.wait(2.0)  # daemon busy → slow reply
+            return {"activity": {"AA:BB": {"kind": "clock"}}}
+
+    client._client = _Inner()
+
+    t0 = time.monotonic()
+    first = client.device_activity()  # cache empty, refresh kicked in background
+    elapsed = time.monotonic() - t0
+    assert elapsed < 0.3, f"device_activity blocked {elapsed:.2f}s on the RPC"
+    assert first == {}, "first read returns the (empty) cache, not the live RPC"
+
+    gate.set()
+    client._activity_refresh_thread.join(2.0)  # let the refresh land
+    second = client.device_activity()
+    assert second == {"AA:BB": {"kind": "clock"}}, "cache must reflect the refresh"

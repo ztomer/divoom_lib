@@ -106,6 +106,15 @@ class MenubarClient:
         self._status = {"state": STATE_IDLE, "counters": {}}
         self._on_status_change: Callable[[dict], None] | None = None
         self._on_shutdown: Callable[[], None] | None = None  # R40 §9
+        # R53.40: device_activity is read from the AppKit main thread
+        # (menuNeedsUpdate_). It must NEVER do a blocking socket RPC there —
+        # while the daemon is mid-BLE-op the read blocks up to `timeout` (2s),
+        # freezing the whole menu. Serve a cached snapshot instead, refreshed off
+        # the main thread.
+        import threading
+        self._activity_cache: dict = {}
+        self._activity_lock = threading.Lock()
+        self._activity_refresh_thread: threading.Thread | None = None
 
     def start(self) -> bool:
         """Start the subscription thread. Returns True if daemon reachable."""
@@ -113,6 +122,7 @@ class MenubarClient:
             return True
         self._running = True
         self._subscribe_thread = self._run_subscribe()
+        self._refresh_activity_async()  # warm the activity cache before the first menu open
         return self._subscribe_thread is not None
 
     def stop(self) -> None:
@@ -122,11 +132,33 @@ class MenubarClient:
 
     def device_activity(self) -> dict:
         """R46 #3: {mac: {name, kind, at}} of what each device is showing, for the
-        per-device menubar tiles. Best-effort — returns {} if the daemon is down."""
-        try:
-            return (self._client.get_device_activity() or {}).get("activity", {}) or {}
-        except Exception:
-            return {}
+        per-device menubar tiles. Best-effort — returns {} if the daemon is down.
+
+        R53.40: NON-BLOCKING. Returns the last cached snapshot immediately (so the
+        main-thread menuNeedsUpdate_ never stalls on a socket RPC) and kicks a
+        background refresh so the next read is current. Call repeatedly — the
+        refresh self-dedupes while one is already in flight."""
+        self._refresh_activity_async()
+        with self._activity_lock:
+            return dict(self._activity_cache)
+
+    def _refresh_activity_async(self) -> None:
+        import threading
+        t = self._activity_refresh_thread
+        if t is not None and t.is_alive():
+            return  # a refresh is already running — don't pile up threads
+
+        def _refresh() -> None:
+            try:
+                act = (self._client.get_device_activity() or {}).get("activity", {}) or {}
+            except Exception:
+                return
+            with self._activity_lock:
+                self._activity_cache = act
+
+        t = threading.Thread(target=_refresh, daemon=True)
+        self._activity_refresh_thread = t
+        t.start()
 
     def _run_subscribe(self):
         import threading
