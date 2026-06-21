@@ -18,6 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 21 (2026-06-21): scan dict-race + GUI/menubar threads.**
+  Fresh 3-agent pass over GUI api / menubar / discovery+scan. 3 real bugs fixed (R53.37–39,
+  on main, teeth-tested, suite 1600 green): (37) `_owned_devices()` was the one `_live_devices`
+  read R53.32 missed — a scan (off-queue, G2) concurrent with a poller raised "dict changed
+  size" → swallowed → false empty scan; now snapshots; (38) GUI `get_ticker_preview` probed
+  the connection (dev.lan/is_connected/connect) on the JS thread for a LOCAL-only preview render
+  — R53.30 anti-pattern, removed; (39) the menubar subscriber loop killed its reader thread on
+  a daemon drop even under keep-alive → menubar froze forever after a daemon restart; now it
+  follows-down only under the shared lifecycle and otherwise keeps reconnecting. DEFERRED
+  (GUI-side, bigger): menubar `menuNeedsUpdate_` still does a blocking `get_device_activity`
+  RPC on the AppKit main thread (≤2s freeze opening the menu while the daemon is mid-BLE-op) —
+  proper fix is to cache device_activity in the now-reliable subscribe thread. Core BLE/daemon
+  otherwise clean this pass.
+
 - **R53 ADVERSARIAL LOOP — ROUND 20 (2026-06-21): wall honesty + blob leak.** Fresh
   3-agent pass over wall / animation+custom-art push / command-queue+exclusive core.
   2 real bugs fixed (R53.35–36, on main, teeth-tested, suite 1596 green): (35) the four

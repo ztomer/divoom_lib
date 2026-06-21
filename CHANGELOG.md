@@ -5,6 +5,33 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 21: scan dict-race + GUI/menubar thread fixes (2026-06-21)
+
+Fresh 3-agent adversarial pass over the GUI api layer, the menubar, and the
+discovery/scan path. Three real bugs fixed (R53.37–39), teeth-tested, suite 1600
+green:
+
+- **R53.37** — `OwnerConnectMixin._owned_devices()` iterated `_live_devices` with a
+  bare for-loop (the one read R53.32 missed). A scan (off-queue, G2) concurrent
+  with a live-job poller raised "dict changed size during iteration", swallowed by
+  `scan()` → a false empty "no devices found" while streaming. Now `list()`-snapshots.
+- **R53.38** — GUI `get_ticker_preview` renders only a LOCAL preview yet probed
+  `dev.lan`/`dev.is_connected` and called `dev.connect()` — blocking RPCs on the
+  pywebview JS thread (up to the 120s `_run_async` cap) for no benefit (R53.30
+  anti-pattern). Pre-check removed.
+- **R53.39** — the menubar subscriber loop killed its reader thread on a daemon
+  drop even under keep-alive (called the no-op `_on_shutdown` then unconditionally
+  returned) → the menubar froze forever after any daemon restart, never
+  re-subscribing. Now follows the daemon down (terminate) only under the shared
+  lifecycle; under keep-alive it keeps the reader alive and reconnects with backoff.
+
+DEFERRED (tracked, GUI-side, bigger change): menubar `menuNeedsUpdate_` still does
+a synchronous `get_device_activity` RPC on the AppKit main thread — clicking the
+icon while the daemon is mid-BLE-op freezes the menu up to the 2.0s read timeout.
+Proper fix is to cache `device_activity` in the subscribe thread and have the main
+thread read the cache (now that R53.39 keeps that thread reliably alive).
+
+---
 ## R53 round 20: wall partial-failure honesty + blob temp-file leak (2026-06-21)
 
 Fresh 3-agent adversarial pass over the wall, the animation/custom-art push paths,
