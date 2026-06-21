@@ -254,10 +254,17 @@ def get_credentials(force_refresh: bool = False) -> DivoomCredentials:
     if email and password and (force_refresh or not in_cooldown):
         try:
             creds = _login_email(email, password)
-            _save_cache(creds)
-            return creds
         except Exception as e:
             print_wrn(f"Email login failed: {e} — falling back to guest")
+        else:
+            # A cache-WRITE failure (disk full / read-only ~/.config) must NOT
+            # discard a SUCCESSFUL login → don't silently drop a valid account to
+            # a guest token. Caching is best-effort; the creds are already valid.
+            try:
+                _save_cache(creds)
+            except Exception as e:
+                print_wrn(f"Could not cache auth token: {e}")
+            return creds
 
     # Fail fast inside the cooldown window so a down cloud can't be hammered.
     if in_cooldown:
