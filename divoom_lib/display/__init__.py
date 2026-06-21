@@ -192,14 +192,16 @@ class Display:
 
         # Fallback path: 0x49 chunked animation.
         blobs = encode_animation(frames)
-        result = None
+        # Honest bool: start False so an empty blob list (nothing sent) reports
+        # failure rather than returning None (the annotated return type is bool).
+        result: bool = False
         for packet in blobs:
             result = await self.communicator.send_command(
                 "set animation frame", list(packet)
             )
             if not result:
-                return result
-        return result
+                return False
+        return bool(result)
 
     def _get_screensize(self) -> int:
         """Read the active device's screensize from the config.

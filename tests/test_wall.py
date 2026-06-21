@@ -113,6 +113,41 @@ class TestDivoomWall(unittest.IsolatedAsyncioTestCase):
                 mc.display.show_image.assert_called_once()
 
     @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    @patch('divoom_lib.wall.ImageSequence.Iterator')
+    @patch('divoom_lib.wall.Image.open')
+    async def test_wall_show_image_zero_frames_reports_failure(
+        self, mock_image_open, mock_iter, mock_divoom_class
+    ):
+        """R53.28: a truncated/animated source that yields 0 frames must make
+        show_image report FAILURE (the screens got nothing) — not vacuous
+        success. Teeth: the old code did a bare `continue`, leaving all_ok=True
+        with an empty task list, so it returned True for a no-op render.
+        """
+        mock_img = MagicMock(spec=Image.Image)
+        mock_img.is_animated = True
+        mock_image_open.return_value = mock_img
+        mock_iter.return_value = iter([])  # animated, but zero frames
+
+        mock_clients = []
+        for _ in range(4):
+            mc = MagicMock()
+            mc.display.show_image = AsyncMock(return_value=True)
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+
+        orig_exists = Path.exists
+        Path.exists = lambda self_path: "mock_path.gif" in str(self_path)
+        try:
+            wall = DivoomWall(self.device_configs)
+            success = await wall.show_image("mock_path.gif")
+            self.assertFalse(success)  # NOT vacuous True
+            # Nothing was pushed to any device.
+            for mc in mock_clients:
+                mc.display.show_image.assert_not_called()
+        finally:
+            Path.exists = orig_exists
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
     async def test_wall_set_light_and_clock(self, mock_divoom_class):
         """Test DivoomWall batch operations: set_light and show_clock."""
         mock_clients = []

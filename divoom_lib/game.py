@@ -116,10 +116,13 @@ class Game:
             return await self.communicator.send_command(constants.COMMANDS["send game shark"])
         else:
             args = [control_value]
-            result = await self.communicator.send_command(constants.COMMANDS["set game ctrl info"], args)
+            # Combine BOTH sends: the key-down result was previously overwritten
+            # by the key-up result, so a failed key-down (the press never landed)
+            # with a successful key-up reported True.
+            down_ok = await self.communicator.send_command(constants.COMMANDS["set game ctrl info"], args)
             await asyncio.sleep(0.1)
-            result = await self.communicator.send_command(constants.COMMANDS["set game ctrl key up info"], args)
-            return result
+            up_ok = await self.communicator.send_command(constants.COMMANDS["set game ctrl key up info"], args)
+            return bool(down_ok) and bool(up_ok)
 
     async def set_key_down(self, key: int) -> bool:
         """

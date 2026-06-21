@@ -245,8 +245,11 @@ class DivoomWall:
         main_img = Image.open(file_path)
         is_ani = hasattr(main_img, 'is_animated') and main_img.is_animated
         
-        display_tasks = []
-        
+        # Pair each task with its slot so result accounting can't drift out of
+        # alignment with self.devices when a slot is skipped (see skipped_slots).
+        display_tasks: list = []   # list of (slot, coro)
+        skipped_slots: list = []   # slots that produced no push (counted as failures)
+
         for slot in self.devices:
             divoom = slot.device
             x = slot.x
@@ -287,9 +290,13 @@ class DivoomWall:
                     if not frames:
                         # A truncated/corrupt GIF can report is_animated yet yield zero
                         # frames — frames[0] would IndexError and abort the WHOLE wall
-                        # update (this loop isn't per-slot isolated). Skip this slot.
+                        # update (this loop isn't per-slot isolated). Skip this slot,
+                        # but record it as a FAILURE: the screen got nothing, so the
+                        # wall must NOT report overall success for it (and dropping
+                        # the task silently would also misalign result indexing).
                         self.logger.warning("wall slot %s: animated source yielded 0 frames; skipping",
                                             getattr(divoom, "mac", "?"))
+                        skipped_slots.append(slot)
                         continue
                     frames[0].save(
                         cached_file_path,
@@ -310,23 +317,23 @@ class DivoomWall:
             except Exception as ex:
                 self.logger.warning(f"Failed to cache preview bytes for {slot.device.mac}: {ex}")
                 
-            display_tasks.append(self._push_slot(divoom, temp_path_str, time))
-            
+            display_tasks.append((slot, self._push_slot(divoom, temp_path_str, time)))
+
         # Execute all BLE streams concurrently
-        self.logger.info(f"Streaming splits concurrently to {len(self.devices)} screens...")
-        results = await asyncio.gather(*display_tasks, return_exceptions=True)
-        
-        # Check results
-        all_ok = True
-        for idx, res in enumerate(results):
-            slot = self.devices[idx]
+        self.logger.info(f"Streaming splits concurrently to {len(display_tasks)} screens...")
+        results = await asyncio.gather(*[t for _, t in display_tasks], return_exceptions=True)
+
+        # Check results. Each result is paired with its own slot, so a skipped
+        # slot earlier in the loop can't shift this mapping.
+        all_ok = not skipped_slots   # any skipped slot -> wall did not fully render
+        for (slot, _), res in zip(display_tasks, results):
             if isinstance(res, Exception):
                 self.logger.error(f"Failed to display slot ({slot.x}, {slot.y}) on device {slot.device.mac}: {res}")
                 all_ok = False
             elif not res:
                 self.logger.error(f"Failed to display slot ({slot.x}, {slot.y}) on device {slot.device.mac}")
                 all_ok = False
-                
+
         return all_ok
             
     async def _push_slot(self, divoom, path: str, time: int | None) -> bool:
