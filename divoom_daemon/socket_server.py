@@ -86,12 +86,25 @@ class SocketServer:
                 except OSError:
                     pass
 
-    def _add_subscriber(self, conn: socket.socket) -> bool:
+    def _add_subscriber(self, conn: socket.socket, initial: bytes | None = None) -> bool:
         """Register a subscriber, or return False if the cap is reached (so a
-        subscribe flood can't hold unbounded threads/sockets)."""
+        subscribe flood can't hold unbounded threads/sockets).
+
+        If ``initial`` is given, send it to the socket WHILE HOLDING _sub_lock,
+        before the socket is visible to broadcast(). Otherwise the initial status
+        frame raced a concurrent broadcast() sendall() on the same fd (broadcast
+        runs from the notification-monitor thread) — two concurrent sendall()s on
+        one socket interleave their bytes, corrupting the NDJSON stream so the
+        subscriber drops BOTH the snapshot and the notification event. Caller must
+        have already set a send timeout so a wedged client can't hold the lock."""
         with self._sub_lock:
             if len(self._subscribers) >= self._max_subscribers:
                 return False
+            if initial is not None:
+                try:
+                    conn.sendall(initial)
+                except OSError:
+                    return False   # dead before it started — don't register it
             self._subscribers.append(conn)
             return True
 
@@ -180,19 +193,22 @@ class SocketServer:
                 pass
 
     def _serve_subscriber(self, conn: socket.socket) -> None:
-        if not self._add_subscriber(conn):
-            logger.warning("subscriber limit reached; rejecting subscribe")
-            self._reply_safe(conn, {"success": False, "error": "subscriber limit reached"})
-            return
         # Bounded (not None): broadcast() does sendall() on this socket while
         # holding _sub_lock. A passive subscriber whose recv window fills would
         # otherwise block that sendall FOREVER — freezing the whole event fan-out
         # and notification routing. With a timeout, a wedged sendall raises
         # socket.timeout (OSError) → broadcast drops it as dead. Here, recv
-        # timeouts just mean "idle", so we loop rather than disconnect.
+        # timeouts just mean "idle", so we loop rather than disconnect. Set it
+        # BEFORE _add_subscriber so the under-lock initial send is bounded too.
         conn.settimeout(SUBSCRIBER_IO_TIMEOUT)
+        # Send the initial status snapshot UNDER _sub_lock (inside _add_subscriber)
+        # so it can't interleave with a concurrent broadcast() sendall on this fd.
+        initial = encode_message(self._status_event_factory())
+        if not self._add_subscriber(conn, initial=initial):
+            logger.warning("subscriber limit reached; rejecting subscribe")
+            self._reply_safe(conn, {"success": False, "error": "subscriber limit reached"})
+            return
         try:
-            conn.sendall(encode_message(self._status_event_factory()))
             while self._running:
                 try:
                     if not conn.recv(4096):
