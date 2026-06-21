@@ -22,8 +22,11 @@ class OwnerLiveMixin:
         import json
         from divoom_lib.utils.atomic_io import atomic_write_text
         try:
+            # snapshot first: _live_params is mutated from other RPC threads
+            # (live_job_start/stop); a bare .items() loop here can raise
+            # "dictionary changed size during iteration".
             jobs = [{"mac": m, "kind": k, "params": p}
-                    for (m, k), p in getattr(self, "_live_params", {}).items()]
+                    for (m, k), p in list(getattr(self, "_live_params", {}).items())]
             atomic_write_text(self._live_jobs_path(), json.dumps(jobs, indent=2))
         except Exception as e:
             logger.debug(f"persist live jobs failed: {e}")
@@ -98,7 +101,15 @@ class OwnerLiveMixin:
     def get_device_activity(self, _args: dict) -> dict:
         self._prune_device_activity()
         self._stamp_live_health()
-        return {"success": True, "activity": getattr(self, "_device_activity", {}) or {}}
+        # Return a point-in-time DEEP-ish snapshot, not the live dict: the caller
+        # json-serializes this on the RPC thread while set_device_activity /
+        # forget_device_activity may mutate _device_activity (and its entries) from
+        # the loop thread or another connection → "dict changed size during
+        # iteration" mid-serialize. list()+dict() copies are each one C call (atomic
+        # under the GIL), so the snapshot can't tear.
+        act = getattr(self, "_device_activity", {}) or {}
+        snapshot = {k: dict(v) for k, v in list(act.items())}
+        return {"success": True, "activity": snapshot}
 
     def _stamp_live_health(self) -> None:
         """G5: a background live-widget device that drops gets self-healed but its
@@ -109,7 +120,9 @@ class OwnerLiveMixin:
         if not act:
             return
         from divoom_lib.ble_connection import derive_connection_state
-        for mac, dev in (getattr(self, "_live_devices", {}) or {}).items():
+        # snapshot: the loop thread inserts into / clears _live_devices
+        # (get_live_device, stop_all_live_jobs) while this runs on an RPC thread.
+        for mac, dev in list((getattr(self, "_live_devices", {}) or {}).items()):
             if mac in act:
                 act[mac]["state"] = derive_connection_state(dev).value
         # the active device's own state (if it's tracked as an activity entry)
@@ -142,7 +155,8 @@ class OwnerLiveMixin:
         active = getattr(self, "mac", None)
         lan_ip = getattr(self, "_lan_ip", None)
         active_lan = f"LAN:{lan_ip}" if lan_ip else None
-        live_macs = {m for (m, _k) in getattr(self, "_live_tasks", {})}
+        # snapshot: _live_tasks is mutated on the loop thread (_start/_stop).
+        live_macs = {m for (m, _k) in list(getattr(self, "_live_tasks", {}))}
         for mac in list(act.keys()):
             # Never prune the active device or a mac with a running live job —
             # a long-running widget sets `at` once at start, so age alone lies.
@@ -229,7 +243,7 @@ class OwnerLiveMixin:
             self._live_params.pop(key, None)
             self._save_live_jobs()
         # R46 #3: no more jobs of this kind — mark idle unless another job runs.
-        if not any(m == mac for (m, _k) in self._live_tasks):
+        if not any(m == mac for (m, _k) in list(self._live_tasks)):
             self.set_device_activity({"mac": mac, "kind": "idle"})
         return {"success": True, "stopped": True}
 
@@ -253,7 +267,7 @@ class OwnerLiveMixin:
     def _release_live_device_if_idle(self, mac: str) -> None:
         """R44 §6: disconnect + drop a cached BACKGROUND device once no live
         jobs remain for it (the active device is owned elsewhere, never here)."""
-        if any(m == mac for (m, _k) in self._live_tasks):
+        if any(m == mac for (m, _k) in list(self._live_tasks)):
             return
         dev = self._live_devices.pop(mac, None)
         if dev is not None and self._loop is not None:
@@ -301,7 +315,7 @@ class OwnerLiveMixin:
     def stop_all_live_jobs(self) -> None:
         if not getattr(self, "_live_tasks", None):
             return
-        macs = {m for (m, _k) in self._live_tasks}
+        macs = {m for (m, _k) in list(self._live_tasks)}
 
         # R53.20: cancel AND AWAIT every poller, then disconnect the cached
         # background devices — ALL on the loop thread in one shot. The old
