@@ -153,18 +153,13 @@ int divoom_encode_animation_frame(
     uint8_t palette[DIVOOM_PALETTE_MAX * 3];
     int palette_n = 0;
 
-    /* Walk pixels once, building palette. We also write the
-     * per-pixel index into a temporary "indices" array. We
-     * re-use palette[] storage as the indices buffer after the
-     * palette is complete — but indices need 1 byte each, so we
-     * can't share with the palette (which needs 3 bytes/color).
-     * Use a separate stack-allocated indices buffer. */
-    /* Max 65535 pixels → 64 KB on stack. That might blow the default
-     * 8 MB stack on some systems for huge images; for 160x140=22400
-     * pixels it's 22 KB which is fine. */
-    uint8_t* indices = (uint8_t*)out_buf;  /* borrow the output buffer! */
-    int indices_capacity = out_buf_size;
-    if (indices_capacity < num_pixels) return -1;
+    /* Per-pixel palette indices. This MUST be a SEPARATE buffer, not aliased
+     * onto out_buf: the pixel packer below writes into out_buf[7 + 3*n ..] while
+     * still reading indices[i], so borrowing out_buf overwrote not-yet-consumed
+     * indices once 7+3*n < i, corrupting the output (divergence from the Python
+     * reference). num_pixels is bounded to 65535 above → 64 KB on the stack,
+     * within the default 8 MB stack (22 KB for a 160x140 frame). */
+    uint8_t indices[65535];
 
     const uint8_t* p = rgb;
     for (int i = 0; i < num_pixels; i++) {
@@ -354,9 +349,9 @@ int divoom_encode_static_image(
     uint8_t palette[DIVOOM_PALETTE_MAX * 3];
     int palette_n = 0;
 
-    uint8_t* indices = (uint8_t*)out_buf;
-    int indices_capacity = out_buf_size;
-    if (indices_capacity < num_pixels) return -1;
+    /* Separate index buffer — see divoom_encode_animation_frame for why aliasing
+     * onto out_buf corrupts the packed pixel data. */
+    uint8_t indices[65535];
 
     const uint8_t* p = rgb;
     for (int i = 0; i < num_pixels; i++) {

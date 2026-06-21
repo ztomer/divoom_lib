@@ -139,8 +139,13 @@ int divoom_encode_animation_frame_32(
     uint8_t palette[DIVOOM_PALETTE_MAX_32 * 3];
     int palette_n = 0;
 
-    uint8_t* indices = (uint8_t*)out_buf;
-    if (out_buf_size < num_pixels) return -1;
+    /* Per-pixel palette indices. MUST be a SEPARATE buffer — aliasing this onto
+     * out_buf corrupted the output: the pixel packer writes into
+     * out_buf[7 + 3*n ..] while still reading indices[i] from out_buf[i], so
+     * once 7+3*n < i the not-yet-consumed indices were overwritten, producing
+     * wrong pixel bytes (divergence from the Python reference, confirmed by a
+     * dylib probe). w/h are guaranteed 32 here, so 1024 bytes on the stack. */
+    uint8_t indices[DIVOOM_PIXEL_COUNT_32];
 
     const uint8_t* p = rgb;
     for (int i = 0; i < num_pixels; i++) {
