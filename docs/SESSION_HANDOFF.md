@@ -18,6 +18,38 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL REVIEW-AND-FIX LOOP IN PROGRESS (2026-06-20).** A multi-agent
+  "review and fix until clean" loop is running. 13 real bugs fixed so far across
+  R53.19–25 (all on main, suite 1571 green): SPP-reconnect NameError, wall-config
+  slot-drop, wall-disconnect leak, live-job resurrection/leak, zero-frame crash,
+  poller reconnect-storm, daemon broadcast-freeze, release-disconnect leak,
+  background-wall caching, 0x8B scalar leak, wall MAC-case (G4 double-own + delta
+  leak), exclusive_end silent-drop. **STILL OPEN from the latest pass (verify then
+  fix):**
+  - HIGH `divoom_daemon/owner_notify.py _send_to_device_ble`: spins a THROWAWAY
+    asyncio loop on the notification polling thread and mutates `self._device` —
+    racing the persistent device loop (bleak isn't safe across loops → "Future
+    attached to a different loop" / GATT corruption). Also uses `is_connected` not
+    `is_alive`, has NO timeout on connect/push (one wedge blocks the monitor thread),
+    and a no-device-found return is reported as `routed=True` (success). Right fix:
+    route notification pushes through `self._run_device(...)` (the one serialized
+    device loop with its timeout/liveness backstops) instead of a private loop.
+  - MEDIUM `owner_wall.wall_configure`: a PARTIAL wall connect (2 of 3 panels) is
+    reported `{"success": True}` — `DivoomWall.connect()` only raises when ALL slots
+    fail. Surface the failed-slot macs/reasons (degraded list).
+  - LOW-MED `owner_wall._wall_delta`: disconnects `removed` panels BEFORE
+    `new_wall.connect()` succeeds — a transient connect failure then loses the
+    "keep shared screens" guarantee. Connect first, disconnect removed after.
+  - MEDIUM `daemon_client` `_status()`: synchronous `device_status()` RPC on
+    attribute access (`is_connected`/`lan`/`_conn`) blocks the GUI loop/JS thread
+    (e.g. media_sync.py:161 inside a coroutine). Cache/await it instead.
+  - Plus the 3 documented-DEFERRED (risk>reward, see review doc "ADVERSARIAL
+    MULTI-AGENT RE-READ — DEFERRED"): live_job_start double-poller, 0x8B
+    retransmit-drop, custom-art ACK!=success.
+  STOP the loop when a fresh 3-agent pass surfaces nothing new beyond these.
+  A cloud scheduled task `divoom-ble-adversarial-loop` resumes this at 21:15 today
+  (2026-06-20) when quota resets.
+
 - **R53 round 18 — BASIC-PROTOCOL RX PARSER BOUNDS THE LENGTH FIELD SHIPPED (2026-06-20).**
   Second fresh-re-read find. `parse_basic_protocol_frames` (shared by BLE notify RX +
   SPP `_on_data`) trusted the 2-byte length unboundedly → a corrupt length stalled all
