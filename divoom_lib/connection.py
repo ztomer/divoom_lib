@@ -21,7 +21,14 @@ class DivoomConnection(DeviceTransport):
         self.cfg = cfg
         self.logger = divoom.logger
         self._use_spp = False
-        
+        # R53.34: the router (this class) is the single entry point for
+        # send_command_and_wait_for_response on the live path — it shadows the
+        # transport's own lock-protected version, so the R53.11 cross-talk lock
+        # was effectively bypassed. Serialize the drain→set-scalar→send→wait
+        # sequence here too, so two concurrent waiters on one device can't drain
+        # each other's frames or clobber _expected_response_command.
+        self._response_lock = asyncio.Lock()
+
         # Instantiate BLETransport as the initial default
         self._active_transport = BLETransport(cfg, self.logger, divoom=self._divoom)
 
@@ -166,11 +173,20 @@ class DivoomConnection(DeviceTransport):
 
     async def send_command_and_wait_for_response(self, command: int | str, args: list | None = None, timeout: float = 10.0) -> bytes | None:
         command_id = models.COMMANDS.get(command, command) if isinstance(command, str) else command
-        while not self.notification_queue.empty():
-            self.notification_queue.get_nowait()
-        self._expected_response_command = command_id
-        await self._divoom.send_command(command, args, write_with_response=True)
-        return await self._divoom._wait_for_response(command_id, timeout)
+        if self._response_lock.locked():
+            self.logger.warning(
+                "send_command_and_wait_for_response(0x%02x) contended — another "
+                "response wait is in flight; serializing to avoid cross-talk",
+                command_id if isinstance(command_id, int) else 0)
+        # Hold the lock across drain→set-scalar→send→wait. We keep delegating the
+        # actual send/wait to self._divoom (the HW-tuned path) rather than the
+        # transport's send_command_and_wait_for_response, so routing is unchanged.
+        async with self._response_lock:
+            while not self.notification_queue.empty():
+                self.notification_queue.get_nowait()
+            self._expected_response_command = command_id
+            await self._divoom.send_command(command, args, write_with_response=True)
+            return await self._divoom._wait_for_response(command_id, timeout)
 
     async def wait_for_response(self, command_id: int, timeout: float = 10.0) -> Optional[bytes]:
         return await self._active_transport.wait_for_response(command_id, timeout)
