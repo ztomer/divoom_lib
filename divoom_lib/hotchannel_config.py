@@ -125,12 +125,22 @@ def _normalize(cfg: dict) -> dict:
             seen.add(t)
             clean.append(t)
     out["targets"] = clean
-    # Per-device gallery styles.
+    # Per-device gallery styles. Coerce defensively and DROP bad entries: a
+    # non-numeric value (hand-edited JSON, or a blank style from the GUI) must
+    # not raise here — load_config() calls _normalize() outside its try/except
+    # and promises "never raises", and monthly_best_daemon.main() calls
+    # load_config() unguarded at startup, so a bare int(v) would crash the
+    # headless daemon. Mirrors get_device_classify()'s tolerant coercion.
     dg = out.get("device_galleries") or {}
     if not isinstance(dg, dict):
         dg = {}
-    out["device_galleries"] = {
-        k: int(v) for k, v in dg.items()
-        if isinstance(k, str) and k.strip()
-    }
+    clean_dg: dict = {}
+    for k, v in dg.items():
+        if not (isinstance(k, str) and k.strip()):
+            continue
+        try:
+            clean_dg[k] = int(v)
+        except (TypeError, ValueError):
+            continue
+    out["device_galleries"] = clean_dg
     return out

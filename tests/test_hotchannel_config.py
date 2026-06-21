@@ -61,3 +61,33 @@ def test_written_file_is_valid_json(cfg_path):
     hc.save_config({"targets": ["LAN:192.168.1.5"]})
     data = json.loads(cfg_path.read_text())
     assert data["targets"] == ["LAN:192.168.1.5"]
+
+
+def test_nonnumeric_device_gallery_does_not_raise(cfg_path):
+    """load_config() promises 'never raises' and runs unguarded in the headless
+    daemon's main(). A non-numeric device_galleries value (hand-edited JSON or a
+    blank style from the GUI) must be DROPPED, not crash _normalize().
+
+    Teeth: revert _normalize() to `{k: int(v) ...}` and this raises ValueError
+    out of load_config() (the int(v) is outside its try/except), reproducing the
+    daemon-killing startup crash.
+    """
+    cfg_path.write_text(
+        json.dumps({
+            "device_galleries": {
+                "AA:BB:CC:DD:EE:FF": "recommend",  # non-numeric -> dropped
+                "11:22:33:44:55:66": "",           # blank        -> dropped
+                "77:88:99:AA:BB:CC": 9,            # valid        -> kept
+            }
+        }),
+        encoding="utf-8",
+    )
+    cfg = hc.load_config()  # must NOT raise
+    assert cfg["device_galleries"] == {"77:88:99:AA:BB:CC": 9}
+
+
+def test_set_device_galleries_with_blank_value_does_not_raise(cfg_path):
+    """The GUI can hand set_device_galleries an empty style; it must persist
+    cleanly (dropping the blank) rather than throwing out of save_config."""
+    assert hc.set_device_galleries({"AA:BB:CC:DD:EE:FF": ""}) is True
+    assert hc.load_config()["device_galleries"] == {}

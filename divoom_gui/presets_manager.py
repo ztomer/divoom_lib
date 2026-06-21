@@ -78,15 +78,25 @@ class PresetsManagerMixin:
             last_connected_device = ""
             last_detected_count = 0
             
+            # Per-field int coercion that degrades to the default instead of
+            # throwing: a single non-numeric field (corrupt/hand-edited
+            # config.ini) used to escape to the outer except and return {} —
+            # wiping email, slots, devices and cloud status along with it.
+            def _safe_int(value: str, default: int) -> int:
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return default
+
             if config_file.exists():
                 cfg.read(config_file)
                 email = cfg.get("divoom", "email", fallback="")
-                timeout = int(cfg.get("gui", "timeout", fallback="60"))
-                limit = int(cfg.get("gui", "limit", fallback="4"))
+                timeout = _safe_int(cfg.get("gui", "timeout", fallback="60"), 60)
+                limit = _safe_int(cfg.get("gui", "limit", fallback="4"), 4)
                 last_connected_device = cfg.get("gui", "last_connected_device", fallback="")
-                last_detected_count = int(cfg.get("gui", "last_detected_count", fallback="0"))
+                last_detected_count = _safe_int(cfg.get("gui", "last_detected_count", fallback="0"), 0)
                 lan_ip = cfg.get("lan", "device_ip", fallback="")
-                lan_token = int(cfg.get("lan", "local_token", fallback="0"))
+                lan_token = _safe_int(cfg.get("lan", "local_token", fallback="0"), 0)
                 
             presets_file = self._get_presets_file()
             slots = {}

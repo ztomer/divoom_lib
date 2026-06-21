@@ -269,11 +269,14 @@ class ScannerMixin:
                         "skipping last-active-slots save to avoid wiping presets")
                     return
             presets["_last_active_slots_"] = self.wall_slots
-            # Atomic write (tmp + rename) so a crash mid-write can't corrupt
-            # the file other writers/readers share.
-            tmp = presets_file.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(presets, indent=2), encoding="utf-8")
-            tmp.replace(presets_file)
+            # Atomic write so a crash mid-write can't corrupt the file other
+            # writers/readers share. The previous hand-rolled version used a
+            # FIXED ".json.tmp" name with no fsync — two arranger changes close
+            # together (this fires on EVERY change) wrote the same tmp path and
+            # could interleave/replace each other's partial file. Use the shared
+            # helper (unique temp per call + fsync + os.replace), matching the
+            # other writers in this file.
+            atomic_write_text(presets_file, json.dumps(presets, indent=2))
         except Exception as e:
             logger.warning(f"Failed to save last active slots: {e}")
 

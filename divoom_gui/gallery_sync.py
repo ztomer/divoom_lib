@@ -8,7 +8,7 @@ import threading
 from pathlib import Path
 from divoom_lib import divoom_auth
 from divoom_lib import media_decoder
-from divoom_lib.utils.atomic_io import atomic_write_config
+from divoom_lib.utils.atomic_io import atomic_write_config, atomic_write_text
 
 logger = logging.getLogger("divoom_gui")
 
@@ -273,8 +273,10 @@ class GallerySyncMixin(GalleryHotApiMixin):
                 
                 cache_file = Path.home() / ".config" / "divoom-control" / "gallery_cache.json"
                 try:
-                    cache_file.parent.mkdir(parents=True, exist_ok=True)
-                    cache_file.write_text(json.dumps(results, indent=2), encoding="utf-8")
+                    # Atomic (temp+fsync+rename): a crash/disk-full mid-write must
+                    # not truncate the offline cache — a partial file makes every
+                    # json.loads consumer fall back to an empty gallery (A1).
+                    atomic_write_text(cache_file, json.dumps(results, indent=2))
                     logger.info(f"Gallery Cache: Successfully saved {len(results)} gallery items offline.")
                 except Exception as cache_err:
                     logger.warning(f"Failed to save gallery cache: {cache_err}")

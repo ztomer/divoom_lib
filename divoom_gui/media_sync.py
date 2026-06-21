@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from divoom_lib.utils import media_source
+from divoom_lib.utils.atomic_io import atomic_write_text
 from gallery_sync import GallerySyncMixin
 from audio_visualizer import AudioVisualizerWorker
 
@@ -240,8 +241,11 @@ class MediaSyncMixin(GallerySyncMixin):
                     seen.add(s)
                     clean.append(s)
             path = self._tickers_path()
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(clean, indent=2), encoding="utf-8")
+            # Atomic (temp+fsync+rename): a truncated tickers.json would make
+            # get_tickers() fall into its except branch and silently RE-SEED the
+            # user's list from macOS/defaults — i.e. corruption here destroys the
+            # saved tickers, not just fails to load them (A1).
+            atomic_write_text(path, json.dumps(clean, indent=2))
             return True
         except Exception as e:
             logger.error(f"set_tickers failed: {e}")

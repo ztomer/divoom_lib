@@ -108,3 +108,34 @@ def test_save_preset_roundtrip_atomic(tmp_path):
     names = json.loads(h.load_preset_names())
     assert names == ["Wall A"]
     assert not (tmp_path / "presets.json.tmp").exists()
+
+
+def test_load_config_corrupt_int_field_does_not_wipe_whole_config(tmp_path, monkeypatch):
+    """One non-numeric field in config.ini (corrupt / hand-edited) must degrade
+    to that field's default — NOT escape to the outer except and return {},
+    which silently wiped email, wall slots, devices and cloud status too.
+
+    Teeth: revert the _safe_int() calls back to int(cfg.get(...)) and the bad
+    `timeout = abc` raises ValueError out to the `except`, so load_config()
+    returns {} and the email/limit assertions below fail with KeyError.
+    """
+    from divoom_gui.presets_manager import PresetsManagerMixin
+    cfg_dir = tmp_path / ".config" / "divoom-control"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "config.ini").write_text(
+        "[divoom]\nemail = user@example.com\n"
+        "[gui]\ntimeout = abc\nlimit = 7\n"          # timeout corrupt, limit valid
+        "[lan]\nlocal_token = notanint\n"            # token corrupt
+    )
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    class Host(PresetsManagerMixin):
+        cached_creds = None
+        def _get_presets_file(self):
+            return tmp_path / "presets.json"
+
+    data = json.loads(Host().load_config())
+    assert data["email"] == "user@example.com"  # whole config survives
+    assert data["timeout"] == 60                # corrupt -> default
+    assert data["limit"] == 7                   # valid   -> parsed
+    assert data["lan_token"] == 0               # corrupt -> default
