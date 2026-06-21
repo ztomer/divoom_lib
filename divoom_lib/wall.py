@@ -349,8 +349,11 @@ class DivoomWall:
         tasks = []
         for slot in self.devices:
             tasks.append(slot.device.display.show_light(color=color, brightness=brightness))
-        results = await asyncio.gather(*tasks)
-        return all(results)
+        # return_exceptions: one slot's BLE failure must yield an honest degraded
+        # False, not raise out of the method and abandon the sibling pushes
+        # (matches set_volume / switch_channel / set_brightness below).
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return all(res is True for res in results)
 
     async def show_clock(self, clock: int = 0) -> bool:
         """Displays clock style on all screens in the wall."""
@@ -358,8 +361,11 @@ class DivoomWall:
         tasks = []
         for slot in self.devices:
             tasks.append(slot.device.display.show_clock(clock=clock))
-        results = await asyncio.gather(*tasks)
-        return all(results)
+        # return_exceptions: one slot's BLE failure must yield an honest degraded
+        # False, not raise out of the method and abandon the sibling pushes
+        # (matches set_volume / switch_channel / set_brightness below).
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return all(res is True for res in results)
 
     async def show_effects(self, number: int = 0) -> bool:
         """Displays VJ effect style on all screens in the wall."""
@@ -367,8 +373,11 @@ class DivoomWall:
         tasks = []
         for slot in self.devices:
             tasks.append(slot.device.display.show_effects(number=number))
-        results = await asyncio.gather(*tasks)
-        return all(results)
+        # return_exceptions: one slot's BLE failure must yield an honest degraded
+        # False, not raise out of the method and abandon the sibling pushes
+        # (matches set_volume / switch_channel / set_brightness below).
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return all(res is True for res in results)
 
     async def show_visualization(self, number: int = 0) -> bool:
         """Displays visualization EQ style on all screens in the wall."""
@@ -376,8 +385,11 @@ class DivoomWall:
         tasks = []
         for slot in self.devices:
             tasks.append(slot.device.display.show_visualization(number=number))
-        results = await asyncio.gather(*tasks)
-        return all(results)
+        # return_exceptions: one slot's BLE failure must yield an honest degraded
+        # False, not raise out of the method and abandon the sibling pushes
+        # (matches set_volume / switch_channel / set_brightness below).
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return all(res is True for res in results)
 
     async def set_brightness(self, brightness: int) -> bool:
         """Sets brightness across all screens (LAN transport when available,

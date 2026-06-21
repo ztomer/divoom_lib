@@ -66,12 +66,14 @@ class DeviceOwner(OwnerArtMixin, OwnerConnectMixin, OwnerLiveMixin, OwnerLoopMix
         if not method:
             return {"success": False, "error": "device_call requires 'method'"}
 
+        blob_tmps: list[str] = []   # materialized blob files to unlink after the call
         for idx_str, b64 in (args.get("blobs") or {}).items():
             try:
                 idx = int(idx_str)
                 data = base64.b64decode(b64)
                 suffix = Path(str(call_args[idx])).suffix if idx < len(call_args) and call_args[idx] else ".bin"
                 fd, tmp_path = tempfile.mkstemp(prefix="divoom_blob_", suffix=suffix or ".bin")
+                blob_tmps.append(tmp_path)
                 with os.fdopen(fd, "wb") as f:
                     f.write(data)
                 if idx < len(call_args):
@@ -79,6 +81,11 @@ class DeviceOwner(OwnerArtMixin, OwnerConnectMixin, OwnerLiveMixin, OwnerLoopMix
                 else:
                     call_args.append(tmp_path)
             except (ValueError, TypeError, IndexError) as e:
+                for p in blob_tmps:   # don't leak the ones already written
+                    try:
+                        os.unlink(p)
+                    except OSError:
+                        pass
                 return {"success": False, "error": f"bad blob {idx_str}: {e}"}
 
         async def _do():
@@ -102,6 +109,15 @@ class DeviceOwner(OwnerArtMixin, OwnerConnectMixin, OwnerLiveMixin, OwnerLoopMix
         except Exception as e:
             logger.warning(f"device_call {which}.{method} failed: {e}")
             return {"success": False, "error": str(e)}
+        finally:
+            # The device op has read the blob file by now (push paths read it
+            # synchronously before returning); unlink so a blob-based client
+            # push can't slowly fill /tmp — one file per call, success or fail.
+            for p in blob_tmps:
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
 
     def exclusive_start(self, args: dict) -> dict:
         token = args.get("token")
