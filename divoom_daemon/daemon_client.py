@@ -314,13 +314,16 @@ class DaemonDeviceProxy:
 
         Returns ``True`` on success.
         """
+        import os
         import tempfile
+        own_tmp = None
         if isinstance(file_or_data, bytes):
             tmp = tempfile.NamedTemporaryFile(suffix=".gif", delete=False)
             try:
                 tmp.write(file_or_data)
                 tmp.close()
                 path = tmp.name
+                own_tmp = path
             except OSError:
                 tmp.close()
                 raise
@@ -328,8 +331,18 @@ class DaemonDeviceProxy:
             path = file_or_data
 
         effective_token = token or f"push-anim-{id(path)}"
-        async with self.exclusive(effective_token) as p:
-            return bool(await p.display.show_image(path))
+        try:
+            async with self.exclusive(effective_token) as p:
+                return bool(await p.display.show_image(path))
+        finally:
+            # Delete the temp file WE created (bytes input) — on success AND on
+            # error. Without this every byte-payload animation push leaked one
+            # /tmp/*.gif for the process lifetime.
+            if own_tmp is not None:
+                try:
+                    os.unlink(own_tmp)
+                except OSError:
+                    pass
 
     def exclusive(self, token: str) -> _ProxyExclusiveCtx:
         """Context manager for an exclusive-mode session on the daemon.

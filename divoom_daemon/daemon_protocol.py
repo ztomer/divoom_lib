@@ -433,6 +433,11 @@ class DaemonClient:
                     if not chunk:
                         return True  # daemon closed the stream
                     buf += chunk
+                    # Cap the unparsed buffer (the read path in send_command does the
+                    # same). A malformed / never-newline-terminated broadcast frame
+                    # would otherwise grow buf without bound → menubar OOM.
+                    if len(buf) > MAX_REPLY_BYTES:
+                        return False
                     events, buf = iter_messages(buf)
                     for ev in events:
                         on_event(ev)
