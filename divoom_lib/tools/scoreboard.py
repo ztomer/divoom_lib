@@ -89,6 +89,15 @@ class Scoreboard:
         self.logger.info(
             f"Setting scoreboard info: on_off={on_off}, red_score={red_score}, blue_score={blue_score} (0x72)...")
 
+        # Clamp/mask at the boundary: an out-of-range score (the GUI's number
+        # input doesn't enforce max=999 for typed values) otherwise hit
+        # red_score.to_bytes(2,...) → OverflowError, and an out-of-byte on_off hit
+        # bytes() → ValueError — an uncaught crash for any direct lib/daemon/LAN
+        # caller. 0–999 matches the documented range (ScoreBoardChannel clamps too).
+        on_off = int(on_off) & 0xFF
+        red_score = max(0, min(999, int(red_score)))
+        blue_score = max(0, min(999, int(blue_score)))
+
         args = [TOOL_TYPE_SCORE]
         args.append(on_off)
         args.extend(red_score.to_bytes(2, byteorder='little'))

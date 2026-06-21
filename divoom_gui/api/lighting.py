@@ -148,7 +148,17 @@ class LightingApi(ApiBase):
         canvas.paste(text_img, (max(0, (sz - tw) // 2), max(0, (sz - th) // 2)))
         fd, path = tempfile.mkstemp(prefix="divoom_text_", suffix=".png")
         os.close(fd)
-        canvas.save(path)
+        # If the save fails (PIL encode error, disk full), the mkstemp'd file
+        # already exists but push_text's caller-side `finally: unlink(png_path)`
+        # never runs (png_path is never bound), leaking the orphan. Clean it here.
+        try:
+            canvas.save(path)
+        except Exception:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            raise
         return path
 
     def set_brightness(self, brightness: int) -> bool:

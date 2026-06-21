@@ -46,6 +46,22 @@ APK/HW truth). And the 0x49 PACKET_NUM wraps past 255 on >51KB blobs (low
 reachability, superseded path).
 
 ---
+## R53 round 25: scoreboard bounds + render-text temp cleanup (2026-06-21)
+
+Parallel opencode-session pass (ses_184471307ffeCUHgzv9w51O0oA), landed here on
+request. 2 defensive fixes (R53.45–46), teeth-tested (test_adversarial_round25.py):
+
+- **R53.45** — `Scoreboard.set_scoreboard` had no bounds: an out-of-range score
+  hit `red_score.to_bytes(2, ...)` → OverflowError, and an out-of-byte `on_off`
+  hit `bytes()` → ValueError — an uncaught crash for any direct lib/daemon/LAN
+  caller (the GUI number input doesn't enforce max=999 for typed values). Now
+  clamps to 0–999 / masks to a byte at the boundary (matches ScoreBoardChannel).
+- **R53.46** — `LightingApi._render_text_png` mkstemp'd a temp PNG then called
+  `canvas.save()`; on save failure the file was orphaned because push_text's
+  caller-side `finally: unlink` never ran (png_path never bound). Now unlinks the
+  temp on a save failure before re-raising.
+
+---
 ## R53 round 26: config/state persistence hardening (2026-06-21)
 
 (Round 25 is opencode's parallel scoreboard/lighting pass — shared tree.) Fresh
