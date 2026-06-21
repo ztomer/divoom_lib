@@ -36,6 +36,29 @@ class LanTransportError(Exception):
     """Raised when the LAN device HTTP API returns an error or is unreachable."""
 
 
+def _validate_lan_response(status: int, text: str, command: str) -> dict:
+    """Parse + validate a Divoom local-API HTTP response.
+
+    The device returns HTTP 200 with a JSON body ``{"error_code": N, ...}`` where
+    ``error_code == 0`` means success. A REJECTED command (bad LocalToken,
+    out-of-range value, command unsupported on this model) comes back 200 with a
+    NON-ZERO error_code — the old code returned that dict verbatim, so the daemon
+    reported a silent success (ACK != success). Now a non-200 status, non-JSON
+    body, or non-zero error_code all raise LanTransportError so the failure is
+    honest. A missing error_code is tolerated (treated as success)."""
+    try:
+        result = json.loads(text)
+    except (ValueError, json.JSONDecodeError) as e:
+        raise LanTransportError(
+            f"device returned non-JSON for {command}: {text[:120]!r}") from e
+    if status != 200:
+        raise LanTransportError(f"device returned HTTP {status} for {command}")
+    err = result.get("error_code") if isinstance(result, dict) else None
+    if err not in (None, 0):
+        raise LanTransportError(f"device rejected {command}: error_code={err}")
+    return result
+
+
 class LanTransport:
     """
     Sends commands to a WiFi-enabled Divoom device via its local HTTP API.
@@ -113,10 +136,8 @@ class LanTransport:
                     headers={"Content-Type": "application/json"},
                     timeout=aiohttp.ClientTimeout(total=self.TIMEOUT),
                 ) as resp:
+                    status = resp.status
                     text = await resp.text()
-                    result = json.loads(text)
-                    self.logger.debug(f"[LAN ] ← {result}")
-                    return result
         except aiohttp.ClientConnectorError as e:
             raise LanTransportError(
                 f"Cannot reach device at {self.device_ip}:{self.PORT}. "
@@ -128,6 +149,12 @@ class LanTransport:
             )
         except Exception as e:
             raise LanTransportError(f"LAN request failed: {e}") from e
+
+        # Validate OUTSIDE the network try so an honest-failure raise here isn't
+        # re-wrapped as "LAN request failed" by the broad except above.
+        result = _validate_lan_response(status, text, command)
+        self.logger.debug(f"[LAN ] ← {result}")
+        return result
 
     # ── Connection probe ──────────────────────────────────────────────────────
 

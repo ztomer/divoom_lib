@@ -41,7 +41,18 @@ class OwnerLoopMixin:
             def _run():
                 asyncio.set_event_loop(loop)
                 ready.set()
-                loop.run_forever()
+                try:
+                    loop.run_forever()
+                finally:
+                    # Close the loop once its thread exits (stop() signals
+                    # loop.stop). Without this the loop's selector/fds leaked on
+                    # every stop→restart cycle in a long-lived (keep-alive) daemon.
+                    # Runs in the dying loop thread AFTER run_forever returns, so
+                    # it can't race stop()'s sync teardown.
+                    try:
+                        loop.close()
+                    except Exception:
+                        pass
 
             self._loop_thread = threading.Thread(target=_run, daemon=True, name="device-loop")
             self._loop_thread.start()
