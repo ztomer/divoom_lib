@@ -107,6 +107,30 @@ def test_keep_active_when_its_mac_is_not_a_wall_slot():
     assert o._device is dev and o.mac == "AA"
 
 
+def test_relinquish_is_case_insensitive():
+    """R53.24/G4: a wall slot key in a DIFFERENT case than the active mac must STILL
+    relinquish — else the mac is double-owned (active + wall)."""
+    o = _owner(None)
+    o._device = _FakeDev()
+    o.mac = "aa:bb:cc:dd:ee:01"            # active stored lowercase
+    o._lan_ip = None
+    o._relinquish_active_if_in({"AA:BB:CC:DD:EE:01": {"x": 0, "y": 0, "size": 16}})
+    assert o._device is None and o.mac is None, "case drift defeated G4"
+
+
+def test_wall_configure_uppercases_slot_keys():
+    """R53.24: slot MACs are canonicalized to upper at the boundary, so the delta
+    key-arithmetic + device.mac lookups agree (else removed panels leak)."""
+    o = _owner(None)
+    captured = {}
+    o._drop_current_wall = lambda: None
+    o._relinquish_active_if_in = lambda slots: captured.update(relinquished=slots)
+    o._run_device = lambda coro, **k: (coro.close(), object())[1]   # skip real build
+    o.wall_configure({"slots": {"aa:bb": {"x": 0, "y": 0, "size": 16}}})
+    assert set(o._wall_slots) == {"AA:BB"}                  # stored uppercase
+    assert set(captured["relinquished"]) == {"AA:BB"}
+
+
 def test_connect_to_a_wall_member_drops_the_wall(monkeypatch):
     """Taking a current wall slot as the active device relinquishes the wall so
     they don't both claim the same MAC."""

@@ -36,7 +36,10 @@ class OwnerWallMixin:
         active mac is also a wall slot, drop it — else the wall takes the BLE link
         and the orphaned handle wastes a ~5s reconnect-timeout on every call."""
         key = self._active_key()
-        if not key or key not in slots:
+        # Case-insensitive: self.mac may be stored in a different case than the GUI's
+        # slot keys; an exact match would silently skip the relinquish and leave the
+        # mac double-owned (active + wall) — the exact state G4 prevents.
+        if not key or key.upper() not in {str(k).upper() for k in slots}:
             return
         d = getattr(self, "_device", None)
         if d is not None and hasattr(d, "disconnect"):
@@ -61,7 +64,13 @@ class OwnerWallMixin:
         return configs
 
     def wall_configure(self, args: dict) -> dict:
-        slots = args.get("slots") or {}
+        # Canonicalize MAC case ONCE at the boundary: the delta key-arithmetic
+        # (old_macs/new_macs/removed) and the `s.device.mac` lookups in _wall_delta
+        # do exact comparisons, so mixed case between configures would (a) miss the
+        # overlap → needless full rebuild, and (b) fail old_by_mac.get(removed_mac)
+        # → a dropped panel never disconnected (leaked BLE link). Uppercase matches
+        # the daemon's convention (_owned_devices/_current_target_key).
+        slots = {str(k).upper(): v for k, v in (args.get("slots") or {}).items()}
         cell = int(args.get("cell_size", 16) or 16)
         if not slots:
             self._drop_current_wall()
