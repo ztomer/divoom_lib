@@ -57,7 +57,15 @@ def _is_emoji(ch: str) -> bool:
 # status glyphs (arrow / middot / check / cross / warning, matching
 # ~/projects/scripts/_stylerc). These are functional TUI iconography, not
 # decorative emoji — the R14 section-6 ban targets the latter.
-EXEMPT_FILES = {"scripts/hw_smoke.py"}
+#   tui/lib.{sh,py}        — the self-contained Kare TUI style helpers.
+#   tools/check_no_emoji.py — the house emoji gate; it lists the permitted Kare
+#                             glyphs in its ALLOWED set + status messages.
+EXEMPT_FILES = {
+    "scripts/hw_smoke.py",
+    "tui/lib.sh",
+    "tui/lib.py",
+    "tools/check_no_emoji.py",
+}
 
 
 def _scannable_files() -> list[Path]:

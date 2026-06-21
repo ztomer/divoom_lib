@@ -20,8 +20,9 @@ Claude) should read this on entry and **update it at the end of every round**
 
 - **HOUSE STANDARDS BOOTSTRAP (2026-06-21): emoji gate + Kare TUI lib + pre-commit hook.**
   Ran `~/projects/scripts/init_repo.sh` (commit `79d432c`, on main): installed
-  `tools/check_no_emoji.py` (gate — only `→ ✓ ✗ ⚠ ↔ ↑ ↓` + Mac key glyphs permitted;
-  excludes `docs/divoom_docs/` vendor API samples), `tui/{lib.sh,lib.py,stylerc}` (Kare
+  `tools/check_no_emoji.py` (gate — only the Kare icon set: arrow/check/cross/warn/bi-arrow/
+  up/down plus Mac key glyphs are permitted; excludes `docs/divoom_docs/` vendor API
+  samples), `tui/{lib.sh,lib.py,stylerc}` (Kare
   style for scripts), `.githooks/pre-commit` (blocks staged emoji), and set
   `core.hooksPath=.githooks` — **this is now active for ALL agents on this tree (opencode
   too): commits with disallowed emoji will be blocked.** Added a fast `no-emoji` CI job.
