@@ -32,6 +32,25 @@ Claude) should read this on entry and **update it at the end of every round**
   `tui.lib` and use the
   Kare helpers (info/ok/err/warn/section); never hand-roll ANSI colors or decorative emoji.
 
+- **R53 ADVERSARIAL LOOP — ROUND 26 (2026-06-21): config/state persistence hardening.**
+  (Round 25 = opencode's parallel scoreboard/lighting pass, shared tree.) Fresh 3-agent
+  sweep over daemon IPC / protocol framing / config persistence. Framing+transport core
+  CLEAN (byte formats verified vs docs + C ref). 5 real bugs fixed (commit `a042440`, on
+  main, teeth-tested, suite 1614 green): (HIGH) `hotchannel_config._normalize()` bare
+  `int(v)` over device_galleries crashed the headless sync daemon at startup
+  (`load_config` runs `_normalize` outside its try/except, daemon calls it unguarded) — now
+  drops bad entries; (MED x3, A1 non-atomic) gallery_cache.json + tickers.json + wall-slots
+  writer routed to `atomic_write_text` (tickers corruption was worst — get_tickers re-seeds
+  defaults, destroying the user's list); (MED) `presets_manager.load_config()` one bad int
+  field returned `{}` and wiped the whole config — now per-field `_safe_int`. DEFERRED
+  (tracked, risk>reward/HW-aware): daemon 270s backstop > 120s client read timeout on >120s
+  wall pushes (phantom-fail + clobber); `iter_messages` swallows a bad req/resp frame into
+  "no reply"; `control_server.call()` unix-socket fd leak (test client only); `gui_api._client()`
+  cold-start double-spawn race; iOS-LE notification checksum unvalidated. NOTE: also fixed a
+  self-inflicted regression — the house-bootstrap commit `79d432c` had turned R14 `test_no_emojis`
+  red (tui/ + check_no_emoji carry the Kare glyphs); reconciled via the test's EXEMPT_FILES
+  (commit `15e7344`). Lesson: run the FULL pytest suite before pushing, not just the touched gate.
+
 - **R53 ADVERSARIAL LOOP — ROUND 24 (2026-06-21): device-loop fd leak + LAN ACK!=success.**
   2-agent pass over framing primitives (CLEAN) + LAN transport. 2 real bugs fixed (commit
   `0ef1d6a`, on main, teeth-tested, suite 1608 green): device asyncio loop never closed on

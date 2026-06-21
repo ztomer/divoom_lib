@@ -5,6 +5,41 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 26: config/state persistence hardening (2026-06-21)
+
+(Round 25 is opencode's parallel scoreboard/lighting pass — shared tree.) Fresh
+3-agent adversarial sweep over daemon IPC, protocol framing, and config
+persistence. The framing/transport core came back CLEAN — byte formats (basic +
+iOS-LE checksums, length fields, 0x01–0x03 escaping, endianness, frame
+reassembly) verified against `docs/DIVOOM_PROTOCOL_SUMMARY.md` + the C reference.
+5 real bugs fixed, each teeth-tested; suite 1614 passed / 75 skipped:
+
+- **HIGH** — `hotchannel_config._normalize()` did a bare `int(v)` over
+  `device_galleries`, but `load_config()` calls `_normalize()` OUTSIDE its
+  try/except (promises "never raises") and `monthly_best_daemon.main()` calls it
+  unguarded at startup. A non-numeric value (hand-edited JSON, or a blank style
+  from the GUI) raised `ValueError` and crashed the headless sync daemon before
+  it ran. Now coerces defensively and drops bad entries.
+- **MEDIUM** (A1 non-atomic write) — `gallery_sync.py` (gallery_cache.json) and
+  `media_sync.py` (tickers.json) wrote via `write_text` → now `atomic_write_text`.
+  The tickers one is worse than a failed load: `get_tickers()` re-seeds from
+  macOS/defaults on a corrupt read, so a truncated write DESTROYS the user's list.
+- **MEDIUM** — `scanner_mixin.update_wall_slots` was self-described "atomic" but
+  used a FIXED `.json.tmp` name with no fsync; two arranger changes close
+  together raced the same tmp path. Now uses the shared `atomic_write_text`.
+- **MEDIUM** — `presets_manager.load_config()` parsed 4 int fields inside the
+  outer try, so one bad field (corrupt config.ini) returned `{}`, wiping email,
+  slots, devices and cloud status. Now per-field `_safe_int()` degrades to default.
+
+DEFERRED (tracked, verified real but risk>reward / HW-aware / low reachability —
+not blocking "clean"): daemon 270s result backstop can exceed the 120s client
+read timeout on >120s wall pushes (phantom-failure + possible device clobber);
+`iter_messages` swallows a malformed request/response frame into a generic "no
+reply"; `control_server.call()` leaks the unix socket fd (test/instrumentation
+client only); `gui_api._client()` check-then-act can double-spawn the daemon on
+cold start; iOS-LE notification parser doesn't validate its checksum.
+
+---
 ## R53 round 24: device-loop fd leak + LAN ACK!=success (2026-06-21)
 
 (Commit `0ef1d6a`; its two fixes were tagged R53.43/44 in the message, which
