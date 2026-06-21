@@ -18,6 +18,24 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — BLE-CORE CONVERGED; GUI-RESPONSIVENESS CLUSTER REMAINS
+  (2026-06-20).** 20 real bugs fixed across R53.19–29 (all on main, teeth-tested, suite
+  1584 green). The last two passes found the BLE/daemon/transport/wall/live-job/IPC
+  CORE clean — no new BLE-core bugs — and now surface a GUI/menubar UI-thread-blocking
+  cluster (a separate domain). Tracked in the review doc "GUI-RESPONSIVENESS CLUSTER":
+  media_sync.py:161 loop-stall, menubar menuNeedsUpdate_ main-thread RPC, ConnectionApi
+  JS-thread RPCs, get_alarms stale-as-success, get_weather throwaway loop — root cause
+  is DaemonDeviceProxy introspection attrs (is_connected/lan/_conn) each doing a blocking
+  device_status() RPC. Fix as one GUI-threading pass (hoist/await/cache the RPCs).
+  Also still DEFERRED (risk>reward, see review doc): live_job_start double-poller, 0x8B
+  retransmit-drop, custom-art ACK!=success. Flaky CI item: test_native_image_encoder
+  ::test_packets_have_correct_header_layout (intermittent RecursionError under full
+  suite, passes in isolation — test-pollution, not a product bug).
+  R53.26–29 fixes: notification routed through device loop; wall MAC-case (G4+delta);
+  exclusive_end honesty; wall delta connect-before-release + partial-wall degraded;
+  queue-drain-before-release; ApiBase timeout guard; push_animation temp-leak; subscribe
+  buffer cap.
+
 - **R53 ADVERSARIAL REVIEW-AND-FIX LOOP IN PROGRESS (2026-06-20).** A multi-agent
   "review and fix until clean" loop is running. 13 real bugs fixed so far across
   R53.19–25 (all on main, suite 1571 green): SPP-reconnect NameError, wall-config

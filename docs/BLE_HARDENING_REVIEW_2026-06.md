@@ -147,6 +147,30 @@ real, but each fix carries more risk than the bug:
   via `query_page` (0x8E), which is unreliable on real HW (times out). Pending a
   product decision on surfacing "unconfirmed" to the GUI.
 
+## GUI-RESPONSIVENESS CLUSTER (separate domain from BLE-core; tracked, not yet fixed)
+
+Later adversarial passes (R53.29-era) found the BLE/daemon CORE clean and instead
+surfaced a cluster of GUI/menubar **UI-thread blocking** issues — a coherent
+separate workstream (move blocking daemon RPCs off the pywebview JS thread / the
+AppKit main thread / the asyncio loop). Real but not BLE-core; fix together:
+
+- `divoom_gui/media_sync.py:161` — `dev.is_connected` (a BLOCKING daemon
+  `device_status()` RPC) read INSIDE `connect_and_push_ble()` on the asyncio loop
+  thread → stalls the whole loop for the RPC. (HIGH of the cluster.) Hoist the read
+  out of the coroutine or `run_in_executor` it.
+- `divoom_menubar/menubar.py` `menuNeedsUpdate_` → `device_activity()` does a
+  blocking socket round-trip on the AppKit MAIN thread on every menu open → frozen
+  menubar when the daemon is slow. Cache it in the subscribe thread instead.
+- `divoom_gui/api/connection.py` (`scan_devices`/`get_capabilities`/`probe_lan`/
+  `get_transport_status`) — blocking socket RPCs directly on the JS-API thread.
+- `divoom_gui/api/tools.py get_alarms` — swallows a device-read failure and returns
+  the stale local cache as an indistinguishable success (add a `stale`/`source` marker).
+- `divoom_gui/api/widgets.py get_weather` — uses `asyncio.run` (throwaway loop) on the
+  JS thread instead of the shared `_run_async`.
+- The shared root cause: `DaemonDeviceProxy` introspection attrs (`is_connected`/`lan`/
+  `_conn`) each do a synchronous blocking `device_status()` RPC — cache it / make the
+  reads async.
+
 ## DEFERRED — real, but need their own tested surgery (do NOT rush)
 
 Ranked by value. Several touch the 0x8B animation handshake or task lifecycle
