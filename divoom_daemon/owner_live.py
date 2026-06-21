@@ -208,6 +208,7 @@ class OwnerLiveMixin:
                 return False
             t.cancel()
             await asyncio.gather(t, return_exceptions=True)   # wait for it to die
+            await self._drain_cmd_queue()   # settle any in-flight push it submitted
             return True
 
         try:
@@ -231,6 +232,23 @@ class OwnerLiveMixin:
         if not any(m == mac for (m, _k) in self._live_tasks):
             self.set_device_activity({"mac": mac, "kind": "idle"})
         return {"success": True, "stopped": True}
+
+    async def _drain_cmd_queue(self) -> None:
+        """Await a no-op THROUGH the command queue so any push item a just-cancelled
+        poller had ALREADY submitted finishes first. That push runs as a separate
+        queue-worker item (cancelling the poller task only cancels its result-wait,
+        not the running item); its get_live_device() does `_live_devices[mac] = dev`,
+        which — if it lands AFTER _release_live_device_if_idle popped the mac — leaks
+        a connected device with no poller and no scheduled disconnect. Draining first
+        guarantees that write happened before the pop. Bounded; tolerates exclusive
+        mode deferring the barrier."""
+        q = getattr(self, "_cmd_queue", None)
+        if q is None:
+            return
+        try:
+            await asyncio.wait_for(q.submit_async(asyncio.sleep(0)), timeout=5.0)
+        except Exception:
+            pass
 
     def _release_live_device_if_idle(self, mac: str) -> None:
         """R44 §6: disconnect + drop a cached BACKGROUND device once no live
@@ -298,6 +316,7 @@ class OwnerLiveMixin:
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            await self._drain_cmd_queue()   # settle in-flight pushes before clearing
             devs = list(self._live_devices.values())
             self._live_devices.clear()
             for d in devs:

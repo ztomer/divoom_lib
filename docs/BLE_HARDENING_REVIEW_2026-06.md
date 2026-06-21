@@ -128,11 +128,20 @@ real, but each fix carries more risk than the bug:
   dies on its next cancel-checkpoint. Every robust fix needs orphan-tracking that
   RACES the hot start/stop path (a late `_stop_on_loop` pop can orphan the NEW task;
   awaiting a wedged task in `_start` hangs the start). Risk > reward → deferred.
-- **0x8B retransmit-drop between `wait_for_response` calls** (`display/animation.py`).
-  A retransmit request arriving after the scalar was cleared and before re-arm is
-  dropped → an incomplete upload can still return True. The 0x8B handshake is
-  HW-verified on 4 devices; changing the response-correlation there risks breaking
-  working animation pushes that can't be fully re-validated without all 4 devices.
+- **0x8B retransmit serving is effectively dead on BLE** (`display/animation.py`).
+  Sharper analysis (2nd pass): `_expected_response_command` is set to 0x8B once
+  before START, but `_await_8b_device_ready`'s `wait_for_response` CLEARS it to None
+  on the start-ACK match. For the entire chunk loop AND the retransmit window the
+  scalar is None, so the notification handler DROPS every unsolicited 0x8B retransmit
+  request (it's not in `_listen_commands` / `GENERIC_ACK_COMMANDS`). `_serve_8b_retransmits`
+  then waits 1s on an empty queue and returns "done" → a dropped chunk is silently
+  lost and the stream still returns True (ACK≠success). **Why deferred, not WONTFIX:**
+  the path is HW-verified rendering correctly on 4 devices — i.e. BLE write-with-response
+  is reliable enough that retransmits ~never fire in practice, so the dead mechanism is
+  a latent robustness gap, not an active failure. The fix (add 0x8B to `_listen_commands`
+  for the stream duration so retransmit frames queue without consuming the scalar) is
+  clean but needs the 4-device HW rig to confirm it doesn't perturb the working push —
+  hence deferred to a HW session, not rushed blind.
 - **Custom-art ACK≠success** (`custom_art_push.push_page`). The honest fix is to
   *downgrade* `success` to "writes accepted, not device-confirmed" — NOT to verify
   via `query_page` (0x8E), which is unreliable on real HW (times out). Pending a
