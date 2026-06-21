@@ -153,21 +153,14 @@ class MediaSyncMixin(GallerySyncMixin):
         dev = self.current_divoom
         if not dev:
             return False
-            
-        if dev.lan:
-            return bool(self._run_async(dev.display.show_image(str(frame_path))))
-            
-        async def connect_and_push_ble():
-            if not dev.is_connected:
-                logger.info("BLE device went idle/disconnected. Attempting auto-reconnect...")
-                try:
-                    await dev.connect()
-                except Exception as ex:
-                    logger.error(f"Auto-reconnect failed: {ex}")
-                    return False
-            return await dev.display.show_image(str(frame_path))
-            
-        return bool(self._run_async(connect_and_push_ble()))
+
+        # Push directly. The daemon's device_call already ensures the device is
+        # connected (_ensure_device_async reconnects an idle/dropped link, honest
+        # is_alive) before the call AND routes to the right transport, so the GUI
+        # must NOT pre-check `dev.is_connected` / `dev.lan` here: each was a BLOCKING
+        # device_status() RPC — `is_connected` ran INSIDE the loop coroutine, stalling
+        # the WHOLE asyncio loop for the round-trip; the reconnect was redundant too.
+        return bool(self._run_async(dev.display.show_image(str(frame_path))))
 
     @staticmethod
     def _frame_to_data_url(frame_path) -> str:
