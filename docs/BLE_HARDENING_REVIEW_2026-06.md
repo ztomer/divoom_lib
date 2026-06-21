@@ -112,6 +112,32 @@ Real-device testing became possible via `scripts/make_dev_daemon_app.sh` (a thin
   decoded length resyncs (drop the start byte). Mirrors the SPP iOS-LE bound (R53.13).
   Test `test_basic_corrupt_length_resyncs_and_recovers` (verified to fail without fix).
 
+## ADVERSARIAL MULTI-AGENT RE-READ — DEFERRED (fix riskier than the bug)
+
+A 3-agent adversarial sweep (wall / live-job / transport / IPC / push paths) over
+R53.19–23 fixed 11 real bugs (SPP-reconnect NameError, wall-config slot-drop,
+wall-disconnect leak, live-job resurrection/leak, zero-frame crash, poller
+reconnect-storm, daemon broadcast-freeze, release-disconnect leak, background-wall
+caching, 0x8B scalar leak). These three remain DELIBERATELY DEFERRED — verified
+real, but each fix carries more risk than the bug:
+
+- **`live_job_start` ignores a TIMED-OUT `live_job_stop` → a 2nd poller for the same
+  `(mac,kind)`.** Requires a poller wedged >10s despite `cancel()` (rare — queue ops
+  are bounded; cancel raises `CancelledError` into awaits). Impact is low + bounded:
+  the queue serializes both pollers' pushes (no protocol corruption), and the orphan
+  dies on its next cancel-checkpoint. Every robust fix needs orphan-tracking that
+  RACES the hot start/stop path (a late `_stop_on_loop` pop can orphan the NEW task;
+  awaiting a wedged task in `_start` hangs the start). Risk > reward → deferred.
+- **0x8B retransmit-drop between `wait_for_response` calls** (`display/animation.py`).
+  A retransmit request arriving after the scalar was cleared and before re-arm is
+  dropped → an incomplete upload can still return True. The 0x8B handshake is
+  HW-verified on 4 devices; changing the response-correlation there risks breaking
+  working animation pushes that can't be fully re-validated without all 4 devices.
+- **Custom-art ACK≠success** (`custom_art_push.push_page`). The honest fix is to
+  *downgrade* `success` to "writes accepted, not device-confirmed" — NOT to verify
+  via `query_page` (0x8E), which is unreliable on real HW (times out). Pending a
+  product decision on surfacing "unconfirmed" to the GUI.
+
 ## DEFERRED — real, but need their own tested surgery (do NOT rush)
 
 Ranked by value. Several touch the 0x8B animation handshake or task lifecycle

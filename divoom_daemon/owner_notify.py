@@ -23,27 +23,25 @@ class OwnerNotifyMixin:
         self._send_to_device_ble(app_type, text)
 
     def _send_to_device_ble(self, app_type: int, text: str) -> None:
-        import asyncio
-        from divoom_lib.divoom import Divoom
-        from divoom_lib.utils import discovery
+        # Route through the daemon's ONE device loop + command queue — NEVER a
+        # private throwaway loop. A Divoom built/driven on a throwaway loop binds
+        # its bleak client to THAT loop, so the persistent device loop can no longer
+        # use self._device ("Future attached to a different loop") and two loops
+        # driving one GATT link corrupt it. _ensure_device_async manages self._device
+        # on the loop with honest is_alive + bounded reconnect; _run_device's
+        # result-timeout bounds a wedged push (the old throwaway path had NO timeout).
+        # We RAISE on no-reachable-device so NotificationService records routed=False
+        # (it keys routed off raise-vs-no-raise; the old `return` lied routed=True).
+        if getattr(self, "_loop", None) is None:
+            self._device_loop()
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            if not getattr(self, "_device", None) or not self._device.is_connected:
-                mac = self.mac
-                if not mac:
-                    from divoom_daemon.daemon_config import load_daemon_config
-                    devs = loop.run_until_complete(discovery.discover_all_divoom_devices(
-                        timeout=load_daemon_config().reconnect_scan_timeout))
-                    if not devs:
-                        return
-                    mac = devs[0]["address"]
-                self._device = Divoom(mac=mac, logger=logger, use_ios_le_protocol=False)
-                loop.run_until_complete(self._device.connect())
+        async def _do():
+            dev = await self._ensure_device_async(self.mac)
+            if dev is None:
+                raise RuntimeError("no Divoom device to route notification to")
             if text:
-                loop.run_until_complete(self._device.notification.show_notification_text(int(app_type), text))
+                await dev.notification.show_notification_text(int(app_type), text)
             else:
-                loop.run_until_complete(self._device.notification.show_notification(int(app_type)))
-        finally:
-            loop.close()
+                await dev.notification.show_notification(int(app_type))
+
+        self._run_device(_do())
