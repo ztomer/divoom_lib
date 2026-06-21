@@ -51,6 +51,21 @@ class OwnerWallMixin:
         self.forget_device_activity(key)
         logger.info("relinquished active device %s — claimed by the wall", key)
 
+    def _wall_degraded(self) -> dict:
+        """Failed-slot honesty: DivoomWall.connect() only RAISES when EVERY panel
+        fails, so a partial wall (2 of 3 up) otherwise reports full success and the
+        dark panel is invisible. Return the unreachable slot macs so the GUI can
+        flag them; empty when the wall is fully connected."""
+        w = getattr(self, "_wall", None)
+        if w is None or getattr(w, "is_connected", True):
+            return {}
+        down = [getattr(s.device, "mac", "?") for s in getattr(w, "devices", [])
+                if not getattr(s.device, "is_connected", False)]
+        if down:
+            logger.warning("wall configured with %d unreachable panel(s): %s",
+                           len(down), down)
+        return {"degraded": down} if down else {}
+
     def _wall_configs(self, slots: dict, cell: int) -> list:
         configs = []
         for mac, s in slots.items():
@@ -83,7 +98,7 @@ class OwnerWallMixin:
         # keep the shared screens connected, only disconnect removed + connect
         # added (a full rebuild reconnected ALL members; HW: +14s for a 3rd).
         if self._wall_delta(slots, cell):
-            return {"success": True, "wall": True}
+            return {"success": True, "wall": True, **self._wall_degraded()}
         self._drop_current_wall()    # release the old wall before rebuilding
         self._relinquish_active_if_in(slots)   # G4: don't double-own a slot mac
         self._wall_slots = slots
@@ -97,7 +112,7 @@ class OwnerWallMixin:
 
         try:
             self._wall = self._run_device(_build())
-            return {"success": True, "wall": True}
+            return {"success": True, "wall": True, **self._wall_degraded()}
         except Exception as e:
             logger.warning(f"wall_configure failed: {e}")
             self._wall = None
@@ -127,6 +142,12 @@ class OwnerWallMixin:
                 keep = old_by_mac.get(slot.device.mac)
                 if keep is not None:
                     slot.device = keep
+            # Connect the new wall FIRST, then release the removed panels — so a
+            # transient connect failure doesn't first tear down panels we were
+            # keeping (the whole point of the delta). On failure the caller's
+            # except → _drop_current_wall() disconnects the old wall (incl. the
+            # removed ones), so nothing leaks.
+            await new_wall.connect()
             for mac in removed:           # release the screens dropped from the layout
                 dev = old_by_mac.get(mac)
                 if dev is not None:
@@ -134,7 +155,6 @@ class OwnerWallMixin:
                         await dev.disconnect()
                     except Exception:
                         pass
-            await new_wall.connect()
             return new_wall
 
         try:

@@ -210,6 +210,76 @@ def test_wall_delta_reuses_shared_screens(monkeypatch):
     assert "C" in o._wall_slots and "B" not in o._wall_slots
 
 
+def test_wall_delta_connects_before_releasing_removed(monkeypatch):
+    """R53.27: the new wall connects BEFORE removed panels are disconnected, so a
+    transient connect failure doesn't tear down the shared screens we were keeping."""
+    order = []
+
+    class _NewWall:
+        is_connected = True
+        def __init__(self, configs, custom_logger=None):
+            self.devices = [_Slot(_WallDev(c["mac"])) for c in configs]
+        async def connect(self):
+            order.append("connect")
+
+    class _RemDev:
+        mac = "B"
+        is_connected = True
+        async def disconnect(self):
+            order.append("disconnect")
+
+    devA, devB = _WallDev("A"), _RemDev()
+
+    class _OldWall:
+        devices = [_Slot(devA), _Slot(devB)]
+
+    o = _owner(_OldWall(), {"A": _slot(0), "B": _slot(1)})
+    o._device = None
+    o.mac = None
+    o._lan_ip = None
+    monkeypatch.setattr("divoom_lib.wall.DivoomWall", _NewWall)
+    o.wall_configure({"slots": {"A": _slot(0), "C": _slot(1)}})
+    assert order == ["connect", "disconnect"], f"wrong order: {order}"
+
+
+def test_wall_configure_reports_degraded_panels(monkeypatch):
+    """R53.27: a wall where some panels failed to connect is reported with a
+    `degraded` list (DivoomWall.connect only raises when ALL fail)."""
+    class _PartialWall:
+        is_connected = False                      # not every slot connected
+        def __init__(self, configs, custom_logger=None):
+            self.devices = [_Slot(_WallDev(c["mac"])) for c in configs]
+            self.devices[1].device.is_connected = False   # 2nd panel down
+        async def connect(self):
+            pass
+
+    o = _owner(None)                              # no existing wall → full build
+    o._device = None
+    o.mac = None
+    o._lan_ip = None
+    monkeypatch.setattr("divoom_lib.wall.DivoomWall", _PartialWall)
+    r = o.wall_configure({"slots": {"A": _slot(0), "B": _slot(1)}})
+    assert r["success"] is True and r["wall"] is True
+    assert r.get("degraded") == ["B"]             # the dark panel is surfaced
+
+
+def test_wall_configure_no_degraded_when_all_connected(monkeypatch):
+    class _FullWall:
+        is_connected = True
+        def __init__(self, configs, custom_logger=None):
+            self.devices = [_Slot(_WallDev(c["mac"])) for c in configs]
+        async def connect(self):
+            pass
+
+    o = _owner(None)
+    o._device = None
+    o.mac = None
+    o._lan_ip = None
+    monkeypatch.setattr("divoom_lib.wall.DivoomWall", _FullWall)
+    r = o.wall_configure({"slots": {"A": _slot(0)}})
+    assert "degraded" not in r                    # clean wall → no degraded key
+
+
 def test_wall_no_overlap_falls_back_to_full_rebuild(monkeypatch):
     """A disjoint layout {A,B} -> {C,D} has no shared screen, so it tears down the
     old wall fully and builds fresh."""
