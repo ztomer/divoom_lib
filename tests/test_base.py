@@ -215,7 +215,11 @@ async def test_handle_ios_le_notification_generic_ack(divoom_base_instance):
         response = await base.notification_queue.get()
         assert response['command_id'] == cmd_id
         assert response['payload'] == bytearray(data_payload)
-        assert base._expected_response_command is None # Should clear on generic ACK
+        # The generic 0x33 ACK is the FIRST of a two-frame reply; it must NOT clear
+        # the correlation scalar (the real 0x46 data frame still follows, and
+        # clearing here dropped it → iOS-LE read-backs timed out). The scalar is
+        # cleared only when the real data frame arrives.
+        assert base._expected_response_command == 0x45
     finally:
         constants.GENERIC_ACK_COMMANDS = original_generic_acks # Restore original
 

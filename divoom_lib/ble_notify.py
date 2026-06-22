@@ -54,10 +54,16 @@ class BleNotifyMixin:
             # listen set without consuming _expected_response_command.
             is_listened = command_identifier in getattr(self, "_listen_commands", ())
 
-            if is_listened:
+            if is_listened or is_generic_ack:
+                # The generic 0x33 ACK is the FIRST of a two-frame reply for a
+                # GENERIC_ACK_COMMANDS query; wait_for_response skips it and keeps
+                # waiting for the real data frame. Do NOT clear the correlation
+                # scalar here — clearing it dropped the follow-up data frame (it
+                # then matched neither branch), so iOS-LE read-backs timed out.
+                # Matches the basic-protocol / SPP parsers, which never clear on the ack.
                 self.notification_queue.put_nowait(response_payload)
                 return True
-            if is_expected_response or is_generic_ack:
+            if is_expected_response:
                 self.notification_queue.put_nowait(response_payload)
                 self._expected_response_command = None
                 return True

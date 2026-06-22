@@ -150,6 +150,29 @@ class DivoomDaemon:
         self._socket_server.stop()
         self._cleanup()
 
+    def _acquire_instance_lock(self) -> bool:
+        """Single-instance guard: hold an exclusive flock on a sibling lockfile.
+
+        Two daemons can race to start — the GUI host eagerly spawns one
+        (gui_main) while the MCP server (a SEPARATE process launched by the AI
+        client) spawns another; both see no live daemon and both spawn. Without a
+        guard the second to reach serve_forever() os.remove()s + rebinds the
+        socket, orphaning the first — which still holds the single BLE device →
+        BLE contention + a zombie owner nobody can reach. The loser of the flock
+        exits cleanly instead. The fh is kept on self for the process lifetime."""
+        if not self.socket_path:
+            return True
+        import fcntl
+        try:
+            fh = open(f"{self.socket_path}.lock", "w")
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return False          # another daemon already holds it
+        except Exception:         # flock unsupported on this fs → don't block startup
+            return True
+        self._instance_lock_fh = fh
+        return True
+
 
 def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH,
         host: Optional[str] = None, port: Optional[int] = None,
@@ -157,6 +180,11 @@ def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH,
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     daemon = DivoomDaemon(mac=mac, socket_path=socket_path,
                           host=host, port=port, token=token)
+    # Single-instance guard BEFORE starting anything, so the loser of a
+    # double-spawn race doesn't start the notifier / rehydrate jobs / grab BLE.
+    if not daemon._acquire_instance_lock():
+        logger.warning("another divoom daemon already owns %s; exiting cleanly", socket_path)
+        return 0
     # Auto-start the notification listener on launch (best-effort; idle on non-mac).
     daemon._notifier.start()
     # A2: resume any live widgets that were running before the last restart/crash.

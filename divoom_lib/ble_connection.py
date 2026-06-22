@@ -190,6 +190,13 @@ async def ensure_connected(
                     raise ConnectionError("post-connect verify failed")
             return ConnectResult(True, ConnectionState.CONNECTED)
         except BaseException as e:  # noqa: BLE001 — classify everything
+            # asyncio.CancelledError is a BaseException (not Exception) since 3.8.
+            # Swallowing it here treated a cancellation (daemon teardown cancelling
+            # the device-loop worker, or a wait_for timeout) as an ordinary connect
+            # failure → the retry loop kept running, defeating cooperative
+            # cancellation and delaying stop() by wasted connect attempts. Re-raise.
+            if isinstance(e, asyncio.CancelledError):
+                raise
             last = classify_connect_error(e)
             detail = str(e)
             logger.warning("connect attempt %d/%d failed: %s (%s)",
