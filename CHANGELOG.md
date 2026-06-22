@@ -5,6 +5,29 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 35: cancel-safety + iOS-LE read-back + daemon single-instance (2026-06-22)
+
+(Commit `a7e0761`.) Persona pass over the deepest core. Carmack CLEAN (BLE
+write/notify hot path verified); Bob/Linus/Hashimoto each found one. Teeth-tested,
+suite 1676 green.
+
+- **HIGH (Hashimoto)** — the daemon had NO single-instance guard. The GUI host and
+  the MCP server (separate processes) can both cold-spawn a daemon; the second to
+  reach serve_forever() os.remove()s + rebinds the socket, orphaning the first —
+  which still holds the single BLE device → contention + a zombie owner. Added a
+  flock guard (mirrors the GUI's), checked in run() before anything starts; the loser
+  exits cleanly.
+- **MEDIUM (Bob)** — the iOS-LE notification parser cleared
+  _expected_response_command on the generic 0x33 ACK (the FIRST of a two-frame
+  reply), so the real data frame was dropped → iOS-LE read-backs (get_light_mode etc.)
+  timed out. Now the ACK is queued without clearing the scalar (matches the basic /
+  SPP parsers). Updated the test that codified the buggy behavior.
+- **MEDIUM (Linus)** — ensure_connected caught BaseException, swallowing
+  asyncio.CancelledError (a BaseException since 3.8) → a teardown cancellation was
+  treated as a connect failure and retried, defeating cooperative cancellation and
+  delaying stop(). Now re-raises CancelledError first.
+
+---
 ## R53 round 34: mcp NameError + notification health + config reload + SIGTERM (2026-06-22)
 
 (Commit `1eb0a27`.) Persona pass over the LEAST-reviewed corners — not clean. Bob

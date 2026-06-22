@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 35 (2026-06-22): deepest core — Carmack clean, 3 bugs (Claude).**
+  Commit `a7e0761`, teeth-tested, suite 1676 green. Carmack's BLE write/notify hot-path review
+  came back CLEAN. (HIGH Hashimoto) daemon had no single-instance guard → GUI + MCP-server
+  double-spawn clobbered the socket + orphaned the BLE owner; added a flock guard in run() so
+  the loser exits cleanly. (MEDIUM Bob) iOS-LE notification parser cleared the response scalar on
+  the 0x33 generic ACK → dropped the real data frame → iOS-LE read-backs timed out; now the ACK
+  is queued without clearing (matches basic/SPP); updated the test that codified the bug. (MEDIUM
+  Linus) ensure_connected caught BaseException → swallowed CancelledError → broke cooperative
+  teardown; now re-raises. HW deferrals unchanged. NOTE: shell test runs occasionally hit a native
+  IOBluetooth/PyObjC crash (the known TCC issue) when a subset imports BLE modules — the FULL
+  suite run is the authoritative check (it ran clean at 1676).
+
 - **R53 ADVERSARIAL LOOP — ROUND 34 (2026-06-22): least-reviewed corners — NOT clean (Claude).**
   Commit `1eb0a27`, teeth-tested, suite 1673 green. Bob+Linus CONVERGED on a HIGH:
   mcp_tools.get_capabilities used `dataclasses` with no module-level import → NameError on a
