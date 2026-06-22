@@ -5,6 +5,33 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 32: multi-persona convergence pass — 6 new bugs (2026-06-22)
+
+(Commit `93bf159`.) The "expected-clean" convergence pass was NOT clean — a fresh
+4-persona sweep over the less-traveled code surfaced 6 new verified bugs. All fixed,
+teeth-tested, suite green (1607 + 61 GUI e2e).
+
+- **HIGH** — `exclusive_start`/`exclusive_end` used the 2s quick timeout, but the
+  daemon enqueues acquire behind an in-flight push (10-30s+) → client timed out while
+  the daemon acquired → orphaned token + wedged device. Now `sync_read_timeout` (120s).
+- **HIGH** — `run_music` ran `get_current_playing_track()` (up to 2 blocking osascript
+  subprocesses) synchronously on the BLE event loop every 1.5s. Off-loaded via
+  `asyncio.to_thread`.
+- **MEDIUM** — `set_temperature_channel` was duplicated; the GUI routed to the copy
+  that hard-coded white (dropped the user's color) and ignored the wall. Routed to the
+  color-honoring, wall-aware version; deleted the dead duplicate.
+- **MEDIUM** — `get_memorial_time` decoded the title without `errors=` → a
+  truncated-multibyte title crashed and lost all 10 memorials. Now `errors='replace'`.
+- **HIGH-latent** — `ConnectionApi.scan_devices`/`get_capabilities` called `self._client`
+  (property) but the class shadows it with a method → AttributeError → always-empty scan.
+  Call `self._client()`.
+- **LOW** — `media_source` used `urllib.parse.quote` but only imported `urllib.request`
+  (parse bound via a CPython side-effect). Added explicit `import urllib.parse`.
+
+(Also restored the Playwright chromium browser — a SessionStart bun-install side-effect
+had removed it, failing the GUI e2e suite; unrelated to the code changes.)
+
+---
 ## R53 round 31: wall resize hoist + atomic hot_update guard (2026-06-21)
 
 (Commit `44e69b5`.) Clears the last two non-HW deferrals from the multi-persona

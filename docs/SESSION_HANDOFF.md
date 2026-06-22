@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 32 (2026-06-22): convergence pass NOT clean — 6 new bugs (Claude).**
+  A fresh 4-persona sweep over the less-traveled code (commit `93bf159`, teeth-tested, suite green
+  1607 + 61 GUI): HIGH exclusive_start/end 2s-timeout → orphaned-token/wedged-device (now
+  sync_read_timeout); HIGH run_music blocking osascript ×2 on the BLE loop every 1.5s (now
+  asyncio.to_thread); MEDIUM set_temperature_channel dup dropped the user's color + ignored the
+  wall (routed to LightingApi, deleted dup); MEDIUM get_memorial_time crashed on truncated-UTF-8
+  title (errors='replace'); HIGH-latent ConnectionApi.scan_devices/get_capabilities called the
+  _client property not the method (always-empty scan); LOW media_source missing import urllib.parse.
+  LESSON: "non-HW backlog exhausted" did NOT mean clean — the less-traveled modules (live-job
+  pollers, GUI api routing, library scheduling, RPC timeouts) still hid real bugs. Also restored the
+  Playwright chromium browser (SessionStart bun-install removed it; unrelated to code). Remaining HW
+  deferrals unchanged (native C static encoder, SPP framing, RX stall, 0x8B retransmit, custom-art ACK).
+
 - **R53 ADVERSARIAL LOOP — ROUND 31 (2026-06-21): wall resize hoist + hot_update guard (Claude).**
   Cleared the last two non-HW deferrals (commit `44e69b5`, teeth-tested, suite 1664 green):
   (PERF) DivoomWall full-canvas resize hoisted out of the per-slot loop (was N× per tick on a
