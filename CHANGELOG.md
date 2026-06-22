@@ -5,6 +5,38 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53.x HW round: native C image encoder — divergence fixed + revived (2026-06-22)
+
+Two compounding bugs in the native image encoder:
+
+- **Static header off-by-one** (`image_encode.c divoom_encode_static_image`) —
+  `static_header_size` was 6, so the NN palette-count byte written at `out_buf[6]`
+  was immediately CLOBBERED by `memcpy(out_buf + static_header_size, palette, …)`
+  (the palette landed on byte 6), and LLLL undercounted by 1. The C emitted a
+  6-byte header vs Python's correct 7-byte (AA + LLLL + 000000 + NN). Fix:
+  `static_header_size = 7`.
+- **Wrapper under-allocation** (`image_encoder.py`) — `_c_encode_animation_frame`
+  and `_c_encode_static_image` sized the output buffer at `(w*h+7)//8` (1 BIT per
+  pixel), but the C's conservative worst-case check needs `w*h` (8 bits/pixel). For
+  any frame past ~1 pixel the C returned -1 → silent Python fallback. **The native
+  image encoders were effectively DEAD for real frames** (16x16 → None). Fix:
+  allocate `7 + 256*3 + w*h`.
+
+Together: the native path is now actually reached for real frames AND byte-identical
+to the verified-correct Python reference across every size/colour count tested
+(1x1…32x32, 1…256 colours — static AND animation-frame). Dylib rebuilt.
+
+- **HW-validated** — restarted the daemon onto the rebuilt dylib and pushed the
+  test animation to Pixoo-1 via `display.show_image` (now encoding through the
+  revived native C path): `result: true`, identical device behaviour (byte-identical
+  bytes -> identical push); read-back sanity `get_brightness` → 60.
+- **Tests** — direct-C-path teeth added (`test_c_static_matches_python`,
+  `test_c_static_header_is_7_bytes_with_nn`) that drive the C function with a
+  worst-case buffer (bypassing the wrapper's Python fallback, which made the
+  pre-existing wrapper-based parity tests false positives). Teeth-verified: against
+  the pre-fix 6-byte-header dylib, 17 direct-C tests fail; fixed + rebuilt, green.
+
+---
 ## R53.x HW round: 0x8B animation retransmit dead-path fixed (2026-06-22)
 
 The 0x8B animation streamer set `_expected_response_command = 0x8B` before START,

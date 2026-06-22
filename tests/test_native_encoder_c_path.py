@@ -24,6 +24,7 @@ import pytest
 from divoom_lib.native import image_encoder
 from divoom_lib.utils.divoom_image_encode import (
     encode_animation_frame as py_encode_animation_frame,
+    encode_static_image as py_encode_static_image,
 )
 from divoom_lib.utils.divoom_image_encode_32 import (
     encode_animation_frame_32 as py_encode_animation_frame_32,
@@ -95,6 +96,47 @@ def test_c_frame_arbitrary_matches_python(w, h, num_colors):
         f"len(c)={len(cn)}, first diff at "
         f"{[i for i, (a, b) in enumerate(zip(py, cn)) if a != b][:3]}"
     )
+
+
+def _c_static_worstcase(rgb: bytes, w: int, h: int) -> bytes:
+    """Call the C `divoom_encode_static_image` directly with a worst-case buffer
+    so the C packer runs (bypassing the wrapper's Python fallback)."""
+    lib = image_encoder._load_lib()
+    assert lib is not None
+    worst = 7 + 256 * 3 + (w * h * 8 + 7) // 8
+    out = (ctypes.c_uint8 * worst)()
+    src = (ctypes.c_uint8 * len(rgb)).from_buffer_copy(rgb)
+    rc = lib.divoom_encode_static_image(src, w, h, out, worst)
+    assert rc > 0, f"C static encoder rejected a worst-case buffer (rc={rc})"
+    return bytes(out[:rc])
+
+
+@pytest.mark.parametrize("w,h", [(1, 1), (2, 2), (8, 8), (16, 16), (5, 7)])
+@pytest.mark.parametrize("num_colors", [1, 2, 5, 16, 256])
+def test_c_static_matches_python(w, h, num_colors):
+    """Direct C-path teeth for divoom_encode_static_image. The C header was 6
+    bytes (the NN palette-count byte at out_buf[6] was clobbered by the palette
+    memcpy), diverging from Python's correct 7-byte header. Against the pre-fix
+    dylib this FAILS (C is 1 byte short, NN missing); fixed + rebuilt it passes."""
+    if num_colors > w * h:
+        pytest.skip("more colors than pixels")
+    rgb = _patterned_rgb(w, h, num_colors, seed=w * 100 + h + num_colors)
+    py = bytes(py_encode_static_image(rgb, w, h))
+    cn = _c_static_worstcase(rgb, w, h)
+    assert cn == py, (
+        f"{w}x{h} nc={num_colors}: C static diverges from Python — "
+        f"len(py)={len(py)} len(c)={len(cn)}"
+    )
+
+
+def test_c_static_header_is_7_bytes_with_nn():
+    """Pin the exact fix: a 4-colour 16x16 must emit the 7-byte header AA + LLLL +
+    000000 + NN with NN=4 (the pre-fix 6-byte header dropped NN)."""
+    rgb = _patterned_rgb(16, 16, 4, seed=1)
+    cn = _c_static_worstcase(rgb, 16, 16)
+    assert cn[0] == 0xAA
+    assert cn[6] == 4, "NN palette-count byte must survive at offset 6"
+    assert cn[3:6] == b"\x00\x00\x00"
 
 
 def test_c_frame_uniform_image_is_not_corrupted():

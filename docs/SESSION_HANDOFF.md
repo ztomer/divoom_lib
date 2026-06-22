@@ -18,6 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HW ROUND (2026-06-22 17:10 EDT): native C image encoder — divergence FIXED + revived (Claude).**
+  Two bugs: (1) `image_encode.c` static header was 6 bytes — the NN palette-count byte at
+  `out_buf[6]` got clobbered by the palette memcpy (palette landed on byte 6), diverging from
+  Python's correct 7-byte header; fix `static_header_size = 7`. (2) Both `image_encoder.py` wrappers
+  allocated `(w*h+7)//8` (1 BIT/pixel) but the C worst-case check needs `w*h` (8 bits/pixel), so the
+  C returned -1 for any real frame → silent Python fallback (native image encode was DEAD for
+  16x16+). Fix: allocate `7 + 256*3 + w*h`. Now byte-identical to Python across all sizes/colours
+  (static AND frame) AND actually reached. Dylib rebuilt + committed. HW: pushed the test animation
+  to Pixoo-1 via the revived native path → `result:true`, identical behaviour. Teeth: direct-C-path
+  tests (`test_c_static_*`) that bypass the wrapper fallback — 17 fail against the pre-fix dylib.
+  **ALL named HW-deferred items are now cleared.** Remaining NOT-testable-on-this-fleet: SPP
+  transport + live-job-double-poller (BLE-only Pixoo/Timoo/Tivoo; no RFCOMM/SPP device). R45 #1
+  "Custom Art channel empty" still needs eyes on the device screen (can't validate headless).
+
 - **HW ROUND (2026-06-22 12:43 EDT): 0x8B animation retransmit dead-path FIXED (Claude).** The
   0x8B streamer set the response scalar to 0x8B before START, but the start-ACK wait CLEARS it —
   so for the chunk loop + retransmit window the scalar was None and 0x8B isn't a generic-ACK, so

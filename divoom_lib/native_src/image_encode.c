@@ -373,9 +373,13 @@ int divoom_encode_static_image(
 
     int pixel_data_bytes = (num_pixels * nb_bits + 7) / 8;
     int color_data_bytes = n * 3;
-    /* Static header is 6 bytes: AA + LLLL(LE) + 000000 + NN.
-     * (No TTTT, no RR.) */
-    int static_header_size = 6;
+    /* Static header is 7 bytes: AA + LLLL(LE u16) + 000000(3) + NN — identical to
+     * the animation-frame header (the 000000 stands in for TTTT(2)+RR(1)). It was
+     * 6 here, which made the NN palette-count byte written at out_buf[6] get
+     * CLOBBERED by the `memcpy(out_buf + static_header_size, palette, ...)` below
+     * (palette landed on byte 6) and undercounted LLLL by 1 — diverging from the
+     * Python reference (which is verified-correct). */
+    int static_header_size = 7;
     int llll = static_header_size + color_data_bytes + pixel_data_bytes;
     int total = llll;
 

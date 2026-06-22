@@ -139,8 +139,12 @@ def _c_encode_animation_frame(
     if lib is None:
         return None
     in_size = w * h * 3
-    # Worst case: 7-byte header + 256*3 palette + w*h*1 pixel bytes
-    out_size = 7 + 256 * 3 + (w * h + 7) // 8
+    # Worst case: 7-byte header + 256*3 palette + 1 byte/pixel (8 bits/pixel, the
+    # C's own worst_size bound). The old `(w*h+7)//8` assumed 1 BIT/pixel, so for
+    # any image past ~1 pixel the buffer was smaller than the C's conservative
+    # worst_size check and the C returned -1 → silent Python fallback (the native
+    # encoder was effectively dead for real frames).
+    out_size = 7 + 256 * 3 + w * h
     try:
         in_buf = (ctypes.c_ubyte * in_size).from_buffer_copy(rgb)
         out_buf = (ctypes.c_ubyte * out_size)()
@@ -187,7 +191,10 @@ def _c_encode_static_image(rgb: bytes, w: int, h: int) -> bytes | None:
     if lib is None:
         return None
     in_size = w * h * 3
-    out_size = 7 + 256 * 3 + (w * h + 7) // 8
+    # Worst case: 7-byte header + 256*3 palette + 1 byte/pixel (matches the C's
+    # worst_size bound). The old `(w*h+7)//8` (1 bit/pixel) under-allocated for any
+    # multi-pixel image, so the C returned -1 → silent Python fallback.
+    out_size = 7 + 256 * 3 + w * h
     try:
         in_buf = (ctypes.c_ubyte * in_size).from_buffer_copy(rgb)
         out_buf = (ctypes.c_ubyte * out_size)()
