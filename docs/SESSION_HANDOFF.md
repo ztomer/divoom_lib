@@ -18,6 +18,21 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 29 (2026-06-21): multi-persona review (Claude).** Four-persona
+  pass (Uncle Bob / Linus / Carmack / Hashimoto) + cloud sweep. 4 real bugs fixed (commit
+  `d5a9aab`, on main, teeth-tested, suite 1657 green): (SECURITY) `divoom_auth` logged the cloud
+  bearer token in clear → `_redact()`; (CORRECTNESS) `CommandQueue.acquire` let a 2nd token STEAL
+  the exclusive slot → now rejects different-token acquire; (LATENT CRASH) `audio_visualizer`
+  used `time.sleep` without importing time (killed the capture thread) + Hann-window hoist;
+  (HONESTY+LEAK) `custom_art_push` ignored CDN HTTP status and never unlinked its scratch GIFs.
+  NEW DEFERRED (HIGH, needs dedicated session): `_ensure_device_async` returns the cached device
+  without comparing the requested mac → silent WRONG-DEVICE write reported as success; mirror
+  `_build_device_async`'s guard + update `self.mac` on rebuild + LAN-key handling + churn-guard +
+  teeth-test. Also deferred: wall full-canvas resize per-device-per-tick (perf); `hot_update`
+  in-progress guard check-then-act race. NOTE: my "round 26" commit label cosmetically collides
+  with opencode's round 26 (config persistence) — renumbered to 29 in the docs. The round numbers
+  are NOT coordinated across the two agents; use commit hashes to disambiguate.
+
 - **R53 ADVERSARIAL LOOP — ROUND 28 (2026-06-21): fan-out honesty + C encoder aliasing.**
   (Round 27 left for opencode, shared tree.) Fresh 3-agent sweep over BLE transport /
   native encoder / wall+animation. 4 fixes (commits `d4910d6` + `921f1ba`, on main,

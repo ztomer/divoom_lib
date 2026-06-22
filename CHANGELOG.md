@@ -5,6 +5,36 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 29: multi-persona review — auth/exclusive/audio/cdn/scratch (2026-06-21)
+
+(Commit `d5a9aab`, labeled "round 26" in its message — cosmetic collision with the
+parallel opencode round-26; renumbered here to 29 to stay after round 28.) A
+four-persona adversarial pass (Uncle Bob / Linus / Carmack / Hashimoto) plus a
+cloud/hot-channel sweep. Four real bugs fixed, teeth-tested, suite 1657 green:
+
+- **SECURITY** — `divoom_auth` printed the cloud bearer token in clear on every
+  (re)login; headless daemon stdout → logfile leaked a replayable 23h token. Added
+  `_redact()` (prefix + length only) on both login paths.
+- **CORRECTNESS** — `CommandQueue.acquire` unconditionally overwrote
+  `_exclusive_owner`, so a 2nd `exclusive_start` STOLE the session (holder's queued
+  items stranded until the 30s idle release; thief ran concurrently → clobber). Now
+  rejects a different-token acquire; same-token re-acquire stays idempotent.
+- **LATENT CRASH** — `audio_visualizer` read-loop error path called `time.sleep`
+  but never imported `time` → NameError killed the capture thread on first error.
+  Added the import; hoisted the Hann window out of the ~86 Hz FFT loop.
+- **HONESTY + LEAK** — `custom_art_push._encode_file` ignored the CDN HTTP status
+  and never unlinked its two per-file scratch GIFs. Now checks `status != 200` and
+  unlinks both temps in a `finally`.
+
+DEFERRED (documented): `_ensure_device_async` returns the cached device without
+comparing the requested mac → a silent wrong-device write reported as success
+(HIGH, but a delicate hot-path change — needs self.mac consistency + LAN-key
+handling + churn-guard + teeth-test); wall full-canvas resize done once per device
+per tick (perf); `hot_update` in-progress guard check-then-act race. Plus standing
+HW/opencode deferrals (native C static-encoder format divergence, SPP framing
+divergences, basic-protocol RX stall).
+
+---
 ## R53 round 28: fan-out honesty + C encoder aliasing corruption (2026-06-21)
 
 (Round 27 left for opencode's parallel work — shared tree.) Fresh 3-agent
