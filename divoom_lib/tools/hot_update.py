@@ -154,7 +154,18 @@ class HotUpdate:
 
     # ── session ───────────────────────────────────────────────────────────
 
-    async def _stream_file(self, f: HotFile, start_packet: int, wait_any) -> bool:
+    async def _stream_file(self, f: HotFile, start_packet: int, wait_any) -> tuple[bool, bool]:
+        """Stream one file's packets, then serve resends until the device ends it.
+
+        Returns ``(ok, confirmed)``:
+          * ``(False, False)`` — a packet write failed (transport error).
+          * ``(True, True)``   — the device explicitly confirmed the file done, OR
+            moved on to request the next file (it accepted this one).
+          * ``(True, False)``  — every packet was written but the device went SILENT
+            (no done-ack within IDLE_DONE_TIMEOUT). The bytes were ACKed at the link
+            layer, but the device never confirmed it stored/applied the file — an
+            honest "unconfirmed", NOT a clean success (ACK ≠ device-confirmed).
+        """
         total = f.packet_count
         self.logger.info(f"hot: streaming {f.file_id} v{f.version} "
                          f"({len(f.body)}B, packets {start_packet}..{total - 1})")
@@ -162,22 +173,22 @@ class HotUpdate:
             payload = list(idx.to_bytes(2, "little")) + list(f.packet(idx))
             if not await self.divoom.send_command(_CMD_DATA, payload):
                 self.logger.error(f"hot: packet {idx} write failed")
-                return False
+                return False, False
             await asyncio.sleep(INTER_PACKET_DELAY)
         # Post-stream: serve resends until the device declares the file done.
         while True:
             got = await wait_any([_CMD_DATA, _CMD_REQUEST], timeout=IDLE_DONE_TIMEOUT)
             if got is None:
-                self.logger.warning(f"hot: no done-ack for {f.file_id}; continuing")
-                return True
+                self.logger.warning(f"hot: no done-ack for {f.file_id}; continuing (UNCONFIRMED)")
+                return True, False
             cmd, payload = got
             if cmd == _CMD_REQUEST:
-                # Device moved on already — treat as done; let caller handle it.
+                # Device moved on already — it accepted this file; let caller handle it.
                 self._pending_request = payload
-                return True
+                return True, True
             if len(payload) >= 1 and payload[0] in (1, 2):
                 self.logger.info(f"hot: device confirmed {f.file_id} done")
-                return True
+                return True, True
             if len(payload) >= 3 and payload[0] == 0:
                 idx = int.from_bytes(bytes(payload[1:3]), "little")
                 self.logger.info(f"hot: resend packet {idx}")
@@ -267,8 +278,10 @@ class HotUpdate:
                     self.logger.info(f"hot: device declined file (resp {bytes(p2).hex()})")
                     continue
                 start = int.from_bytes(bytes(p2[1:3]), "little") if len(p2) >= 3 else 0
-                if await self._stream_file(f, start, wait_any):
-                    served.append({"file_id": f.file_id, "version": f.version})
+                ok, confirmed = await self._stream_file(f, start, wait_any)
+                if ok:
+                    served.append({"file_id": f.file_id, "version": f.version,
+                                   "confirmed": confirmed})
                     if progress_cb:
                         progress_cb({"phase": "uploading", "current": len(served),
                                      "total": ok_dl, "file_id": f.file_id})
@@ -276,8 +289,13 @@ class HotUpdate:
             if isinstance(listen, set):
                 listen.difference_update({_CMD_REQUEST, _CMD_INFO, _CMD_DATA, _CMD_PAUSE})
 
+        # ACK ≠ device-confirmed: `confirmed` counts files the device positively
+        # acknowledged (done-ack or moved-on); served files that streamed but went
+        # silent are in `served` with confirmed=False. A caller that needs honesty
+        # compares confirmed against len(served).
         result = {"success": True, "served": served,
-                  "manifest": len(files), "downloaded": ok_dl}
+                  "manifest": len(files), "downloaded": ok_dl,
+                  "confirmed": sum(1 for s in served if s.get("confirmed"))}
         if progress_cb:
             progress_cb({"phase": "done", **result})
         self.logger.info(f"hot: session complete — {len(served)} file(s) served")

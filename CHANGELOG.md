@@ -5,6 +5,30 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53.x HW round: ACK ≠ device-confirmed honesty (custom-art + hot-update) (2026-06-22)
+
+Two push paths reported `success: True` on bare GATT write-with-response ACKs with
+no device-state confirmation. GATT-ACK catches a mid-stream *unreachable* device
+(the write fails), but NOT an *app-layer drop* (the device ACKs the link write then
+silently ignores the data). HW-confirmed the only confirmation channel is unusable:
+on the live Pixoo-1, **0x8E `query_page` times out at 4 s on every page and returns
+empty** — so verification is impossible and would only add a 4 s dead wait per push.
+Fix: surface the honest confirmation status instead of overstating success.
+
+- **custom-art** (`owner_art.custom_art_push`) — the success result now carries
+  `device_confirmed: False`. `success` stays `True` (writes were accepted). The GUI
+  toast (`custom_art.js`) says "sent" rather than "pushed" when unconfirmed.
+- **hot-update** (`hot_update._stream_file`) — returned a bare `True` on the
+  no-done-ack timeout, indistinguishable from a device-confirmed file. Now returns
+  `(ok, confirmed)`; each `served` entry carries `confirmed`, and the result adds a
+  `confirmed` count. A file that streamed but whose device went silent is served
+  with `confirmed: False`.
+- **Tests** — `test_silent_device_file_marked_unconfirmed` (hot-update teeth: silent
+  device → `confirmed:False`, count 0); custom-art success tests assert
+  `device_confirmed:False`; replay tests updated to assert `confirmed:True` on the
+  explicit done-ack. NOT verified via 0x8E (HW-unreliable, per above).
+
+---
 ## R53.x HW round: exclusive steal-reject — hang-then-steal fixed (2026-06-22)
 
 (HW-found on a live Pixoo-1 while validating the deferred exclusive-mode item.)

@@ -116,7 +116,16 @@ class OwnerArtMixin:
 
             if not await push_page(device, page, frames, use_new_mode=False):
                 return {"success": False, "error": "page push failed"}
-            return {"success": True, "files_pushed": len(slot_map)}
+            # ACK ≠ device-confirmed. push_page returns True once every chunk got a
+            # GATT write-with-response ACK — that catches a mid-stream unreachable
+            # device (write_with_response fails), but NOT an app-layer drop (the
+            # device ACKs the link write then silently ignores the data). The only
+            # confirmation channel, 0x8E query_page, is unreliable on real HW (Pixoo
+            # never answers — HW-verified 2026-06: all pages time out at 4s), so we
+            # do NOT verify (it would add a 4s dead wait to every push). Report the
+            # honest truth instead: writes accepted, storage not device-confirmed.
+            return {"success": True, "files_pushed": len(slot_map),
+                    "device_confirmed": False}
 
         coro = _do()
         try:

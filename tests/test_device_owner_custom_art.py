@@ -136,6 +136,9 @@ class TestCustomArtPushSuccess:
 
         assert result.get("success") is True
         assert result.get("files_pushed") == 1
+        # ACK ≠ device-confirmed: the push is GATT-accepted but storage is NOT
+        # verified (0x8E is unreliable on real HW), so the honest result must say so.
+        assert result.get("device_confirmed") is False
 
     def test_push_with_specific_slot(self, owner_with_device):
         """When slot is specified, all files go to that slot."""

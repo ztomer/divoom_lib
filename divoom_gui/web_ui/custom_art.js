@@ -248,8 +248,13 @@
             result = { success: false, error: "parse error" };
           }
           if (result && result.success) {
+            // ACK ≠ device-confirmed: the daemon reports device_confirmed:false
+            // because custom-art storage can't be verified on real HW (0x8E is
+            // unreliable). Say "sent" (writes accepted) rather than "pushed"
+            // (which overstates a confirmed result) until a device confirms.
+            const verb = result.device_confirmed === false ? "sent" : "pushed";
             window.showToast(
-              `Page ${currentPage + 1} pushed (${result.files_pushed} slot${result.files_pushed !== 1 ? "s" : ""})`,
+              `Page ${currentPage + 1} ${verb} (${result.files_pushed} slot${result.files_pushed !== 1 ? "s" : ""})`,
               "success", " BLE");
           } else {
             window.showToast("Push failed: " + (result?.error || "unknown"), "error");

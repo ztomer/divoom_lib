@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HW ROUND (2026-06-22 12:40 EDT): ACK ≠ device-confirmed honesty (Claude).** custom-art and
+  hot-update both reported `success:True` on bare GATT write-ACKs with no device confirmation.
+  HW-confirmed on Pixoo-1 that the only verification channel is unusable — **0x8E query_page
+  times out at 4 s on every page, returns empty** — so we can't verify and won't add a 4 s dead
+  wait. Fix surfaces honest status: `custom_art_push` returns `device_confirmed:False` (GUI toast
+  "sent" not "pushed"); `hot_update._stream_file` now returns `(ok, confirmed)` and each `served`
+  entry + a top-level `confirmed` count distinguishes device-confirmed files from streamed-but-
+  silent ones. Teeth: `test_silent_device_file_marked_unconfirmed`. NOT verified via 0x8E (HW-
+  unreliable). NOTE: the deeper R45 #1 "Custom Art channel empty" functional regression needs eyes
+  on the device screen (can't validate headless) — still open. Remaining HW-deferred: 0x8B
+  retransmit dead path, native C static-encoder, push smoke.
+
 - **HW ROUND (2026-06-22 12:25 EDT): exclusive steal-reject — hang-then-steal FIXED (Claude).**
   Validating the deferred exclusive-mode item on the live Pixoo-1 surfaced a real bug: a
   competing `exclusive_start` hung exactly 30 s (the `exclusive_timeout`) then SILENTLY STOLE
@@ -29,7 +41,10 @@ Claude) should read this on entry and **update it at the end of every round**
   the loop (off the dispatch queue — no device I/O in `acquire`). `exclusive_start` uses it and
   returns the honest error. HW re-validated: steal rejects in 0.00 s; idempotent re-acquire +
   post-release acquire still work. Teeth: `test_acquire_now_rejects_steal_immediately`. Suite
-  1680 green. **Working harness: the dev-daemon `.app` (`open "dist/Divoom Dev Daemon.app"`)
+  1680 green. ALSO HW-validated (no change): the **wrong-device guard** — a `device_call` with a
+  mac different from the held device does NOT silently read/write the cached device; it releases
+  + attempts the requested target and fails honestly if unreachable (`get_brightness(mac=BOGUS)`
+  → `success:false "timed out"`, never the held Pixoo's 60). **Working harness: the dev-daemon `.app` (`open "dist/Divoom Dev Daemon.app"`)
   runs live repo code under its own BLE grant — restart it to load each fix, then drive it over
   `/tmp/divoom.sock` with `DaemonClient`.** Remaining HW-deferred queue: custom-art ACK≠success,
   hot_update ACK≠success, 0x8B retransmit dead path, native C static-encoder, push smoke.

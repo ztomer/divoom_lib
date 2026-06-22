@@ -88,7 +88,9 @@ async def test_session_replays_real_ditoo_exchange(monkeypatch):
 
     result = await hu.update(device_size=16)
     assert result["success"] is True
-    assert result["served"] == [{"file_id": f.file_id, "version": 1099}]
+    # device sent an explicit done-ack (CMD_DATA [1]) → confirmed.
+    assert result["served"] == [{"file_id": f.file_id, "version": 1099, "confirmed": True}]
+    assert result["confirmed"] == 1
 
     sent = [c.args for c in divoom.send_command.await_args_list]
     cmds = [a[0] for a in sent]
@@ -130,3 +132,37 @@ async def test_session_serves_resend_requests(monkeypatch):
     data_idx = [int.from_bytes(bytes(c.args[1][:2]), "little")
                 for c in divoom.send_command.await_args_list if c.args[0] == CMD_DATA]
     assert data_idx == [0, 1, 1]  # packet 1 re-sent on request
+
+
+@pytest.mark.asyncio
+async def test_silent_device_file_marked_unconfirmed(monkeypatch):
+    """ACK ≠ device-confirmed: a file whose packets all wrote but got NO done-ack
+    (device went silent) must be served with confirmed=False, and not counted in
+    the confirmed total. Teeth: the old _stream_file returned a bare True for the
+    no-done-ack case, so served carried no confirmed flag and the silent file was
+    indistinguishable from a device-confirmed one."""
+    f = _file(body=b"\x01" * 300)  # 2 packets
+
+    divoom = MagicMock()
+    divoom.logger = MagicMock()
+    divoom.send_command = AsyncMock(return_value=True)
+    conn = MagicMock()
+    conn._listen_commands = set()
+    req = bytes((40005454).to_bytes(4, "little")) + bytes((1099).to_bytes(4, "little"))
+    conn.wait_for_any_response = AsyncMock(side_effect=[
+        (CMD_REQUEST, req),            # device asks for v1099
+        (CMD_INFO, bytes([0, 0, 0])),  # accept, start at packet 0
+        None,                          # _stream_file done-wait: device SILENT
+        None,                          # outer loop: quiet -> end session
+    ])
+    divoom._conn = conn
+
+    hu = HotUpdate(divoom)
+    monkeypatch.setattr("divoom_lib.tools.hot_update.fetch_hot_manifest", lambda dt: [f])
+    monkeypatch.setattr("divoom_lib.tools.hot_update.download_hot_file", lambda x: True)
+    monkeypatch.setattr("divoom_lib.tools.hot_update.INTER_PACKET_DELAY", 0)
+
+    result = await hu.update(device_size=16)
+    assert result["success"] is True
+    assert result["served"] == [{"file_id": f.file_id, "version": 1099, "confirmed": False}]
+    assert result["confirmed"] == 0  # streamed but NOT device-confirmed
