@@ -43,13 +43,16 @@ def test_ensure_connected_reraises_cancellation():
     assert asyncio.run(run()) == "cancelled", "CancelledError must propagate, not be retried"
 
 
-# ── Uncle Bob: iOS-LE generic ACK must not clear the response scalar ─────────
+# ── iOS-LE generic ACK clears the scalar (load-bearing for the 0x46 autoprobe) ─
+# R53.35 originally tried to KEEP the scalar on the ACK; that was HW-disproven (it
+# mis-detected real Basic devices as iOS-LE via the 0x46 probe and broke ALL
+# read-backs). The correct behavior is: the generic ACK resolves the wait.
 
-def test_ios_le_generic_ack_keeps_scalar_then_data_frame_clears_it():
+def test_ios_le_generic_ack_clears_scalar():
     from divoom_lib.ble_notify import BleNotifyMixin
     from divoom_lib import framing, models
 
-    expected = next(iter(models.GENERIC_ACK_COMMANDS))  # a command that two-frames
+    expected = next(iter(models.GENERIC_ACK_COMMANDS))  # e.g. 0x46 (the probe cmd)
 
     o = object.__new__(BleNotifyMixin)
     o._expected_response_command = expected
@@ -60,12 +63,8 @@ def test_ios_le_generic_ack_keeps_scalar_then_data_frame_clears_it():
 
     ack = framing.encode_ios_le_payload([models.GENERIC_ACK_COMMAND_ID, 0x00])
     o._handle_ios_le_notification(bytes(ack))
-    assert o._expected_response_command == expected, "the 0x33 ACK must NOT clear the scalar"
-
-    data = framing.encode_ios_le_payload([expected, 0xAB, 0xCD])
-    o._handle_ios_le_notification(bytes(data))
-    assert o._expected_response_command is None, "the real data frame clears the scalar"
-    assert o.notification_queue.qsize() == 2, "both the ack and the data frame are queued"
+    assert o._expected_response_command is None, "generic ACK must clear the scalar (autoprobe relies on it)"
+    assert o.notification_queue.qsize() == 1, "the ACK frame is queued"
 
 
 # ── Hashimoto: daemon single-instance flock guard ───────────────────────────

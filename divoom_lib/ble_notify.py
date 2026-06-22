@@ -54,16 +54,17 @@ class BleNotifyMixin:
             # listen set without consuming _expected_response_command.
             is_listened = command_identifier in getattr(self, "_listen_commands", ())
 
-            if is_listened or is_generic_ack:
-                # The generic 0x33 ACK is the FIRST of a two-frame reply for a
-                # GENERIC_ACK_COMMANDS query; wait_for_response skips it and keeps
-                # waiting for the real data frame. Do NOT clear the correlation
-                # scalar here — clearing it dropped the follow-up data frame (it
-                # then matched neither branch), so iOS-LE read-backs timed out.
-                # Matches the basic-protocol / SPP parsers, which never clear on the ack.
+            if is_listened:
                 self.notification_queue.put_nowait(response_payload)
                 return True
-            if is_expected_response:
+            if is_expected_response or is_generic_ack:
+                # NB: clearing the scalar on the generic 0x33 ACK is LOAD-BEARING
+                # for the protocol autoprobe (ble_probe sends a 0x46 probe, and 0x46
+                # is a GENERIC_ACK command). Making the ACK keep the scalar (R53.35)
+                # let the iOS-LE probe spuriously succeed on a Basic-only device →
+                # the Pixoo was mis-detected as iOS-LE and EVERY read-back timed out
+                # on real hardware. Reverted (HW-disproven). The "two-frame iOS-LE
+                # read-back" the change targeted is unverified on any real device.
                 self.notification_queue.put_nowait(response_payload)
                 self._expected_response_command = None
                 return True
