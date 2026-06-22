@@ -33,16 +33,6 @@ class WidgetsApi(ApiBase):
 
         return self._tool_call(_push, "weather")
 
-    def set_temperature_channel(self, celsius: bool = True, color: str = "#ffffff") -> bool:
-        from divoom_lib.models import COMMANDS
-
-        async def _call(d):
-            temp_type = 0 if celsius else 1
-            payload = [0x01, temp_type, 0xFF, 0xFF, 0xFF, 0x00]
-            return await d.send_command(COMMANDS["set light mode"], payload)
-
-        return self._tool_call(_call, "set_temperature_channel")
-
     def _tool_call(self, fn, label: str) -> bool:
         logger.info(f"GUI Action: Tool {label}...")
         try:

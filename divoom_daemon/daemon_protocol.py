@@ -245,12 +245,22 @@ class DaemonClient:
     def exclusive_start(self, token: str) -> dict:
         """Begin an exclusive-mode session on the daemon. Only ``device_call``
         items whose ``token`` matches ``token`` will be dispatched until
-        ``exclusive_end`` is called. Returns the daemon reply."""
-        return self.send_command("exclusive_start", {"token": token})
+        ``exclusive_end`` is called. Returns the daemon reply.
+
+        Uses the long sync read timeout, not the 2s default: the daemon-side
+        handler stops live jobs then ENQUEUES acquire behind any in-flight device
+        op (a wall 0x8B push runs 10-30s+). At 2s the client timed out while the
+        daemon went on to acquire → orphaned token + a spurious failure to the GUI,
+        wedging the device until the 30s G3 idle release."""
+        from divoom_daemon.daemon_config import load_daemon_config
+        return self.send_command("exclusive_start", {"token": token},
+                                 read_timeout=load_daemon_config().sync_read_timeout)
 
     def exclusive_end(self, token: str) -> dict:
         """End the exclusive-mode session for ``token``. Returns the daemon reply."""
-        return self.send_command("exclusive_end", {"token": token})
+        from divoom_daemon.daemon_config import load_daemon_config
+        return self.send_command("exclusive_end", {"token": token},
+                                 read_timeout=load_daemon_config().sync_read_timeout)
 
     # ── notifications (the daemon owns the single macOS monitor) ──────────
     def start_notifications(self) -> dict:

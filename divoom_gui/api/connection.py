@@ -22,7 +22,7 @@ class ConnectionApi(ApiBase):
     def scan_devices(self, timeout: float = 10.0) -> str:
         logger.info("GUI Action: Scanning for devices...")
         try:
-            client = self._client
+            client = self._client()   # method form (ConnectionApi shadows the base property)
             if client is None:
                 return json.dumps([])
             reply = client.scan(timeout=timeout, limit=4)
@@ -32,7 +32,7 @@ class ConnectionApi(ApiBase):
             return json.dumps([])
 
     def get_capabilities(self) -> str:
-        client = self._client
+        client = self._client()   # method form (ConnectionApi shadows the base property)
         if client is None:
             return json.dumps({})
         reply = client.device_call("get_capabilities", [], {}, target="device")

@@ -186,7 +186,10 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
         return self.widgets.push_weather()
 
     def set_temperature_channel(self, celsius: bool = True, color: str = "#ffffff") -> bool:
-        return self.widgets.set_temperature_channel(celsius, color)
+        # Route to LightingApi: it honors `color` and is wall-aware via _dispatch.
+        # The old WidgetsApi version hard-coded white (dropped the user's color) and
+        # only ever targeted the single active device.
+        return self.lighting.set_temperature_channel(celsius, color)
 
     def set_clock_rich(self, style: int = 0, twentyfour: bool = True,
                        humidity: bool = False, weather: bool = False,

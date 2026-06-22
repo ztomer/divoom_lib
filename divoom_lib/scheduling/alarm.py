@@ -163,7 +163,11 @@ class Alarm:
                         "hour": memorial_data[GMT_HOUR],
                         "minute": memorial_data[GMT_MINUTE],
                         "have_flag": memorial_data[GMT_HAVE_FLAG],
-                        "title_name": bytes(memorial_data[GMT_TITLE_NAME_START:GMT_TITLE_NAME_END]).decode('utf-8').strip('\x00')
+                        # errors='replace': a title cut mid-multibyte at the 32-byte
+                        # field boundary (or any non-UTF-8 device byte) otherwise
+                        # raised UnicodeDecodeError and aborted ALL memorials, unlike
+                        # the deliberately-tolerant get_alarm_time parser.
+                        "title_name": bytes(memorial_data[GMT_TITLE_NAME_START:GMT_TITLE_NAME_END]).decode('utf-8', errors='replace').strip('\x00')
                     })
             return memorials
         return None

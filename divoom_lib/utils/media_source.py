@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import urllib.request
+import urllib.parse  # quote() in fetch_album_art_url — was only bound via a urllib.request side-effect
 import json
 import logging
 from pathlib import Path

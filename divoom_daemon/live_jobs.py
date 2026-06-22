@@ -118,7 +118,10 @@ async def run_music(device_owner, mac: str, params: dict):
     fails = 0
     while True:
         try:
-            track_info = media_source.get_current_playing_track()
+            # get_current_playing_track runs up to TWO blocking osascript
+            # subprocesses (Spotify, then Music.app) — at the 1.5s music cadence
+            # that would stall the shared BLE event loop ~80×/min. Off-load it.
+            track_info = await asyncio.to_thread(media_source.get_current_playing_track)
             if track_info:
                 track = track_info.get("track")
                 artist = track_info.get("artist")
