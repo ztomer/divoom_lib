@@ -76,15 +76,35 @@ class OwnerConnectMixin:
         # dead handle the next command silently times out on.
         from divoom_lib.ble_connection import ensure_connected, BleConnectionError
         if self._device is not None:
-            # R53/HW: re-ensure on a dead-but-cached-connected link (is_alive is
-            # honest; is_connected lags True after an OS drop).
-            if not getattr(self._device, "is_alive",
-                           getattr(self._device, "is_connected", False)) \
-                    and hasattr(self._device, "connect"):
-                res = await ensure_connected(self._device)
-                if not res.ok:
-                    raise BleConnectionError(res)
-            return self._device
+            # R53.x: if a DIFFERENT known BLE target is requested than the one we
+            # hold, release it first and rebuild below — returning the cached
+            # device would drive the WRONG screen and report success (the bug
+            # _build_device_async already guards on the connect path; device_call
+            # reaches us, not that path). Scoped to real BLE macs: a LAN target
+            # isn't built here, and mac=None means "the active device".
+            req_key = (mac or "").upper() or None
+            held_key = self._current_target_key()
+            if (req_key and not req_key.startswith("LAN:")
+                    and held_key and not held_key.startswith("LAN:")
+                    and req_key != held_key):
+                logger.info("ensure target changed (%s -> %s); releasing held device",
+                            held_key, req_key)
+                try:
+                    await self._device.disconnect()
+                except Exception as e:
+                    logger.debug("ensure release-on-switch disconnect failed: %s", e)
+                self._device = None
+                self._lan_ip = None
+            else:
+                # R53/HW: re-ensure on a dead-but-cached-connected link (is_alive is
+                # honest; is_connected lags True after an OS drop).
+                if not getattr(self._device, "is_alive",
+                               getattr(self._device, "is_connected", False)) \
+                        and hasattr(self._device, "connect"):
+                    res = await ensure_connected(self._device)
+                    if not res.ok:
+                        raise BleConnectionError(res)
+                return self._device
         from divoom_lib.divoom import Divoom
         from divoom_lib.utils import discovery
         target = mac or self.mac
@@ -95,12 +115,15 @@ class OwnerConnectMixin:
             if not devs:
                 raise RuntimeError("no Divoom device found")
             target = devs[0]["address"]
-            self.mac = target
         dev = Divoom(mac=target, logger=logger, use_ios_le_protocol=False)
         res = await ensure_connected(dev)
         if not res.ok:
             raise BleConnectionError(res)
         self._device = dev
+        # Keep self.mac in lockstep with the held device so _current_target_key
+        # reflects reality — otherwise the NEXT ensure(B) would see a stale held
+        # key and disconnect/reconnect on every call (churn).
+        self.mac = target
         return self._device
 
     async def _build_device_async(self, args: dict):
