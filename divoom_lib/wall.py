@@ -250,6 +250,16 @@ class DivoomWall:
         display_tasks: list = []   # list of (slot, coro)
         skipped_slots: list = []   # slots that produced no push (counted as failures)
 
+        # Perf: the full-canvas resize depends only on (source, total_w, total_h)
+        # — it is IDENTICAL for every slot; only the per-slot crop differs. Compute
+        # it ONCE, lazily, on the first cache miss (so the all-cached fast path
+        # still does zero resizes). Without this, an N-device wall LIVE job — whose
+        # content changes every tick, so the byte-hash cache misses every tick —
+        # re-decoded+resized the whole canvas N times per tick (for a GIF: N × all
+        # frames).
+        resized_static = None          # PIL.Image for the static path
+        resized_frames: list | None = None  # list[PIL.Image] for the animated path
+
         for slot in self.devices:
             divoom = slot.device
             x = slot.x
@@ -279,9 +289,16 @@ class DivoomWall:
             else:
                 self.logger.info(f"Cropping slots bounding box: Left={left}, Upper={upper}, Right={right}, Lower={lower}")
                 if is_ani:
+                    # Resize every source frame to the full canvas ONCE (shared
+                    # across slots); per slot we only crop (and, free-form, resize
+                    # the crop to the panel).
+                    if resized_frames is None:
+                        resized_frames = [
+                            f.resize((self.total_width, self.total_height), Image.NEAREST)
+                            for f in ImageSequence.Iterator(main_img)
+                        ]
                     frames = []
-                    for frame in ImageSequence.Iterator(main_img):
-                        resized_frame = frame.resize((self.total_width, self.total_height), Image.NEAREST)
+                    for resized_frame in resized_frames:
                         cropped_frame = resized_frame.crop((left, upper, right, lower))
                         if self.is_free_form:
                             cropped_frame = cropped_frame.resize((size, size), Image.NEAREST)
@@ -306,8 +323,10 @@ class DivoomWall:
                         loop=main_img.info.get('loop', 0)
                     )
                 else:
-                    resized_img = main_img.resize((self.total_width, self.total_height), Image.NEAREST)
-                    cropped_img = resized_img.crop((left, upper, right, lower))
+                    if resized_static is None:
+                        resized_static = main_img.resize(
+                            (self.total_width, self.total_height), Image.NEAREST)
+                    cropped_img = resized_static.crop((left, upper, right, lower))
                     if self.is_free_form:
                         cropped_img = cropped_img.resize((size, size), Image.NEAREST)
                     cropped_img.save(cached_file_path)

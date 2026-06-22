@@ -165,17 +165,38 @@ class OwnerArtMixin:
         with self._hot_progress_lock:
             return dict(self._hot_progress)
 
+    # Phases during which a new hot update must be refused. "starting" is included
+    # so a second call can't slip through the window between the claim and the
+    # first download (the old guard omitted it AND did a non-atomic check-then-set,
+    # so two socket-handler threads could both launch and clobber each other's
+    # progress). _try_begin_hot_update claims the slot atomically under the lock.
+    _HOT_ACTIVE_PHASES = ("starting", "fetching_manifest", "downloading", "uploading")
+
+    def _try_begin_hot_update(self) -> bool:
+        with self._hot_progress_lock:
+            if self._hot_progress.get("phase") in self._HOT_ACTIVE_PHASES:
+                return False
+            self._hot_progress = {"phase": "starting"}
+            return True
+
+    def _clear_stuck_starting(self) -> None:
+        """If the fire-and-forget _do() never ran (its queue item expired/cancelled
+        under a held exclusive session), 'starting' would wedge ALL future hot
+        updates now that it's in the active set. Reset it to a terminal error."""
+        with self._hot_progress_lock:
+            if self._hot_progress.get("phase") == "starting":
+                self._hot_progress = {"phase": "error",
+                                      "error": "hot update did not start (queue timeout)"}
+
     def hot_update(self, args: dict) -> dict:
         """Start a HOT channel update in the background and return immediately.
         Call ``hot_update_progress({})`` to poll progress."""
         device_size = int(args.get("device_size", 16) or 16)
         show = bool(args.get("show", True))
 
-        if self._get_hot_progress().get("phase") in (
-                "fetching_manifest", "downloading", "uploading"):
+        # Atomic claim: refuses concurrent starts (incl. the "starting" window).
+        if not self._try_begin_hot_update():
             return {"success": False, "error": "hot update already in progress"}
-
-        self._set_hot_progress({"phase": "starting"})
 
         async def _do():
             try:
@@ -192,7 +213,23 @@ class OwnerArtMixin:
 
         if self._cmd_queue is None:
             self._device_loop()
-        self._cmd_queue.submit(_do())
+        fut = self._cmd_queue.submit(_do())
+
+        def _on_done(f):
+            # _do() catches its own errors (→ "done"/"error"); a future exception
+            # here means the QUEUE expired/cancelled the item before _do() ran, so
+            # the phase is stuck "starting" — clear it so it can't wedge.
+            try:
+                failed = f.cancelled() or f.exception() is not None
+            except Exception:
+                failed = True
+            if failed:
+                self._clear_stuck_starting()
+
+        try:
+            fut.add_done_callback(_on_done)
+        except Exception:
+            pass
         return {"success": True, "started": True}
 
     def hot_update_progress(self, args: dict) -> dict:
