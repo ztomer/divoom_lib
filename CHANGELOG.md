@@ -5,6 +5,31 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 34: mcp NameError + notification health + config reload + SIGTERM (2026-06-22)
+
+(Commit `1eb0a27`.) Persona pass over the LEAST-reviewed corners — not clean. Bob
+and Linus INDEPENDENTLY CONVERGED on the same HIGH. Teeth-tested, suite 1673 green.
+
+- **HIGH (Bob+Linus)** — `mcp_tools.get_capabilities` used `dataclasses` with no
+  module-level import → NameError on a real Divoom (the DaemonDeviceProxy path masked
+  it). Added the import.
+- **HIGH (Hashimoto)** — the macOS notification monitor swallowed a sustained DB-read
+  failure as "no new rows" → thread alive, status ACTIVE, feature silently deaf. Now a
+  failure streak → `health_error` → STATE_ERROR (same "alive != working" class as the
+  menubar-reader / fd-leak fixes).
+- **MEDIUM (Hashimoto)** — `monthly_best_daemon --use-config` bound its params once
+  before the loop → GUI edits ignored until restart. Now re-reads config each cycle.
+- **LOW (Hashimoto)** — daemon had no SIGTERM handler → the production stop path skipped
+  cleanup (BLE not disconnected, monitor not joined). Routed through the clean path.
+- **Residual TOCTOU** — `_stamp_live_health` did `if mac in act: act[mac]` (KeyError if
+  another thread pops the key); switched to atomic `.get()`. Caught by the R53.32 stress
+  test failing under full-suite load.
+
+SPLIT: the health additions pushed macos_notifications.py over the 500-LOC cap →
+extracted the routing concern (DEFAULT_ROUTING / load-save-validate / MacAppRouter) into
+`notification_router.py` (re-exported). macos_notifications.py 370 LOC, router 177.
+
+---
 ## R53 round 33: poller off-loads + push_text size + hot_update submit guard (2026-06-22)
 
 (Commit `fc9bd87`.) Persona pass — **Linus + Carmack came back CLEAN** (convergence;

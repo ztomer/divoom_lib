@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 34 (2026-06-22): least-reviewed corners — NOT clean (Claude).**
+  Commit `1eb0a27`, teeth-tested, suite 1673 green. Bob+Linus CONVERGED on a HIGH:
+  mcp_tools.get_capabilities used `dataclasses` with no module-level import → NameError on a
+  real device. Hashimoto found 3: (HIGH) notification monitor goes silently deaf on a sustained
+  DB failure while status lies ACTIVE → now health_error→STATE_ERROR; (MEDIUM) monthly_best
+  --use-config never reloaded config in-loop → now re-reads each cycle; (LOW) no SIGTERM handler
+  → cleanup skipped on the production stop path. Plus a residual `_stamp_live_health` TOCTOU
+  (.get() now) caught by the R53.32 stress test under load. SPLIT macos_notifications.py (over
+  500 LOC after the health additions) → routing concern moved to notification_router.py
+  (re-exported); 370/177 LOC. LESSON (again): "convergence near" was wrong — the least-traveled
+  modules (mcp, notification monitor, headless daemons, signal handling) still hid real bugs,
+  incl. a HIGH found by two lenses. HW deferrals unchanged.
+
 - **R53 ADVERSARIAL LOOP — ROUND 33 (2026-06-22): poller off-loads + 2 niche bugs (Claude).**
   Persona pass — Linus + Carmack CLEAN (2/4 lenses found nothing; convergence signal). Commit
   `fc9bd87`, teeth-tested, suite 1671 green: (PERF) off-loaded the 3 pure poller fetches
