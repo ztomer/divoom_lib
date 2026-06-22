@@ -5,6 +5,32 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53.x HW round: 0x8B animation retransmit dead-path fixed (2026-06-22)
+
+The 0x8B animation streamer set `_expected_response_command = 0x8B` before START,
+but `_await_8b_device_ready`'s `wait_for_response` CLEARS the scalar on the start-ACK
+match. For the entire chunk loop AND the retransmit window the scalar was therefore
+None, and 0x8B is not a generic-ACK command — so the notification handler DROPPED
+every unsolicited 0x8B retransmit request. `_serve_8b_retransmits` then waited 1 s on
+an empty queue and returned "done": a device-requested re-send was silently lost, the
+chunk never recovered, and the stream STILL returned True (ACK ≠ success).
+
+- **Fix** — `stream_animation_8b` adds 0x8B to `_listen_commands` for the stream's
+  duration (removed in `finally`). The handler's `is_listened` branch queues those
+  frames WITHOUT consuming the scalar, so `_serve_8b_retransmits` can actually serve
+  them. Purely additive: the happy path (no retransmits) is unchanged.
+- **HW-validated** — pushed a 2-frame test GIF to the live Pixoo-1 via
+  `display.show_image`: device replied "requested the animation (start ACK)", the
+  chunk streamed, the retransmit phase went quiet, push returned True. The fix does
+  not perturb the working push (the deferral's key concern).
+- **Tests** — `test_stream_listens_for_0x8b_during_stream_and_cleans_up` (wiring:
+  0x8B present during stream, removed after); `test_listened_0x8b_retransmit_queues_
+  without_consuming_scalar` (mechanism: listened 0x8B queues + scalar untouched;
+  not-listening drops it — the bug). The pre-existing retransmit test mocked
+  `wait_for_response` directly, so it never exercised the real handler/queue — which
+  is why it didn't catch this.
+
+---
 ## R53.x HW round: ACK ≠ device-confirmed honesty (custom-art + hot-update) (2026-06-22)
 
 Two push paths reported `success: True` on bare GATT write-with-response ACKs with

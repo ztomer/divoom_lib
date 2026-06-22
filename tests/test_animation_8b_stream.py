@@ -153,3 +153,71 @@ async def test_stream_clears_expected_response_command_on_success():
         ok = await anim.stream_animation_8b(bytes(300))
     assert ok is True
     assert comm._expected_response_command is None, "scalar leaked after successful stream"
+
+
+# ── R53.x HW: 0x8B retransmit dead-path fix ──────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_stream_listens_for_0x8b_during_stream_and_cleans_up():
+    """The retransmit window runs with _expected_response_command == None (the
+    start-ACK wait cleared it). Without 0x8B in _listen_commands the real handler
+    DROPS every unsolicited retransmit request, so the streamer must LISTEN for
+    0x8B for the stream's duration and remove it afterward.
+
+    Teeth: drop the `_listen.add(...)` and seen_during is all-False; drop the
+    `_listen.discard(...)` and 0x8B leaks into _listen_commands after the stream."""
+    cmd8b = COMMANDS["app new send gif cmd"]
+    comm = MagicMock()
+    comm.logger = MagicMock()
+    comm.lan = None
+    comm.use_spp = False
+    comm.send_command = AsyncMock(return_value=True)
+    comm._expected_response_command = None
+    comm._listen_commands = set()  # a REAL set so the fix engages (isinstance check)
+
+    seen_during = []
+
+    async def _wait(cmd, timeout):
+        seen_during.append(cmd8b in comm._listen_commands)
+        return None  # device quiet → ready-wait falls back, retransmit phase ends
+
+    comm.wait_for_response = _wait
+    anim = Animation(comm)
+    with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
+        ok = await anim.stream_animation_8b(bytes(300))
+    assert ok is True
+    assert any(seen_during), "0x8B must be in _listen_commands DURING the stream"
+    assert cmd8b not in comm._listen_commands, "0x8B must be removed after the stream"
+
+
+def test_listened_0x8b_retransmit_queues_without_consuming_scalar():
+    """The mechanism the fix relies on: with the scalar cleared mid-stream, a 0x8B
+    frame survives ONLY because it's in _listen_commands (the handler is_listened
+    branch queues it without touching the scalar). Not-listening = dropped = the bug."""
+    import asyncio
+    import logging
+    from divoom_lib.ble_notify import BleNotifyMixin
+    from divoom_lib import framing
+
+    cmd8b = COMMANDS["app new send gif cmd"]
+    frame = bytes(framing.encode_ios_le_payload([cmd8b, 0x01, 0x05, 0x00]))  # "resend chunk 5"
+
+    def _mk(listen):
+        o = object.__new__(BleNotifyMixin)
+        o._expected_response_command = None  # cleared by the start-ACK wait
+        o.notification_queue = asyncio.Queue()
+        o._listen_commands = listen
+        o.use_ios_le_protocol = True
+        o.logger = logging.getLogger("t8b")
+        return o
+
+    listening = _mk({cmd8b})
+    listening._handle_ios_le_notification(frame)
+    assert listening.notification_queue.qsize() == 1, "listened 0x8B must be queued"
+    assert listening._expected_response_command is None, "listening must not touch the scalar"
+
+    # teeth: not listening → the retransmit request is silently dropped (the bug)
+    not_listening = _mk(set())
+    not_listening._handle_ios_le_notification(frame)
+    assert not_listening.notification_queue.qsize() == 0

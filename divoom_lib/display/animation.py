@@ -167,8 +167,22 @@ class Animation(AnimationUserDefine):
         # handler sees expected_cmd=None, the device's ACK is lost, and we
         # sleep the full timeout before sending data — ~3.5s dead air which
         # exceeds the device's internal spinner timeout (~1-2s).
+        _cmd_8b = COMMANDS["app new send gif cmd"]
+        # R53.x HW: LISTEN for 0x8B for the whole stream. _await_8b_device_ready's
+        # wait_for_response CLEARS the scalar on the start-ACK match, so for the chunk
+        # loop AND the retransmit window _expected_response_command is None — and 0x8B
+        # is not a generic-ACK command, so without it in _listen_commands the
+        # notification handler DROPS every unsolicited retransmit request. The device's
+        # "re-send chunk N" was then lost, the chunk never recovered, and the stream
+        # STILL returned True (ACK != success). Listening queues those frames WITHOUT
+        # consuming the scalar (handler is_listened branch), so _serve_8b_retransmits
+        # can actually serve them. Scoped to the stream; removed in finally.
+        _listen = getattr(self.communicator, "_listen_commands", None)
+        _listening_8b = is_ble and isinstance(_listen, set)
         if is_ble and hasattr(self.communicator, '_expected_response_command'):
-            self.communicator._expected_response_command = COMMANDS["app new send gif cmd"]
+            self.communicator._expected_response_command = _cmd_8b
+        if _listening_8b:
+            _listen.add(_cmd_8b)
 
         try:
             if not await self.app_new_send_gif_cmd(
@@ -218,6 +232,8 @@ class Animation(AnimationUserDefine):
             # handshake is unchanged — this only guarantees cleanup on exit.
             if is_ble and hasattr(self.communicator, '_expected_response_command'):
                 self.communicator._expected_response_command = None
+            if _listening_8b:
+                _listen.discard(_cmd_8b)
 
     async def _await_8b_device_ready(self, timeout: float = 3.0) -> bool:
         """Wait for the device's 0x8b response with ``payload[0] == 0`` —

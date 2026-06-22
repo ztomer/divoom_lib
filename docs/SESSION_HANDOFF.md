@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HW ROUND (2026-06-22 12:43 EDT): 0x8B animation retransmit dead-path FIXED (Claude).** The
+  0x8B streamer set the response scalar to 0x8B before START, but the start-ACK wait CLEARS it —
+  so for the chunk loop + retransmit window the scalar was None and 0x8B isn't a generic-ACK, so
+  the handler DROPPED every unsolicited retransmit request; `_serve_8b_retransmits` then timed out
+  "done" and a lost chunk was silently unrecoverable (stream still returned True). Fix:
+  `stream_animation_8b` adds 0x8B to `_listen_commands` for the stream (removed in finally) so the
+  handler's is_listened branch queues retransmit frames without consuming the scalar. HW-validated:
+  pushed a 2-frame test GIF to Pixoo-1 (`display.show_image`) — device start-ACKed, chunk streamed,
+  retransmit phase quiet, push True; the working push is NOT perturbed. Teeth: wiring + handler-
+  mechanism tests (the old retransmit test mocked wait_for_response, never hit the real handler).
+  Remaining HW-deferred: native C static-encoder; SPP/live-job-double-poller NOT testable on this
+  BLE-only fleet.
+
 - **HW ROUND (2026-06-22 12:40 EDT): ACK ≠ device-confirmed honesty (Claude).** custom-art and
   hot-update both reported `success:True` on bare GATT write-ACKs with no device confirmation.
   HW-confirmed on Pixoo-1 that the only verification channel is unusable — **0x8E query_page
