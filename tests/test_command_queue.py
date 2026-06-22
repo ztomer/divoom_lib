@@ -167,6 +167,35 @@ async def test_exclusive_token_none_with_exclusive_active(loop, queue):
     assert history == ["x1", "x2", "none"], f"Got {history}"
 
 
+def test_acquire_now_rejects_steal_immediately(loop, queue):
+    """A foreign-token acquire must be REJECTED immediately, not block on the
+    idle deadline and then silently steal.
+
+    Teeth: the pre-fix daemon routed acquire through ``submit()`` with the
+    foreign token, so ``_dequeue`` gated it out (it only dispatches the owner's
+    items) — ``acquire``'s "held by another session" raise was unreachable and
+    the steal was "handled" only by the 30 s G3 force-release (which then let the
+    thief WIN). ``acquire_now`` runs ``acquire`` straight on the loop, so the
+    RuntimeError fires now and the owner is NOT stolen. If ``acquire_now`` were
+    reverted to the ``submit()`` path this raises ``TimeoutError`` after the full
+    result timeout (or steals) — either way the assertions below fail."""
+    import time
+
+    queue.acquire_now("A")
+    assert queue._exclusive_owner == "A"
+
+    t0 = time.monotonic()
+    with pytest.raises(RuntimeError, match="held by another session"):
+        queue.acquire_now("B")
+    elapsed = time.monotonic() - t0
+    assert elapsed < 2.0, f"steal-reject must be immediate, took {elapsed:.1f}s"
+    assert queue._exclusive_owner == "A", "the slot must NOT be stolen by B"
+
+    # same-token re-acquire stays idempotent (re-arms the deadline, no raise)
+    queue.acquire_now("A")
+    assert queue._exclusive_owner == "A"
+
+
 # ── G3: exclusive auto-release (orphaned owner) ─────────────────────────────
 
 

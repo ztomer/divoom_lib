@@ -5,6 +5,35 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53.x HW round: exclusive steal-reject — hang-then-steal fixed (2026-06-22)
+
+(HW-found on a live Pixoo-1 while validating the deferred exclusive-mode item.)
+A competing `exclusive_start` did NOT cleanly reject — it hung for **exactly 30 s**
+(the `exclusive_timeout`) and then **silently stole** the lock, reporting
+`success: true`.
+
+- **Root cause** — `exclusive_start` acquired the slot by submitting
+  `acquire(token)` THROUGH the gated command queue (`_run_device(..., token=token)`).
+  A lock-acquire must not be gated by the lock it seeks: while a different session
+  owned the slot, `_dequeue` (which only dispatches the owner's items) never ran the
+  foreign-token `acquire`, so `acquire`'s clean `RuntimeError("device is exclusively
+  held by another session")` was unreachable. The request blocked until the G3 idle
+  deadline force-released the real owner, then the waiter acquired — a 30 s hang that
+  resolved as a silent steal.
+- **Fix** — new `CommandQueue.acquire_now(token)` runs `acquire` directly on the loop
+  (off the dispatch queue); `acquire` only touches `_cond` + `_exclusive_owner` (no
+  device I/O), so it's safe off-queue. `exclusive_start` now calls it and returns the
+  honest error on a foreign owner. The existing stop-active-live-jobs-first ordering
+  (R53.10) is preserved for the success path.
+- **HW re-validation** — on the live Pixoo-1: a steal now rejects in **0.00 s** with
+  `device is exclusively held by another session`; idempotent re-acquire and
+  post-release acquire both still work.
+- **Tests** — `test_acquire_now_rejects_steal_immediately` (teeth: the old `submit()`
+  path raises `TimeoutError` after the result timeout / steals — both fail the
+  assertions); `test_exclusive_stops_jobs` fakes updated to the `acquire_now` contract.
+  Suite 1680 green.
+
+---
 ## R53.x REVERT: R53.35 iOS-LE ACK change — HW-disproven on real Pixoo (2026-06-22)
 
 (Commit `b1e9770`; hardware-validated 12:07 EDT.) R53.35 changed

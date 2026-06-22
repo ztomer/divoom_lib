@@ -375,6 +375,24 @@ class CommandQueue:
             self._arm_exclusive_deadline()
             self._cond.notify_all()
 
+    def acquire_now(self, token: Any, timeout: float = 10.0) -> None:
+        """Acquire the exclusive slot synchronously, OFF the dispatch queue.
+
+        A lock-acquire must NOT be routed through the lock's own gate. When a
+        different session owns the slot, a foreign-token ``acquire`` submitted via
+        ``submit()`` can never be dequeued (``_dequeue`` only dispatches the
+        owner's items), so ``acquire``'s clean "held by another session" raise is
+        unreachable — instead the caller blocks for the full idle deadline and the
+        G3 force-release then lets it SILENTLY STEAL the slot. (HW-confirmed: a
+        competing ``exclusive_start`` hung exactly 30 s, then stole and reported
+        success.) Running ``acquire`` directly on the loop surfaces the rejection
+        immediately. ``acquire`` only touches ``_cond`` + ``_exclusive_owner`` (no
+        device I/O), so it is safe to run off the dispatch queue. Thread-safe; must
+        NOT be called from the queue's own loop thread (it blocks on the result).
+        """
+        return asyncio.run_coroutine_threadsafe(
+            self.acquire(token), self._loop).result(timeout=timeout)
+
     async def release(self, token: Any) -> None:
         async with self._cond:
             if self._exclusive_owner == token:

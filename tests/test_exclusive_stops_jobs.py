@@ -17,16 +17,20 @@ from divoom_daemon.device_owner import DeviceOwner
 
 
 class _Queue:
-    def acquire(self, token):
-        async def _a():
-            return None
-        return _a()
+    # exclusive_start acquires OFF the dispatch queue via acquire_now (a lock-acquire
+    # must not be gated by the lock it seeks — see CommandQueue.acquire_now). A foreign
+    # owner would raise here; this fake always grants.
+    def __init__(self):
+        self.acquired = []
+
+    def acquire_now(self, token):
+        self.acquired.append(token)
+        return None
 
 
 def _owner():
     o = DeviceOwner.__new__(DeviceOwner)
     o._cmd_queue = _Queue()
-    o._run_device = lambda coro, token=None: coro.close()   # close the acquire coro
     return o
 
 
@@ -36,6 +40,7 @@ def test_exclusive_start_stops_active_live_jobs():
     o.live_jobs_stop_for = lambda args: calls.append(args) or {"success": True, "stopped": 1}
     r = o.exclusive_start({"token": "art-token"})
     assert calls == [{}], "exclusive_start must stop the active device's live jobs"
+    assert o._cmd_queue.acquired == ["art-token"], "must acquire off-queue via acquire_now"
     assert r["success"] is True and r["token"] == "art-token"
 
 

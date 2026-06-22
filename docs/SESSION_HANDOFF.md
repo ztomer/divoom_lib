@@ -18,6 +18,22 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HW ROUND (2026-06-22 12:25 EDT): exclusive steal-reject — hang-then-steal FIXED (Claude).**
+  Validating the deferred exclusive-mode item on the live Pixoo-1 surfaced a real bug: a
+  competing `exclusive_start` hung exactly 30 s (the `exclusive_timeout`) then SILENTLY STOLE
+  the lock and reported success. Root cause: `exclusive_start` acquired by submitting
+  `acquire(token)` through the GATED queue — a lock-acquire gated by the lock it seeks. The
+  foreign-token `acquire` never dispatched (the gate only runs the owner's items), so the clean
+  "held by another session" reject was unreachable; the G3 idle deadline force-released the real
+  owner and the waiter stole. Fix: `CommandQueue.acquire_now(token)` runs `acquire` straight on
+  the loop (off the dispatch queue — no device I/O in `acquire`). `exclusive_start` uses it and
+  returns the honest error. HW re-validated: steal rejects in 0.00 s; idempotent re-acquire +
+  post-release acquire still work. Teeth: `test_acquire_now_rejects_steal_immediately`. Suite
+  1680 green. **Working harness: the dev-daemon `.app` (`open "dist/Divoom Dev Daemon.app"`)
+  runs live repo code under its own BLE grant — restart it to load each fix, then drive it over
+  `/tmp/divoom.sock` with `DaemonClient`.** Remaining HW-deferred queue: custom-art ACK≠success,
+  hot_update ACK≠success, 0x8B retransmit dead path, native C static-encoder, push smoke.
+
 - **HARDWARE VALIDATION (2026-06-22 12:07 EDT): R53.35 iOS-LE ACK change REVERTED — read-backs
   fixed on the real Pixoo (Claude).** Commit `b1e9770`. On a live Pixoo-1, ALL read-backs
   (`device.get_brightness`, `device.get_device_name`) had regressed to a 5.26 s timeout → `null`

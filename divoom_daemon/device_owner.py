@@ -136,12 +136,18 @@ class DeviceOwner(OwnerArtMixin, OwnerConnectMixin, OwnerLiveMixin, OwnerLoopMix
         except Exception as e:
             logger.debug("stop live jobs on exclusive_start: %s", e)
         try:
-            # Submit acquire WITH the token so it passes the exclusive-mode
-            # gate on the queue's worker side.
-            self._run_device(self._cmd_queue.acquire(token), token=token)
+            # Acquire OFF the dispatch queue (acquire_now). Routing the acquire
+            # through the gated queue meant a FOREIGN token could never be
+            # dispatched while the current owner held — so instead of a clean
+            # "held by another session" reject, a competing exclusive_start blocked
+            # for the full 30s idle deadline and then SILENTLY STOLE the slot
+            # (HW-confirmed). acquire_now surfaces the rejection immediately.
+            self._cmd_queue.acquire_now(token)
             return {"success": True, "token": token}
         except Exception as e:
-            logger.warning(f"exclusive_start failed: {e}")
+            # A foreign-owner reject is expected contention, not a fault — log at
+            # info and return the honest error so the second session can back off.
+            logger.info("exclusive_start rejected (%s): %s", token, e)
             return {"success": False, "error": str(e)}
 
     def exclusive_end(self, _args: dict) -> dict:
