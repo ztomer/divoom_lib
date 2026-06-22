@@ -66,6 +66,12 @@ class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
 
     def _wire_collaborators(self):
         _state = lambda: self.__dict__
+        # Expose the active-device-size resolver to collaborators through the shared
+        # state dict. It's a METHOD (on MediaSyncMixin), so it isn't in __dict__ by
+        # default → LightingApi._device_size's `_state.get("_active_device_size")`
+        # always missed and push_text rendered text at the 16px fallback on every
+        # non-16px device. Storing the bound method here makes the lookup resolve.
+        self.__dict__["_active_device_size"] = self._active_device_size
         _dc = lambda: self._daemon_client
         self.connection = ConnectionApi(self.loop_thread, _dc, _state)
         self.lighting = LightingApi(self.loop_thread, _dc, _state)

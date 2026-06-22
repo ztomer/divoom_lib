@@ -61,7 +61,10 @@ async def run_sysmon(device_owner, mac: str, params: dict):
     fails = 0
     while True:
         try:
-            stats = media_source.get_system_stats()
+            # psutil read off the BLE event loop (render is a fast small-canvas
+            # PIL op writing a shared scratch path — left on-loop so concurrent
+            # device pollers can't race that file).
+            stats = await asyncio.to_thread(media_source.get_system_stats)
             frame_path = media_source.render_system_stats_frame(stats, size=size)
             await push_image_to_device(device_owner, mac, params, frame_path)
             fails = 0
@@ -82,7 +85,7 @@ async def run_stocks(device_owner, mac: str, params: dict):
     fails = 0
     while True:
         try:
-            data = media_source.fetch_stock_ticker(symbol)
+            data = await asyncio.to_thread(media_source.fetch_stock_ticker, symbol)  # urllib off the loop
             if data:
                 frame_path = media_source.render_stock_ticker_frame(symbol, data, size=size)
                 await push_image_to_device(device_owner, mac, params, frame_path)
@@ -126,7 +129,7 @@ async def run_music(device_owner, mac: str, params: dict):
                 track = track_info.get("track")
                 artist = track_info.get("artist")
                 if track != last_track or artist != last_artist:
-                    art_url = media_source.fetch_album_art_url(track, artist)
+                    art_url = await asyncio.to_thread(media_source.fetch_album_art_url, track, artist)
                     if art_url:
                         out_path = media_source.render_and_downsample_artwork(art_url, size=size)
                         if out_path and out_path.exists():

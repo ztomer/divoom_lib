@@ -213,7 +213,17 @@ class OwnerArtMixin:
 
         if self._cmd_queue is None:
             self._device_loop()
-        fut = self._cmd_queue.submit(_do())
+        try:
+            fut = self._cmd_queue.submit(_do())
+        except Exception as e:
+            # submit() can raise (QueueStopped mid-restart, QueueFull) BEFORE
+            # returning a future → add_done_callback never attaches and _do() never
+            # runs, so the just-claimed "starting" phase (now in the active set)
+            # would reject EVERY future hot_update for the daemon's lifetime. Clear
+            # the claim and surface the error instead of wedging the feature.
+            self._clear_stuck_starting()
+            logger.warning(f"hot_update submit failed: {e}")
+            return {"success": False, "error": str(e)}
 
         def _on_done(f):
             # _do() catches its own errors (→ "done"/"error"); a future exception
