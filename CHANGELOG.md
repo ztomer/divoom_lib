@@ -5,6 +5,33 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53.x REVERT: R53.35 iOS-LE ACK change — HW-disproven on real Pixoo (2026-06-22)
+
+(Commit `b1e9770`; hardware-validated 12:07 EDT.) R53.35 changed
+`_handle_ios_le_notification` to KEEP `_expected_response_command` on the generic
+0x33 ACK (intending to preserve a two-frame iOS-LE read-back). On a live Pixoo-1
+this broke EVERY read-back: `device.get_brightness` / `device.get_device_name`
+timed out at 5.26 s → `null` while writes still worked.
+
+- **Root cause** — clearing the scalar on the ACK is **load-bearing** for the
+  protocol autoprobe. `ble_probe` sends a 0x46 query and `0x46 ∈
+  GENERIC_ACK_COMMANDS`; with the scalar kept, the iOS-LE probe spuriously
+  "succeeded" on the Basic-only Pixoo → the device was mis-detected as iOS-LE →
+  all subsequent read-backs waited on the wrong framing and timed out.
+- **Fix** — reverted to `self._expected_response_command = None` on the generic
+  ACK. The 0x46 probe now correctly fails over to Basic framing.
+- **HW re-validation** — via the granted dev-daemon `.app` (live repo code, owns
+  the Bluetooth grant): `device.get_brightness` → `60` in **0.06 s** (was 5.26 s
+  → null); `device.get_device_name` → fast 0.06 s response.
+- **Tests** — `test_ios_le_generic_ack_clears_scalar` (round35) and the
+  `test_base` assertion restored to expect the scalar cleared, both commented as
+  load-bearing for the autoprobe. Suite 1679 green.
+- **Lesson** — 1679 mocked unit tests can't catch an autoprobe regression that
+  only manifests against real BLE framing (Hyrum's law: the scalar-clear was
+  load-bearing for protocol detection). The targeted "two-frame iOS-LE read-back"
+  remains unverified on any real device.
+
+---
 ## R53 round 36: hot-enable byte + GIF zero-duration + temp validate + MCP write (2026-06-22)
 
 (Commit `29a84d3`.) Persona pass over the last un-reviewed Python (display dispatch,

@@ -18,6 +18,24 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HARDWARE VALIDATION (2026-06-22 12:07 EDT): R53.35 iOS-LE ACK change REVERTED — read-backs
+  fixed on the real Pixoo (Claude).** Commit `b1e9770`. On a live Pixoo-1, ALL read-backs
+  (`device.get_brightness`, `device.get_device_name`) had regressed to a 5.26 s timeout → `null`
+  while writes worked. Root cause: R53.35 made `_handle_ios_le_notification` KEEP the
+  `_expected_response_command` scalar on the generic 0x33 ACK. Clearing it is **load-bearing** for
+  the protocol autoprobe — `ble_probe` sends a 0x46 query (0x46 ∈ GENERIC_ACK_COMMANDS); keeping
+  the scalar let the iOS-LE probe spuriously "succeed" on the Basic-only Pixoo → mis-detected as
+  iOS-LE → every read-back timed out. The revert restores `self._expected_response_command = None`
+  on the ACK; the 0x46 probe now correctly fails over to Basic. **Re-validated on hardware via the
+  granted dev-daemon `.app`** (`dist/Divoom Dev Daemon.app`, thin launcher → live repo code, owns
+  the Bluetooth TCC grant): `device.get_brightness` → `60` in **0.06 s** (was 5.26 s → null);
+  `device.get_device_name` → fast 0.06 s response. Lesson: 1679 mocked unit tests can't catch an
+  autoprobe regression that only manifests against real BLE framing — a Hyrum's-law case where the
+  scalar-clear was load-bearing for protocol detection. The R53.35 "two-frame iOS-LE read-back" the
+  change targeted remains unverified on ANY real device. NB: to drive HW from Claude, launch the
+  dev-daemon `.app` (`open "dist/Divoom Dev Daemon.app"`) — it runs BLE under its own grant, unlike
+  the Bash tool (TCC SIGABRT).
+
 - **R53 ADVERSARIAL LOOP — ROUND 36 (2026-06-22): last un-reviewed Python — all LOW (Claude).**
   Commit `29a84d3`, teeth-tested, suite 1679 green. Pass over display dispatch / media decode /
   MCP server / CLI. ALL FOUR findings LOW/latent/cosmetic (real convergence): show_clock(hot=True)
@@ -33,7 +51,9 @@ Claude) should read this on entry and **update it at the end of every round**
   double-spawn clobbered the socket + orphaned the BLE owner; added a flock guard in run() so
   the loser exits cleanly. (MEDIUM Bob) iOS-LE notification parser cleared the response scalar on
   the 0x33 generic ACK → dropped the real data frame → iOS-LE read-backs timed out; now the ACK
-  is queued without clearing (matches basic/SPP); updated the test that codified the bug. (MEDIUM
+  is queued without clearing (matches basic/SPP); updated the test that codified the bug.
+  **[REVERTED `b1e9770` — HW-disproven: keeping the scalar broke the 0x46 autoprobe → ALL
+  read-backs timed out on the real Pixoo. See the HARDWARE VALIDATION entry at the top.]** (MEDIUM
   Linus) ensure_connected caught BaseException → swallowed CancelledError → broke cooperative
   teardown; now re-raises. HW deferrals unchanged. NOTE: shell test runs occasionally hit a native
   IOBluetooth/PyObjC crash (the known TCC issue) when a subset imports BLE modules — the FULL
