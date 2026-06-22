@@ -5,6 +5,24 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 36: hot-enable byte + GIF zero-duration + temp validate + MCP write (2026-06-22)
+
+(Commit `29a84d3`.) Persona pass over the last un-reviewed Python (display dispatch,
+media decode, MCP server, CLI). ALL four findings are LOW / latent / cosmetic — a
+genuine convergence signal. Teeth-tested, suite 1679 green.
+
+- **LOW-MED (Bob)** — Display.show_clock(hot=True) sent 0x26 with an empty payload,
+  omitting the mandatory enable byte → hot mode unreliable. Now sends [BOOLEAN_TRUE]
+  (latent: no production caller passes hot=True).
+- **LOW (Linus)** — process_image kept a present-but-zero GIF frame duration (`.get(k,
+  default)` only fills an absent key) → _clamp_ms floored it to 1ms → strobe. Now
+  `.get("duration") or default`.
+- **LOW-MED (Hashimoto)** — MCPServer.run_stdio's write path was unguarded; a client
+  closing stdout mid-write crashed the loop with a traceback. Now breaks cleanly.
+- **LOW (Hashimoto)** — cmd_set_temperature didn't range-validate before connecting →
+  out-of-range temp opened BLE then died with a raw ValueError. Now validates up front.
+
+---
 ## R53 round 35: cancel-safety + iOS-LE read-back + daemon single-instance (2026-06-22)
 
 (Commit `a7e0761`.) Persona pass over the deepest core. Carmack CLEAN (BLE

@@ -18,6 +18,15 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 36 (2026-06-22): last un-reviewed Python — all LOW (Claude).**
+  Commit `29a84d3`, teeth-tested, suite 1679 green. Pass over display dispatch / media decode /
+  MCP server / CLI. ALL FOUR findings LOW/latent/cosmetic (real convergence): show_clock(hot=True)
+  missing the 0x26 enable byte (latent); GIF duration=0 → 1ms strobe; MCP run_stdio write
+  unguarded → traceback on client teardown; set-temperature CLI no pre-connect range validation.
+  After ~18 overnight rounds (19→36, ~65 real bugs fixed) the severity has finally dropped to all
+  LOW — the codebase is approaching genuinely clean. HW deferrals unchanged (native C static
+  encoder, SPP framing, RX stall, 0x8B retransmit, custom-art ACK).
+
 - **R53 ADVERSARIAL LOOP — ROUND 35 (2026-06-22): deepest core — Carmack clean, 3 bugs (Claude).**
   Commit `a7e0761`, teeth-tested, suite 1676 green. Carmack's BLE write/notify hot-path review
   came back CLEAN. (HIGH Hashimoto) daemon had no single-instance guard → GUI + MCP-server
