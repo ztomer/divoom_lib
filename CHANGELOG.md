@@ -5,6 +5,32 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 31: wall resize hoist + atomic hot_update guard (2026-06-21)
+
+(Commit `44e69b5`.) Clears the last two non-HW deferrals from the multi-persona
+review. Teeth-tested, suite 1664 green.
+
+- **PERF (Carmack)** — `DivoomWall`'s full-canvas resize ran inside the per-slot
+  loop → an N-device wall re-resized the whole source N times per tick (animated:
+  N × all frames), and a wall LIVE job's byte-hash cache misses every tick. The
+  resize is identical for every slot (only the crop differs); now computed once,
+  lazily on first cache miss (all-cached path still does zero resizes), shared
+  across slots. Output identical; 0-frame skip preserved.
+- **CORRECTNESS (Hashimoto)** — `hot_update`'s in-progress guard was a non-atomic
+  check-then-set that omitted "starting", so two socket-handler threads could both
+  launch concurrent updates and clobber each other's progress. Now an atomic
+  `_try_begin_hot_update` claim (with "starting" in the active set); a never-started
+  fire-and-forget item is reset via a submit done-callback so "starting" can't wedge
+  future updates.
+
+With this, the multi-persona review's non-HW backlog is EXHAUSTED. Remaining items
+all need hardware / APK truth to resolve safely: native C static-encoder format
+divergence (dead path; 6- vs 7-byte header), SPP framing divergences (escaping /
+packet_number / pacing / timeout-clear — need an SPP device), basic-protocol RX
+stall behind a spurious start byte (low, self-healing), 0x8B retransmit-drop,
+custom-art ACK!=success (0x8E HW-unreliable).
+
+---
 ## R53 round 30: _ensure_device_async target-switch guard (2026-06-21)
 
 (Commit `ad0021e`.) Fixes the HIGH deferral from round 29.

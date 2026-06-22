@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 31 (2026-06-21): wall resize hoist + hot_update guard (Claude).**
+  Cleared the last two non-HW deferrals (commit `44e69b5`, teeth-tested, suite 1664 green):
+  (PERF) DivoomWall full-canvas resize hoisted out of the per-slot loop (was N× per tick on a
+  wall live job) — computed once lazily, shared, output-identical; (CORRECTNESS) hot_update
+  in-progress guard is now an atomic claim including "starting" (+ stuck-reset on a never-started
+  item). **The multi-persona review's non-HW backlog is now EXHAUSTED** — every remaining item
+  needs hardware / APK truth: native C static-encoder format divergence (dead path), SPP framing
+  divergences (need an SPP device), basic-protocol RX stall (low/self-healing), 0x8B
+  retransmit-drop, custom-art ACK!=success. Next fresh persona/adversarial pass is expected to
+  surface only these HW deferrals → that's the "clean" signal.
+
 - **R53 ADVERSARIAL LOOP — ROUND 30 (2026-06-21): wrong-device write guard (Claude).** Fixed the
   HIGH round-29 deferral (commit `ad0021e`, teeth-tested, suite 1660 green): `_ensure_device_async`
   returned the cached device without comparing the requested mac, so `device_call(mac=B)` while A
