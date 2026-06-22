@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 33 (2026-06-22): poller off-loads + 2 niche bugs (Claude).**
+  Persona pass — Linus + Carmack CLEAN (2/4 lenses found nothing; convergence signal). Commit
+  `fc9bd87`, teeth-tested, suite 1671 green: (PERF) off-loaded the 3 pure poller fetches
+  (get_system_stats/fetch_stock_ticker/fetch_album_art_url) off the BLE loop; (MEDIUM Bob)
+  LightingApi._device_size always returned 16 (probed a state-dict key for a method) → push_text
+  wrong-sized on non-16px devices; now the orchestrator exposes the resolver; (MEDIUM Hashimoto)
+  hot_update wedged forever if _cmd_queue.submit() raised before returning a future — now guarded.
+  DEFERRED (perf): render_and_downsample_artwork still downloads album art on-loop (needs a
+  per-call unique scratch path first). HW deferrals unchanged. Convergence trend: persona passes
+  now mostly clean with occasional niche bugs in collaborator-routing / error-edge paths.
+
 - **R53 ADVERSARIAL LOOP — ROUND 32 (2026-06-22): convergence pass NOT clean — 6 new bugs (Claude).**
   A fresh 4-persona sweep over the less-traveled code (commit `93bf159`, teeth-tested, suite green
   1607 + 61 GUI): HIGH exclusive_start/end 2s-timeout → orphaned-token/wedged-device (now

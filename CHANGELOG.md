@@ -5,6 +5,27 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 33: poller off-loads + push_text size + hot_update submit guard (2026-06-22)
+
+(Commit `fc9bd87`.) Persona pass — **Linus + Carmack came back CLEAN** (convergence;
+2 of 4 lenses found nothing new); Uncle Bob + Hashimoto each found 1 MEDIUM. Plus
+the round-32 poller-blocking follow-up. Teeth-tested, suite 1671 green.
+
+- **PERF** — run_sysmon/run_stocks/run_music still ran blocking network/psutil calls
+  on the BLE event loop; off-loaded the three pure (no-file-write) ones via
+  asyncio.to_thread (get_system_stats, fetch_stock_ticker, fetch_album_art_url).
+  DEFERRED: render_and_downsample_artwork still downloads album art on-loop (needs a
+  per-call unique scratch path before off-loading without a file race).
+- **MEDIUM (Bob)** — LightingApi._device_size() probed a state-dict key for a method
+  that lives on the orchestrator class (never in __dict__) → always returned the 16px
+  fallback, so push_text rendered wrong-sized text on non-16px devices. The orchestrator
+  now exposes the bound resolver through the shared state dict.
+- **MEDIUM (Hashimoto)** — hot_update wedged the whole HOT-channel feature forever if
+  _cmd_queue.submit() RAISED (QueueStopped/QueueFull) before returning a future: the
+  claimed "starting" phase was never cleared. submit() is now guarded (releases the claim
+  + surfaces the error). Gap in the round-31 fix, which only covered future-expiry.
+
+---
 ## R53 round 32: multi-persona convergence pass — 6 new bugs (2026-06-22)
 
 (Commit `93bf159`.) The "expected-clean" convergence pass was NOT clean — a fresh
