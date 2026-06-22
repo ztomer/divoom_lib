@@ -362,6 +362,15 @@ class CommandQueue:
 
     async def acquire(self, token: Any) -> None:
         async with self._cond:
+            # Reject a STEAL: if a different session already holds the exclusive
+            # slot, don't silently overwrite it — that stranded the first owner's
+            # queued items (they only dispatch while it's the owner) until the 30s
+            # idle release, and let the thief run concurrently with the holder's
+            # in-flight op (clobber). The same token re-acquiring is idempotent
+            # (re-arms the deadline). G3's idle deadline still frees a dead holder
+            # so this can't wedge forever.
+            if self._exclusive_owner is not None and self._exclusive_owner != token:
+                raise RuntimeError("device is exclusively held by another session")
             self._exclusive_owner = token
             self._arm_exclusive_deadline()
             self._cond.notify_all()

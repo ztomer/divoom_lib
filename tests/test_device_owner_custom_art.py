@@ -86,6 +86,7 @@ class TestCustomArtPushSuccess:
         fake_png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 
         class FakeResponse:
+            status = 200  # real aiohttp responses always have a status
             async def __aenter__(self):
                 return self
             async def __aexit__(self, *a):
@@ -144,6 +145,7 @@ class TestCustomArtPushSuccess:
         fake_png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 
         class FakeResponse:
+            status = 200  # real aiohttp responses always have a status
             async def __aenter__(self):
                 return self
             async def __aexit__(self, *a):
@@ -208,6 +210,7 @@ class TestCustomArtPushSuccess:
         fake_png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 
         class FakeResponse:
+            status = 200  # real aiohttp responses always have a status
             async def __aenter__(self):
                 return self
             async def __aexit__(self, *a):
@@ -261,6 +264,7 @@ class TestCustomArtPushSuccess:
         owner._ensure_device_async = AsyncMock(return_value=dev)
 
         class FakeEmptyResponse:
+            status = 200  # real aiohttp responses always have a status
             async def __aenter__(self):
                 return self
             async def __aexit__(self, *a):

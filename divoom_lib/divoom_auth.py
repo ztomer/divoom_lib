@@ -34,6 +34,15 @@ def print_err(message):
 def print_ok(message):
     print(f"[ Ok  ] {message}")
 
+def _redact(secret) -> str:
+    """Mask a bearer token for logs: keep a short prefix for correlation, never
+    the full value. The daemon is commonly launched with stdout → logfile, so
+    printing the live cloud token in clear let anyone with log access replay it."""
+    s = str(secret or "")
+    if len(s) <= 4:
+        return "****"
+    return f"{s[:4]}…({len(s)} chars)"
+
 
 BASE_URL   = "https://appin.divoom-gz.com"
 HMAC_KEY   = b"DivoomBluetoothDevice<>?"  # from P2/a.java
@@ -121,7 +130,7 @@ def _login_email(email: str, password: str) -> DivoomCredentials:
 
     token   = data.get("Token",  0)
     user_id = data.get("UserId", 0)
-    print_ok(f"Logged in: UserId={user_id} Token={token}")
+    print_ok(f"Logged in: UserId={user_id} Token={_redact(token)}")
     return DivoomCredentials(token=token, user_id=user_id, email=email)
 
 
@@ -164,7 +173,7 @@ def _login_guest() -> DivoomCredentials:
 
     token   = data.get("Token",  0)
     user_id = data.get("UserId", 0)
-    print_ok(f"Guest credentials: UserId={user_id} Token={token}")
+    print_ok(f"Guest credentials: UserId={user_id} Token={_redact(token)}")
     return DivoomCredentials(token=token, user_id=user_id, utc=utc)
 
 

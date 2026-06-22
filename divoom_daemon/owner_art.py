@@ -67,7 +67,13 @@ class OwnerArtMixin:
                         headers={"User-Agent": "okhttp/4.12.0"},
                         timeout=aiohttp.ClientTimeout(total=10),
                     ) as resp:
+                        status = resp.status
                         file_bytes = await resp.read()
+                # A non-200 returns an HTML/JSON error page that can be >4 bytes —
+                # don't let it slip past the length guard and get treated as art.
+                if status != 200:
+                    logger.warning("custom_art_push: CDN HTTP %s for %s", status, fid)
+                    return None
                 if len(file_bytes) < 4:
                     return None
 
@@ -76,20 +82,30 @@ class OwnerArtMixin:
                 # branching missed 0xAA, so assigning a hot tile to a slot
                 # crashed Image.open with "cannot identify image file").
                 scratch = tmp / f"ca_{fid.replace('/', '_')}.gif"
-                gif_data = await asyncio.to_thread(
-                    media_decoder.resolve_to_gif, file_bytes, scratch)
-                if gif_data is None:
-                    logger.warning(f"custom_art_push: undecodable payload for {fid} "
-                                   f"(magic {file_bytes[0]})")
-                    return None
-
-                # Resize to 16x16 and encode as AA frame
                 src = tmp / f"ca_in_{fid.replace('/', '_')}.gif"
-                src.write_bytes(gif_data)
-                with Image.open(src) as img:
-                    img = img.convert("RGB").resize((16, 16), Image.Resampling.NEAREST)
-                    rgb = img.tobytes()
-                return encode_animation_frame(rgb, 16, 16, 500)
+                try:
+                    gif_data = await asyncio.to_thread(
+                        media_decoder.resolve_to_gif, file_bytes, scratch)
+                    if gif_data is None:
+                        logger.warning(f"custom_art_push: undecodable payload for {fid} "
+                                       f"(magic {file_bytes[0]})")
+                        return None
+
+                    # Resize to 16x16 and encode as AA frame
+                    src.write_bytes(gif_data)
+                    with Image.open(src) as img:
+                        img = img.convert("RGB").resize((16, 16), Image.Resampling.NEAREST)
+                        rgb = img.tobytes()
+                    return encode_animation_frame(rgb, 16, 16, 500)
+                finally:
+                    # The two per-file scratch GIFs were never deleted → scratch/
+                    # grew without bound on a long-running daemon doing repeated
+                    # custom-art/hot pushes. Clean both on every path.
+                    for _p in (scratch, src):
+                        try:
+                            _p.unlink()
+                        except OSError:
+                            pass
 
             frames: list[bytes] = [b""] * SLOTS_PER_PAGE
             for idx, fid in slot_map.items():

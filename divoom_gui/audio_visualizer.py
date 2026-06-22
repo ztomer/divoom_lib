@@ -5,6 +5,7 @@ MediaSyncMixin imports it.
 """
 import logging
 import threading
+import time  # used by the read-loop error backoff (was NameError → killed the thread)
 
 logger = logging.getLogger("divoom_gui")
 
@@ -113,17 +114,22 @@ class AudioVisualizerWorker:
             (75, 110)  # Presence/Brilliance
         ]
 
+        # Hoist the Hann window out of the ~86 Hz capture loop — len(samples) is
+        # CHUNK every normal iteration, so recomputing np.hanning(CHUNK) each frame
+        # was pure wasted work. Fall back only for a rare short final read.
+        window_full = np.hanning(CHUNK)
+
         while self.active:
             try:
                 data = self.stream.read(CHUNK, exception_on_overflow=False)
                 if not data:
                     continue
-                
+
                 samples = np.frombuffer(data, dtype=np.int16).astype(np.float32)
                 if len(samples) == 0:
                     continue
-                
-                window = np.hanning(len(samples))
+
+                window = window_full if len(samples) == CHUNK else np.hanning(len(samples))
                 fft_data = np.fft.rfft(samples * window)
                 fft_mag = np.abs(fft_data)
                 
