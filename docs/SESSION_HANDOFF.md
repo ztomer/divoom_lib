@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R53 ADVERSARIAL LOOP — ROUND 30 (2026-06-21): wrong-device write guard (Claude).** Fixed the
+  HIGH round-29 deferral (commit `ad0021e`, teeth-tested, suite 1660 green): `_ensure_device_async`
+  returned the cached device without comparing the requested mac, so `device_call(mac=B)` while A
+  was held drove A and reported success. Now mirrors `_build_device_async`'s switch guard (release
+  + rebuild on a different BLE mac) and keeps `self.mac` in lockstep to avoid churn. Remaining
+  non-HW deferrals: wall full-canvas resize per-device-per-tick (perf, Carmack); `hot_update`
+  in-progress guard check-then-act race (Hashimoto). HW/opencode deferrals unchanged (native C
+  static-encoder format divergence, SPP framing divergences, basic-protocol RX stall, 0x8B
+  retransmit-drop, custom-art ACK!=success).
+
 - **R53 ADVERSARIAL LOOP — ROUND 29 (2026-06-21): multi-persona review (Claude).** Four-persona
   pass (Uncle Bob / Linus / Carmack / Hashimoto) + cloud sweep. 4 real bugs fixed (commit
   `d5a9aab`, on main, teeth-tested, suite 1657 green): (SECURITY) `divoom_auth` logged the cloud

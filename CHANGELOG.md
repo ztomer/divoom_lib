@@ -5,6 +5,23 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## R53 round 30: _ensure_device_async target-switch guard (2026-06-21)
+
+(Commit `ad0021e`.) Fixes the HIGH deferral from round 29.
+`_ensure_device_async` returned the cached `self._device` whenever one was held,
+without comparing the requested mac — and `device_call` routes through it (not the
+connect path that already guards switches). So `device_call(mac=B)` while device A
+was held silently executed against A and returned `{"success": True}` (wrong-device
+write reported as success). Now it mirrors `_build_device_async`'s guard: a
+different known BLE target → disconnect + rebuild for the requested mac; `self.mac`
+is kept in lockstep on rebuild to avoid switch-churn. Scoped to real BLE macs
+(LAN isn't built here; `mac=None` still reuses the active device). Teeth-tested
+(test_ensure_device_target); suite 1660 green.
+
+Still deferred (non-HW): wall full-canvas resize per-device-per-tick (perf);
+`hot_update` in-progress guard check-then-act race.
+
+---
 ## R53 round 29: multi-persona review — auth/exclusive/audio/cdn/scratch (2026-06-21)
 
 (Commit `d5a9aab`, labeled "round 26" in its message — cosmetic collision with the
