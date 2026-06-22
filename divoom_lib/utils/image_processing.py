@@ -67,8 +67,12 @@ def process_image(file, time: int | None = None, size: int | None = None):
         for frame_idx in range(img.n_frames):
             img.seek(frame_idx)
             rgb = _to_rgb_bytes(img)
-            # PIL exposes per-frame duration in ms via .info.get("duration")
-            duration = img.info.get("duration", default_duration_ms)
+            # PIL exposes per-frame duration in ms via .info.get("duration").
+            # `or default`: a GIF frame often stores duration=0 ("as fast as
+            # possible"); `.get(k, default)` only substitutes when the key is
+            # ABSENT, so a present 0 fell through to _clamp_ms's 1ms floor → an
+            # unviewable strobe on every frame after the first.
+            duration = img.info.get("duration") or default_duration_ms
             frames.append((rgb, out_w, out_h, _clamp_ms(duration)))
     else:
         rgb = _to_rgb_bytes(img)

@@ -321,8 +321,14 @@ class MCPServer:
                 # Notification — no reply.
                 continue
             data = (json.dumps(response) + "\n").encode("utf-8")
-            writer.write(data)
-            await writer.drain()
+            try:
+                writer.write(data)
+                await writer.drain()
+            except (BrokenPipeError, ConnectionResetError):
+                # The MCP client closed our stdout (teardown) — exit the loop
+                # cleanly, the same as the read-side EOF guard, instead of letting
+                # the write race crash run_stdio with a traceback in the client log.
+                break
         writer.close()
         try:
             await writer.wait_closed()

@@ -56,7 +56,10 @@ class Display:
             return True
             
         if hot:
-            return await self.communicator.send_command("set hot", [])
+            # 0x26 "set hot" needs its 1-byte enable flag (canonical frame
+            # 0x26 0x01); an empty payload made the device read a garbage/OOB
+            # enable byte → hot mode didn't reliably turn on. Matches Control.set_hot.
+            return await self.communicator.send_command("set hot", [constants.BOOLEAN_TRUE])
         
         args = [constants.BOOLEAN_FALSE]
         args += [bool_to_byte(twentyfour)]

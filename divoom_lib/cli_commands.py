@@ -196,6 +196,11 @@ WEATHER_NAME_TO_ID = {
 
 async def cmd_set_temperature(args: argparse.Namespace) -> int:
     """Set the device's weather channel: temperature + icon (0x5F)."""
+    # Validate BEFORE connecting (mirrors set-volume / set-brightness): an
+    # out-of-range temp otherwise opened the BLE link, then died with a raw
+    # ValueError traceback from Weather.set instead of a clean usage error.
+    if not (-127 <= args.temperature <= 128):
+        _err("temperature must be -127..128", 2)
     d, mac = await _resolve_device(args)
     try:
         if not d.capabilities.has_weather:
