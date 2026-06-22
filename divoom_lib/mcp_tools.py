@@ -28,6 +28,7 @@ value of 99 for ``level`` passes the schema but is a domain error.
 """
 from __future__ import annotations
 
+import dataclasses  # used by get_capabilities' real-Divoom fallback (was NameError)
 from typing import Any, Optional
 
 from divoom_lib.models import WeatherType

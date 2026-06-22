@@ -122,13 +122,19 @@ class OwnerLiveMixin:
         from divoom_lib.ble_connection import derive_connection_state
         # snapshot: the loop thread inserts into / clears _live_devices
         # (get_live_device, stop_all_live_jobs) while this runs on an RPC thread.
+        # .get() not `mac in act` + `act[mac]`: another thread can pop the key
+        # between the membership check and the index (TOCTOU → KeyError under
+        # contention). get() reads the entry atomically; None means it's gone.
         for mac, dev in list((getattr(self, "_live_devices", {}) or {}).items()):
-            if mac in act:
-                act[mac]["state"] = derive_connection_state(dev).value
+            entry = act.get(mac)
+            if entry is not None:
+                entry["state"] = derive_connection_state(dev).value
         # the active device's own state (if it's tracked as an activity entry)
         active = getattr(self, "_active_key", lambda: None)()
-        if active and active in act and getattr(self, "_device", None) is not None:
-            act[active]["state"] = derive_connection_state(self._device).value
+        if active and getattr(self, "_device", None) is not None:
+            entry = act.get(active)
+            if entry is not None:
+                entry["state"] = derive_connection_state(self._device).value
 
     # G1: keep the registry honest. Without teardown an entry survives disconnect /
     # wall tear-down / stop-all, so the R47 selector + menubar keep showing a

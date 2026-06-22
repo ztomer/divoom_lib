@@ -42,8 +42,11 @@ def test_load_returns_defaults_when_configured_path_missing(
     # which is what load_routing_table(None) reads at call time. (Setting the
     # env var here used to make the test depend on the absence of the user's
     # real ~/.config file, which is flaky.)
-    import divoom_daemon.macos_notifications as macos_notif
-    monkeypatch.setattr(macos_notif, "ROUTING_PATH", tmp_path / "nope.json")
+    # ROUTING_PATH + load_routing_table now live in notification_router (the
+    # routing concern was split out of macos_notifications for the 500-LOC cap);
+    # patch the attribute load_routing_table actually reads.
+    import divoom_daemon.notification_router as nrouter
+    monkeypatch.setattr(nrouter, "ROUTING_PATH", tmp_path / "nope.json")
     rules = load_routing_table()
     assert rules == DEFAULT_ROUTING
 
@@ -227,11 +230,13 @@ def test_env_var_overrides_default_path(
     # is to pass routing_path explicitly. The env var is only
     # honored by reloading the module; document that behavior.
     from importlib import reload
-    import divoom_daemon.macos_notifications as m
-    reload(m)
+    # ROUTING_PATH is resolved from the env var at import of notification_router
+    # (where it now lives), so reload THAT module to pick up the override.
+    import divoom_daemon.notification_router as nrouter
+    reload(nrouter)
     try:
-        assert str(m.ROUTING_PATH) == str(custom)
+        assert str(nrouter.ROUTING_PATH) == str(custom)
     finally:
         # Reset by removing the env var and reloading again.
         monkeypatch.delenv("DIVOOM_CONTROL_ROUTING", raising=False)
-        reload(m)
+        reload(nrouter)

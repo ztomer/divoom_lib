@@ -164,6 +164,19 @@ def run(mac: Optional[str] = None, socket_path: str = DEFAULT_SOCKET_PATH,
         daemon._device_owner.rehydrate_live_jobs()
     except Exception as e:
         logger.warning("live-job rehydrate failed: %s", e)
+    # A daemon is stopped with SIGTERM (launchd KillSignal, `kill`, a supervisor),
+    # not Ctrl-C. Without a handler the default action kills the process instantly,
+    # skipping serve_forever's cleanup → the BLE link isn't disconnected and the
+    # monitor thread isn't joined. Route SIGTERM through the same clean path as
+    # KeyboardInterrupt. (signal.signal only works on the main thread.)
+    import signal as _signal
+
+    def _on_sigterm(_signum, _frame):
+        raise KeyboardInterrupt
+    try:
+        _signal.signal(_signal.SIGTERM, _on_sigterm)
+    except (ValueError, OSError):
+        pass  # not on the main thread (e.g. under a test harness) — skip
     try:
         daemon.serve_forever()
     except KeyboardInterrupt:

@@ -38,8 +38,17 @@ class NotificationService:
         return self._monitor
 
     # ── status / events ──────────────────────────────────────────────────
-    def _state(self) -> str:
+    def _health_error(self) -> Optional[str]:
+        """An explicit service error, OR a sustained monitor DB-read failure (the
+        thread is alive but deaf). Surfacing the latter stops status from lying
+        ACTIVE while no notifications can be read."""
         if self._error:
+            return self._error
+        mon = self._monitor
+        return getattr(mon, "health_error", None) if mon is not None else None
+
+    def _state(self) -> str:
+        if self._health_error():
             return STATE_ERROR
         mon = self._monitor
         return STATE_ACTIVE if (mon is not None and mon.is_running) else STATE_IDLE
@@ -55,7 +64,7 @@ class NotificationService:
         }
 
     def status_event(self) -> dict:
-        return make_status_event(self._state(), self._counters(), self._error)
+        return make_status_event(self._state(), self._counters(), self._health_error())
 
     # ── notification sink (monitor -> device + broadcast) ────────────────
     def _sink(self, app_type: int, title: str, body: str) -> None:

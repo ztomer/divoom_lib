@@ -168,6 +168,27 @@ async def main_async():
     scratch_dir.mkdir(parents=True, exist_ok=True)
 
     while True:
+        if args.use_config:
+            # Re-read the GUI-persisted config EACH cycle so target/interval/
+            # classify/enabled edits take effect without restarting the daemon —
+            # the whole purpose of --use-config (the values were previously bound
+            # once before the loop, so GUI edits were ignored for hours).
+            try:
+                hc_cfg = hotchannel_config.load_config()
+            except Exception as e:
+                print_wrn(f"could not reload hot-channel config: {e}")
+            else:
+                if not hc_cfg.get("enabled", True):
+                    print_info("Hot-channel disabled in config; stopping headless sync loop.")
+                    break
+                classify = hc_cfg["classify"]
+                interval = hc_cfg["interval"]
+                targets = list(hc_cfg["targets"])
+                targets_per_classify = {}
+                for t in targets:
+                    dc = hotchannel_config.get_device_classify(hc_cfg, t)
+                    targets_per_classify.setdefault(dc, []).append(t)
+
         # Push per-classify group — each group fetches and pushes its own set.
         if args.use_config and targets_per_classify:
             for classify, group_targets in targets_per_classify.items():
