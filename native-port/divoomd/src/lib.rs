@@ -8,5 +8,6 @@
 //! notify/response correlation, and the command queue — each pinned to the Python
 //! behavior by parity tests.
 
+pub mod command_queue;
 pub mod framing;
 pub mod models;
