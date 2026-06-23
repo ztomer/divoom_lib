@@ -9,6 +9,8 @@
 //! behavior by parity tests.
 
 pub mod command_queue;
+pub mod commands;
 pub mod framing;
 pub mod models;
+pub mod protocol;
 pub mod response;
