@@ -71,6 +71,7 @@ pub struct BleTransport {
     write_char: Characteristic,
     protocol: Protocol,
     rx: Mutex<mpsc::Receiver<Frame>>,
+    device_name: std::sync::Mutex<Option<String>>,
 }
 
 impl BleTransport {
@@ -129,15 +130,31 @@ impl BleTransport {
             }
         });
 
+        let dev_name = peripheral
+            .properties()
+            .await
+            .ok()
+            .flatten()
+            .and_then(|pr| pr.local_name);
+
         let mut transport = Self {
             _central: central.clone(),
             peripheral,
             write_char,
             protocol: Protocol::Basic,
             rx: Mutex::new(rx),
+            device_name: std::sync::Mutex::new(dev_name),
         };
         transport.autoprobe().await;
         Ok(transport)
+    }
+
+    pub fn device_name(&self) -> Option<String> {
+        self.device_name.lock().unwrap().clone()
+    }
+
+    pub fn set_cached_device_name(&self, name: String) {
+        *self.device_name.lock().unwrap() = Some(name);
     }
 
     /// Detect the framing by probing 0x46 in iOS-LE then Basic (default Basic).

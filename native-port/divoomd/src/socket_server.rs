@@ -22,6 +22,18 @@ use crate::protocol::{encode_message, err_reply, iter_messages, Request, MAX_REP
 /// device owner / command queue; tests use a stub.
 pub trait Handler: Send + Sync + 'static {
     fn handle<'a>(&'a self, req: Request) -> Pin<Box<dyn Future<Output = Value> + Send + 'a>>;
+    /// Get a receiver for the broadcast event stream.
+    fn subscribe(&self) -> Option<tokio::sync::broadcast::Receiver<Value>> {
+        None
+    }
+    /// Get the initial status event to send immediately on subscribe.
+    fn initial_status(&self) -> Value {
+        serde_json::json!({
+            "type": "status",
+            "state": "idle",
+            "counters": {}
+        })
+    }
 }
 
 /// Serve a single connection: accumulate bytes, split into NDJSON requests,
@@ -46,10 +58,48 @@ pub async fn serve_connection<H: Handler>(
         let (msgs, remainder) = iter_messages(&buf);
         buf = remainder;
         for msg in msgs {
-            let reply = match serde_json::from_value::<Request>(msg) {
-                Ok(req) => handler.handle(req).await,
-                Err(_) => err_reply("bad request: expected an object with a 'command' string"),
+            let req = match serde_json::from_value::<Request>(msg) {
+                Ok(req) => req,
+                Err(_) => {
+                    let reply = err_reply("bad request: expected an object with a 'command' string");
+                    stream.write_all(&encode_message(&reply)).await?;
+                    continue;
+                }
             };
+            if req.command == "subscribe" {
+                if let Some(mut rx) = handler.subscribe() {
+                    let initial = handler.initial_status();
+                    stream.write_all(&encode_message(&initial)).await?;
+                    loop {
+                        tokio::select! {
+                            n = stream.read(&mut tmp) => {
+                                match n {
+                                    Ok(0) => break, // EOF
+                                    Err(_) => break, // error
+                                    Ok(_) => {}, // ignore client input after subscribe
+                                }
+                            }
+                            msg = rx.recv() => {
+                                match msg {
+                                    Ok(event) => {
+                                        stream.write_all(&encode_message(&event)).await?;
+                                    }
+                                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return Ok(());
+                } else {
+                    let reply = err_reply("subscriptions not supported");
+                    stream.write_all(&encode_message(&reply)).await?;
+                    continue;
+                }
+            }
+            let reply = handler.handle(req).await;
             stream.write_all(&encode_message(&reply)).await?;
         }
     }
@@ -70,3 +120,4 @@ pub async fn serve<H: Handler>(listener: UnixListener, handler: Arc<H>) {
         }
     }
 }
+

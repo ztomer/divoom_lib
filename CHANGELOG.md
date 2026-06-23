@@ -4,6 +4,13 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Post-v0.20.2 — Native Port Event Subscription & Device Name (2026-06-23)
+
+- **Event Subscription & Broadcast**: Extended the native Rust daemon socket server with a robust, tokio-native subscription system (`subscribe` command). When subscribed, clients immediately receive the initial status frame and subsequently stream real-time broadcast events (such as connection state changes) over the held-open Unix socket. Multiplexed via `tokio::select!`, connection close (EOF) automatically cleans up subscribers.
+- **Friendly Name Cache**: Added a thread-safe `device_name` cache to `BleTransport` to avoid redundant BLE read round-trips.
+- **New Device Commands**: Ported `"device.get_device_name"` (queries the device name via BLE 0x76 as fallback, or returns cached name) and `"device.set_device_name"` (modifies device name via BLE 0x75, updating cache).
+- **Parity & E2E Validation**: Added integration tests `subscription_and_event_broadcast` and `device_name_commands_route_to_device_call`. All tests pass. Verified E2E against real hardware.
+
 ## v0.20.0 — Native Rust Port Phase 2 & App Startup Fix (2026-06-22)
 
 This release bundles the fixes from v0.16.1 along with major milestones in the native Rust daemon port (`divoomd`):

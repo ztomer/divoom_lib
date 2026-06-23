@@ -14,7 +14,15 @@ use tokio::net::{UnixListener, UnixStream};
 
 /// Stub handler: echoes the command back, and surfaces args/token so the test can
 /// assert the request was parsed correctly.
-struct Echo;
+struct Echo {
+    tx: tokio::sync::broadcast::Sender<Value>,
+}
+impl Echo {
+    fn new() -> Self {
+        let (tx, _) = tokio::sync::broadcast::channel(10);
+        Echo { tx }
+    }
+}
 impl Handler for Echo {
     fn handle<'a>(&'a self, req: Request) -> Pin<Box<dyn Future<Output = Value> + Send + 'a>> {
         Box::pin(async move {
@@ -25,6 +33,9 @@ impl Handler for Echo {
                 "token": req.token,
             })
         })
+    }
+    fn subscribe(&self) -> Option<tokio::sync::broadcast::Receiver<Value>> {
+        Some(self.tx.subscribe())
     }
 }
 
@@ -54,7 +65,7 @@ async fn request_reply_round_trip() {
     let path = temp_sock("rr");
     let _ = std::fs::remove_file(&path);
     let listener = UnixListener::bind(&path).unwrap();
-    tokio::spawn(serve(listener, Arc::new(Echo)));
+    tokio::spawn(serve(listener, Arc::new(Echo::new())));
 
     let mut client = UnixStream::connect(&path).await.unwrap();
     let req = make_request("scan", Some(json!({"timeout": 5})), Some("tok".into()));
@@ -79,7 +90,7 @@ async fn two_pipelined_requests_get_two_replies() {
     let path = temp_sock("pipe");
     let _ = std::fs::remove_file(&path);
     let listener = UnixListener::bind(&path).unwrap();
-    tokio::spawn(serve(listener, Arc::new(Echo)));
+    tokio::spawn(serve(listener, Arc::new(Echo::new())));
 
     let mut client = UnixStream::connect(&path).await.unwrap();
     // send two requests back-to-back in one write
@@ -110,7 +121,7 @@ async fn malformed_line_gets_error_reply() {
     let path = temp_sock("bad");
     let _ = std::fs::remove_file(&path);
     let listener = UnixListener::bind(&path).unwrap();
-    tokio::spawn(serve(listener, Arc::new(Echo)));
+    tokio::spawn(serve(listener, Arc::new(Echo::new())));
 
     let mut client = UnixStream::connect(&path).await.unwrap();
     // valid JSON but not a Request (no "command") -> error reply, connection stays up
@@ -122,3 +133,44 @@ async fn malformed_line_gets_error_reply() {
 
     let _ = std::fs::remove_file(&path);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn subscription_and_event_broadcast() {
+    let path = temp_sock("sub");
+    let _ = std::fs::remove_file(&path);
+    let listener = UnixListener::bind(&path).unwrap();
+    let handler = Arc::new(Echo::new());
+    tokio::spawn(serve(listener, handler.clone()));
+
+    let mut client = UnixStream::connect(&path).await.unwrap();
+    let req = make_request("subscribe", None, None);
+    client
+        .write_all(&encode_message(&serde_json::to_value(&req).unwrap()))
+        .await
+        .unwrap();
+
+    // 1. Initial status event
+    let line = read_one_line(&mut client).await;
+    let (msgs, _rem) = iter_messages(&line);
+    assert_eq!(msgs.len(), 1);
+    assert_eq!(msgs[0]["type"], json!("status"));
+    assert_eq!(msgs[0]["state"], json!("idle"));
+
+    // 2. Broadcast a custom event
+    let event = json!({
+        "type": "notification",
+        "app_type": 1,
+        "title": "Hello",
+        "body": "World"
+    });
+    handler.tx.send(event.clone()).unwrap();
+
+    // Read the broadcast event
+    let line2 = read_one_line(&mut client).await;
+    let (msgs2, _rem) = iter_messages(&line2);
+    assert_eq!(msgs2.len(), 1);
+    assert_eq!(msgs2[0], event);
+
+    let _ = std::fs::remove_file(&path);
+}
+

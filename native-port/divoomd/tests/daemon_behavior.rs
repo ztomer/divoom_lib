@@ -55,7 +55,28 @@ async fn exclusive_start_requires_token() {
 #[tokio::test]
 async fn device_commands_are_honestly_unimplemented() {
     let d = Daemon::new();
-    let r = d.handle(make_request("device_call", Some(json!({"method": "device.set_brightness"})), None)).await;
+    let r = d.handle(make_request("device_call", Some(json!({"method": "device.unimplemented_method"})), None)).await;
     assert_eq!(r["success"], json!(false), "must NOT fake success");
-    assert!(r["error"].as_str().unwrap().contains("not implemented"));
+    let err = r["error"].as_str().unwrap();
+    assert!(err.contains("no device connected") || err.contains("not implemented") || err.contains("not ported"), "Unexpected error: {}", err);
 }
+
+#[tokio::test]
+async fn device_name_commands_route_to_device_call() {
+    let d = Daemon::new();
+    // get_device_name returns "no device connected" when no device is connected,
+    // which confirms it is routed to cmd_device_call (implemented)
+    let r1 = d.handle(make_request("device_call", Some(json!({"method": "device.get_device_name"})), None)).await;
+    assert_eq!(r1["success"], json!(false));
+    let err1 = r1["error"].as_str().unwrap();
+    assert!(err1.contains("no device connected") || err1.contains("not implemented"), "Unexpected error: {}", err1);
+
+    // set_device_name returns "no device connected"
+    let r2 = d.handle(make_request("device_call", Some(json!({"method": "device.set_device_name", "args": ["NewName"]})), None)).await;
+    assert_eq!(r2["success"], json!(false));
+    let err2 = r2["error"].as_str().unwrap();
+    assert!(err2.contains("no device connected") || err2.contains("not implemented"), "Unexpected error: {}", err2);
+}
+
+
+

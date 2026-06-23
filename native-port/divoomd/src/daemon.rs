@@ -46,6 +46,7 @@ pub struct Daemon {
     central: Mutex<Option<Adapter>>,
     // C image encoder (libdivoom_compact FFI); loaded once, cached for lifetime.
     encoder: OnceLock<Option<NativeEncoder>>,
+    tx: tokio::sync::broadcast::Sender<Value>,
 }
 
 impl Default for Daemon {
@@ -56,6 +57,7 @@ impl Default for Daemon {
 
 impl Daemon {
     pub fn new() -> Self {
+        let (tx, _) = tokio::sync::broadcast::channel(32);
         Daemon {
             queue: CommandQueue::new(Some(EXCLUSIVE_TIMEOUT), Some(ITEM_TIMEOUT)),
             started: Instant::now(),
@@ -66,6 +68,7 @@ impl Daemon {
             #[cfg(feature = "ble")]
             central: Mutex::new(None),
             encoder: OnceLock::new(),
+            tx,
         }
     }
 
@@ -204,6 +207,11 @@ impl Daemon {
             Ok(t) => {
                 *self.device.lock().await = Some(t);
                 *self.device_id.lock().await = Some(id.clone());
+                let _ = self.tx.send(json!({
+                    "type": "status",
+                    "state": "active",
+                    "counters": {}
+                }));
                 json!({
                     "success": true,
                     "connected": true,
@@ -274,6 +282,53 @@ impl Daemon {
         let timeout = Duration::from_secs(5);
 
         match method {
+            "device.get_device_name" | "get_device_name" => {
+                if let Some(name) = dev.device_name() {
+                    if !name.trim().is_empty() {
+                        return json!({"success": true, "result": name});
+                    }
+                }
+                match dev.send_command_and_wait(0x76, &[], timeout).await {
+                    Some(p) if p.len() >= 1 => {
+                        let name_len = p[0] as usize;
+                        if p.len() >= 1 + name_len {
+                            let name_bytes = &p[1..1 + name_len];
+                            match std::str::from_utf8(name_bytes) {
+                                Ok(name) => {
+                                    dev.set_cached_device_name(name.to_string());
+                                    json!({"success": true, "result": name})
+                                }
+                                Err(_) => json!({"success": true, "result": Value::Null}),
+                            }
+                        } else {
+                            json!({"success": true, "result": Value::Null})
+                        }
+                    }
+                    _ => json!({"success": true, "result": Value::Null}),
+                }
+            }
+            "device.set_device_name" | "set_device_name" => {
+                let name = raw_args.first()
+                    .and_then(|v| v.as_str())
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("name")).and_then(|v| v.as_str()))
+                    .unwrap_or("");
+                let mut name_bytes = name.as_bytes().to_vec();
+                if name_bytes.len() > 16 {
+                    name_bytes.truncate(16);
+                }
+                let mut payload = Vec::with_capacity(1 + name_bytes.len());
+                payload.push(name_bytes.len() as u8);
+                payload.extend_from_slice(&name_bytes);
+                match dev.send_command(0x75, &payload, true).await {
+                    Ok(()) => {
+                        if let Ok(utf8_name) = std::str::from_utf8(&name_bytes) {
+                            dev.set_cached_device_name(utf8_name.to_string());
+                        }
+                        json!({"success": true, "result": true})
+                    }
+                    Err(e) => err_reply(&format!("set_device_name failed: {e}")),
+                }
+            }
             // get-light-mode (0x46): brightness is payload[6] (matches _read_brightness_once)
             "device.get_brightness" | "get_brightness" => {
                 match dev.send_command_and_wait(0x46, &[], timeout).await {
@@ -485,6 +540,11 @@ impl Daemon {
             let _ = t.disconnect().await;
         }
         *self.device_id.lock().await = None;
+        let _ = self.tx.send(json!({
+            "type": "status",
+            "state": "idle",
+            "counters": {}
+        }));
         json!({"success": true})
     }
 }
@@ -519,5 +579,19 @@ fn color_from_arg(raw_args: &[Value], req_args: &Value) -> Option<[u8; 3]> {
 impl Handler for Daemon {
     fn handle<'a>(&'a self, req: Request) -> Pin<Box<dyn Future<Output = Value> + Send + 'a>> {
         Box::pin(async move { self.dispatch(req).await })
+    }
+    fn subscribe(&self) -> Option<tokio::sync::broadcast::Receiver<Value>> {
+        Some(self.tx.subscribe())
+    }
+    fn initial_status(&self) -> Value {
+        #[cfg(feature = "ble")]
+        let connected = self.device.try_lock().map(|g| g.is_some()).unwrap_or(false);
+        #[cfg(not(feature = "ble"))]
+        let connected = false;
+        json!({
+            "type": "status",
+            "state": if connected { "active" } else { "idle" },
+            "counters": {}
+        })
     }
 }

@@ -18,6 +18,30 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE PORT: EVENT SUBSCRIPTION & DEVICE NAME COMMANDS (2026-06-23 10:15 EDT):**
+  Four changes in the native Rust daemon (`divoomd`):
+
+  **Event Subscription & Broadcast:** Extended the socket server with support for the
+  `"subscribe"` command. When a client connects and subscribes, the server immediately
+  replies with the initial status snapshot (`{"type":"status", "state":"idle"}` or `"active"`)
+  and then holds the connection open, streaming real-time broadcast events (such as BLE
+  connection state changes). We use `tokio::select!` to multiplex socket reading (to detect
+  peer disconnects) and event broadcasting (from a shared `tokio::sync::broadcast::Sender`),
+  achieving self-cleaning, resource-safe event delivery.
+  
+  **Friendly Name Cache:** Added a thread-safe `device_name` cache (`Mutex<Option<String>>`)
+  to `BleTransport` to avoid redundant BLE name queries (0x76 read is slow/flaky on some models).
+  The cache is populated from peripheral advertisement properties on connect.
+  
+  **New Device Commands:** Ported `"device.get_device_name"` (retrieves from cache, falling back
+  to 0x76 BLE query) and `"device.set_device_name"` (writes via 0x75 BLE command and updates cache).
+  
+  **E2E & Parity Tests:** Added `subscription_and_event_broadcast` integration test to verify the
+  subscriber socket, and `device_name_commands_route_to_device_call` to check command dispatch.
+  All Rust tests pass (with and without `ble` feature). E2E-smoke-tested `test_subscribe.py` against
+  real Divoom hardware: successfully subscribed, connected, and observed the broadcasted status
+  transition (`idle` -> `active`). Python suite: 1706 passed, 87 skipped.
+
 - **FEISHIN + KASET + CARD PADDING ROUND (2026-06-23 00:45 EDT):** Three changes.
 
   **Feishin album art integration:** Added `/Applications/Feishin.app` (Electron-based
