@@ -172,6 +172,11 @@ hot paths (port to native Rust later only if it earns its keep).
    correlation (autoprobe, `_expected_response_command`, generic-ACK 0x33) +
    `command_queue` (FIFO + exclusive mode, incl. the R53.x `acquire_now`
    steal-reject and the G3 idle release). FFI to the C encoders.
+   - **[DONE] framing + models** (`native-port/divoomd/`): Basic + iOS-LE
+     encode/parse, byte-identical to Python across 32 generated vectors
+     (`gen_framing_vectors.py` -> `tests/framing_vectors.json`, asserted by
+     `tests/framing_parity.rs`). Next: command_queue (tokio), then the
+     notify/response correlation.
 3. **Socket server** — NDJSON parity with `daemon_protocol.py`. Drive the existing
    Python test suite's socket-level cases against the Rust daemon for behavioral
    parity (run the Python `DaemonClient` against the Rust server).
