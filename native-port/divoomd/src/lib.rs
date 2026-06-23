@@ -9,6 +9,7 @@
 //! behavior by parity tests.
 
 pub mod autoprobe;
+pub mod image_proc;
 #[cfg(feature = "ble")]
 pub mod ble;
 pub mod command_queue;

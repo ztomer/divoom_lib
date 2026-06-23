@@ -13,9 +13,14 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
+use base64::engine::general_purpose::STANDARD as B64;
+use base64::Engine as _;
+
 use crate::command_queue::CommandQueue;
+use crate::image_proc;
 use crate::native_encode::NativeEncoder;
 use crate::protocol::{err_reply, Request};
 use crate::socket_server::Handler;
@@ -219,12 +224,41 @@ impl Daemon {
             Some(m) => m,
             None => return err_reply("device_call requires 'method'"),
         };
+        // Numeric positional args (for brightness, clock, etc.)
         let args: Vec<i64> = req
             .args
             .get("args")
             .and_then(|v| v.as_array())
             .map(|a| a.iter().filter_map(|x| x.as_i64()).collect())
             .unwrap_or_default();
+        // Raw positional args as Values (for string paths in display.show_image)
+        let raw_args: Vec<Value> = req
+            .args
+            .get("args")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        // Blob map: base64-encoded binary data keyed by positional arg index.
+        // Mirrors Python device_call's blobs mechanism: the client encodes binary
+        // payloads (e.g. image files) as base64 here rather than writing temp files
+        // on the server side.
+        let mut blob_map: HashMap<usize, Vec<u8>> = HashMap::new();
+        if let Some(blobs) = req.args.get("blobs").and_then(|v| v.as_object()) {
+            for (idx_str, b64val) in blobs {
+                let idx: usize = match idx_str.parse() {
+                    Ok(i) => i,
+                    Err(_) => return err_reply(&format!("blobs: bad index key '{idx_str}'")),
+                };
+                let b64 = match b64val.as_str() {
+                    Some(s) => s,
+                    None => return err_reply(&format!("blobs[{idx_str}]: not a string")),
+                };
+                match B64.decode(b64) {
+                    Ok(data) => { blob_map.insert(idx, data); }
+                    Err(e) => return err_reply(&format!("blobs[{idx_str}]: base64 error: {e}")),
+                }
+            }
+        }
         // The per-op token gates exclusive mode: if another session holds exclusive,
         // device_call is rejected immediately (Python parity: _cmd_queue.run(token)).
         let token = req.args.get("token").and_then(|v| v.as_str());
@@ -299,6 +333,71 @@ impl Daemon {
                     Some(b) => b,
                     None => return err_reply("encode_animation_frame failed"),
                 };
+                match dev.stream_animation_8b(&blob).await {
+                    Ok(true) => json!({"success": true, "result": true}),
+                    Ok(false) => err_reply("stream_animation_8b: empty blob"),
+                    Err(e) => err_reply(&format!("stream_animation_8b failed: {e}")),
+                }
+            }
+            // display.show_image(path_or_blob, [time_ms]) — the DaemonDeviceProxy path.
+            // The Python DaemonClient sends image bytes as blobs["0"] (base64); the
+            // daemon decodes in-memory and processes via the image_proc module (port of
+            // Python process_image). show_design (0x45 [0x05,0×9]) runs first, matching
+            // Python's show_image which always calls self.show_design() before streaming.
+            "display.show_image" => {
+                let size = req.args
+                    .get("kwargs").and_then(|v| v.get("size")).and_then(|v| v.as_u64())
+                    .unwrap_or(16) as u32;
+                let default_time_ms = raw_args.get(1)
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(100) as u16;
+
+                // Resolve image bytes: prefer blob[0], fall back to reading the path arg.
+                let img_data: Vec<u8> = if let Some(data) = blob_map.remove(&0) {
+                    data
+                } else {
+                    let path = match raw_args.get(0).and_then(|v| v.as_str()) {
+                        Some(p) => p,
+                        None => return err_reply("display.show_image requires a path or blob[0]"),
+                    };
+                    match std::fs::read(path) {
+                        Ok(d) => d,
+                        Err(e) => return err_reply(&format!("display.show_image: read {path}: {e}")),
+                    }
+                };
+
+                // show_design first: switch device to custom-art / design channel (0x45 [0x05,0×9])
+                if let Err(e) = dev.send_command(0x45, &[0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0], false).await {
+                    return err_reply(&format!("show_design failed: {e}"));
+                }
+
+                // Decode and resize frames (CPU-bound; run off the async thread)
+                let frames = match tokio::task::spawn_blocking(move || {
+                    image_proc::process_image_bytes(img_data, size, default_time_ms)
+                }).await {
+                    Ok(Ok(f)) => f,
+                    Ok(Err(e)) => return err_reply(&format!("image decode: {e}")),
+                    Err(e) => return err_reply(&format!("image decode task: {e}")),
+                };
+
+                // Build animation blob: concatenate encoded frame bodies
+                let enc = match self.encoder() {
+                    Some(e) => e,
+                    None => return err_reply("encoder not available (DIVOOMD_ENCODER_LIB)"),
+                };
+                let mut blob = Vec::new();
+                for (rgb, w, h, t) in &frames {
+                    let frame_body = if *w == 32 && *h == 32 {
+                        enc.encode_animation_frame_32(rgb, *w, *h, *t)
+                    } else {
+                        enc.encode_animation_frame(rgb, *w, *h, *t)
+                    };
+                    match frame_body {
+                        Some(b) => blob.extend_from_slice(&b),
+                        None => return err_reply(&format!("encode_animation_frame failed (frame {w}x{h})")),
+                    }
+                }
+
                 match dev.stream_animation_8b(&blob).await {
                     Ok(true) => json!({"success": true, "result": true}),
                     Ok(false) => err_reply("stream_animation_8b: empty blob"),
