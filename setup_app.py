@@ -16,9 +16,35 @@ TCC "responsible process" and macOS shows the normal Allow-Bluetooth prompt
 (instead of crashing on first CoreBluetooth touch). See scripts/make_app_bundle.sh
 for the background.
 """
+import os
+import tomllib
+from pathlib import Path
+
 from setuptools import setup
 
-VERSION = "0.15.2"
+
+def _version() -> str:
+    """Single source of truth for the app version, so the bundle's CFBundleVersion
+    can never drift from the package version (it did — the first v0.16.0 dmg
+    shipped an app stamped 0.15.2 because this was hardcoded).
+
+    Order: an explicit build override (DIVOOM_BUILD_VERSION, set by
+    scripts/build_release.sh), else pyproject.toml located by walking UP from this
+    file's resolved dir — robust to py2app running us with a relative __file__ or
+    from a temp cwd (the un-resolved Path(__file__).parent broke the build)."""
+    env = os.environ.get("DIVOOM_BUILD_VERSION")
+    if env:
+        return env
+    here = Path(__file__).resolve().parent
+    for d in (here, *here.parents):
+        pp = d / "pyproject.toml"
+        if pp.is_file():
+            with pp.open("rb") as f:
+                return tomllib.load(f)["project"]["version"]
+    raise RuntimeError("setup_app.py: could not locate pyproject.toml to read the version")
+
+
+VERSION = _version()
 BT_DESC = ("Divoom Control uses Bluetooth to discover and control your Divoom "
            "pixel display.")
 AE_DESC = ("Divoom Control reads the now-playing track from Music and Spotify to "

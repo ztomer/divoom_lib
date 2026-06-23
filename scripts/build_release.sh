@@ -34,6 +34,9 @@ if [[ ! -x "${PYBUILD}" ]]; then
 fi
 
 VERSION="$(grep -m1 '^version' pyproject.toml | sed -E 's/.*"(.*)".*/\1/')"
+# setup_app.py reads the version from this env override because the py2app step
+# below renames pyproject.toml out of the way (so setup_app can't read it then).
+export DIVOOM_BUILD_VERSION="${VERSION}"
 echo "Building Divoom Control v${VERSION}"
 
 # 1. Native dylib (palette encoder / downsampler / framing).
