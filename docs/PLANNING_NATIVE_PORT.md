@@ -179,8 +179,11 @@ hot paths (port to native Rust later only if it earns its keep).
    - **[DONE] command_queue** (tokio): FIFO + exclusive gate + `acquire_now`
      steal-reject + G3 idle auto-release + item timeout. Behavioral port (not a
      line port — the thread/loop bridge is gone); 5 tests mirror
-     `test_command_queue.py`. Next: notify/response correlation (autoprobe +
-     generic-ACK 0x33), then the COMMANDS map + NDJSON socket types.
+     `test_command_queue.py`.
+   - **[DONE] notify/response correlation** (`response.rs`): the route-notification
+     decision (generic-ACK 0x33 scalar-clear; listen-set priority) + `wait_for_response`
+     / `wait_for_any_response`. 10 tests pin the two load-bearing rules from this
+     session's iOS-LE revert and 0x8B fix. Next: COMMANDS map + NDJSON socket types.
 3. **Socket server** — NDJSON parity with `daemon_protocol.py`. Drive the existing
    Python test suite's socket-level cases against the Rust daemon for behavioral
    parity (run the Python `DaemonClient` against the Rust server).

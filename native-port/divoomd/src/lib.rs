@@ -11,3 +11,4 @@
 pub mod command_queue;
 pub mod framing;
 pub mod models;
+pub mod response;
