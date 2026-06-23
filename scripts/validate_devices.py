@@ -59,7 +59,7 @@ async def _run_step(results, label, coro, dwell):
 async def validate_device(address, name, dwell, quick):
     print(f"\n=== {name or 'device'} ({address}) ===")
     entry = {"address": address, "name": name, "connected": False, "steps": []}
-    dev = Divoom(mac=address, use_ios_le_protocol=False)
+    dev = Divoom(mac=address, use_ios_le_protocol=None)
     try:
         await dev.connect()
         entry["connected"] = bool(dev.is_connected)
@@ -131,7 +131,7 @@ async def validate_device_rigorous(address, name, dwell):
     """
     print(f"\n=== {name or 'device'} ({address}) [RIGOROUS] ===")
     entry = {"address": address, "name": name, "connected": False, "steps": []}
-    dev = Divoom(mac=address, use_ios_le_protocol=False)
+    dev = Divoom(mac=address, use_ios_le_protocol=None)
 
     def record(label, ok, detail=None):
         entry["steps"].append({"step": label, "ok": bool(ok), "error": None if ok else detail})
