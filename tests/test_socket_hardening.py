@@ -205,13 +205,14 @@ def test_subscriber_cap_rejects_excess():
 
 def test_connection_cap_rejects_when_full():
     # 1 handler slot, held by a subscriber → the next connection is "server busy".
+    # The server proactively sends the error reply and closes the connection,
+    # so we read the buffered reply without sending first.
     with _Server(max_connections=1, max_subscribers=8) as srv:
         held = srv.raw()
         held.sendall(encode_message({"command": "subscribe"}))
         _recv_reply(held)
         time.sleep(0.1)
         s2 = srv.raw()
-        s2.sendall(encode_message({"command": "ping"}))
         reply = _recv_reply(s2)
         assert reply and reply["success"] is False and reply["error"] == "server busy"
         held.close(); s2.close()
