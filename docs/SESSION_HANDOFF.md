@@ -18,17 +18,28 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **KASET ALBUM ART + CARD PADDING ROUND (2026-06-23 00:45 EDT):** Two independent
-  changes shipped this round.
+- **FEISHIN + KASET + CARD PADDING ROUND (2026-06-23 00:45 EDT):** Three changes.
+
+  **Feishin album art integration:** Added `/Applications/Feishin.app` (Electron-based
+  Navidrome client) as the first-checked now-playing source in
+  `media_source.py:get_current_playing_track()`. The integration works by:
+  1. Checking if Feishin is running via `pgrep`
+  2. Extracting Navidrome Subsonic API credentials from Feishin's Chromium Local
+     Storage (LevelDB files at `~/Library/Application Support/Feishin/Local Storage/leveldb/`)
+  3. Querying the Navidrome `/rest/getNowPlaying.view` Subsonic API endpoint
+  4. Building a cover art URL from `/rest/getCoverArt.view` when available
+  Credentials are cached for 60s to avoid repeated LevelDB file scans. The Navidrome
+  server URL + auth params (`u=...&s=...&t=...`) are extracted via regex scanning of
+  the LevelDB .ldb/.log files. Tests: 4 new Feishin-specific tests + updated Spotify
+  test for the new check order (12 total, all pass).
 
   **Kaset album art integration:** Added `/Applications/Kaset.app` (YouTube Music
-  client for macOS) as a third now-playing source in `media_source.py:get_current_playing_track()`,
-  checked BEFORE Spotify and Apple Music. Kaset's AppleScript `get player info` returns
-  a JSON blob with an `artworkURL` (YouTube thumbnail), so callers skip the iTunes
-  Search API for Kaset-originated tracks. All three callers (`live_jobs.py:run_music()`,
-  `media_sync.py:get_current_track_info()`, `media_sync.py:push_music_cover_now()`) fall
-  back to the iTunes API when no direct URL is provided (Spotify/Apple Music paths unchanged).
-  Tests: `test_get_current_playing_track_kaset` added, 8/8 pass.
+  client for macOS) as a now-playing source (checked second). Kaset's AppleScript
+  `get player info` returns a JSON blob with an `artworkURL` (YouTube thumbnail),
+  so callers skip the iTunes Search API for Kaset-originated tracks. All three callers
+  (`live_jobs.py:run_music()`, `media_sync.py:get_current_track_info()`,
+  `media_sync.py:push_music_cover_now()`) fall back to the iTunes API when no direct
+  URL is provided (Spotify/Apple Music paths unchanged).
 
   **Card padding tightened:** `.card` padding reduced from `20px` → `12px`,
   `--panel-gap` from `20px` → `12px`, `.card-header` margin-bottom from `15px` → `10px`

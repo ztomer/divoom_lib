@@ -10,19 +10,20 @@ from divoom_lib.utils import media_source
 
 
 def test_get_current_playing_track_spotify():
-    # Kaset check returns empty, then Spotify returns the track
     empty_mock = MagicMock()
     empty_mock.stdout = ""
     spotify_mock = MagicMock()
     spotify_mock.stdout = "Song Title -|- Artist Name"
     with patch("subprocess.run", side_effect=[empty_mock, spotify_mock]) as mock_run:
-        res = media_source.get_current_playing_track()
+        with patch.object(media_source, "_feishin_is_running", return_value=False):
+            res = media_source.get_current_playing_track()
         assert res == {
             "track": "Song Title",
             "artist": "Artist Name",
             "source": "Spotify",
             "artwork_url": None,
         }
+        # Kaset (empty) + Spotify (hit) — Music.app not reached
         assert mock_run.call_count == 2
 
 
@@ -38,7 +39,8 @@ def test_get_current_playing_track_kaset():
     mock_proc = MagicMock()
     mock_proc.stdout = kaset_json
     with patch("subprocess.run", return_value=mock_proc) as mock_run:
-        res = media_source.get_current_playing_track()
+        with patch.object(media_source, "_feishin_is_running", return_value=False):
+            res = media_source.get_current_playing_track()
         assert res == {
             "track": "Test Song",
             "artist": "Test Artist",
@@ -46,6 +48,68 @@ def test_get_current_playing_track_kaset():
             "artwork_url": "https://i.ytimg.com/vi/test/hqdefault.jpg",
         }
         mock_run.assert_called_once()
+
+
+def test_get_feishin_playing_track():
+    """Feishin returns a track via Navidrome Subsonic API."""
+    api_response = {
+        "subsonic-response": {
+            "status": "ok",
+            "nowPlaying": {
+                "entry": [{
+                    "title": "Feishin Song",
+                    "artist": "Feishin Artist",
+                    "coverArt": "ar-42",
+                }]
+            }
+        }
+    }
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(api_response).encode("utf-8")
+    with patch.object(media_source, "_feishin_is_running", return_value=True), \
+         patch.object(media_source, "_feishin_creds",
+                      return_value=("http://server:4533", "u=admin&s=abc&t=def")), \
+         patch("urllib.request.urlopen", return_value=MagicMock(__enter__=lambda self: mock_resp)):
+        res = media_source.get_feishin_playing_track()
+    assert res == {
+        "track": "Feishin Song",
+        "artist": "Feishin Artist",
+        "source": "Feishin",
+        "artwork_url": "http://server:4533/rest/getCoverArt.view?f=json&c=divoom&v=1.16.0&u=admin&s=abc&t=def&id=ar-42&size=500",
+    }
+
+
+def test_get_feishin_nothing_playing():
+    """Feishin running but no track playing."""
+    api_response = {
+        "subsonic-response": {
+            "status": "ok",
+            "nowPlaying": {}
+        }
+    }
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(api_response).encode("utf-8")
+    with patch.object(media_source, "_feishin_is_running", return_value=True), \
+         patch.object(media_source, "_feishin_creds",
+                      return_value=("http://server:4533", "u=admin&s=abc&t=def")), \
+         patch("urllib.request.urlopen", return_value=MagicMock(__enter__=lambda self: mock_resp)):
+        res = media_source.get_feishin_playing_track()
+    assert res is None
+
+
+def test_get_feishin_not_running():
+    """Feishin not running → no track."""
+    with patch.object(media_source, "_feishin_is_running", return_value=False):
+        res = media_source.get_feishin_playing_track()
+    assert res is None
+
+
+def test_get_feishin_no_creds():
+    """Feishin running but no credentials found."""
+    with patch.object(media_source, "_feishin_is_running", return_value=True), \
+         patch.object(media_source, "_feishin_creds", return_value=None):
+        res = media_source.get_feishin_playing_track()
+    assert res is None
 
 
 def test_fetch_album_art_url():

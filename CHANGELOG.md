@@ -49,18 +49,21 @@ This release bundles the fixes from v0.16.1 along with major milestones in the n
 
 ## Post-v0.20.1 — Kaset album art integration + card padding (2026-06-22)
 
-- **Kaset album art support**: Added Kaset (`/Applications/Kaset.app`) as a third
-  now-playing source (checked before Spotify and Apple Music). Kaset's AppleScript
-  `get player info` returns a JSON blob with direct YouTube thumbnail URLs, so
-  artwork sync now works for YouTube Music tracks without relying on the iTunes
-  Search API. `media_source.py:get_current_playing_track()` returns the enriched
-  dict with `artwork_url` field; callers in `live_jobs.py` and `media_sync.py` skip
-  the iTunes fallback when a direct URL is available.
+- **Kaset album art support**: Added Kaset (`/Applications/Kaset.app`) as a now-playing
+  source. Kaset's AppleScript `get player info` returns a JSON blob with direct YouTube
+  thumbnail URLs, so artwork sync works for YouTube Music tracks without the iTunes
+  Search API. Returns `artwork_url` in the enriched dict; callers skip the iTunes
+  fallback when a direct URL is available.
+- **Feishin album art support**: Added Feishin (`/Applications/Feishin.app`, an
+  Electron-based Navidrome client) as a now-playing source (checked first). Extracts
+  Subsonic API credentials from Feishin's Chromium Local Storage (LevelDB), then
+  queries the Navidrome server's `getNowPlaying` endpoint for track info and cover
+  art. Credentials are cached for 60s to avoid repeated LevelDB scans.
 - **Card padding tightened**: Reduced `.card` padding from `20px` → `12px`,
   `--panel-gap` from `20px` → `12px`, and `.card-header` margin-bottom from
   `15px` → `10px` so general tab panels (settings, routines, tools) match the
   tighter tile component spacing.
-- Tests: 8 passed (media_source), N/A full suite.
+- Tests: 12 passed (media_source).
 
 ---
 ## v0.16.1 — packaged app startup fix (2026-06-22)
