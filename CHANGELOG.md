@@ -5,6 +5,18 @@ format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
 ---
+## v0.16.0 — hardware-validated daemon fixes (2026-06-22)
+
+Packaged release bundling the HW-validated fixes below since v0.15.2: read-backs
+restored (iOS-LE ACK revert), exclusive steal-reject (no 30 s hang-then-steal),
+ACK != device-confirmed honesty for custom-art + hot-update, the 0x8B animation
+retransmit dead-path fix, and the native C image-encoder divergence fix + fast-path
+revival. All validated against a live Pixoo-1; suite 1700 passed. New socket
+response fields (`device_confirmed`, `confirmed`) are additive. This is the
+ground-truth Python release cut before the native-daemon port (see
+`docs/PLANNING_NATIVE_PORT.md`). Full notes: `docs/release_notes_v0.16.0.md`.
+
+---
 ## R53.x HW round: native C image encoder — divergence fixed + revived (2026-06-22)
 
 Two compounding bugs in the native image encoder:
