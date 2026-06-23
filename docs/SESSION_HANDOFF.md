@@ -18,6 +18,21 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE PORT: TOOL & NOTIFICATION COMMANDS (2026-06-23 14:30 EDT):**
+  Ported the device tool commands (scoreboard, timer, countdown, noise meter) and notification display commands to the native Rust daemon (`divoomd`):
+
+  **Scoreboard:** Ported `"scoreboard.set_scoreboard"`, `"set_scoreboard"`, `"scoreboard.get_scoreboard"`, and `"get_scoreboard"` (0x71/0x72 commands with type 1).
+
+  **Timer:** Ported `"timer.set_timer"`, `"set_timer"`, `"timer.get_timer"`, and `"get_timer"` (0x71/0x72 commands with type 0).
+
+  **Countdown:** Ported `"countdown.set_countdown"`, `"set_countdown"`, `"countdown.get_countdown"`, and `"get_countdown"` (0x71/0x72 commands with type 3).
+
+  **Noise Meter:** Ported `"noise.set_noise"`, `"set_noise"`, `"noise.get_noise"`, and `"get_noise"` (0x71/0x72 commands with type 2).
+
+  **Notification Display:** Ported `"device.show_notification"`, `"show_notification"`, `"notification.show_notification"`, `"device.show_notification_text"`, `"show_notification_text"`, and `"notification.show_notification_text"` (0x50 command handling icon-only and icon+text variations).
+
+  **E2E & Parity Tests:** Updated the `ported_commands_route_to_device_call` integration test in `tests/daemon_behavior.rs` to verify that all newly implemented commands and their aliases correctly match in the router and dispatch to the device transport. Verified both compilation and test suite correctness with and without the `ble` feature gate. Full Python pytest suite passes with 1706 passed, 87 skipped.
+
 - **NATIVE PORT: REMAINING DEVICE CALL COMMANDS (2026-06-23 10:23 EDT):**
   Ported the rest of the high-value `device_call` commands to the native Rust daemon (`divoomd`):
   

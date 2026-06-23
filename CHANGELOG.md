@@ -4,6 +4,16 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Post-v0.20.2 — Native Port Tool & Notification Commands (2026-06-23)
+
+- **Tool & Notification Commands**: Ported device tool commands and notification display commands to the native Rust daemon (`divoomd`), ensuring parity with the Python API:
+  - **Scoreboard**: Ported `"scoreboard.set_scoreboard"`, `"set_scoreboard"`, `"scoreboard.get_scoreboard"`, `"get_scoreboard"`.
+  - **Timer**: Ported `"timer.set_timer"`, `"set_timer"`, `"timer.get_timer"`, `"get_timer"`.
+  - **Countdown**: Ported `"countdown.set_countdown"`, `"set_countdown"`, `"countdown.get_countdown"`, `"get_countdown"`.
+  - **Noise Meter**: Ported `"noise.set_noise"`, `"set_noise"`, `"noise.get_noise"`, `"get_noise"`.
+  - **Notification Display**: Ported `"device.show_notification"`, `"show_notification"`, `"notification.show_notification"`, `"device.show_notification_text"`, `"show_notification_text"`, `"notification.show_notification_text"`.
+- **Parity & Tests**: Updated the `ported_commands_route_to_device_call` integration test in `tests/daemon_behavior.rs` to verify that all newly implemented commands and their aliases correctly match in the router and dispatch to the device transport. Verified both compilation and test suite correctness with and without the `ble` feature gate. Full Python pytest suite passes with 1706 passed, 87 skipped.
+
 ## Post-v0.20.2 — Native Port Remaining Device Call Commands (2026-06-23)
 
 - **Remaining Device Call Commands**: Ported the rest of the high-value `device_call` commands to the native Rust daemon (`divoomd`), ensuring 100% parity with the Python API:
