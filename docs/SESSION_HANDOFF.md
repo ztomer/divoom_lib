@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE PORT: SCHEDULING COMMANDS (2026-06-23 14:35 EDT):**
+  Ported the alarm, sleep, and timeplan scheduling commands to the native Rust daemon (`divoomd`):
+
+  **Alarm:** Ported `alarm.get_alarm_time`, `alarm.set_alarm`, `alarm.set_alarm_gif`, `alarm.get_memorial_time`, `alarm.set_memorial_time`, `alarm.set_memorial_gif`, `alarm.set_alarm_listen`, `alarm.set_alarm_volume`, and `alarm.set_alarm_volume_control` (with direct name and alias dispatch). Deserialized and parsed 10-byte alarm info blocks and 39-byte memorial blocks.
+
+  **Sleep:** Ported `sleep.show_sleep`, `sleep.get_sleep_scene`, `sleep.set_sleep_scene_listen`, `sleep.set_scene_volume`, `sleep.set_sleep_color`, `sleep.set_sleep_light`, and `sleep.set_sleep_scene` (with direct name and alias dispatch). Deserialized and parsed 10-byte sleep scene status blocks.
+
+  **Timeplan:** Ported `timeplan.set_time_manage_info` and `timeplan.set_time_manage_ctrl` (with direct name and alias dispatch). Mapped to command codes `0x56` and `0x57` respectively.
+
+  **E2E & Parity Tests:** Updated the `ported_commands_route_to_device_call` integration test in `tests/daemon_behavior.rs` to verify that all newly implemented commands and their aliases correctly match in the router and dispatch to the device transport. Verified both compilation and test suite correctness with and without the `ble` feature gate. Full Python pytest suite passes with 1706 passed, 87 skipped.
+
 - **NATIVE PORT: TOOL & NOTIFICATION COMMANDS (2026-06-23 14:30 EDT):**
   Ported the device tool commands (scoreboard, timer, countdown, noise meter) and notification display commands to the native Rust daemon (`divoomd`):
 

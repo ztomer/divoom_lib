@@ -747,6 +747,522 @@ impl Daemon {
                     Err(e) => err_reply(&format!("show_notification_text failed: {e}")),
                 }
             }
+            // alarm.get_alarm_time / get_alarm_time
+            "alarm.get_alarm_time" | "get_alarm_time" => {
+                match dev.send_command_and_wait(0x42, &[], timeout).await {
+                    Some(p) => {
+                        let record_len = 10;
+                        let count = std::cmp::min(10, p.len() / record_len);
+                        let mut alarms = Vec::with_capacity(count);
+                        for i in 0..count {
+                            let start = i * record_len;
+                            let block = &p[start..start + record_len];
+                            alarms.push(json!({
+                                "status": block[1] as i64,
+                                "hour": block[2] as i64,
+                                "minute": block[3] as i64,
+                                "week": block[4] as i64,
+                                "mode": block[5] as i64,
+                                "trigger_mode": block[6] as i64,
+                                "fm_freq": u16::from_le_bytes([block[7], block[8]]) as i64,
+                                "volume": block[9] as i64,
+                            }));
+                        }
+                        json!({"success": true, "result": alarms})
+                    }
+                    _ => json!({"success": true, "result": Value::Null}),
+                }
+            }
+            // alarm.set_alarm / set_alarm
+            "alarm.set_alarm" | "set_alarm" => {
+                let alarm_index = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("alarm_index")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let status = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("status")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let hour = args.get(2).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("hour")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let minute = args.get(3).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("minute")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let week = args.get(4).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("week")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let mode = args.get(5).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("mode")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let trigger_mode = args.get(6).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("trigger_mode")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let fm_freq = args.get(7).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("fm_freq")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u16;
+                let volume = args.get(8).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("volume")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+
+                let mut payload = Vec::with_capacity(10);
+                payload.push(alarm_index);
+                payload.push(status);
+                payload.push(hour);
+                payload.push(minute);
+                payload.push(week);
+                payload.push(mode);
+                payload.push(trigger_mode);
+                payload.extend_from_slice(&fm_freq.to_le_bytes());
+                payload.push(volume);
+
+                match dev.send_command(0x43, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_alarm failed: {e}")),
+                }
+            }
+            // alarm.set_alarm_gif / set_alarm_gif
+            "alarm.set_alarm_gif" | "set_alarm_gif" => {
+                let alarm_index = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("alarm_index")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let total_length = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("total_length")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u16;
+                let gif_id = args.get(2).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("gif_id")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let data: Vec<u8> = raw_args.get(3)
+                    .and_then(|v| v.as_array())
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("data")).and_then(|v| v.as_array()))
+                    .map(|a| a.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect())
+                    .unwrap_or_default();
+
+                let mut payload = Vec::with_capacity(4 + data.len());
+                payload.push(alarm_index);
+                payload.extend_from_slice(&total_length.to_le_bytes());
+                payload.push(gif_id);
+                payload.extend_from_slice(&data);
+
+                match dev.send_command(0x51, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_alarm_gif failed: {e}")),
+                }
+            }
+            // alarm.get_memorial_time / get_memorial_time
+            "alarm.get_memorial_time" | "get_memorial_time" => {
+                match dev.send_command_and_wait(0x53, &[], timeout).await {
+                    Some(p) => {
+                        let record_len = 39;
+                        let count = std::cmp::min(10, p.len() / record_len);
+                        let mut memorials = Vec::with_capacity(count);
+                        for i in 0..count {
+                            let start = i * record_len;
+                            let block = &p[start..start + record_len];
+                            let title = String::from_utf8_lossy(&block[7..39])
+                                .trim_end_matches('\0')
+                                .to_string();
+                            memorials.push(json!({
+                                "dialy_id": block[0] as i64,
+                                "on_off": block[1] as i64,
+                                "month": block[2] as i64,
+                                "day": block[3] as i64,
+                                "hour": block[4] as i64,
+                                "minute": block[5] as i64,
+                                "have_flag": block[6] as i64,
+                                "title_name": title,
+                            }));
+                        }
+                        json!({"success": true, "result": memorials})
+                    }
+                    _ => json!({"success": true, "result": Value::Null}),
+                }
+            }
+            // alarm.set_memorial_time / set_memorial_time
+            "alarm.set_memorial_time" | "set_memorial_time" => {
+                let dialy_id = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("dialy_id")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let on_off = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("on_off")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let month = args.get(2).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("month")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let day = args.get(3).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("day")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let hour = args.get(4).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("hour")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let minute = args.get(5).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("minute")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let have_flag = args.get(6).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("have_flag")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let title_name = raw_args.get(7)
+                    .and_then(|v| v.as_str())
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("title_name")).and_then(|v| v.as_str()))
+                    .unwrap_or("");
+
+                let mut title_bytes = title_name.as_bytes().to_vec();
+                if title_bytes.len() > 32 {
+                    title_bytes.truncate(32);
+                }
+                while title_bytes.len() < 32 {
+                    title_bytes.push(0);
+                }
+
+                let mut payload = Vec::with_capacity(39);
+                payload.push(dialy_id);
+                payload.push(on_off);
+                payload.push(month);
+                payload.push(day);
+                payload.push(hour);
+                payload.push(minute);
+                payload.push(have_flag);
+                payload.extend_from_slice(&title_bytes);
+
+                match dev.send_command(0x54, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_memorial_time failed: {e}")),
+                }
+            }
+            // alarm.set_memorial_gif / set_memorial_gif
+            "alarm.set_memorial_gif" | "set_memorial_gif" => {
+                let memorial_index = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("memorial_index")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let total_length = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("total_length")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u16;
+                let gif_id = args.get(2).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("gif_id")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let data: Vec<u8> = raw_args.get(3)
+                    .and_then(|v| v.as_array())
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("data")).and_then(|v| v.as_array()))
+                    .map(|a| a.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect())
+                    .unwrap_or_default();
+
+                let mut payload = Vec::with_capacity(4 + data.len());
+                payload.push(memorial_index);
+                payload.extend_from_slice(&total_length.to_le_bytes());
+                payload.push(gif_id);
+                payload.extend_from_slice(&data);
+
+                match dev.send_command(0x55, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_memorial_gif failed: {e}")),
+                }
+            }
+            // alarm.set_alarm_listen / set_alarm_listen
+            "alarm.set_alarm_listen" | "set_alarm_listen" => {
+                let on_off = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("on_off")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let mode = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("mode")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let volume = args.get(2).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("volume")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                match dev.send_command(0xa5, &[on_off, mode, volume], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_alarm_listen failed: {e}")),
+                }
+            }
+            // alarm.set_alarm_volume / set_alarm_volume
+            "alarm.set_alarm_volume" | "set_alarm_volume" => {
+                let volume = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("volume")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                match dev.send_command(0xa6, &[volume], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_alarm_volume failed: {e}")),
+                }
+            }
+            // alarm.set_alarm_volume_control / set_alarm_volume_control
+            "alarm.set_alarm_volume_control" | "set_alarm_volume_control" => {
+                let control = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("control")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let index = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("index")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                match dev.send_command(0x82, &[control, index], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_alarm_volume_control failed: {e}")),
+                }
+            }
+            // sleep.show_sleep / show_sleep
+            "sleep.show_sleep" | "show_sleep" => {
+                let kw = req.args.get("kwargs");
+                let sleeptime = kw.and_then(|v| v.get("sleeptime")).and_then(|v| v.as_i64())
+                    .or_else(|| args.first().copied())
+                    .unwrap_or(60) as u8;
+                let sleepmode = kw.and_then(|v| v.get("sleepmode")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(1).copied())
+                    .unwrap_or(0) as u8;
+                let on = kw.and_then(|v| v.get("on")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(2).copied())
+                    .unwrap_or(1) as u8;
+                let frequency = kw.and_then(|v| v.get("frequency")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(3).copied())
+                    .unwrap_or(0) as u16;
+                let volume = kw.and_then(|v| v.get("volume")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(4).copied())
+                    .unwrap_or(16) as u8;
+                let color_val = kw.and_then(|v| v.get("color"))
+                    .or_else(|| raw_args.get(5));
+                let [r, g, b] = if let Some(cv) = color_val {
+                    if let Some(arr) = cv.as_array() {
+                        let ns: Vec<u8> = arr.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect();
+                        if ns.len() >= 3 { [ns[0], ns[1], ns[2]] } else { [255, 255, 255] }
+                    } else if let Some(s) = cv.as_str() {
+                        parse_hex_color(s).unwrap_or([255, 255, 255])
+                    } else {
+                        [255, 255, 255]
+                    }
+                } else {
+                    [255, 255, 255]
+                };
+                let brightness = kw.and_then(|v| v.get("brightness")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(6).copied())
+                    .unwrap_or(100) as u8;
+
+                let mut payload = Vec::with_capacity(10);
+                payload.push(sleeptime);
+                payload.push(sleepmode);
+                payload.push(on);
+                payload.extend_from_slice(&frequency.to_le_bytes());
+                payload.push(volume);
+                payload.push(r);
+                payload.push(g);
+                payload.push(b);
+                payload.push(brightness);
+
+                match dev.send_command(0x40, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("show_sleep failed: {e}")),
+                }
+            }
+            // sleep.get_sleep_scene / get_sleep_scene
+            "sleep.get_sleep_scene" | "get_sleep_scene" => {
+                match dev.send_command_and_wait(0xa2, &[], timeout).await {
+                    Some(p) if p.len() >= 10 => json!({
+                        "success": true,
+                        "result": {
+                            "time": p[0] as i64,
+                            "mode": p[1] as i64,
+                            "on": p[2] as i64,
+                            "fm_freq": u16::from_le_bytes([p[3], p[4]]) as i64,
+                            "volume": p[5] as i64,
+                            "color_r": p[6] as i64,
+                            "color_g": p[7] as i64,
+                            "color_b": p[8] as i64,
+                            "light": p[9] as i64,
+                        }
+                    }),
+                    _ => json!({"success": true, "result": Value::Null}),
+                }
+            }
+            // sleep.set_sleep_scene_listen / set_sleep_scene_listen
+            "sleep.set_sleep_scene_listen" | "set_sleep_scene_listen" => {
+                let on_off = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("on_off")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let mode = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("mode")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let volume = args.get(2).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("volume")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                match dev.send_command(0xa3, &[on_off, mode, volume], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_sleep_scene_listen failed: {e}")),
+                }
+            }
+            // sleep.set_scene_volume / set_scene_volume
+            "sleep.set_scene_volume" | "set_scene_volume" => {
+                let volume = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("volume")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                match dev.send_command(0xa4, &[volume], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_scene_volume failed: {e}")),
+                }
+            }
+            // sleep.set_sleep_color / set_sleep_color
+            "sleep.set_sleep_color" | "set_sleep_color" => {
+                let color_val = raw_args.first()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("color")));
+                let [r, g, b] = if let Some(cv) = color_val {
+                    if let Some(arr) = cv.as_array() {
+                        let ns: Vec<u8> = arr.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect();
+                        if ns.len() >= 3 { [ns[0], ns[1], ns[2]] } else { [255, 255, 255] }
+                    } else if let Some(s) = cv.as_str() {
+                        parse_hex_color(s).unwrap_or([255, 255, 255])
+                    } else {
+                        [255, 255, 255]
+                    }
+                } else {
+                    [255, 255, 255]
+                };
+                match dev.send_command(0xad, &[r, g, b], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_sleep_color failed: {e}")),
+                }
+            }
+            // sleep.set_sleep_light / set_sleep_light
+            "sleep.set_sleep_light" | "set_sleep_light" => {
+                let light = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("light")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                match dev.send_command(0xae, &[light], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_sleep_light failed: {e}")),
+                }
+            }
+            // sleep.set_sleep_scene / set_sleep_scene
+            "sleep.set_sleep_scene" | "set_sleep_scene" => {
+                let mode = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("mode")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let on = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("on")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let fm_freq: Vec<u8> = raw_args.get(2)
+                    .and_then(|v| v.as_array())
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("fm_freq")).and_then(|v| v.as_array()))
+                    .map(|a| a.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect())
+                    .unwrap_or_else(|| vec![0, 0]);
+                let fm_freq = if fm_freq.len() >= 2 { fm_freq } else { vec![0, 0] };
+                let volume = args.get(3).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("volume")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let color_val = raw_args.get(4)
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("color")));
+                let [r, g, b] = if let Some(cv) = color_val {
+                    if let Some(arr) = cv.as_array() {
+                        let ns: Vec<u8> = arr.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect();
+                        if ns.len() >= 3 { [ns[0], ns[1], ns[2]] } else { [255, 255, 255] }
+                    } else if let Some(s) = cv.as_str() {
+                        parse_hex_color(s).unwrap_or([255, 255, 255])
+                    } else {
+                        [255, 255, 255]
+                    }
+                } else {
+                    [255, 255, 255]
+                };
+                let light = args.get(5).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("light")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+
+                let mut payload = Vec::with_capacity(9);
+                payload.push(mode);
+                payload.push(on);
+                payload.extend_from_slice(&fm_freq[0..2]);
+                payload.push(volume);
+                payload.push(r);
+                payload.push(g);
+                payload.push(b);
+                payload.push(light);
+
+                match dev.send_command(0x41, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_sleep_scene failed: {e}")),
+                }
+            }
+            // timeplan.set_time_manage_info / set_time_manage_info
+            "timeplan.set_time_manage_info" | "set_time_manage_info" => {
+                let kw = req.args.get("kwargs");
+                let status = kw.and_then(|v| v.get("status")).and_then(|v| v.as_i64())
+                    .or_else(|| args.first().copied())
+                    .unwrap_or(0) as u8;
+                let hour = kw.and_then(|v| v.get("hour")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(1).copied())
+                    .unwrap_or(0) as u8;
+                let minute = kw.and_then(|v| v.get("minute")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(2).copied())
+                    .unwrap_or(0) as u8;
+                let week = kw.and_then(|v| v.get("week")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(3).copied())
+                    .unwrap_or(0) as u8;
+                let mode = kw.and_then(|v| v.get("mode")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(4).copied())
+                    .unwrap_or(0) as u8;
+                let trigger_mode = kw.and_then(|v| v.get("trigger_mode")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(5).copied())
+                    .unwrap_or(0) as u8;
+                let fm_freq = kw.and_then(|v| v.get("fm_freq")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(6).copied())
+                    .unwrap_or(0) as u16;
+                let volume = kw.and_then(|v| v.get("volume")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(7).copied())
+                    .unwrap_or(0) as u8;
+                let tp_type = kw.and_then(|v| v.get("type")).and_then(|v| v.as_i64())
+                    .or_else(|| args.get(8).copied())
+                    .unwrap_or(0) as u8;
+
+                let mut payload = Vec::with_capacity(10);
+                payload.push(status);
+                payload.push(hour);
+                payload.push(minute);
+                payload.push(week);
+                payload.push(mode);
+                payload.push(trigger_mode);
+                payload.extend_from_slice(&fm_freq.to_le_bytes());
+                payload.push(volume);
+                payload.push(tp_type);
+
+                if tp_type == 0 {
+                    let animation_id = kw.and_then(|v| v.get("animation_id")).and_then(|v| v.as_i64())
+                        .or_else(|| args.get(9).copied())
+                        .unwrap_or(0) as u8;
+                    let animation_speed = kw.and_then(|v| v.get("animation_speed")).and_then(|v| v.as_i64())
+                        .or_else(|| args.get(10).copied())
+                        .unwrap_or(0) as u8;
+                    let animation_direction = kw.and_then(|v| v.get("animation_direction")).and_then(|v| v.as_i64())
+                        .or_else(|| args.get(11).copied())
+                        .unwrap_or(0) as u8;
+                    let animation_frame_count = kw.and_then(|v| v.get("animation_frame_count")).and_then(|v| v.as_i64())
+                        .or_else(|| args.get(12).copied())
+                        .unwrap_or(0) as u8;
+                    let animation_frame_delay = kw.and_then(|v| v.get("animation_frame_delay")).and_then(|v| v.as_i64())
+                        .or_else(|| args.get(13).copied())
+                        .unwrap_or(0) as u8;
+                    let animation_frame_data: Vec<u8> = raw_args.get(14)
+                        .and_then(|v| v.as_array())
+                        .or_else(|| kw.and_then(|v| v.get("animation_frame_data")).and_then(|v| v.as_array()))
+                        .map(|a| a.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect())
+                        .unwrap_or_default();
+
+                    payload.push(animation_id);
+                    payload.push(animation_speed);
+                    payload.push(animation_direction);
+                    payload.push(animation_frame_count);
+                    payload.push(animation_frame_delay);
+                    payload.extend_from_slice(&animation_frame_data);
+                }
+
+                match dev.send_command(0x56, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_time_manage_info failed: {e}")),
+                }
+            }
+            // timeplan.set_time_manage_ctrl / set_time_manage_ctrl
+            "timeplan.set_time_manage_ctrl" | "set_time_manage_ctrl" => {
+                let status = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("status")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                let index = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("index")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u8;
+                match dev.send_command(0x57, &[status, index], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_time_manage_ctrl failed: {e}")),
+                }
+            }
             m => err_reply(&format!("device_call method not ported yet: {m}")),
         }
     }

@@ -4,6 +4,14 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Post-v0.20.2 — Native Port Scheduling Commands (2026-06-23)
+
+- **Scheduling Commands**: Ported alarm, sleep, and timeplan scheduling commands to the native Rust daemon (`divoomd`), ensuring parity with the Python API:
+  - **Alarm**: Ported `alarm.get_alarm_time`, `alarm.set_alarm`, `alarm.set_alarm_gif`, `alarm.get_memorial_time`, `alarm.set_memorial_time`, `alarm.set_memorial_gif`, `alarm.set_alarm_listen`, `alarm.set_alarm_volume`, `alarm.set_alarm_volume_control`.
+  - **Sleep**: Ported `sleep.show_sleep`, `sleep.get_sleep_scene`, `sleep.set_sleep_scene_listen`, `sleep.set_scene_volume`, `sleep.set_sleep_color`, `sleep.set_sleep_light`, `sleep.set_sleep_scene`.
+  - **Timeplan**: Ported `timeplan.set_time_manage_info`, `timeplan.set_time_manage_ctrl`.
+- **Parity & Tests**: Updated the `ported_commands_route_to_device_call` integration test in `tests/daemon_behavior.rs` to verify that all newly implemented commands and their aliases correctly match in the router and dispatch to the device transport. Verified both compilation and test suite correctness with and without the `ble` feature gate. Full Python pytest suite passes with 1706 passed, 87 skipped.
+
 ## Post-v0.20.2 — Native Port Tool & Notification Commands (2026-06-23)
 
 - **Tool & Notification Commands**: Ported device tool commands and notification display commands to the native Rust daemon (`divoomd`), ensuring parity with the Python API:
