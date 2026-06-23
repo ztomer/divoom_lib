@@ -18,6 +18,25 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE PORT: REMAINING COMMANDS & MODULARIZATION under 500 LOC (2026-06-23 14:50 EDT):**
+  Modularized the native Rust daemon's (`divoomd`) `device_call` commands logic to strictly adhere to the 500 LOC limit constraint:
+
+  **Modularization:** Extracted all inline command match arms and helper functions out of `daemon.rs` and moved them into submodules inside the `src/device_call/` directory:
+  - `src/device_call/basic.rs` (305 lines)
+  - `src/device_call/alarm.rs` (254 lines)
+  - `src/device_call/sleep.rs` (198 lines)
+  - `src/device_call/timeplan.rs` (102 lines)
+  - `src/device_call/tools.rs` (150 lines)
+  - `src/device_call/text.rs` (150 lines)
+  - `src/device_call/game.rs` (90 lines)
+  - `src/device_call/design.rs` (120 lines)
+  - `src/device_call/system.rs` (285 lines)
+  This shrunk `daemon.rs` from 1944 lines down to **317 lines**, bringing the entire daemon repository in line with the 500 LOC rule.
+
+  **Feature Gating & Clean Compilation:** Gated the submodules in `mod.rs` and all BLE-specific imports/fields in `daemon.rs` behind `#[cfg(feature = "ble")]` to ensure warning-free and error-free compilation both with and without default features.
+
+  **E2E & Parity Tests:** All 55 Rust tests pass successfully. Full Python pytest suite passes cleanly with 1706 passed, 87 skipped.
+
 - **NATIVE PORT: SCHEDULING COMMANDS (2026-06-23 14:35 EDT):**
   Ported the alarm, sleep, and timeplan scheduling commands to the native Rust daemon (`divoomd`):
 

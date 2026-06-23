@@ -4,6 +4,12 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Post-v0.20.2 — Native Port Remaining Commands & Modularization (2026-06-23)
+
+- **Modularization & 500 LOC Enforcement**: Refactored the native Rust daemon (`divoomd`) by migrating all remaining device command logic from `src/daemon.rs` into modular submodules under `src/device_call/`. This shrinks `daemon.rs` from 1944 lines down to 317 lines (complying with the 500 LOC limit).
+- **Clean Compilation & Feature Gating**: Gated the submodules in `mod.rs` and all BLE-specific imports/fields in `daemon.rs` behind `#[cfg(feature = "ble")]` to ensure warning-free compilation both with and without default features.
+- **Verification & Tests**: Verified that all Rust tests (55 passed) and the full Python test suite (1706 passed, 87 skipped) pass successfully.
+
 ## Post-v0.20.2 — Native Port Scheduling Commands (2026-06-23)
 
 - **Scheduling Commands**: Ported alarm, sleep, and timeplan scheduling commands to the native Rust daemon (`divoomd`), ensuring parity with the Python API:

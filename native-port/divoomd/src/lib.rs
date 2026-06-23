@@ -22,3 +22,4 @@ pub mod native_encode;
 pub mod protocol;
 pub mod response;
 pub mod socket_server;
+pub mod device_call;
