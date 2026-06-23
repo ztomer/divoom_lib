@@ -79,7 +79,11 @@ class DivoomConnection(DeviceTransport):
 
         # 2. Check if device kind suggests Bluetooth Classic SPP transport
         use_spp = False
-        if not is_mock and device_name and not self.use_ios_le_protocol:
+        # Only route to SPP when protocol is explicitly set to Basic (False).
+        # When use_ios_le_protocol is None (unknown/unprobed), the autoprobe in
+        # BLETransport.connect() determines it dynamically — don't pre-empt it
+        # with an SPP redirect for a device that may be BLE-only.
+        if not is_mock and device_name and self.use_ios_le_protocol is False:
             name_lower = device_name.lower()
             if any(kw in name_lower for kw in ["timoo", "tivoo", "ditoo", "pixoo", "timebox", "divoom"]):
                 if "pixoo 64" not in name_lower and "pixoo-64" not in name_lower:

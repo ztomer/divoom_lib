@@ -18,6 +18,29 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **TIVOO-MAX SPP ROUTING FIX (2026-06-22 23:45 EDT):** Debugged why Tivoo-Max BLE
+  connections fail. Investigation found 2 bugs in the SPP routing code:
+
+  **Bug 1: `owner_connect.py:_ensure_device_async` (line 118)** — hardcoded
+  `use_ios_le_protocol=False` for ALL devices on the daemon's auto-reconnect path.
+  When a Tivoo-Max is auto-discovered (no specific mac requested), the daemon creates
+  a `Divoom` with `use_ios_le_protocol=False`. The SPP routing code (`connection.py:82`)
+  sees this falsy value and, because the device name contains "tivoo", switches to
+  Bluetooth Classic SPP transport instead of BLE. SPP on macOS has a known "Tahoe
+  reconnection bug" that produces opaque timeouts. Fix: changed to `use_ios_le_protocol=None`
+  so the autoprobe dynamically determines the correct BLE protocol.
+
+  **Bug 2: `connection.py:connect` (line 82)** — SPP routing condition was
+  `not self.use_ios_le_protocol`, which fires for BOTH `False` (explicit Basic protocol)
+  AND `None` (unknown/unprobed). When protocol is unknown, `BLETransport.connect()` runs
+  the autoprobe to determine iOS-LE vs Basic over BLE — SPP should NOT pre-empt that.
+  Fix: changed to `self.use_ios_le_protocol is False` so SPP routing only fires when
+  explicitly set to Basic protocol.
+
+  Also added `test_spp_not_routed_for_unknown_protocol` to codify the fix. Updated
+  `test_spp_connection_resolution` to use explicit `use_ios_le_protocol=False`.
+  Suite: 1701 passed, 87 skipped.
+
 - **CASK RELEASE / SCAN-TIMEOUT BACKSTOP FIX ROUND (2026-06-22 23:30 EDT):** After the
   cask install, `brew reinstall --cask divoom-control` succeeded but the user reported
   the app "can't detect any device — connects to one device (Tivoo) then gets stuck".

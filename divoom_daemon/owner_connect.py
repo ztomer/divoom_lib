@@ -115,7 +115,7 @@ class OwnerConnectMixin:
             if not devs:
                 raise RuntimeError("no Divoom device found")
             target = devs[0]["address"]
-        dev = Divoom(mac=target, logger=logger, use_ios_le_protocol=False)
+        dev = Divoom(mac=target, logger=logger, use_ios_le_protocol=None)
         res = await ensure_connected(dev)
         if not res.ok:
             raise BleConnectionError(res)

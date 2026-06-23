@@ -10,16 +10,42 @@ from divoom_lib.divoom import Divoom
 from divoom_lib.exceptions import DeviceConnectionError
 
 @pytest.mark.asyncio
-async def test_spp_connection_resolution():
-    """Verify that a device with a classic name triggers SPP connection and resolves Classic MAC via IOBluetooth."""
+async def test_spp_not_routed_for_unknown_protocol():
+    """SPP routing does NOT fire when use_ios_le_protocol=None (unknown).
+    The autoprobe in BLETransport.connect() determines the protocol dynamically;
+    don't pre-empt it with an SPP redirect for a BLE-only device."""
     mock_paired_device = MagicMock()
     mock_paired_device.getName.return_value = "Timoo-audio-4"
     mock_paired_device.getAddressString.return_value = "11-75-58-54-b9-13"
     
     mock_iobluetooth.IOBluetoothDevice.pairedDevices.return_value = [mock_paired_device]
     
-    # Construct Divoom with name Timoo
-    divoom = Divoom(mac="11-75-58-54-b9-13", device_name="Timoo")
+    # Construct Divoom with name Timoo, protocol unset (None = autodetect)
+    divoom = Divoom(mac="11-75-58-54-b9-13", device_name="Timoo",
+                     use_ios_le_protocol=None)
+    
+    with patch("divoom_lib.bt_spp_transport.BTSppTransport") as MockTransport:
+        # BLE connect will be attempted (no SPP routing for unknown protocol)
+        # Since there's no real BLE device at this address, it raises. The
+        # important check: SPP transport was NEVER instantiated.
+        with pytest.raises(DeviceConnectionError):
+            await divoom.connect()
+        MockTransport.assert_not_called()
+        assert divoom._conn._use_spp is False
+
+@pytest.mark.asyncio
+async def test_spp_connection_resolution():
+    """A device with explicit use_ios_le_protocol=False AND a matching classic
+    name still routes to SPP transport for legacy Bluetooth Classic devices."""
+    mock_paired_device = MagicMock()
+    mock_paired_device.getName.return_value = "Timoo-audio-4"
+    mock_paired_device.getAddressString.return_value = "11-75-58-54-b9-13"
+    
+    mock_iobluetooth.IOBluetoothDevice.pairedDevices.return_value = [mock_paired_device]
+    
+    # Explicitly set use_ios_le_protocol=False (Basic protocol → SPP routing)
+    divoom = Divoom(mac="11-75-58-54-b9-13", device_name="Timoo",
+                     use_ios_le_protocol=False)
     
     # Mock BTSppTransport connect & properties
     with patch("divoom_lib.bt_spp_transport.BTSppTransport") as MockTransport:

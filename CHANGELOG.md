@@ -20,7 +20,7 @@ This release bundles the fixes from v0.16.1 along with major milestones in the n
   - **Command Queue Parity:** Brought command queue implementation to behavioral parity using Tokio (`eddec22`).
   - **Notify/Response Correlation:** Completed correlation matching for async notifications and command responses in Rust (`6d27a0e`).
 
-## Post-v0.20.0 — cask release / test fix / scan-timeout backstop (2026-06-22)
+## Post-v0.20.0 — cask release / test fix / scan-timeout backstop / Tivoo-Max SPP fix (2026-06-22)
 
 - **Homebrew cask released**: Created GitHub release `v0.20.0` on `ztomer/divoom_lib` and
   uploaded `Divoom-v0.20.0.dmg` so the Homebrew cask URL resolves. Reinstall verified working.
@@ -36,7 +36,16 @@ This release bundles the fixes from v0.16.1 along with major milestones in the n
      `_SCAN_RESULT_TIMEOUT` (90s) at the daemon level.
   3. `app_init.js:load_config` — the HTML `<input max="120">` was bypassed when JS set
      timeout from config (e.g., 360). Now clamped to `el.max` before assignment.
-- Suite: 1700 passed, 87 skipped.
+- **Tivoo-Max SPP routing fix (2 bugs)**:
+  1. `owner_connect.py:_ensure_device_async` hardcoded `use_ios_le_protocol=False` for ALL
+     devices on the daemon's auto-reconnect path. For a Tivoo-Max (or any device with "tivoo"
+     in the name), this triggered SPP (Bluetooth Classic RFCOMM) routing instead of BLE.
+     SPP has a known "macOS Tahoe reconnection bug" that times out. Fix: use `None` (auto-detect via autoprobe).
+  2. `connection.py:connect` — the SPP routing condition `not self.use_ios_le_protocol` fired
+     for both `False` (explicit Basic) AND `None` (unknown/unprobed). When protocol is unknown,
+     the autoprobe should determine it first via BLE, not pre-empt with SPP. Fix: change to
+     `self.use_ios_le_protocol is False`.
+- Suite: 1701 passed, 87 skipped.
 
 ---
 ## v0.16.1 — packaged app startup fix (2026-06-22)
