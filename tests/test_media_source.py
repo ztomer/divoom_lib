@@ -7,6 +7,7 @@ import pytest
 from PIL import Image
 
 from divoom_lib.utils import media_source
+from divoom_lib.utils import media_source_feishin as feishin_mod
 
 
 def test_get_current_playing_track_spotify():
@@ -15,7 +16,7 @@ def test_get_current_playing_track_spotify():
     spotify_mock = MagicMock()
     spotify_mock.stdout = "Song Title -|- Artist Name"
     with patch("subprocess.run", side_effect=[empty_mock, spotify_mock]) as mock_run:
-        with patch.object(media_source, "_feishin_is_running", return_value=False):
+        with patch.object(feishin_mod, "_feishin_is_running", return_value=False):
             res = media_source.get_current_playing_track()
         assert res == {
             "track": "Song Title",
@@ -39,7 +40,7 @@ def test_get_current_playing_track_kaset():
     mock_proc = MagicMock()
     mock_proc.stdout = kaset_json
     with patch("subprocess.run", return_value=mock_proc) as mock_run:
-        with patch.object(media_source, "_feishin_is_running", return_value=False):
+        with patch.object(feishin_mod, "_feishin_is_running", return_value=False):
             res = media_source.get_current_playing_track()
         assert res == {
             "track": "Test Song",
@@ -66,11 +67,11 @@ def test_get_feishin_playing_track():
     }
     mock_resp = MagicMock()
     mock_resp.read.return_value = json.dumps(api_response).encode("utf-8")
-    with patch.object(media_source, "_feishin_is_running", return_value=True), \
-         patch.object(media_source, "_feishin_creds",
+    with patch.object(feishin_mod, "_feishin_is_running", return_value=True), \
+         patch.object(feishin_mod, "_feishin_creds",
                       return_value=("http://server:4533", "u=admin&s=abc&t=def")), \
          patch("urllib.request.urlopen", return_value=MagicMock(__enter__=lambda self: mock_resp)):
-        res = media_source.get_feishin_playing_track()
+        res = feishin_mod.get_feishin_playing_track()
     assert res == {
         "track": "Feishin Song",
         "artist": "Feishin Artist",
@@ -89,26 +90,26 @@ def test_get_feishin_nothing_playing():
     }
     mock_resp = MagicMock()
     mock_resp.read.return_value = json.dumps(api_response).encode("utf-8")
-    with patch.object(media_source, "_feishin_is_running", return_value=True), \
-         patch.object(media_source, "_feishin_creds",
+    with patch.object(feishin_mod, "_feishin_is_running", return_value=True), \
+         patch.object(feishin_mod, "_feishin_creds",
                       return_value=("http://server:4533", "u=admin&s=abc&t=def")), \
          patch("urllib.request.urlopen", return_value=MagicMock(__enter__=lambda self: mock_resp)):
-        res = media_source.get_feishin_playing_track()
+        res = feishin_mod.get_feishin_playing_track()
     assert res is None
 
 
 def test_get_feishin_not_running():
     """Feishin not running → no track."""
-    with patch.object(media_source, "_feishin_is_running", return_value=False):
-        res = media_source.get_feishin_playing_track()
+    with patch.object(feishin_mod, "_feishin_is_running", return_value=False):
+        res = feishin_mod.get_feishin_playing_track()
     assert res is None
 
 
 def test_get_feishin_no_creds():
     """Feishin running but no credentials found."""
-    with patch.object(media_source, "_feishin_is_running", return_value=True), \
-         patch.object(media_source, "_feishin_creds", return_value=None):
-        res = media_source.get_feishin_playing_track()
+    with patch.object(feishin_mod, "_feishin_is_running", return_value=True), \
+         patch.object(feishin_mod, "_feishin_creds", return_value=None):
+        res = feishin_mod.get_feishin_playing_track()
     assert res is None
 
 
