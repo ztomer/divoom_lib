@@ -12,6 +12,12 @@ use btleplug::api::{
     Central, CharPropFlags, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
 };
 use btleplug::platform::{Manager, Peripheral};
+
+/// The platform BLE adapter. On macOS the CoreBluetooth central manager it wraps
+/// MUST stay alive for the duration of a connection — dropping it silently stops
+/// notification delivery — so callers hold it (the daemon caches one; each
+/// `BleTransport` keeps a clone).
+pub use btleplug::platform::Adapter;
 use futures::StreamExt;
 use tokio::sync::{mpsc, Mutex};
 use uuid::Uuid;
@@ -36,15 +42,14 @@ pub struct Discovered {
     pub id: String,
 }
 
-async fn central() -> BleResult<btleplug::platform::Adapter> {
+/// Create the platform adapter. The caller must keep it alive (see [`Adapter`]).
+pub async fn make_central() -> BleResult<Adapter> {
     let manager = Manager::new().await?;
-    let adapter = manager.adapters().await?.into_iter().next().ok_or("no BLE adapter")?;
-    Ok(adapter)
+    manager.adapters().await?.into_iter().next().ok_or_else(|| "no BLE adapter".into())
 }
 
 /// Scan for Divoom devices for `timeout`, returning name + id pairs.
-pub async fn scan(timeout: Duration) -> BleResult<Vec<Discovered>> {
-    let central = central().await?;
+pub async fn scan(central: &Adapter, timeout: Duration) -> BleResult<Vec<Discovered>> {
     central.start_scan(ScanFilter::default()).await?;
     tokio::time::sleep(timeout).await;
     central.stop_scan().await?;
@@ -60,6 +65,8 @@ pub async fn scan(timeout: Duration) -> BleResult<Vec<Discovered>> {
 
 /// An owned connection to one device: serialized writes + a parsed-frame channel.
 pub struct BleTransport {
+    // keep the central alive for the connection's lifetime (notifications need it)
+    _central: Adapter,
     peripheral: Peripheral,
     write_char: Characteristic,
     protocol: Protocol,
@@ -68,9 +75,9 @@ pub struct BleTransport {
 
 impl BleTransport {
     /// Connect to the device whose `id` matches a prior `scan()` result. Discovers
-    /// services, subscribes to notifications, and spawns the frame-parsing task.
-    pub async fn connect(id: &str) -> BleResult<Self> {
-        let central = central().await?;
+    /// services, subscribes to notifications, spawns the frame-parsing task, and
+    /// runs the autoprobe to pick the framing.
+    pub async fn connect(central: &Adapter, id: &str) -> BleResult<Self> {
         // ensure the peripheral is known to the adapter
         central.start_scan(ScanFilter::default()).await?;
         tokio::time::sleep(Duration::from_secs(3)).await;
@@ -98,6 +105,10 @@ impl BleTransport {
             let mut basic_buf: Vec<u8> = Vec::new();
             while let Some(n) = notifications.next().await {
                 let data = n.value;
+                if std::env::var("DIVOOMD_BLE_DEBUG").is_ok() {
+                    let hx: String = data.iter().map(|b| format!("{b:02x}")).collect();
+                    eprintln!("[ble] rx {} bytes: {hx}", data.len());
+                }
                 if data.len() >= 4 && data[0..4] == IOS_LE_HEADER {
                     if let Some(p) = framing::parse_ios_le_notification(&data) {
                         if tx.send(Frame { command_id: p.command_id, payload: p.payload }).await.is_err() {
@@ -107,6 +118,9 @@ impl BleTransport {
                 } else {
                     basic_buf.extend_from_slice(&data);
                     for m in framing::parse_basic_protocol_frames(&mut basic_buf) {
+                        if std::env::var("DIVOOMD_BLE_DEBUG").is_ok() {
+                            eprintln!("[ble] basic frame cmd=0x{:02x} ({} payload bytes)", m.command_id, m.payload.len());
+                        }
                         if tx.send(Frame { command_id: m.command_id, payload: m.payload }).await.is_err() {
                             return;
                         }
@@ -115,7 +129,28 @@ impl BleTransport {
             }
         });
 
-        Ok(Self { peripheral, write_char, protocol: Protocol::Basic, rx: Mutex::new(rx) })
+        let mut transport = Self {
+            _central: central.clone(),
+            peripheral,
+            write_char,
+            protocol: Protocol::Basic,
+            rx: Mutex::new(rx),
+        };
+        transport.autoprobe().await;
+        Ok(transport)
+    }
+
+    /// Detect the framing by probing 0x46 in iOS-LE then Basic (default Basic).
+    /// Mirrors `autoprobe_protocol`. Sets `self.protocol`.
+    async fn autoprobe(&mut self) {
+        let probe = Duration::from_millis(1500);
+        self.protocol = Protocol::IosLe;
+        if self.send_command_and_wait(0x46, &[], probe).await.is_some() {
+            return; // iOS-LE answered
+        }
+        self.protocol = Protocol::Basic;
+        let _ = self.send_command_and_wait(0x46, &[], probe).await; // warm/confirm; Basic is the default
+        self.protocol = Protocol::Basic;
     }
 
     pub fn protocol(&self) -> Protocol {
@@ -157,6 +192,24 @@ impl BleTransport {
     pub async fn wait_for_response(&self, command_id: u8, timeout: Duration) -> Option<Vec<u8>> {
         let mut rx = self.rx.lock().await;
         response::wait_for_response(&mut rx, command_id, timeout).await
+    }
+
+    /// Drain → send → wait, mirroring `send_command_and_wait_for_response`. The
+    /// device emits UNSOLICITED frames (e.g. a proactive 0x46 on a brightness
+    /// change), so stale frames are dropped before the query to avoid reading a
+    /// value one step behind (HW-confirmed in the Python impl).
+    pub async fn send_command_and_wait(
+        &self,
+        command_id: u8,
+        args: &[u8],
+        timeout: Duration,
+    ) -> Option<Vec<u8>> {
+        {
+            let mut rx = self.rx.lock().await;
+            while rx.try_recv().is_ok() {}
+        }
+        self.send_command(command_id, args, true).await.ok()?;
+        self.wait_for_response(command_id, timeout).await
     }
 
     pub async fn disconnect(&self) -> BleResult<()> {
