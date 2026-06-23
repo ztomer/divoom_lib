@@ -404,6 +404,77 @@ impl Daemon {
                     Err(e) => err_reply(&format!("stream_animation_8b failed: {e}")),
                 }
             }
+            // display.show_clock(clock=0, twentyfour=True, weather=False, temp=False,
+            //   calendar=False, color=None) — proxy path for show_clock.
+            // Maps to the same 0x45 environmental packet as device.show_clock, with
+            // optional kwargs for 24h mode, weather/temp/calendar overlays, and color.
+            "display.show_clock" => {
+                let kw = req.args.get("kwargs");
+                let clock = kw.and_then(|v| v.get("clock")).and_then(|v| v.as_i64())
+                    .or_else(|| args.first().copied())
+                    .unwrap_or(0).clamp(0, 15) as u8;
+                let twentyfour = kw.and_then(|v| v.get("twentyfour")).and_then(|v| v.as_bool()).unwrap_or(true);
+                let weather = kw.and_then(|v| v.get("weather")).and_then(|v| v.as_bool()).unwrap_or(false);
+                let temp = kw.and_then(|v| v.get("temp")).and_then(|v| v.as_bool()).unwrap_or(false);
+                let calendar = kw.and_then(|v| v.get("calendar")).and_then(|v| v.as_bool()).unwrap_or(false);
+                let [r, g, b] = kw
+                    .and_then(|v| v.get("color")).and_then(|v| v.as_str())
+                    .and_then(parse_hex_color)
+                    .unwrap_or([0xFF, 0xFF, 0xFF]);
+                let payload = [
+                    0u8, // env = 0 (clock channel)
+                    twentyfour as u8,
+                    clock,
+                    1u8, // clock_active
+                    weather as u8,
+                    temp as u8,
+                    calendar as u8,
+                    r, g, b,
+                ];
+                match dev.send_command(0x45, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("display.show_clock failed: {e}")),
+                }
+            }
+            // display.show_design() — switch to custom-art / design channel.
+            // 0x45 [0x05, 0×9]: payload[0]=0x05 selects the "design" channel.
+            "display.show_design" => {
+                match dev.send_command(0x45, &[0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0], false).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("display.show_design failed: {e}")),
+                }
+            }
+            // display.get_brightness / display.set_brightness — aliases to device.*
+            "display.get_brightness" => {
+                match dev.send_command_and_wait(0x46, &[], timeout).await {
+                    Some(p) if p.len() >= 7 => json!({"success": true, "result": p[6] as i64}),
+                    _ => json!({"success": true, "result": Value::Null}),
+                }
+            }
+            "display.set_brightness" => {
+                let val = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("brightness")).and_then(|v| v.as_i64()))
+                    .unwrap_or(50).clamp(0, 100) as u8;
+                match dev.send_command(0x74, &[val], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("display.set_brightness failed: {e}")),
+                }
+            }
+            // display.show_light(color, brightness, power) — solid-color light mode.
+            // 0x45 payload: [0x01, R, G, B, brightness, 0x00, power_byte, 0x00, 0x00, 0x00].
+            // color: JSON array [R,G,B] or hex string "#RRGGBB". power defaults to True.
+            "display.show_light" | "light.show_light" | "show_light" => {
+                let [r, g, b] = color_from_arg(&raw_args, &req.args).unwrap_or([0xFF, 0xFF, 0xFF]);
+                let brightness = args.get(1).copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("brightness")).and_then(|v| v.as_i64()))
+                    .unwrap_or(100).clamp(0, 100) as u8;
+                let power = req.args.get("kwargs").and_then(|v| v.get("power")).and_then(|v| v.as_bool()).unwrap_or(true);
+                let payload = [0x01u8, r, g, b, brightness, 0x00, power as u8, 0x00, 0x00, 0x00];
+                match dev.send_command(0x45, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("display.show_light failed: {e}")),
+                }
+            }
             m => err_reply(&format!("device_call method not ported yet: {m}")),
         }
     }
@@ -416,6 +487,33 @@ impl Daemon {
         *self.device_id.lock().await = None;
         json!({"success": true})
     }
+}
+
+/// Parse a "#RRGGBB" or "RRGGBB" hex string to [R, G, B]. Returns None on malform.
+fn parse_hex_color(s: &str) -> Option<[u8; 3]> {
+    let s = s.trim_start_matches('#');
+    if s.len() == 6 {
+        let r = u8::from_str_radix(&s[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&s[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&s[4..6], 16).ok()?;
+        Some([r, g, b])
+    } else {
+        None
+    }
+}
+
+/// Extract [R, G, B] from the first positional arg (array [r,g,b] or hex string)
+/// or the "color" kwarg. Returns None if absent or unparseable.
+fn color_from_arg(raw_args: &[Value], req_args: &Value) -> Option<[u8; 3]> {
+    let color_val = raw_args.first().or_else(|| req_args.get("kwargs").and_then(|v| v.get("color")))?;
+    if let Some(arr) = color_val.as_array() {
+        let ns: Vec<u8> = arr.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect();
+        if ns.len() >= 3 { return Some([ns[0], ns[1], ns[2]]); }
+    }
+    if let Some(s) = color_val.as_str() {
+        return parse_hex_color(s);
+    }
+    None
 }
 
 impl Handler for Daemon {
