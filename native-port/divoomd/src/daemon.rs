@@ -222,6 +222,17 @@ impl Daemon {
                     Err(e) => err_reply(&format!("set_brightness failed: {e}")),
                 }
             }
+            // show clock face via set-light-mode (0x45): the 10-byte environmental
+            // packet [env=0, 24h=1, clock_mode, clock_active=1, weather, temp,
+            // calendar, R, G, B], matching display.show_clock (clock 0..15, white).
+            "device.show_clock" | "show_clock" => {
+                let clock = args.first().copied().unwrap_or(0).clamp(0, 15) as u8;
+                let payload = [0u8, 1, clock, 1, 0, 0, 0, 0xFF, 0xFF, 0xFF];
+                match dev.send_command(0x45, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("show_clock failed: {e}")),
+                }
+            }
             m => err_reply(&format!("device_call method not ported yet: {m}")),
         }
     }
