@@ -71,7 +71,7 @@
     --tab-pane-pad-y: 2px;   /* glass-pane vertical padding (above + below the row) */
     --tab-pane-pad-x: 12px;  /* glass-pane horizontal padding */
     --tab-pane-gap:   1px;    /* gap from the pane to the cards below it */
-    --panel-gap:      20px;  /* general spacing between blocks inside a .tab-content */
+    --panel-gap:      12px;  /* general spacing between blocks inside a .tab-content */
 }
 
 /* ── Light Mode Redefinitions ── */
@@ -180,7 +180,7 @@ button {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 20px;
+    padding: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transition: border-color 0.2s ease;
 }
@@ -190,7 +190,7 @@ button {
 }
 
 .card-header {
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     padding-bottom: 10px;
 }

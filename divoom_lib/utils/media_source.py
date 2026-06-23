@@ -21,16 +21,50 @@ logger = logging.getLogger(__name__)
 
 def get_current_playing_track() -> dict | None:
     """
-    Queries Spotify and Apple Music on macOS using AppleScript.
-    Returns: {"track": str, "artist": str, "source": str} or None.
+    Queries Spotify, Kaset, and Apple Music on macOS using AppleScript.
+    Returns: {"track": str, "artist": str, "source": str,
+              "artwork_url": str | None} or None.
 
     macOS-only (AppleScript/osascript). On Linux/Windows there is no portable
     now-playing source wired up yet, so this returns None (cover-art sync simply
     no-ops). A future MPRIS/playerctl backend could fill this in on Linux.
+
+    When the source provides a direct artwork URL (e.g. Kaset's YouTube
+    thumbnail), it is returned as `artwork_url` so callers can skip the
+    iTunes Search API fallback.
     """
     if sys.platform != "darwin":
         return None
-    # 1. Check Spotify
+    # 1. Check Kaset (YouTube Music client) — its AppleScript returns a full
+    #    JSON blob with a direct YouTube thumbnail URL, which is higher-quality
+    #    and more reliable than the iTunes Search API for non-album content.
+    kaset_script = """
+    if application "Kaset" is running then
+        tell application "Kaset"
+            set infoJson to get player info
+            if infoJson is not "" then
+                return infoJson
+            end if
+        end tell
+    end if
+    return ""
+    """
+    try:
+        proc = subprocess.run(["osascript", "-e", kaset_script], capture_output=True, text=True, timeout=2)
+        raw = proc.stdout.strip()
+        if raw:
+            info = json.loads(raw)
+            if info.get("isPlaying") and info.get("currentTrack"):
+                ct = info["currentTrack"]
+                name = ct.get("name", "")
+                artist = ct.get("artist", "")
+                art_url = ct.get("artworkURL") or None
+                if name:
+                    return {"track": name, "artist": artist, "source": "Kaset", "artwork_url": art_url}
+    except Exception as e:
+        logger.debug(f"Kaset AppleScript check failed: {e}")
+
+    # 2. Check Spotify
     spotify_script = """
     if application "Spotify" is running then
         tell application "Spotify"
@@ -46,11 +80,11 @@ def get_current_playing_track() -> dict | None:
         res = proc.stdout.strip()
         if res and "-|-" in res:
             parts = res.split(" -|- ")
-            return {"track": parts[0], "artist": parts[1], "source": "Spotify"}
+            return {"track": parts[0], "artist": parts[1], "source": "Spotify", "artwork_url": None}
     except Exception as e:
         logger.debug(f"Spotify AppleScript check failed: {e}")
 
-    # 2. Check Apple Music (Music.app)
+    # 3. Check Apple Music (Music.app)
     music_script = """
     if application "Music" is running then
         tell application "Music"
@@ -66,7 +100,7 @@ def get_current_playing_track() -> dict | None:
         res = proc.stdout.strip()
         if res and "-|-" in res:
             parts = res.split(" -|- ")
-            return {"track": parts[0], "artist": parts[1], "source": "Apple Music"}
+            return {"track": parts[0], "artist": parts[1], "source": "Apple Music", "artwork_url": None}
     except Exception as e:
         logger.debug(f"Apple Music AppleScript check failed: {e}")
 

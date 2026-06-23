@@ -10,14 +10,40 @@ from divoom_lib.utils import media_source
 
 
 def test_get_current_playing_track_spotify():
-    mock_proc = MagicMock()
-    mock_proc.stdout = "Song Title -|- Artist Name"
-    with patch("subprocess.run", return_value=mock_proc) as mock_run:
+    # Kaset check returns empty, then Spotify returns the track
+    empty_mock = MagicMock()
+    empty_mock.stdout = ""
+    spotify_mock = MagicMock()
+    spotify_mock.stdout = "Song Title -|- Artist Name"
+    with patch("subprocess.run", side_effect=[empty_mock, spotify_mock]) as mock_run:
         res = media_source.get_current_playing_track()
         assert res == {
             "track": "Song Title",
             "artist": "Artist Name",
             "source": "Spotify",
+            "artwork_url": None,
+        }
+        assert mock_run.call_count == 2
+
+
+def test_get_current_playing_track_kaset():
+    kaset_json = json.dumps({
+        "currentTrack": {
+            "name": "Test Song",
+            "artist": "Test Artist",
+            "artworkURL": "https://i.ytimg.com/vi/test/hqdefault.jpg",
+        },
+        "isPlaying": True,
+    })
+    mock_proc = MagicMock()
+    mock_proc.stdout = kaset_json
+    with patch("subprocess.run", return_value=mock_proc) as mock_run:
+        res = media_source.get_current_playing_track()
+        assert res == {
+            "track": "Test Song",
+            "artist": "Test Artist",
+            "source": "Kaset",
+            "artwork_url": "https://i.ytimg.com/vi/test/hqdefault.jpg",
         }
         mock_run.assert_called_once()
 

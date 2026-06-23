@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **KASET ALBUM ART + CARD PADDING ROUND (2026-06-23 00:45 EDT):** Two independent
+  changes shipped this round.
+
+  **Kaset album art integration:** Added `/Applications/Kaset.app` (YouTube Music
+  client for macOS) as a third now-playing source in `media_source.py:get_current_playing_track()`,
+  checked BEFORE Spotify and Apple Music. Kaset's AppleScript `get player info` returns
+  a JSON blob with an `artworkURL` (YouTube thumbnail), so callers skip the iTunes
+  Search API for Kaset-originated tracks. All three callers (`live_jobs.py:run_music()`,
+  `media_sync.py:get_current_track_info()`, `media_sync.py:push_music_cover_now()`) fall
+  back to the iTunes API when no direct URL is provided (Spotify/Apple Music paths unchanged).
+  Tests: `test_get_current_playing_track_kaset` added, 8/8 pass.
+
+  **Card padding tightened:** `.card` padding reduced from `20px` → `12px`,
+  `--panel-gap` from `20px` → `12px`, `.card-header` margin-bottom from `15px` → `10px`
+  in `style.css`. This brings general tab panels (settings, routines, tools) to the same
+  density as tile components.
+
 - **TIVOO-MAX SPP ROUTING FIX (2026-06-22 23:45 EDT):** Debugged why Tivoo-Max BLE
   connections fail. Investigation found 2 bugs in the SPP routing code:
 

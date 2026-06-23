@@ -47,6 +47,21 @@ This release bundles the fixes from v0.16.1 along with major milestones in the n
      `self.use_ios_le_protocol is False`.
 - Suite: 1701 passed, 87 skipped.
 
+## Post-v0.20.1 — Kaset album art integration + card padding (2026-06-22)
+
+- **Kaset album art support**: Added Kaset (`/Applications/Kaset.app`) as a third
+  now-playing source (checked before Spotify and Apple Music). Kaset's AppleScript
+  `get player info` returns a JSON blob with direct YouTube thumbnail URLs, so
+  artwork sync now works for YouTube Music tracks without relying on the iTunes
+  Search API. `media_source.py:get_current_playing_track()` returns the enriched
+  dict with `artwork_url` field; callers in `live_jobs.py` and `media_sync.py` skip
+  the iTunes fallback when a direct URL is available.
+- **Card padding tightened**: Reduced `.card` padding from `20px` → `12px`,
+  `--panel-gap` from `20px` → `12px`, and `.card-header` margin-bottom from
+  `15px` → `10px` so general tab panels (settings, routines, tools) match the
+  tighter tile component spacing.
+- Tests: 8 passed (media_source), N/A full suite.
+
 ---
 ## v0.16.1 — packaged app startup fix (2026-06-22)
 

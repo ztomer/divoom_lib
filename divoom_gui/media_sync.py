@@ -62,7 +62,7 @@ class MediaSyncMixin(GallerySyncMixin):
             track = track_info.get("track")
             artist = track_info.get("artist")
             source = track_info.get("source")
-            art_url = media_source.fetch_album_art_url(track, artist)
+            art_url = track_info.get("artwork_url") or media_source.fetch_album_art_url(track, artist)
             preview_url = ""
             if art_url:
                 size = self._active_device_size()
