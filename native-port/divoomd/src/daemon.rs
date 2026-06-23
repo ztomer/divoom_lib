@@ -225,6 +225,12 @@ impl Daemon {
             .and_then(|v| v.as_array())
             .map(|a| a.iter().filter_map(|x| x.as_i64()).collect())
             .unwrap_or_default();
+        // The per-op token gates exclusive mode: if another session holds exclusive,
+        // device_call is rejected immediately (Python parity: _cmd_queue.run(token)).
+        let token = req.args.get("token").and_then(|v| v.as_str());
+        if let Err(e) = self.queue.check_allowed(token) {
+            return err_reply(&e.to_string());
+        }
 
         let guard = self.device.lock().await;
         let dev = match guard.as_ref() {

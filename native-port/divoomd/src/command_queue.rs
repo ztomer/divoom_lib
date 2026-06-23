@@ -187,6 +187,25 @@ impl CommandQueue {
         self.inner.lock().unwrap().owner.clone()
     }
 
+    /// Return whether a device op with the given token is allowed to proceed:
+    ///   - no exclusive owner → any token allowed
+    ///   - exclusive owner matches token → allowed
+    ///   - exclusive owner exists and token doesn't match → HeldByAnother
+    ///
+    /// Called by device_call dispatch BEFORE acquiring the device transport lock,
+    /// mirroring Python's `_cmd_queue.run(token, ...)` gate.
+    pub fn check_allowed(&self, token: Option<&str>) -> Result<(), AcquireError> {
+        let g = self.inner.lock().unwrap();
+        if g.stopped {
+            return Err(AcquireError::Stopped);
+        }
+        match &g.owner {
+            None => Ok(()),
+            Some(o) if token == Some(o.as_str()) => Ok(()),
+            Some(_) => Err(AcquireError::HeldByAnother),
+        }
+    }
+
     /// Stop the worker; pending items are dropped (their receivers error).
     pub fn stop(&self) {
         {
