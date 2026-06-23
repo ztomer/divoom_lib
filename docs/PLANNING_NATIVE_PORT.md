@@ -171,7 +171,14 @@ hot paths (port to native Rust later only if it earns its keep).
    serves the NDJSON protocol, SIGINT/SIGTERM cleanup, single-instance guard. The
    PYTHON DaemonClient drives it unchanged (ping/device_status/get_status + the
    real exclusive steal-reject); device commands honestly report unimplemented.
-   48 tests green. Next: the BLE transport behind the `Handler`.
+   48 tests green.
+   - **[DONE, compiles] BLE transport** (`ble.rs`, feature `ble`): btleplug
+     scan/connect/subscribe/write, with the notify task parsing inbound bytes via
+     the ported `framing` (iOS-LE self-delimited; Basic stateful buffer) into the
+     `response` correlation channel. Feature-gated so the core + its tests stay
+     btleplug-free (`cargo test --no-default-features` = 48 green). Runtime
+     verification is over the socket once the daemon `.app` holds the BT grant.
+     Next: wire it behind the Handler (scan/connect/device_call) + build the .app.
 
 1. **Spike (de-risk the one real unknown)** — a Rust binary that does
    btleplug scan -> connect -> subscribe-notify -> write against the Pixoo, and

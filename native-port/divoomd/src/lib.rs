@@ -9,6 +9,8 @@
 //! behavior by parity tests.
 
 pub mod autoprobe;
+#[cfg(feature = "ble")]
+pub mod ble;
 pub mod command_queue;
 pub mod commands;
 pub mod daemon;

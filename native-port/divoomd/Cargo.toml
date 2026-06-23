@@ -13,11 +13,21 @@ path = "src/lib.rs"
 name = "divoomd"
 path = "src/main.rs"
 
+[features]
+default = ["ble"]
+# `ble` pulls the platform BLE stack (btleplug). The protocol/transport core +
+# its tests build and run WITHOUT it (`--no-default-features`), keeping the tested
+# core hardware- and platform-free.
+ble = ["dep:btleplug", "dep:futures", "dep:uuid"]
+
 [dependencies]
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net", "io-util", "signal"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 libloading = "0.8"
+btleplug = { version = "0.11", optional = true }
+futures = { version = "0.3", optional = true }
+uuid = { version = "1", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "test-util"] }
