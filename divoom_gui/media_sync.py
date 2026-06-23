@@ -9,8 +9,8 @@ from pathlib import Path
 
 from divoom_lib.utils import media_source
 from divoom_lib.utils.atomic_io import atomic_write_text
-from gallery_sync import GallerySyncMixin
-from audio_visualizer import AudioVisualizerWorker
+from divoom_gui.gallery_sync import GallerySyncMixin
+from divoom_gui.audio_visualizer import AudioVisualizerWorker
 
 logger = logging.getLogger("divoom_gui")
 

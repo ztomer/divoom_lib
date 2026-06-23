@@ -12,7 +12,7 @@ from divoom_lib.utils.atomic_io import atomic_write_config, atomic_write_text
 
 logger = logging.getLogger("divoom_gui")
 
-from gallery_hot_api import GalleryHotApiMixin
+from divoom_gui.gallery_hot_api import GalleryHotApiMixin
 
 
 class GallerySyncMixin(GalleryHotApiMixin):

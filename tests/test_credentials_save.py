@@ -12,11 +12,8 @@ from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).parent.parent))
-sys.path.append(str(Path(__file__).parent.parent / "divoom_gui"))
-
-import presets_manager
-from presets_manager import PresetsManagerMixin
+from divoom_gui import presets_manager
+from divoom_gui.presets_manager import PresetsManagerMixin
 
 
 class _FakeCreds:

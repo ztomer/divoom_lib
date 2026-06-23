@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 sys.path.append(str(Path(__file__).parent.parent))
 
-from gui_api import DivoomGuiAPI
+from divoom_gui.gui_api import DivoomGuiAPI
 from divoom_lib.divoom import Divoom
 from divoom_lib.wall import DivoomWall
 from bleak import BleakScanner

@@ -7,9 +7,9 @@ from pathlib import Path
 
 from divoom_lib import divoom_auth
 
-from presets_manager import PresetsManagerMixin
-from media_sync import MediaSyncMixin
-from scanner_mixin import ScannerMixin
+from divoom_gui.presets_manager import PresetsManagerMixin
+from divoom_gui.media_sync import MediaSyncMixin
+from divoom_gui.scanner_mixin import ScannerMixin
 
 from divoom_gui.api import AsyncLoopThread
 from divoom_gui.api.connection import ConnectionApi

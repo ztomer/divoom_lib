@@ -18,6 +18,10 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **RELEASE FIX ROUND (2026-06-22 21:55 EDT): Fix packaged app bundle ModuleNotFoundError on startup (Claude).**
+  The packaged macOS app bundle `Divoom.app` crashed on startup with `ModuleNotFoundError: No module named 'gui_api'`. Under py2app, `gui_main.py` is copied to `Contents/Resources/gui_main.py` while the rest of the `divoom_gui` package resides in `lib/python3.14/divoom_gui/`. Direct relative-style absolute imports like `from gui_api import DivoomGuiAPI`, `from presets_manager import ...` failed because `divoom_gui/` subfolder is not in `sys.path` within the packaged bundle.
+  Fix: Updated all imports within `divoom_gui` package (including `gui_main.py`, `gui_api.py`, `media_sync.py`, and `gallery_sync.py`) to use package-prefixed absolute imports (e.g. `from divoom_gui.gui_api import DivoomGuiAPI`). Also updated tests `test_gui_drag_instrumented.py` and `test_credentials_save.py` to remove stale `sys.path` insertions. Rebuilt the app bundle (`scripts/build_release.sh`) and verified it launches without crash. Pytest: 1700 passed, 87 skipped. Version bumped to `0.16.1`.
+
 - **HW ROUND (2026-06-22 17:10 EDT): native C image encoder — divergence FIXED + revived (Claude).**
   Two bugs: (1) `image_encode.c` static header was 6 bytes — the NN palette-count byte at
   `out_buf[6]` got clobbered by the palette memcpy (palette landed on byte 6), diverging from

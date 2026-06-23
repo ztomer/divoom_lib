@@ -141,8 +141,7 @@ def test_gui_api_has_no_drag_window():
     drag is handled by pywebview's bundled mechanism + the #1820
     patch in gui_main.py. A custom Python drag_window would be
     dead code (and is the source of multiple regressions)."""
-    sys.path.insert(0, str(REPO_ROOT / "divoom_gui"))
-    import gui_api as _api_mod
+    from divoom_gui import gui_api as _api_mod
     assert not hasattr(_api_mod.DivoomGuiAPI, "drag_window"), (
         "DivoomGuiAPI.drag_window still exists — this is the OLD custom "
         "Python drag path. Delete it; pywebview handles drag natively."
