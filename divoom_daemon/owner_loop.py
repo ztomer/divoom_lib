@@ -92,10 +92,11 @@ class OwnerLoopMixin:
         I/O and live-widget pushes queued behind it (G2)."""
         if self._loop is None:
             self._device_loop()
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         try:
-            return asyncio.run_coroutine_threadsafe(coro, self._loop).result(
-                timeout=_SCAN_RESULT_TIMEOUT)
+            return future.result(timeout=_SCAN_RESULT_TIMEOUT)
         except concurrent.futures.TimeoutError:
             logger.error("on-loop op (scan) exceeded %.0fs backstop", _SCAN_RESULT_TIMEOUT)
+            future.cancel()
             raise TimeoutError(
                 f"scan/on-loop operation timed out after {_SCAN_RESULT_TIMEOUT:.0f}s")

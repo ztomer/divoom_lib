@@ -20,6 +20,24 @@ This release bundles the fixes from v0.16.1 along with major milestones in the n
   - **Command Queue Parity:** Brought command queue implementation to behavioral parity using Tokio (`eddec22`).
   - **Notify/Response Correlation:** Completed correlation matching for async notifications and command responses in Rust (`6d27a0e`).
 
+## Post-v0.20.0 — cask release / test fix / scan-timeout backstop (2026-06-22)
+
+- **Homebrew cask released**: Created GitHub release `v0.20.0` on `ztomer/divoom_lib` and
+  uploaded `Divoom-v0.20.0.dmg` so the Homebrew cask URL resolves. Reinstall verified working.
+- **Test fix**: `test_connection_cap_rejects_when_full` was racing `sendall()` after
+  server closed — fixed by reading the buffered reply first. CI passes.
+- **Scan timeout backstop fix (3 bugs)**:
+  1. `owner_loop.py:_run_on_loop` — when the 90s backstop fires, the underlying coroutine
+     kept running on the loop for the rest of its user-configured timeout (up to 360s),
+     consuming BLE resources and blocking subsequent scans. Now `future.cancel()` is called
+     on timeout.
+  2. `owner_connect.py:scan` — the scan timeout from config (user had 360s) far exceeded
+     the 90s backstop, making every long scan a guaranteed failure. Now capped to
+     `_SCAN_RESULT_TIMEOUT` (90s) at the daemon level.
+  3. `app_init.js:load_config` — the HTML `<input max="120">` was bypassed when JS set
+     timeout from config (e.g., 360). Now clamped to `el.max` before assignment.
+- Suite: 1700 passed, 87 skipped.
+
 ---
 ## v0.16.1 — packaged app startup fix (2026-06-22)
 

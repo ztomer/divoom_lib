@@ -342,7 +342,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     const conf = JSON.parse(configJson);
                     const getEl = id => document.getElementById(id);
                     if (conf.email && getEl("settings-email")) getEl("settings-email").value = conf.email;
-                    if (conf.timeout != null && getEl("scan-timeout")) getEl("scan-timeout").value = conf.timeout;
+                    if (conf.timeout != null && getEl("scan-timeout")) {
+                        const el = getEl("scan-timeout");
+                        let t = parseFloat(conf.timeout);
+                        if (el.max) t = Math.min(t, parseFloat(el.max));
+                        el.value = t;
+                    }
                     if (conf.limit != null && getEl("scan-limit")) getEl("scan-limit").value = conf.limit;
                     
                     if (conf.slots) { window.DivoomState.assignedSlots = conf.slots; window.renderArrangerCanvas(); }

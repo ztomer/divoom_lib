@@ -18,16 +18,41 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **CASK RELEASE / SCAN-TIMEOUT BACKSTOP FIX ROUND (2026-06-22 23:30 EDT):** After the
+  cask install, `brew reinstall --cask divoom-control` succeeded but the user reported
+  the app "can't detect any device — connects to one device (Tivoo) then gets stuck".
+  Investigation found 3 bugs:
+
+  **Bug 1: Backstop doesn't cancel the coroutine.** `owner_loop.py:_run_on_loop` runs
+  scan coroutines on the device loop via `asyncio.run_coroutine_threadsafe`. The 90s
+  backstop (`_SCAN_RESULT_TIMEOUT`) fires with a `TimeoutError` but the Future was never
+  saved — so `future.cancel()` was unreachable. The scan coroutine kept running for the
+  full user-configured timeout (e.g. 360s), consuming BLE resources and blocking
+  subsequent operations. Fix: save the Future and cancel on backstop timeout.
+
+  **Bug 2: Scan timeout > backstop = guaranteed failure.** The user's `config.ini`
+  had `timeout = 360s`. The daemon `owner_connect.py:scan()` passed it straight to
+  the BLE scan, but `_run_on_loop` only waits 90s. Every scan with timeout > 90s was a
+  guaranteed failure (backstop fires, scan reported as failed, but coroutine runs for
+  remaining 270s). Fix: cap scan timeout to `_SCAN_RESULT_TIMEOUT` (90s) at the daemon
+  level, with a warning log.
+
+  **Bug 3: HTML input max bypassed by JS config load.** The `<input id="scan-timeout"
+  max="120">` was bypassed when `app_init.js:load_config()` set `el.value = conf.timeout`
+  (e.g. 360). HTML `max` only applies to user interaction, not programmatic `.value`
+  assignment. Fix: clamp to `el.max` before setting the value.
+
+  The stale `last_connected_device` UUID (not in scan results) causes a 16s auto-connect
+  timeout before the daemon falls back to a 3s reconnect scan and connects to the first
+  available device (Timoo). The Tivoo connection timeout is a separate BLE issue
+  (device-specific, not a code regression). Suite: 1700 passed, 87 skipped.
+
 - **RELEASE CUT ROUND (2026-06-22 21:58 EDT): Cut release v0.20.0 (Claude).**
   Cut the `v0.20.0` release including the startup packaging fix and native Rust daemon port (Phase 2 progress).
   - Version bumped to `0.20.0` in `pyproject.toml` and documented in `CHANGELOG.md` and `docs/release_notes_v0.20.0.md`.
   - Rebuilt the app bundle (`dist/Divoom-v0.20.0.dmg`) and pushed `main` branch + tag `v0.20.0` to GitHub.
   - Updated the Homebrew cask with the new `.dmg` SHA-256 (`42bb39b1...`) in `homebrew-tap` and pushed.
   - Note: GitHub release creation via `gh` CLI failed with 401 Bad Credentials in this environment, so the user needs to execute the `gh release create` command manually (see details in final output).
-
-- **RELEASE FIX ROUND (2026-06-22 21:55 EDT): Fix packaged app bundle ModuleNotFoundError on startup (Claude).**
-  The packaged macOS app bundle `Divoom.app` crashed on startup with `ModuleNotFoundError: No module named 'gui_api'`. Under py2app, `gui_main.py` is copied to `Contents/Resources/gui_main.py` while the rest of the `divoom_gui` package resides in `lib/python3.14/divoom_gui/`. Direct relative-style absolute imports like `from gui_api import DivoomGuiAPI`, `from presets_manager import ...` failed because `divoom_gui/` subfolder is not in `sys.path` within the packaged bundle.
-  Fix: Updated all imports within `divoom_gui` package (including `gui_main.py`, `gui_api.py`, `media_sync.py`, and `gallery_sync.py`) to use package-prefixed absolute imports (e.g. `from divoom_gui.gui_api import DivoomGuiAPI`). Also updated tests `test_gui_drag_instrumented.py` and `test_credentials_save.py` to remove stale `sys.path` insertions. Rebuilt the app bundle (`scripts/build_release.sh`) and verified it launches without crash. Pytest: 1700 passed, 87 skipped. Version bumped to `0.16.1`.
 
 - **HW ROUND (2026-06-22 17:10 EDT): native C image encoder — divergence FIXED + revived (Claude).**
   Two bugs: (1) `image_encode.c` static header was 6 bytes — the NN palette-count byte at

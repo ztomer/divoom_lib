@@ -257,6 +257,16 @@ class OwnerConnectMixin:
         timeout = float(args.get("timeout") or cfg.scan_timeout)
         raw_limit = args.get("limit")
         limit = int(raw_limit if raw_limit is not None else cfg.scan_limit)
+        # Cap scan timeout to the backstop so a long user-configured timeout
+        # doesn't silently guarantee failure (the caller-side _run_on_loop
+        # backstop fires at _SCAN_RESULT_TIMEOUT seconds and the scan coroutine
+        # then wastes BLE resources for the remaining duration).
+        from divoom_daemon.owner_loop import _SCAN_RESULT_TIMEOUT
+        if timeout > _SCAN_RESULT_TIMEOUT:
+            logger.warning(
+                "scan timeout %.0fs exceeds backstop (%.0fs); capping",
+                timeout, _SCAN_RESULT_TIMEOUT)
+            timeout = _SCAN_RESULT_TIMEOUT
 
         # BLE Hardening P4: preflight so an empty scan carries a cause (denied
         # permission / powered-off adapter) instead of a silent "no devices".
