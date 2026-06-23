@@ -194,6 +194,17 @@ hot paths (port to native Rust later only if it earns its keep).
      malformed->error). Next (hardware-gated): the BTLE transport + device owner
      behind the Handler; until then the TCC spike remains the manual gate.
    _Original Phase 3 note:_ NDJSON parity with `daemon_protocol.py`.
+   - **[DONE] FFI to C encoders** (`native_encode.rs`): animation_frame /
+     static_image / frame_32 via libloading, byte-parity vs Python (21 vectors).
+   - **[DONE] LAN validation** (`lan.rs`): body build + validate_response honesty.
+   - **[DONE] autoprobe decision** (`autoprobe.rs`): iOS-LE -> Basic -> default.
+
+**HARDWARE-INDEPENDENT LAYER COMPLETE (44 tests).** Everything portable without a
+device is done: framing, models, response correlation, command_queue, commands,
+NDJSON protocol, socket server, C-encoder FFI, LAN validation, autoprobe. The
+remaining work is hardware-gated and starts at the TCC spike: the BTLE transport
+(btleplug), the device owner (the `Handler` impl wiring queue + transport +
+encoders), the LAN HTTP send (reqwest), and the macOS notification monitor.
 3. **Socket server** — NDJSON parity with `daemon_protocol.py`. Drive the existing
    Python test suite's socket-level cases against the Rust daemon for behavioral
    parity (run the Python `DaemonClient` against the Rust server).
