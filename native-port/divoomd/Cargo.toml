@@ -10,7 +10,7 @@ name = "divoomd"
 path = "src/lib.rs"
 
 [dependencies]
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net", "io-util"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

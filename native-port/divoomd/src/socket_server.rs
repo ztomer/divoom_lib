@@ -1,0 +1,72 @@
+//! Unix-socket NDJSON server — the request/reply transport, ported from
+//! `divoom_daemon/socket_server.py`. This is the conformance seam: a client (the
+//! Python GUI/menubar/CLI, or the Python test suite as an oracle) connects, sends
+//! one `{"command","args","token"?}` line, and reads one reply line.
+//!
+//! The device/command logic is injected through the [`Handler`] trait so this
+//! transport is fully testable without hardware: the real daemon plugs in the
+//! device owner; tests plug in a stub.
+
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
+use serde_json::Value;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{UnixListener, UnixStream};
+
+use crate::protocol::{encode_message, err_reply, iter_messages, Request, MAX_REPLY_BYTES};
+
+/// Dispatches a parsed request to a reply. Object-safe + Send-explicit so each
+/// connection can be served on its own task. The real implementation routes to the
+/// device owner / command queue; tests use a stub.
+pub trait Handler: Send + Sync + 'static {
+    fn handle<'a>(&'a self, req: Request) -> Pin<Box<dyn Future<Output = Value> + Send + 'a>>;
+}
+
+/// Serve a single connection: accumulate bytes, split into NDJSON requests,
+/// dispatch each, and write back one reply line per request. Returns when the peer
+/// closes (EOF) or on an I/O error. A peer that never sends a newline can't grow
+/// the buffer past `MAX_REPLY_BYTES` (the connection is dropped instead).
+pub async fn serve_connection<H: Handler>(
+    mut stream: UnixStream,
+    handler: Arc<H>,
+) -> std::io::Result<()> {
+    let mut buf: Vec<u8> = Vec::new();
+    let mut tmp = [0u8; 4096];
+    loop {
+        let n = stream.read(&mut tmp).await?;
+        if n == 0 {
+            return Ok(()); // EOF — peer closed
+        }
+        buf.extend_from_slice(&tmp[..n]);
+        if buf.len() > MAX_REPLY_BYTES {
+            return Ok(()); // frame cap: a never-newline-terminated frame, drop it
+        }
+        let (msgs, remainder) = iter_messages(&buf);
+        buf = remainder;
+        for msg in msgs {
+            let reply = match serde_json::from_value::<Request>(msg) {
+                Ok(req) => handler.handle(req).await,
+                Err(_) => err_reply("bad request: expected an object with a 'command' string"),
+            };
+            stream.write_all(&encode_message(&reply)).await?;
+        }
+    }
+}
+
+/// Accept connections forever, serving each on its own task. Runs until the
+/// listener errors unrecoverably (callers normally `tokio::spawn` this).
+pub async fn serve<H: Handler>(listener: UnixListener, handler: Arc<H>) {
+    loop {
+        match listener.accept().await {
+            Ok((stream, _addr)) => {
+                let h = handler.clone();
+                tokio::spawn(async move {
+                    let _ = serve_connection(stream, h).await;
+                });
+            }
+            Err(_) => continue,
+        }
+    }
+}

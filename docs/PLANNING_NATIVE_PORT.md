@@ -183,7 +183,17 @@ hot paths (port to native Rust later only if it earns its keep).
    - **[DONE] notify/response correlation** (`response.rs`): the route-notification
      decision (generic-ACK 0x33 scalar-clear; listen-set priority) + `wait_for_response`
      / `wait_for_any_response`. 10 tests pin the two load-bearing rules from this
-     session's iOS-LE revert and 0x8B fix. Next: COMMANDS map + NDJSON socket types.
+     session's iOS-LE revert and 0x8B fix.
+   - **[DONE] COMMANDS map + NDJSON protocol** (`commands.rs`, `protocol.rs`):
+     command name->id (generated, 109 entries) + encode_message/iter_messages,
+     typed Request, ok/err replies. Cross-language test parses Python-encoded bytes.
+3. **Socket server** (Phase 3) — NDJSON parity with `daemon_protocol.py`.
+   - **[DONE] transport skeleton** (`socket_server.rs`): tokio UnixListener accept
+     -> read NDJSON -> dispatch via a pluggable `Handler` -> reply, with the frame
+     cap. 3 end-to-end tests over a real unix socket (request/reply, pipelined,
+     malformed->error). Next (hardware-gated): the BTLE transport + device owner
+     behind the Handler; until then the TCC spike remains the manual gate.
+   _Original Phase 3 note:_ NDJSON parity with `daemon_protocol.py`.
 3. **Socket server** — NDJSON parity with `daemon_protocol.py`. Drive the existing
    Python test suite's socket-level cases against the Rust daemon for behavioral
    parity (run the Python `DaemonClient` against the Rust server).

@@ -14,3 +14,4 @@ pub mod framing;
 pub mod models;
 pub mod protocol;
 pub mod response;
+pub mod socket_server;
