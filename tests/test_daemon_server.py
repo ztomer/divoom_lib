@@ -117,21 +117,35 @@ def test_subscribe_receives_status_then_broadcasts(daemon_ctx):
         daemon=True,
     )
     sub.start()
-    time.sleep(0.2)  # let the subscription register + receive initial status
+
+    def wait_until(pred, timeout=5.0):
+        # poll instead of a fixed sleep — the subscribe thread can be starved under
+        # heavy suite load, so a fixed 0.2s race-failed intermittently (the initial
+        # status event hadn't arrived yet). Same assertions, just race-free.
+        end = time.time() + timeout
+        while time.time() < end:
+            if pred():
+                return True
+            time.sleep(0.02)
+        return False
 
     # initial status event arrives on subscribe
-    assert events and events[0]["type"] == EVENT_STATUS
+    assert wait_until(lambda: bool(events)), "no event received on subscribe"
+    assert events[0]["type"] == EVENT_STATUS
 
     # a command-driven broadcast reaches the subscriber
     DaemonClient(sp).send_command("start_notifications")
-    time.sleep(0.2)
-    assert any(e["type"] == EVENT_STATUS and e["state"] == STATE_ACTIVE for e in events)
+    assert wait_until(
+        lambda: any(e["type"] == EVENT_STATUS and e["state"] == STATE_ACTIVE for e in events)
+    ), "no ACTIVE status broadcast after start_notifications"
 
     # a notification fires -> notification event + status event broadcast
     monitor.fire(6, "WhatsApp", "ping")
-    time.sleep(0.2)
+    assert wait_until(
+        lambda: any(e["type"] == EVENT_NOTIFICATION for e in events)
+    ), "no notification event broadcast"
     notifs = [e for e in events if e["type"] == EVENT_NOTIFICATION]
-    assert notifs and notifs[0]["app_type"] == 6 and notifs[0]["routed"] is True
+    assert notifs[0]["app_type"] == 6 and notifs[0]["routed"] is True
 
     stop.set()
     sub.join(timeout=3.0)
