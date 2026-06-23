@@ -85,9 +85,9 @@ impl Daemon {
             #[cfg(feature = "ble")]
             "scan" => self.cmd_scan(&req).await,
             #[cfg(feature = "ble")]
-            "connect_device" => self.cmd_connect(&req).await,
+            "connect" => self.cmd_connect(&req).await,
             #[cfg(feature = "ble")]
-            "disconnect_device" => self.cmd_disconnect().await,
+            "disconnect" => self.cmd_disconnect().await,
 
             other => err_reply(&format!(
                 "command not implemented in the native daemon yet: {other}"
