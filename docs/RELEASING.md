@@ -9,9 +9,11 @@ hard-fails if anything matching `*smali*`/`references`/`*.apk` is found in the b
 
 ## 1. Bump the version
 
-- `pyproject.toml` → `version = "X.Y.Z"`
-- `setup_app.py` → `VERSION = "X.Y.Z"`
-- Add a CHANGELOG entry.
+- `pyproject.toml` → `version = "X.Y.Z"` — this is the **single source of truth**.
+  `setup_app.py` reads it (via `DIVOOM_BUILD_VERSION`, which `build_release.sh`
+  exports, with a `pyproject.toml` fallback), so the bundle's CFBundleVersion can
+  never drift from the package version. Do NOT hardcode the version elsewhere.
+- Add a CHANGELOG entry + a `docs/release_notes_vX.Y.Z.md`.
 
 ## 2. Build the `.dmg`
 
