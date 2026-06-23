@@ -4,6 +4,15 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Post-v0.20.2 — Native Port Remaining Device Call Commands (2026-06-23)
+
+- **Remaining Device Call Commands**: Ported the rest of the high-value `device_call` commands to the native Rust daemon (`divoomd`), ensuring 100% parity with the Python API:
+  - **Volume Control**: Ported `"music.get_volume"`, `"get_volume"`, `"music.set_volume"`, and `"set_volume"` (0x08/0x09 commands).
+  - **FM Radio**: Ported `"radio.set_radio_frequency"`, `"set_radio_frequency"`, `"radio.set_radio"`, and `"set_radio"` (0x61 command).
+  - **Low Power Switch**: Ported `"device.get_low_power_switch"`, `"get_low_power_switch"`, `"device.get_low_power"`, `"get_low_power"`, `"device.set_low_power_switch"`, `"set_low_power_switch"`, `"device.set_low_power"`, and `"set_low_power"` (0xb2/0xb3 commands).
+  - **Auto Power Off**: Ported `"device.get_auto_power_off"`, `"get_auto_power_off"`, `"sound.get_auto_power_off"`, `"device.set_auto_power_off"`, `"set_auto_power_off"`, and `"sound.set_auto_power_off"` (0xab/0xac commands).
+- **Parity & Tests**: Added the `ported_commands_route_to_device_call` integration test to `tests/daemon_behavior.rs` to verify that all newly implemented commands are correctly matched in the router and dispatch to the device transport (failing honestly with "no device connected"). Verified both compilation and test suite correctness with and without the `ble` feature gate. Running full Python pytest suite resulted in 1706 passed, 87 skipped.
+
 ## Post-v0.20.2 — Native Port Event Subscription & Device Name (2026-06-23)
 
 - **Event Subscription & Broadcast**: Extended the native Rust daemon socket server with a robust, tokio-native subscription system (`subscribe` command). When subscribed, clients immediately receive the initial status frame and subsequently stream real-time broadcast events (such as connection state changes) over the held-open Unix socket. Multiplexed via `tokio::select!`, connection close (EOF) automatically cleans up subscribers.

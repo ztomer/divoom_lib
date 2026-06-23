@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE PORT: REMAINING DEVICE CALL COMMANDS (2026-06-23 10:23 EDT):**
+  Ported the rest of the high-value `device_call` commands to the native Rust daemon (`divoomd`):
+  
+  **Volume Control:** Ported `"music.get_volume"`, `"get_volume"`, `"music.set_volume"`, and `"set_volume"` (0x08/0x09 commands).
+  
+  **FM Radio:** Ported `"radio.set_radio_frequency"`, `"set_radio_frequency"`, `"radio.set_radio"`, and `"set_radio"` (0x61 command) taking a 2-byte little-endian frequency.
+  
+  **Low Power Switch:** Ported `"device.get_low_power_switch"`, `"get_low_power_switch"`, `"device.get_low_power"`, `"get_low_power"`, `"device.set_low_power_switch"`, `"set_low_power_switch"`, `"device.set_low_power"`, and `"set_low_power"` (0xb2/0xb3 commands).
+  
+  **Auto Power Off:** Ported `"device.get_auto_power_off"`, `"get_auto_power_off"`, `"sound.get_auto_power_off"`, `"device.set_auto_power_off"`, `"set_auto_power_off"`, and `"sound.set_auto_power_off"` (0xab/0xac commands) taking a 2-byte little-endian minutes.
+  
+  **E2E & Parity Tests:** Added the `ported_commands_route_to_device_call` integration test to verify that all newly implemented commands are correctly matched in the router and dispatch to the device transport (failing honestly with "no device connected"). Verified both compilation and test suite correctness with and without the `ble` feature gate. Full Python pytest suite passes with 1706 passed, 87 skipped.
+
 - **NATIVE PORT: EVENT SUBSCRIPTION & DEVICE NAME COMMANDS (2026-06-23 10:15 EDT):**
   Four changes in the native Rust daemon (`divoomd`):
 

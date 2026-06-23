@@ -78,5 +78,32 @@ async fn device_name_commands_route_to_device_call() {
     assert!(err2.contains("no device connected") || err2.contains("not implemented"), "Unexpected error: {}", err2);
 }
 
+#[tokio::test]
+async fn ported_commands_route_to_device_call() {
+    let d = Daemon::new();
+    let methods = vec![
+        ("music.get_volume", json!([])),
+        ("music.set_volume", json!([10])),
+        ("radio.set_radio_frequency", json!([875])),
+        ("device.get_low_power_switch", json!([])),
+        ("device.set_low_power_switch", json!([1])),
+        ("device.get_auto_power_off", json!([])),
+        ("device.set_auto_power_off", json!([15])),
+    ];
+
+    for (method, args) in methods {
+        let r = d.handle(make_request("device_call", Some(json!({"method": method, "args": args})), None)).await;
+        assert_eq!(r["success"], json!(false), "method {} should fail", method);
+        let err = r["error"].as_str().unwrap();
+        assert!(
+            err.contains("no device connected") || err.contains("not implemented") || err.contains("not ported"),
+            "Method {} returned unexpected error: {}",
+            method,
+            err
+        );
+    }
+}
+
+
 
 

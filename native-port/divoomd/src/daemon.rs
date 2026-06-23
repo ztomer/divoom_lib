@@ -530,6 +530,78 @@ impl Daemon {
                     Err(e) => err_reply(&format!("display.show_light failed: {e}")),
                 }
             }
+            // music.set_volume / set_volume
+            "music.set_volume" | "set_volume" => {
+                let val = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("volume")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0).clamp(0, 15) as u8;
+                match dev.send_command(0x08, &[val], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_volume failed: {e}")),
+                }
+            }
+            // music.get_volume / get_volume
+            "music.get_volume" | "get_volume" => {
+                match dev.send_command_and_wait(0x09, &[], timeout).await {
+                    Some(p) if p.len() >= 1 => json!({"success": true, "result": p[0] as i64}),
+                    _ => json!({"success": true, "result": Value::Null}),
+                }
+            }
+            // radio.set_radio_frequency / set_radio_frequency / set_radio / radio.set_radio
+            "radio.set_radio_frequency" | "set_radio_frequency" | "radio.set_radio" | "set_radio" => {
+                let freq = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("frequency")).and_then(|v| v.as_i64()))
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("freq_x10")).and_then(|v| v.as_i64()))
+                    .unwrap_or(875) as u16;
+                let payload = freq.to_le_bytes();
+                match dev.send_command(0x61, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_radio_frequency failed: {e}")),
+                }
+            }
+            // device.set_low_power_switch / set_low_power_switch / device.set_low_power / set_low_power
+            "device.set_low_power_switch" | "set_low_power_switch" | "device.set_low_power" | "set_low_power" => {
+                let on_off_val = raw_args.first()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("on_off")))
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("enabled")));
+                let on_off = match on_off_val {
+                    Some(Value::Bool(b)) => if *b { 1 } else { 0 },
+                    Some(Value::Number(n)) => n.as_i64().unwrap_or(0).clamp(0, 1) as u8,
+                    _ => args.first().copied().unwrap_or(0).clamp(0, 1) as u8,
+                };
+                match dev.send_command(0xb2, &[on_off], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_low_power_switch failed: {e}")),
+                }
+            }
+            // device.get_low_power_switch / get_low_power_switch / device.get_low_power / get_low_power
+            "device.get_low_power_switch" | "get_low_power_switch" | "device.get_low_power" | "get_low_power" => {
+                match dev.send_command_and_wait(0xb3, &[], timeout).await {
+                    Some(p) if p.len() >= 1 => json!({"success": true, "result": p[0] as i64}),
+                    _ => json!({"success": true, "result": Value::Null}),
+                }
+            }
+            // device.set_auto_power_off / set_auto_power_off / sound.set_auto_power_off
+            "device.set_auto_power_off" | "set_auto_power_off" | "sound.set_auto_power_off" => {
+                let minutes = args.first().copied()
+                    .or_else(|| req.args.get("kwargs").and_then(|v| v.get("minutes")).and_then(|v| v.as_i64()))
+                    .unwrap_or(0) as u16;
+                let payload = minutes.to_le_bytes();
+                match dev.send_command(0xab, &payload, true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("set_auto_power_off failed: {e}")),
+                }
+            }
+            // device.get_auto_power_off / get_auto_power_off / sound.get_auto_power_off
+            "device.get_auto_power_off" | "get_auto_power_off" | "sound.get_auto_power_off" => {
+                match dev.send_command_and_wait(0xac, &[], timeout).await {
+                    Some(p) if p.len() >= 2 => {
+                        let minutes = u16::from_le_bytes([p[0], p[1]]) as i64;
+                        json!({"success": true, "result": minutes})
+                    }
+                    _ => json!({"success": true, "result": Value::Null}),
+                }
+            }
             m => err_reply(&format!("device_call method not ported yet: {m}")),
         }
     }
