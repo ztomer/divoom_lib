@@ -4,6 +4,23 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.20.0 — Native Rust Port Phase 2 & App Startup Fix (2026-06-22)
+
+This release bundles the fixes from v0.16.1 along with major milestones in the native Rust daemon port (`divoomd`):
+
+- **Fixed `ModuleNotFoundError: No module named 'gui_api'` on startup.** 
+  Corrected directory layout assumptions within `divoom_gui` imports so that the packaged `Divoom.app` starts up successfully under `py2app` without encountering import issues.
+  
+- **Single-Source Versioning.**
+  The bundle version is now read dynamically from `pyproject.toml` rather than being hardcoded.
+
+- **Native Rust Port (Phase 2):**
+  - **Phase-1 BLE Spike:** Completed compilation check for `btleplug` and `tokio` integration (`364c979`).
+  - **Framing & Models:** Implemented framing and model serialization in Rust, ensuring they are byte-identical to the Python implementation (`b37d987`).
+  - **Command Queue Parity:** Brought command queue implementation to behavioral parity using Tokio (`eddec22`).
+  - **Notify/Response Correlation:** Completed correlation matching for async notifications and command responses in Rust (`6d27a0e`).
+
+---
 ## v0.16.1 — packaged app startup fix (2026-06-22)
 
 Fixes a critical startup crash when running the packaged macOS app bundle `Divoom.app` installed via the Homebrew cask:
