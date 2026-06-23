@@ -9,8 +9,12 @@ publish = false
 name = "divoomd"
 path = "src/lib.rs"
 
+[[bin]]
+name = "divoomd"
+path = "src/main.rs"
+
 [dependencies]
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net", "io-util"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "net", "io-util", "signal"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 libloading = "0.8"

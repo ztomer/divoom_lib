@@ -163,6 +163,16 @@ hot paths (port to native Rust later only if it earns its keep).
 
 ## 6. Phased plan (incremental, hardware-validated each step)
 
+1. **Spike — DONE, PASSED (2026-06-23).** The signed native `.app` scanned, found
+   a Ditoo, connected, and subscribed to notifications with no SIGKILL: a native
+   binary gets the CoreBluetooth TCC grant. The BLE foundation is de-risked.
+   **Runnable daemon binary** also landed (`src/main.rs` + `daemon.rs`): owns
+   `/tmp/divoomd.sock` (distinct from Python's `/tmp/divoom.sock` so both coexist),
+   serves the NDJSON protocol, SIGINT/SIGTERM cleanup, single-instance guard. The
+   PYTHON DaemonClient drives it unchanged (ping/device_status/get_status + the
+   real exclusive steal-reject); device commands honestly report unimplemented.
+   48 tests green. Next: the BLE transport behind the `Handler`.
+
 1. **Spike (de-risk the one real unknown)** — a Rust binary that does
    btleplug scan -> connect -> subscribe-notify -> write against the Pixoo, and
    proves the macOS TCC grant works for a *signed native binary* with
