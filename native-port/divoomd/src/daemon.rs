@@ -13,7 +13,10 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
+use std::sync::OnceLock;
+
 use crate::command_queue::CommandQueue;
+use crate::native_encode::NativeEncoder;
 use crate::protocol::{err_reply, Request};
 use crate::socket_server::Handler;
 
@@ -36,6 +39,8 @@ pub struct Daemon {
     // lifetime (dropping it stops notification delivery).
     #[cfg(feature = "ble")]
     central: Mutex<Option<Adapter>>,
+    // C image encoder (libdivoom_compact FFI); loaded once, cached for lifetime.
+    encoder: OnceLock<Option<NativeEncoder>>,
 }
 
 impl Default for Daemon {
@@ -55,7 +60,30 @@ impl Daemon {
             device_id: Mutex::new(None),
             #[cfg(feature = "ble")]
             central: Mutex::new(None),
+            encoder: OnceLock::new(),
         }
+    }
+
+    /// Find the libdivoom_compact dylib: env override, then relative to the binary.
+    fn find_encoder_lib() -> Option<std::path::PathBuf> {
+        if let Ok(p) = std::env::var("DIVOOMD_ENCODER_LIB") {
+            let pb = std::path::PathBuf::from(&p);
+            if pb.exists() {
+                return Some(pb);
+            }
+        }
+        // binary is at native-port/divoomd/target/release/divoomd — 5 parents = project root
+        let exe = std::env::current_exe().ok()?;
+        let root = exe.parent()?.parent()?.parent()?.parent()?.parent()?;
+        let candidate = root.join("divoom_lib").join("libdivoom_compact.dylib");
+        if candidate.exists() { Some(candidate) } else { None }
+    }
+
+    /// Get (or lazy-init) the cached NativeEncoder. Returns None if the dylib is absent.
+    fn encoder(&self) -> Option<&NativeEncoder> {
+        self.encoder.get_or_init(|| {
+            Self::find_encoder_lib().and_then(|p| NativeEncoder::load(p).ok())
+        }).as_ref()
     }
 
     /// Get (creating + caching once) the shared CoreBluetooth central.
@@ -231,6 +259,44 @@ impl Daemon {
                 match dev.send_command(0x45, &payload, true).await {
                     Ok(()) => json!({"success": true, "result": true}),
                     Err(e) => err_reply(&format!("show_clock failed: {e}")),
+                }
+            }
+            // Push a single-frame animation via the 0x8B 3-phase streaming protocol.
+            // Args: w (int), h (int), time_ms (int, default 100),
+            //       rgb (array of u8 integers, length w*h*3).
+            // The RGB bytes are encoded via the C FFI encoder (libdivoom_compact) into
+            // the AA-format blob, then streamed to the device matching stream_animation_8b.
+            "device.show_image" | "show_image" => {
+                let w = req.args.get("w").and_then(|v| v.as_i64()).unwrap_or(16) as i32;
+                let h = req.args.get("h").and_then(|v| v.as_i64()).unwrap_or(16) as i32;
+                let time_ms =
+                    req.args.get("time_ms").and_then(|v| v.as_i64()).unwrap_or(100) as u16;
+                let rgb: Vec<u8> = match req.args.get("rgb").and_then(|v| v.as_array()) {
+                    Some(a) => a.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect(),
+                    None => return err_reply("show_image requires 'rgb' (array of u8)"),
+                };
+                let expected = (w * h * 3) as usize;
+                if rgb.len() != expected {
+                    return err_reply(&format!(
+                        "show_image: rgb.len()={} expected w*h*3={expected}",
+                        rgb.len()
+                    ));
+                }
+                let enc = match self.encoder() {
+                    Some(e) => e,
+                    None => return err_reply(
+                        "encoder not available (set DIVOOMD_ENCODER_LIB or ensure \
+                         divoom_lib/libdivoom_compact.dylib is in the project root)"
+                    ),
+                };
+                let blob = match enc.encode_animation_frame(&rgb, w, h, time_ms) {
+                    Some(b) => b,
+                    None => return err_reply("encode_animation_frame failed"),
+                };
+                match dev.stream_animation_8b(&blob).await {
+                    Ok(true) => json!({"success": true, "result": true}),
+                    Ok(false) => err_reply("stream_animation_8b: empty blob"),
+                    Err(e) => err_reply(&format!("stream_animation_8b failed: {e}")),
                 }
             }
             m => err_reply(&format!("device_call method not ported yet: {m}")),

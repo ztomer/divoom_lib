@@ -212,6 +212,110 @@ impl BleTransport {
         self.wait_for_response(command_id, timeout).await
     }
 
+    /// Stream a pre-encoded animation blob via the 0x8B 3-phase protocol.
+    /// Mirrors `stream_animation_8b` in `divoom_lib/display/animation.py`:
+    ///
+    ///   Phase 1 — START (CW=0): [0x00, file_size:4 LE]
+    ///             wait for device "ready" reply (payload[0]==0); fall back to 0.5s sleep.
+    ///   Phase 2 — DATA (CW=1):  [0x01, file_size:4 LE, offset_id:2 LE, chunk...]
+    ///             256-byte chunks; MUST be 256 (APK/futpib hardcoded, device places
+    ///             chunk N at byte N*256 — smaller chunks leave permanent gaps).
+    ///   Phase 3 — RETRANSMIT:   device sends 0x8B [1, idx_lo, idx_hi]; re-send that chunk.
+    ///             Stop when device is quiet for 1 s (normal end state).
+    ///
+    /// No TERMINATE (CW=2) packet — verified correct on 4 hardware devices.
+    pub async fn stream_animation_8b(&self, blob: &[u8]) -> BleResult<bool> {
+        const CMD: u8 = 0x8B;
+        const CHUNK_SIZE: usize = 256;
+
+        let file_size = blob.len() as u32;
+        if file_size == 0 {
+            return Ok(false);
+        }
+
+        // Phase 1: START — [CW=0, file_size:4 LE]
+        let mut start_args = Vec::with_capacity(5);
+        start_args.push(0u8);
+        start_args.extend_from_slice(&file_size.to_le_bytes());
+        self.send_command(CMD, &start_args, true).await?;
+
+        // Wait for device "ready" ACK (payload[0]==0). Fall back to 0.5s sleep if no reply.
+        let device_ready = {
+            let mut rx = self.rx.lock().await;
+            let deadline = std::time::Instant::now() + Duration::from_millis(2000);
+            let mut ready = false;
+            loop {
+                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                match tokio::time::timeout(remaining, rx.recv()).await {
+                    Ok(Some(frame)) if frame.command_id == CMD => {
+                        if frame.payload.first() == Some(&0) {
+                            ready = true;
+                            break;
+                        }
+                        // stale frame or early retransmit — keep waiting
+                    }
+                    _ => break,
+                }
+            }
+            ready
+        };
+        if !device_ready {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        // Phase 2: DATA chunks — [CW=1, file_size:4 LE, offset_id:2 LE, chunk...]
+        let mut offset_id: u16 = 0;
+        let mut pos = 0usize;
+        while pos < blob.len() {
+            let end = (pos + CHUNK_SIZE).min(blob.len());
+            let chunk = &blob[pos..end];
+            let mut args = Vec::with_capacity(7 + chunk.len());
+            args.push(1u8); // CW=1 SENDING_DATA
+            args.extend_from_slice(&file_size.to_le_bytes());
+            args.extend_from_slice(&offset_id.to_le_bytes());
+            args.extend_from_slice(chunk);
+            self.send_command(CMD, &args, true).await?;
+            offset_id += 1;
+            pos += CHUNK_SIZE;
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        // Phase 3: serve retransmit requests — device sends 0x8B [1, idx_lo, idx_hi].
+        // Stop when quiet for 1 s (device has everything).
+        for _ in 0..256usize {
+            let frame = {
+                let mut rx = self.rx.lock().await;
+                match tokio::time::timeout(Duration::from_millis(1000), rx.recv()).await {
+                    Ok(Some(f)) => f,
+                    _ => break, // timeout = device quiet = done
+                }
+            };
+            if frame.command_id != CMD {
+                continue;
+            }
+            let p = &frame.payload;
+            if p.len() >= 3 && p[0] == 1 {
+                let idx = u16::from_le_bytes([p[1], p[2]]) as usize;
+                let start = idx * CHUNK_SIZE;
+                if start < blob.len() {
+                    let chunk = &blob[start..(start + CHUNK_SIZE).min(blob.len())];
+                    let mut args = Vec::with_capacity(7 + chunk.len());
+                    args.push(1u8);
+                    args.extend_from_slice(&file_size.to_le_bytes());
+                    args.extend_from_slice(&(idx as u16).to_le_bytes());
+                    args.extend_from_slice(chunk);
+                    self.send_command(CMD, &args, true).await?;
+                }
+            }
+            // payload[0]==0 (another start-ack) or unknown — ignore and keep listening
+        }
+
+        Ok(true)
+    }
+
     pub async fn disconnect(&self) -> BleResult<()> {
         self.peripheral.disconnect().await?;
         Ok(())
