@@ -121,3 +121,5 @@ See `docs/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
 | R31 | `docs/PLANNING_ROUND31.md` | current |
 | R32 | `docs/PLANNING_ROUND32.md` | current |
 | R34 | `docs/PLANNING_ROUND34.md` | current |
+| R46 | `docs/PLANNING_ROUND46.md` | current |
+
