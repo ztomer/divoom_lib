@@ -11,6 +11,7 @@
 pub mod command_queue;
 pub mod commands;
 pub mod framing;
+pub mod lan;
 pub mod models;
 pub mod native_encode;
 pub mod protocol;
