@@ -23,3 +23,11 @@ pub mod protocol;
 pub mod response;
 pub mod socket_server;
 pub mod device_call;
+pub mod daemon_connect;
+pub mod live_jobs;
+pub mod wall;
+pub mod art_codec;
+pub mod art_hot;
+pub mod art;
+#[cfg(target_os = "macos")]
+pub mod macos_notifications;

@@ -55,6 +55,7 @@ async fn main() {
     eprintln!("divoomd listening on {socket_path}");
 
     let daemon = Arc::new(Daemon::new());
+    daemon.initialize_self_weak(Arc::downgrade(&daemon));
     tokio::select! {
         _ = serve(listener, daemon) => {}
         sig = shutdown_signal() => {

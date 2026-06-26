@@ -333,6 +333,31 @@ impl BleTransport {
         Ok(true)
     }
 
+    /// Wait until a frame arrives whose command_id is one of `command_ids`.
+    /// Returns `Some((command_id, payload))` or `None` on timeout.
+    /// Frames with non-matching IDs are dropped (they were unsolicited broadcast frames).
+    pub async fn wait_for_any_response(
+        &self,
+        command_ids: &[u8],
+        timeout: Duration,
+    ) -> Option<(u8, Vec<u8>)> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() { return None; }
+            let frame = {
+                let mut rx = self.rx.lock().await;
+                match tokio::time::timeout(remaining, rx.recv()).await {
+                    Ok(Some(f)) => f,
+                    _ => return None,
+                }
+            };
+            if command_ids.contains(&frame.command_id) {
+                return Some((frame.command_id, frame.payload));
+            }
+        }
+    }
+
     pub async fn disconnect(&self) -> BleResult<()> {
         self.peripheral.disconnect().await?;
         Ok(())

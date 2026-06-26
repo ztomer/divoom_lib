@@ -29,6 +29,8 @@ pub enum LanError {
     NonJson { command: String, snippet: String },
     /// HTTP 200 but a non-zero `error_code` — the device rejected the command.
     Rejected { code: String, command: String },
+    /// Network request failed.
+    NetworkError { message: String, command: String },
 }
 
 impl std::fmt::Display for LanError {
@@ -37,6 +39,7 @@ impl std::fmt::Display for LanError {
             LanError::BadStatus { status, command } => write!(f, "device returned HTTP {status} for {command}"),
             LanError::NonJson { command, snippet } => write!(f, "device returned non-JSON for {command}: {snippet:?}"),
             LanError::Rejected { code, command } => write!(f, "device rejected {command}: error_code={code}"),
+            LanError::NetworkError { message, command } => write!(f, "LAN request failed for {command}: {message}"),
         }
     }
 }
@@ -62,6 +65,49 @@ impl LanTransport {
             }
         }
         Value::Object(map)
+    }
+
+    /// POST a JSON command to the device's local HTTP API.
+    pub async fn post(&self, command: &str, extra: Option<Value>) -> Result<Value, LanError> {
+        let body = self.build_body(command, extra);
+        let client = reqwest::Client::new();
+        let res = client.post(&self.base_url())
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .timeout(std::time::Duration::from_secs(5))
+            .send()
+            .await;
+
+        let resp = match res {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(LanError::NetworkError {
+                    message: e.to_string(),
+                    command: command.to_string(),
+                });
+            }
+        };
+
+        let status = resp.status().as_u16();
+        let text = match resp.text().await {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(LanError::NetworkError {
+                    message: format!("failed to read response text: {e}"),
+                    command: command.to_string(),
+                });
+            }
+        };
+
+        validate_response(status, &text, command)
+    }
+
+    /// Check whether the device is reachable on the LAN.
+    pub async fn probe(&self) -> bool {
+        match self.post("Channel/GetIndex", None).await {
+            Ok(val) => val.is_object(),
+            Err(_) => false,
+        }
     }
 }
 
