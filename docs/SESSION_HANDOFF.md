@@ -18,7 +18,29 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **NATIVE PORT: REMAINING COMMANDS & MODULARIZATION under 500 LOC (2026-06-23 14:50 EDT):**
+- **NATIVE PORT: ART SYNC, HOT-UPDATE, WALL, LIVE JOBS, macOS NOTIFICATIONS + 500 LOC SPLITS (2026-06-26):**
+  Ported the remaining high-level subsystems to the native Rust daemon (`divoomd`). All files comply with 500 LOC.
+
+  **New modules shipped:**
+  - `art.rs` (331): custom art push/query, cloud CDN download, hot-update dispatch
+  - `art_codec.rs` (197): AES-128-CBC (pure Rust), magic-43/9/0xAA frame decoders, image rescale
+  - `art_hot.rs` (251): hot-update manifest, SHA-1 verify, BLE chunk streaming
+  - `wall.rs` (457): DivoomWall multi-panel coordinator + `cmd_wall_configure` (moved from daemon.rs)
+  - `live_jobs.rs`: background widget loops (system monitor, stocks, weather, music album cover)
+  - `macos_notifications.rs` (233): SQLite `usernoted` monitor via sqlite3 CLI, ANCS push
+  - `daemon_connect.rs` (83): connect/disconnect/scan extracted from daemon.rs
+
+  **Refactored:**
+  - `daemon.rs` (498): thin delegations; `tx` field made `pub(crate)`
+  - `lib.rs`: all new modules registered
+  - `ble.rs`: `wait_for_any_response` for hot-update multiplexing
+  - `lan.rs`: `probe()` method for LAN validation
+
+  **Tests:** Rust 51 passed; Python 1686 passed, 87 skipped.
+  Playwright UI failures (12 + 6 errors) are pre-existing missing-browser-binary issues, unrelated.
+
+  **Commit:** `7cb5240`
+
   Modularized the native Rust daemon's (`divoomd`) `device_call` commands logic to strictly adhere to the 500 LOC limit constraint:
 
   **Modularization:** Extracted all inline command match arms and helper functions out of `daemon.rs` and moved them into submodules inside the `src/device_call/` directory:

@@ -4,7 +4,22 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Post-v0.20.2 — Native Port: Art Sync, Hot-Update, Wall, Live Jobs, macOS Notifications + 500 LOC Splits (2026-06-26)
+
+- **Art Sync / Custom Art / Hot-Update** (`art.rs`, `art_codec.rs`, `art_hot.rs`): Ported cloud artwork downloads
+  (magic-43, AES-128-CBC magic-9, 0xAA hot-file), custom art slot push/query, and the hot-channel update protocol
+  (manifest fetch → SHA-1 verify → BLE streaming). AES-128-CBC implemented pure-Rust (no new deps).
+- **DivoomWall Coordinator** (`wall.rs`): Multi-panel display wall — connect, delta reconfigure (G7), image crop/resize/parallel-stream.
+  `cmd_wall_configure` moved from `daemon.rs` to `wall.rs` for LOC compliance.
+- **Live Jobs** (`live_jobs.rs`): Background widget loops — system monitor, stocks ticker, weather updates, music album cover.
+- **macOS Notification Monitor** (`macos_notifications.rs`): SQLite `usernoted` DB monitor via `sqlite3` CLI; maps bundle IDs → ANCS push over BLE.
+- **Connect/Disconnect/Scan extracted** (`daemon_connect.rs`): 83-line module; thin delegations in `daemon.rs`.
+- **500 LOC rule enforced**: All new/modified files ≤ 500 lines:
+  - `daemon.rs`=498, `wall.rs`=457, `art.rs`=331, `art_hot.rs`=251, `macos_notifications.rs`=233, `art_codec.rs`=197, `daemon_connect.rs`=83.
+- **Tests**: Rust 51 passed; Python 1686 passed, 87 skipped (Playwright browser-binary failures are pre-existing, unrelated).
+
 ## Post-v0.20.2 — Native Port Remaining Commands & Modularization (2026-06-23)
+
 
 - **Modularization & 500 LOC Enforcement**: Refactored the native Rust daemon (`divoomd`) by migrating all remaining device command logic from `src/daemon.rs` into modular submodules under `src/device_call/`. This shrinks `daemon.rs` from 1944 lines down to 317 lines (complying with the 500 LOC limit).
 - **Clean Compilation & Feature Gating**: Gated the submodules in `mod.rs` and all BLE-specific imports/fields in `daemon.rs` behind `#[cfg(feature = "ble")]` to ensure warning-free compilation both with and without default features.
