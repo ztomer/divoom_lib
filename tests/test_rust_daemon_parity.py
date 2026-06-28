@@ -256,3 +256,17 @@ def test_rust_default_mac():
             os.remove(sp)
 
 
+def test_rust_spp_connect_failure_integration(rust_daemon_ctx):
+    client = rust_daemon_ctx
+    # Attempting to connect to a dummy MAC with use_ios_le_protocol=False
+    # should trigger the SppTransport path, spawning spp_bridge.py.
+    # It will fail (due to no such device) and return an SPP-specific connection error.
+    reply = client.connect_device(
+        mac="11:22:33:44:55:66",
+        use_ios_le_protocol=False
+    )
+    assert reply["success"] is False
+    # The error message should indicate SPP connection failure
+    assert "spp" in reply.get("error", "").lower()
+
+

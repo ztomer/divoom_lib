@@ -4,6 +4,13 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native Port: Bluetooth Classic SPP Integration (2026-06-28)
+
+- **Bluetooth Classic SPP Transport** (`spp_bridge.py`, `spp.rs`, `transport.rs`, `daemon_connect.rs`): Integrated full Bluetooth Classic SPP transport support into the native Rust daemon using a lightweight Python standard input/output bridge subprocess. Reuses Python's proven `BTSppTransport` to bypass private ObjC `IOBluetooth` bindings in Rust, enabling connection, command execution, and `0x8B` animation streaming.
+- **Match Exhaustiveness**: Fixed exhaustive pattern-matching errors across all matching blocks (in `daemon.rs`, `live_jobs.rs`, `wall.rs`, `art.rs`, `art_hot.rs`, and `macos_notifications.rs`) to cleanly handle `DeviceTransport::Spp` alongside BLE and LAN.
+- **Parity Verification**: Shipped a new integration test `test_rust_spp_connect_failure_integration` verifying subprocess launching and error propagation of the SPP bridge, and renamed manual tests to fix test collection.
+- **Tests**: Rust 51 passed; Python 1701 passed, 87 skipped.
+
 ### Post-v0.20.2 — Native Port: Align Notification Service, Command Parity, TCP/Token Auth, --mac Option & Rust Auto-Spawn (2026-06-28)
 
 - **macOS Notification Monitor** (`macos_notifications.rs`): Refactored to query the Notification Center SQLite DB (Sonoma/Sequoia paths + Group Containers fallback) using a read-only `rusqlite` connection directly. Parsed binary plists with the `plist` crate to retrieve `app`, `title`, and `body` fields. Implemented routing and tracking for `seen`, `routed`, and `dropped` counters, duplicate suppression, and health checks.

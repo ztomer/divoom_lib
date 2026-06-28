@@ -155,6 +155,9 @@ impl DivoomWall {
                         DeviceTransport::Ble(b) => {
                             let _ = b.disconnect().await;
                         }
+                        DeviceTransport::Spp(s) => {
+                            let _ = s.disconnect().await;
+                        }
                         DeviceTransport::Lan(_) => {}
                     }
                 }));

@@ -3,13 +3,11 @@ use std::time::Duration;
 use crate::daemon::{Daemon, DeviceTransport};
 use crate::protocol::Request;
 
-#[cfg(feature = "ble")]
-use crate::ble::BleTransport;
 
 #[cfg(feature = "ble")]
 pub struct CallCtx<'a> {
     pub daemon: &'a Daemon,
-    pub dev: &'a BleTransport,
+    pub dev: &'a DeviceTransport,
     pub args: &'a [i64],
     pub raw_args: &'a [Value],
     pub kwargs: Option<&'a serde_json::Map<String, Value>>,
@@ -96,11 +94,11 @@ pub async fn handle_device_call(
 
     #[cfg(feature = "ble")]
     {
-        if let DeviceTransport::Ble(ble_dev) = dev {
+        if matches!(dev, DeviceTransport::Ble(_) | DeviceTransport::Spp(_)) {
             let kwargs = req.args.get("kwargs").and_then(|v| v.as_object());
             let ctx = CallCtx {
                 daemon: _daemon,
-                dev: ble_dev,
+                dev,
                 args: &args,
                 raw_args: &raw_args,
                 kwargs,

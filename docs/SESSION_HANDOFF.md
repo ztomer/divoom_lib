@@ -18,6 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE PORT: BLUETOOTH CLASSIC SPP INTEGRATION VIA PYTHON SUBPROCESS BRIDGE (2026-06-28):**
+  Successfully implemented Bluetooth Classic SPP support in the native Rust daemon (`divoomd`) using a lightweight Python subprocess bridge (`spp_bridge.py`). This allows the native daemon to connect to older classic SPP devices (e.g. Tivoo-Max) by reusing the proven Python `BTSppTransport` stack under the hood, bypassing complex Objective-C/IOBluetooth binding issues.
+
+  **Changes shipped:**
+  - `divoom_daemon/spp_bridge.py` [NEW]: Standard JSON-line standard I/O bridge wrapping `BTSppTransport` for classic Bluetooth connection management.
+  - `native-port/divoomd/src/spp.rs` [NEW]: Native Rust `SppTransport` implementing tokio process spawning, input/output piping, and `0x8B` animation streaming parity.
+  - `native-port/divoomd/src/transport.rs`: Added the `Spp` variant to `DeviceTransport` and delegated all relevant transport calls.
+  - `native-port/divoomd/src/daemon_connect.rs`: Routed connection requests to `SppTransport` when `use_ios_le_protocol` is `false`.
+  - Exhaustive match coverage updated across `daemon.rs`, `live_jobs.rs`, `wall.rs`, `art.rs`, `art_hot.rs`, and `macos_notifications.rs` to handle `DeviceTransport::Spp` cleanly.
+  - `tests/test_rust_daemon_parity.py`: Shipped `test_rust_spp_connect_failure_integration` E2E test verifying dynamic python bridge subprocess spawning and SPP error propagation.
+  - Renamed manual smoke-test `test_display_aliases.py` to `smoke_display_aliases.py` to fix pytest collection.
+
+  **Tests:** Rust 51 passed; Python 1701 passed, 87 skipped. (Verified with new integration tests).
+
 - **NATIVE PORT: ALIGN NOTIFICATION SERVICE, COMMAND SCHEMAS, TCP/TOKEN AUTH, --mac OPTION & RUST AUTO-SPAWN (2026-06-28):**
   Aligned the native Rust daemon's macOS notification service monitor (`macos_notifications.rs`), routing, and command responses with the ground-truth Python daemon. Ported the headless TCP server listener, token authentication features, and `--mac` option default address configurations. Shipped the `DIVOOM_USE_RUST_DAEMON` auto-spawner integration in the Python clients and GUI launcher.
 

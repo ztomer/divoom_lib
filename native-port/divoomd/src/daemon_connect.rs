@@ -50,6 +50,19 @@ pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
             Some(i) => i.to_string(),
             None => return err_reply("connect_device requires 'mac' or 'lan_ip'"),
         };
+        let use_ios_le = req.args.get("use_ios_le_protocol").and_then(|v| v.as_bool()).unwrap_or(true);
+        if !use_ios_le {
+            match crate::spp::SppTransport::connect(&id, None, None).await {
+                Ok(t) => {
+                    *daemon.device.lock().await = Some(Arc::new(DeviceTransport::Spp(t)));
+                    *daemon.device_id.lock().await = Some(id.clone());
+                    let _ = daemon.tx.send(json!({"type":"status","state":"active","counters":{}}));
+                    return json!({"success":true,"connected":true,"connection_state":"connected","mac":id});
+                }
+                Err(e) => return err_reply(&format!("connect SPP failed: {e}")),
+            }
+        }
+
         let central = match daemon.central().await {
             Ok(c) => c,
             Err(e) => return err_reply(&format!("connect failed: {e}")),
@@ -74,6 +87,7 @@ pub(crate) async fn cmd_disconnect(daemon: &Daemon) -> Value {
         match &*t {
             #[cfg(feature = "ble")]
             DeviceTransport::Ble(b) => { let _ = b.disconnect().await; }
+            DeviceTransport::Spp(s) => { let _ = s.disconnect().await; }
             DeviceTransport::Lan(_) => {}
         }
     }

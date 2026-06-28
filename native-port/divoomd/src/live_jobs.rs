@@ -554,7 +554,7 @@ async fn push_rgb_to_device(
 
     #[cfg(feature = "ble")]
     {
-        if let DeviceTransport::Ble(_) = dev {
+        if matches!(dev, DeviceTransport::Ble(_) | DeviceTransport::Spp(_)) {
             let enc = daemon.encoder().ok_or("encoder not available")?;
             let frame_body = if w == 32 && h == 32 {
                 enc.encode_animation_frame_32(rgb, w, h, time_ms)
@@ -572,7 +572,7 @@ async fn push_rgb_to_device(
                 .map(|_| ())
                 .map_err(|e| format!("stream_8b failed: {e}"))
         } else {
-            Err("BLE not connected".into())
+            Err("BLE/SPP not connected".into())
         }
     }
     #[cfg(not(feature = "ble"))]

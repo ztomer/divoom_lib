@@ -130,16 +130,16 @@ pub(crate) async fn run_hot_update(
         let guard = daemon.device.lock().await;
         let dev = match guard.as_ref() { Some(d) => d.clone(), None => return Err("no device connected".into()) };
         drop(guard);
-        if let crate::daemon::DeviceTransport::Ble(ref ble) = *dev {
-            return run_hot_session(ble, &files, ok_dl, progress).await;
+        if matches!(&*dev, crate::daemon::DeviceTransport::Ble(_) | crate::daemon::DeviceTransport::Spp(_)) {
+            return run_hot_session(&*dev, &files, ok_dl, progress).await;
         }
     }
-    Err("hot_update requires BLE transport".into())
+    Err("hot_update requires BLE/SPP transport".into())
 }
 
 #[cfg(feature = "ble")]
 async fn run_hot_session(
-    ble: &crate::ble::BleTransport,
+    ble: &crate::daemon::DeviceTransport,
     files: &[HotFile],
     ok_dl: usize,
     progress: Arc<HotProgress>,

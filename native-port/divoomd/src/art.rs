@@ -164,7 +164,7 @@ const CMD_QUERY: u8 = 0x8E; // app get user define info
 
 #[cfg(feature = "ble")]
 async fn push_custom_art_page(
-    dev: &crate::ble::BleTransport,
+    dev: &crate::daemon::DeviceTransport,
     page: u8,
     frames: &[Vec<u8>],
 ) -> bool {
@@ -243,8 +243,8 @@ pub async fn cmd_custom_art_push(daemon: Arc<Daemon>, args: &Value) -> Value {
             None => return json!({"success": false, "error": "no device connected"}),
         };
         drop(guard);
-        if let crate::daemon::DeviceTransport::Ble(ref ble) = *dev {
-            let ok = push_custom_art_page(ble, page, &frames).await;
+        if matches!(&*dev, crate::daemon::DeviceTransport::Ble(_) | crate::daemon::DeviceTransport::Spp(_)) {
+            let ok = push_custom_art_page(&*dev, page, &frames).await;
             return json!({
                 "success": ok,
                 "files_pushed": slot_map.len(),
@@ -252,7 +252,7 @@ pub async fn cmd_custom_art_push(daemon: Arc<Daemon>, args: &Value) -> Value {
             });
         }
     }
-    json!({"success": false, "error": "custom_art_push requires BLE transport"})
+    json!({"success": false, "error": "custom_art_push requires BLE/SPP transport"})
 }
 
 /// Handle `custom_art_query_page` command.
@@ -266,8 +266,8 @@ pub async fn cmd_custom_art_query_page(daemon: Arc<Daemon>, args: &Value) -> Val
             None => return json!({"success": false, "error": "no device connected"}),
         };
         drop(guard);
-        if let crate::daemon::DeviceTransport::Ble(ref ble) = *dev {
-            let resp = ble.send_command_and_wait(
+        if matches!(&*dev, crate::daemon::DeviceTransport::Ble(_) | crate::daemon::DeviceTransport::Spp(_)) {
+            let resp = dev.send_command_and_wait(
                 CMD_QUERY, &[page], std::time::Duration::from_secs(4)).await;
             match resp {
                 Some(data) if data.len() >= 8 => {

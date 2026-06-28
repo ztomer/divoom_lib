@@ -32,3 +32,4 @@ pub mod art;
 #[cfg(target_os = "macos")]
 pub mod macos_notifications;
 pub mod transport;
+pub mod spp;

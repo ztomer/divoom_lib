@@ -476,6 +476,9 @@ async fn forward_notification(daemon: &Daemon, app_type: u8, text: &str) -> bool
                 crate::daemon::DeviceTransport::Ble(ref ble) => {
                     return ble.send_command(0x50, &payload, true).await.is_ok();
                 }
+                crate::daemon::DeviceTransport::Spp(ref spp) => {
+                    return spp.send_command(0x50, &payload, true).await.is_ok();
+                }
                 crate::daemon::DeviceTransport::Lan(_) => {}
             }
         }
