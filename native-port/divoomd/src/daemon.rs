@@ -62,12 +62,16 @@ impl Default for Daemon {
 
 impl Daemon {
     pub fn new() -> Self {
+        Self::new_with_mac(None)
+    }
+
+    pub fn new_with_mac(default_mac: Option<String>) -> Self {
         let (tx, _) = tokio::sync::broadcast::channel(32);
         Daemon {
             queue: CommandQueue::new(Some(EXCLUSIVE_TIMEOUT), Some(ITEM_TIMEOUT)),
             started: Instant::now(),
             device: Mutex::new(None),
-            device_id: Mutex::new(None),
+            device_id: Mutex::new(default_mac),
             #[cfg(feature = "ble")]
             central: Mutex::new(None),
             #[cfg(feature = "ble")]
@@ -353,20 +357,20 @@ impl Daemon {
 
     async fn device_status(&self) -> Value {
         let connected = self.device.lock().await.is_some();
+        let id_val = self.device_id.lock().await.clone();
 
         let (mac, lan_ip) = if let Some(ref dev) = *self.device.lock().await {
             match &**dev {
                 #[cfg(feature = "ble")]
                 DeviceTransport::Ble(_) => {
-                    let id = self.device_id.lock().await.clone();
-                    (id.map(Value::String).unwrap_or(Value::Null), Value::Null)
+                    (id_val.map(Value::String).unwrap_or(Value::Null), Value::Null)
                 }
                 DeviceTransport::Lan(l) => {
                     (Value::Null, Value::String(l.device_ip.clone()))
                 }
             }
         } else {
-            (Value::Null, Value::Null)
+            (id_val.map(Value::String).unwrap_or(Value::Null), Value::Null)
         };
 
         json!({

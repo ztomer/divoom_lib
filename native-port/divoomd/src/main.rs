@@ -15,6 +15,7 @@ struct ConfigArgs {
     host: Option<String>,
     port: Option<u16>,
     token: Option<String>,
+    mac: Option<String>,
 }
 
 fn parse_args() -> ConfigArgs {
@@ -23,6 +24,7 @@ fn parse_args() -> ConfigArgs {
     let mut host = None;
     let mut port = None;
     let mut token = std::env::var("DIVOOM_DAEMON_TOKEN").ok();
+    let mut mac = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -46,11 +48,16 @@ fn parse_args() -> ConfigArgs {
         } else if args[i] == "--token" && i + 1 < args.len() {
             token = Some(args[i + 1].clone());
             i += 1;
+        } else if let Some(m) = args[i].strip_prefix("--mac=") {
+            mac = Some(m.to_string());
+        } else if args[i] == "--mac" && i + 1 < args.len() {
+            mac = Some(args[i + 1].clone());
+            i += 1;
         }
         i += 1;
     }
 
-    ConfigArgs { socket_path, host, port, token }
+    ConfigArgs { socket_path, host, port, token, mac }
 }
 
 /// Single-instance + stale-socket handling: if the path exists and something is
@@ -112,7 +119,7 @@ async fn main() {
         tcp_token = Some(token);
     }
 
-    let daemon = Arc::new(Daemon::new());
+    let daemon = Arc::new(Daemon::new_with_mac(args.mac));
     daemon.initialize_self_weak(Arc::downgrade(&daemon));
 
     let unix_fut = serve(listener, daemon.clone());

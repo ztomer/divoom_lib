@@ -197,3 +197,62 @@ def test_rust_tcp_token_auth():
         if os.path.exists(sp):
             os.remove(sp)
 
+
+def test_rust_default_mac():
+    # Locate the compiled Rust binary
+    repo_root = Path(__file__).parent.parent
+    bin_path = repo_root / "native-port" / "divoomd" / "target" / "debug" / "divoomd"
+    if not bin_path.exists():
+        bin_path = repo_root / "native-port" / "divoomd" / "target" / "release" / "divoomd"
+    if not bin_path.exists():
+        pytest.skip(f"Rust binary not found at {bin_path}. Run cargo build first.")
+
+    sp = f"/tmp/divoomd_parity_mac_{os.getpid()}.sock"
+    if os.path.exists(sp):
+        os.remove(sp)
+
+    default_mac = "AA:BB:CC:DD:EE:FF"
+
+    # Spawn divoomd with a default MAC address configured
+    proc = subprocess.Popen(
+        [str(bin_path), "--socket", sp, "--mac", default_mac],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+
+    # Wait for the Unix socket to be bound
+    bound = False
+    for _ in range(50):
+        if os.path.exists(sp):
+            bound = True
+            break
+        time.sleep(0.05)
+
+    if not bound:
+        proc.kill()
+        stdout, stderr = proc.communicate(timeout=1.0)
+        pytest.fail(f"Rust daemon failed to bind. stdout: {stdout}, stderr: {stderr}")
+
+    try:
+        client = DaemonClient(sp)
+        reply = client.send_command("device_status")
+        assert reply["success"] is True
+        assert reply.get("mac") == default_mac
+        assert reply.get("connected") is False
+        assert reply.get("connection_state") == "disconnected"
+
+    finally:
+        try:
+            DaemonClient(sp).send_command("shutdown")
+        except Exception:
+            pass
+        proc.terminate()
+        try:
+            proc.wait(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        if os.path.exists(sp):
+            os.remove(sp)
+
+
