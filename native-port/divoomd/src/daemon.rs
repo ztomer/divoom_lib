@@ -13,11 +13,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-use std::collections::HashMap;
 use std::sync::{Arc, Weak, OnceLock};
-
-use base64::engine::general_purpose::STANDARD as B64;
-use base64::Engine as _;
 
 use crate::command_queue::CommandQueue;
 
@@ -27,75 +23,13 @@ use crate::protocol::{err_reply, Request};
 use crate::socket_server::Handler;
 
 #[cfg(feature = "ble")]
-use crate::ble::{self, Adapter, BleTransport};
+use crate::ble::{self, Adapter};
 use tokio::sync::Mutex;
 
 const EXCLUSIVE_TIMEOUT: Duration = Duration::from_secs(30);
 const ITEM_TIMEOUT: Duration = Duration::from_secs(60);
 
-pub enum DeviceTransport {
-    #[cfg(feature = "ble")]
-    Ble(BleTransport),
-    Lan(crate::lan::LanTransport),
-}
-
-impl DeviceTransport {
-    pub fn device_name(&self) -> Option<String> {
-        match self {
-            #[cfg(feature = "ble")]
-            DeviceTransport::Ble(b) => b.device_name(),
-            DeviceTransport::Lan(_) => None,
-        }
-    }
-
-    pub fn set_cached_device_name(&self, _name: String) {
-        match self {
-            #[cfg(feature = "ble")]
-            DeviceTransport::Ble(b) => b.set_cached_device_name(_name),
-            DeviceTransport::Lan(_) => {}
-        }
-    }
-
-    #[cfg(feature = "ble")]
-    pub async fn send_command(&self, command_id: u8, args: &[u8], write_with_response: bool) -> crate::ble::BleResult<()> {
-        match self {
-            DeviceTransport::Ble(b) => b.send_command(command_id, args, write_with_response).await,
-            DeviceTransport::Lan(_) => Err("send_command not supported on LAN".into()),
-        }
-    }
-
-    #[cfg(feature = "ble")]
-    pub async fn wait_for_response(&self, command_id: u8, timeout: std::time::Duration) -> Option<Vec<u8>> {
-        match self {
-            DeviceTransport::Ble(b) => b.wait_for_response(command_id, timeout).await,
-            DeviceTransport::Lan(_) => None,
-        }
-    }
-
-    #[cfg(feature = "ble")]
-    pub async fn send_command_and_wait(&self, command_id: u8, args: &[u8], timeout: std::time::Duration) -> Option<Vec<u8>> {
-        match self {
-            DeviceTransport::Ble(b) => b.send_command_and_wait(command_id, args, timeout).await,
-            DeviceTransport::Lan(_) => None,
-        }
-    }
-
-    #[cfg(feature = "ble")]
-    pub async fn stream_animation_8b(&self, blob: &[u8]) -> crate::ble::BleResult<bool> {
-        match self {
-            DeviceTransport::Ble(b) => b.stream_animation_8b(blob).await,
-            DeviceTransport::Lan(_) => Err("stream_animation_8b not supported on LAN".into()),
-        }
-    }
-
-    pub fn lan(&self) -> Option<&crate::lan::LanTransport> {
-        match self {
-            #[cfg(feature = "ble")]
-            DeviceTransport::Ble(_) => None,
-            DeviceTransport::Lan(l) => Some(l),
-        }
-    }
-}
+pub use crate::transport::DeviceTransport;
 
 pub struct Daemon {
     pub(crate) queue: CommandQueue,
@@ -458,38 +392,6 @@ impl Daemon {
     /// first to prove op-level parity (the read-back + a write); unported methods
     /// return an honest error. The device mutex serializes device access.
     async fn cmd_device_call(&self, req: &Request) -> Value {
-        // Numeric positional args (for brightness, clock, etc.)
-        let args: Vec<i64> = req
-            .args
-            .get("args")
-            .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|x| x.as_i64()).collect())
-            .unwrap_or_default();
-        // Raw positional args as Values (for string paths in display.show_image)
-        let raw_args: Vec<Value> = req
-            .args
-            .get("args")
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-        // Blob map: base64-encoded binary data keyed by positional arg index.
-        let mut blob_map: HashMap<usize, Vec<u8>> = HashMap::new();
-        if let Some(blobs) = req.args.get("blobs").and_then(|v| v.as_object()) {
-            for (idx_str, b64val) in blobs {
-                let idx: usize = match idx_str.parse() {
-                    Ok(i) => i,
-                    Err(_) => return err_reply(&format!("blobs: bad index key '{idx_str}'")),
-                };
-                let b64 = match b64val.as_str() {
-                    Some(s) => s,
-                    None => return err_reply(&format!("blobs[{idx_str}]: not a string")),
-                };
-                match B64.decode(b64) {
-                    Ok(data) => { blob_map.insert(idx, data); }
-                    Err(e) => return err_reply(&format!("blobs[{idx_str}]: base64 error: {e}")),
-                }
-            }
-        }
         // The per-op token gates exclusive mode: if another session holds exclusive,
         // device_call is rejected immediately (Python parity: _cmd_queue.run(token)).
         let token = req.args.get("token").and_then(|v| v.as_str());
@@ -504,8 +406,7 @@ impl Daemon {
         };
         let timeout = Duration::from_secs(5);
 
-        let blob_map = std::sync::Mutex::new(blob_map);
-        crate::device_call::handle_device_call(self, dev, req, &args, &raw_args, &blob_map, timeout).await
+        crate::device_call::handle_device_call(self, dev, req, timeout).await
     }
 
     async fn cmd_disconnect(&self) -> Value {

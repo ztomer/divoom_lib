@@ -36,13 +36,12 @@ pub mod design;
 #[cfg(feature = "ble")]
 pub mod system;
 
+use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+
 pub async fn handle_device_call(
     _daemon: &Daemon,
     dev: &DeviceTransport,
     req: &Request,
-    args: &[i64],
-    _raw_args: &[Value],
-    _blob_map: &std::sync::Mutex<std::collections::HashMap<usize, Vec<u8>>>,
     _timeout: Duration,
 ) -> Value {
     let method = match req.args.get("method").and_then(|v| v.as_str()) {
@@ -50,10 +49,46 @@ pub async fn handle_device_call(
         None => return crate::protocol::err_reply("device_call requires 'method'"),
     };
 
+    // Numeric positional args (for brightness, clock, etc.)
+    let args: Vec<i64> = req
+        .args
+        .get("args")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|x| x.as_i64()).collect())
+        .unwrap_or_default();
+
+    // Raw positional args as Values (for string paths in display.show_image)
+    let raw_args: Vec<Value> = req
+        .args
+        .get("args")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    // Blob map: base64-encoded binary data keyed by positional arg index.
+    let mut blob_map_raw: std::collections::HashMap<usize, Vec<u8>> = std::collections::HashMap::new();
+    if let Some(blobs) = req.args.get("blobs").and_then(|v| v.as_object()) {
+        for (idx_str, b64val) in blobs {
+            let idx: usize = match idx_str.parse() {
+                Ok(i) => i,
+                Err(_) => return crate::protocol::err_reply(&format!("blobs: bad index key '{idx_str}'")),
+            };
+            let b64 = match b64val.as_str() {
+                Some(s) => s,
+                None => return crate::protocol::err_reply(&format!("blobs[{idx_str}]: not a string")),
+            };
+            match B64.decode(b64) {
+                Ok(data) => { blob_map_raw.insert(idx, data); }
+                Err(e) => return crate::protocol::err_reply(&format!("blobs[{idx_str}]: base64 error: {e}")),
+            }
+        }
+    }
+    let blob_map = std::sync::Mutex::new(blob_map_raw);
+
     if method.starts_with("lan.") {
         if let Some(lan_dev) = dev.lan() {
             let kwargs = req.args.get("kwargs").and_then(|v| v.as_object());
-            return handle_lan_call(lan_dev, method, args, kwargs).await;
+            return handle_lan_call(lan_dev, method, &args, kwargs).await;
         } else {
             return crate::protocol::err_reply("device is not connected via LAN");
         }
@@ -66,10 +101,10 @@ pub async fn handle_device_call(
             let ctx = CallCtx {
                 daemon: _daemon,
                 dev: ble_dev,
-                args,
-                raw_args: _raw_args,
+                args: &args,
+                raw_args: &raw_args,
                 kwargs,
-                blob_map: _blob_map,
+                blob_map: &blob_map,
                 timeout: _timeout,
             };
 
