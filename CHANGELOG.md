@@ -4,11 +4,12 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
-## Post-v0.20.2 — Native Port: Align Notification Service, Command Parity, TCP/Token Auth & --mac Option (2026-06-28)
+### Post-v0.20.2 — Native Port: Align Notification Service, Command Parity, TCP/Token Auth, --mac Option & Rust Auto-Spawn (2026-06-28)
 
 - **macOS Notification Monitor** (`macos_notifications.rs`): Refactored to query the Notification Center SQLite DB (Sonoma/Sequoia paths + Group Containers fallback) using a read-only `rusqlite` connection directly. Parsed binary plists with the `plist` crate to retrieve `app`, `title`, and `body` fields. Implemented routing and tracking for `seen`, `routed`, and `dropped` counters, duplicate suppression, and health checks.
 - **Daemon Command Parity** (`daemon.rs`): Aligned `get_status`, `start_notifications`, `stop_notifications`, `notification_status`, and `set_routing` command payloads and response shapes to match Python's schema exactly. Exposed status and notification events to socket subscribers. Updated `device_status` to return the stored default MAC address when disconnected.
 - **Headless TCP Server** (`main.rs`, `socket_server.rs`): Ported headless TCP listener socket and constant-time token comparison checking. Enforced token setup on TCP configurations (fail-closed check). Added `--mac` command-line argument support.
+- **Rust Daemon Auto-Spawn** (`divoom_daemon/daemon_client.py`): Integrated support for `DIVOOM_USE_RUST_DAEMON=1` to auto-spawn the compiled Rust `divoomd` binary instead of the Python daemon in the desktop GUI/menubar/TUI clients.
 - **Parity Verification**: Shipped a new Python integration test suite `tests/test_rust_daemon_parity.py` verifying response schema alignment, token auth security, and default MAC address configuration of the compiled Rust daemon subprocess using Python `DaemonClient`.
 - **Tests**: Rust 51 passed; Python 1711 passed, 87 skipped.
 

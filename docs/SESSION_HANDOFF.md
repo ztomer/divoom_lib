@@ -18,8 +18,8 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **NATIVE PORT: ALIGN NOTIFICATION SERVICE, COMMAND SCHEMAS, TCP/TOKEN AUTH & --mac OPTION (2026-06-28):**
-  Aligned the native Rust daemon's macOS notification service monitor (`macos_notifications.rs`), routing, and command responses with the ground-truth Python daemon. Ported the headless TCP server listener, token authentication features, and `--mac` option default address configurations.
+- **NATIVE PORT: ALIGN NOTIFICATION SERVICE, COMMAND SCHEMAS, TCP/TOKEN AUTH, --mac OPTION & RUST AUTO-SPAWN (2026-06-28):**
+  Aligned the native Rust daemon's macOS notification service monitor (`macos_notifications.rs`), routing, and command responses with the ground-truth Python daemon. Ported the headless TCP server listener, token authentication features, and `--mac` option default address configurations. Shipped the `DIVOOM_USE_RUST_DAEMON` auto-spawner integration in the Python clients and GUI launcher.
 
   **Changes shipped:**
   - `src/macos_notifications.rs`: Refactored to query the Notification Center SQLite DB (Sonoma/Sequoia paths + Group Containers fallback) using a read-only `rusqlite` connection (removing `sqlite3` CLI subprocess calls). Parsed binary plists with the `plist` crate to retrieve `app`, `title`, and `body` fields. Implemented routing and tracking for `seen`, `routed`, and `dropped` counters, duplicate suppression, and health checks.
@@ -27,6 +27,7 @@ Claude) should read this on entry and **update it at the end of every round**
   - `src/main.rs`: Supported `--host`, `--port`, `--token`, and `--mac` CLI flags (with `DIVOOM_DAEMON_TOKEN` env variable fallback). Enforced token requirement when binding to a TCP port, and wired TCP listener concurrently with Unix listener. Passed the default MAC config to the Daemon.
   - `src/socket_server.rs`: Made `serve_connection` generic over the stream type (`AsyncRead + AsyncWrite + Unpin`) to serve both Unix and TCP streams. Added `serve_tcp` and implemented constant-time comparison for token verification.
   - `tests/test_rust_daemon_parity.py`: Shipped a new Python integration test suite verifying the socket response shapes, token auth, and default MAC address config of the compiled Rust daemon subprocess using Python `DaemonClient`.
+  - `divoom_daemon/daemon_client.py`: Added support for `DIVOOM_USE_RUST_DAEMON` inside `spawn_daemon()`, enabling Python clients/GUI launcher to dynamically auto-spawn and run the compiled Rust `divoomd` daemon instead of the default Python daemon.
 
   **Tests:** Rust 51 passed; Python 1711 passed, 87 skipped. (Verified with new integration tests).
 
