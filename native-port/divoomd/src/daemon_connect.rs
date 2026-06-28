@@ -31,6 +31,15 @@ pub(crate) async fn cmd_scan(daemon: &Daemon, req: &Request) -> Value {
 
 /// Handle `connect_device` command (BLE or LAN).
 pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
+    let mock = req.args.get("mock").and_then(|v| v.as_bool()).unwrap_or(false);
+    if mock {
+        let mock_transport = crate::mock_transport::MockTransport::new();
+        *daemon.device.lock().await = Some(Arc::new(DeviceTransport::Mock(mock_transport)));
+        *daemon.device_id.lock().await = Some("MOCK_MAC".to_string());
+        let _ = daemon.tx.send(json!({"type":"status","state":"active","counters":{}}));
+        return json!({"success":true,"connected":true,"connection_state":"connected","mac":"MOCK_MAC"});
+    }
+
     let lan_ip = req.args.get("lan_ip").and_then(|v| v.as_str());
     if let Some(ip) = lan_ip {
         let token = req.args.get("lan_token").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -89,6 +98,7 @@ pub(crate) async fn cmd_disconnect(daemon: &Daemon) -> Value {
             DeviceTransport::Ble(b) => { let _ = b.disconnect().await; }
             DeviceTransport::Spp(s) => { let _ = s.disconnect().await; }
             DeviceTransport::Lan(_) => {}
+            DeviceTransport::Mock(_) => {}
         }
     }
     *daemon.device_id.lock().await = None;

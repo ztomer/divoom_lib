@@ -18,6 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **RUST MOCK TRANSPORT & TEST COVERAGE INFRASTRUCTURE (2026-06-28):**
+  Implemented MockTransport for offline Rust daemon testing and shipped 4 new E2E mock tests verifying wire byte patterns for core commands. This enables testing device_call serialization without real hardware.
+
+  **Changes shipped:**
+  - `src/mock_transport.rs` [NEW]: `MockTransport` struct with `send_command()` that logs `(cmd_id, payload)` tuples into a `Vec<(u8, Vec<u8>)>` and simulates generic ACK responses.
+  - `src/mock_device_tests.rs` [NEW]: 4 `#[tokio::test]` E2E tests — `set_clock_rich` (0x45 APK C2 layout), `show_clock` (0x45 hass-divoom layout), `set_brightness` (0x74), `set_volume` (0x08). All assert exact wire byte patterns.
+  - `src/transport.rs`: Added `Mock(MockTransport)` variant to `DeviceTransport` enum with delegated trait methods.
+  - `src/daemon_connect.rs`: Added `{"mock": true}` connect path + `Mock` arm in `cmd_disconnect`.
+  - `src/device_call/mod.rs`: Added `DeviceTransport::Mock(_)` to the BLE-like device gate.
+  - `src/wall.rs`, `src/daemon.rs`, `src/macos_notifications.rs`: Added exhaustive `Mock(_)` match arms.
+  - `scripts/rust_coverage.sh` [NEW]: Helper script for `cargo-llvm-cov` code coverage reporting.
+
+  **Tests:** Rust **62 tests passed** (11 lib + 46 integration + 4 mock + 1 native-encode); Python **16 passed, 1 skipped** (daemon parity suite).
+
 - **NATIVE PORT: DIVOOM CLOUD AUTHENTICATION, GALLERY SYNC, MONTHLY BEST LOOP, & CLOCK OVERLAY ALIGNMENT (2026-06-28):**
   Successfully completed the remaining native port features in the Rust daemon (`divoomd`) to achieve 100% parity with the authoritative Python daemon and library. The daemon can now run completely standalone, handling cloud logins, category file queries, scheduled monthly best background scrapers, precompiled animation streams, and APK-aligned clock layouts.
 

@@ -94,7 +94,7 @@ pub async fn handle_device_call(
 
     #[cfg(feature = "ble")]
     {
-        if matches!(dev, DeviceTransport::Ble(_) | DeviceTransport::Spp(_)) {
+        if matches!(dev, DeviceTransport::Ble(_) | DeviceTransport::Spp(_) | DeviceTransport::Mock(_)) {
             let kwargs = req.args.get("kwargs").and_then(|v| v.as_object());
             let ctx = CallCtx {
                 daemon: _daemon,

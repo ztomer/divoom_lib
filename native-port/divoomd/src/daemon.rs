@@ -421,6 +421,9 @@ impl Daemon {
                 DeviceTransport::Lan(l) => {
                     (Value::Null, Value::String(l.device_ip.clone()))
                 }
+                DeviceTransport::Mock(_) => {
+                    (id_val.map(Value::String).unwrap_or(Value::Null), Value::Null)
+                }
             }
         } else {
             (id_val.map(Value::String).unwrap_or(Value::Null), Value::Null)

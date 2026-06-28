@@ -4,6 +4,15 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Rust MockTransport & Test Coverage Infrastructure (2026-06-28)
+
+- **MockTransport** (`src/mock_transport.rs`): New `MockTransport` struct that logs `(cmd_id, payload)` tuples and simulates generic ACK responses, enabling offline command serialization testing without real hardware.
+- **Mock E2E Tests** (`src/mock_device_tests.rs`): 4 `#[tokio::test]` tests asserting exact wire byte patterns for `display.set_clock_rich` (0x45 APK C2), `display.show_clock` (0x45 hass-divoom), `device.set_brightness` (0x74), and `music.set_volume` (0x08).
+- **DeviceTransport::Mock** (`src/transport.rs`, `src/device_call/mod.rs`): Added `Mock` variant to `DeviceTransport` enum, delegated trait methods, and included in the BLE-like device gate for `device_call` dispatch.
+- **Exhaustive Match Coverage**: Added `Mock(_)` arms in `wall.rs`, `daemon.rs`, `daemon_connect.rs`, and `macos_notifications.rs`.
+- **Coverage Script** (`scripts/rust_coverage.sh`): Helper bash script for running `cargo-llvm-cov` code coverage reports.
+- **Tests**: Rust **62 passed** (11 lib + 46 integration + 4 mock + 1 native-encode); Python **16 passed, 1 skipped** (daemon parity suite).
+
 ### Post-v0.20.2 — Native Port: Complete Rust Parity (2026-06-28)
 
 - **Divoom Cloud Authentication & Caching** (`src/cloud.rs`, `src/lib.rs`, `src/daemon.rs`, `Cargo.toml`): Ported email login (`POST /UserLogin`), guest HMAC-MD5 signing (`POST /User/NewGuest`), server UTC time sync, configuration parser (`config.ini`), cache manager (`auth_token.json` with 0o600 file write), and failure cooldown mechanism from Python to Rust. Added new dependencies (`md-5` and `hmac`) for cryptographic operations.

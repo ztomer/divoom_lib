@@ -480,6 +480,9 @@ async fn forward_notification(daemon: &Daemon, app_type: u8, text: &str) -> bool
                     return spp.send_command(0x50, &payload, true).await.is_ok();
                 }
                 crate::daemon::DeviceTransport::Lan(_) => {}
+                crate::daemon::DeviceTransport::Mock(ref mock) => {
+                    return mock.send_command(0x50, &payload, true).await.is_ok();
+                }
             }
         }
     }

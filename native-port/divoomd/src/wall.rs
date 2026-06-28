@@ -159,6 +159,7 @@ impl DivoomWall {
                             let _ = s.disconnect().await;
                         }
                         DeviceTransport::Lan(_) => {}
+                        DeviceTransport::Mock(_) => {}
                     }
                 }));
             }
