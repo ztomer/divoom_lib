@@ -272,6 +272,21 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 _ => json!({"success": true, "result": Value::Null}),
             }
         }
+        "animation.stream_animation_8b" => {
+            let blob: Vec<u8> = if let Some(data) = ctx.blob_map.lock().unwrap().remove(&0) {
+                data
+            } else {
+                match kw.and_then(|m| m.get("blob")).and_then(|v| v.as_array()) {
+                    Some(a) => a.iter().filter_map(|x| x.as_u64().map(|n| n as u8)).collect(),
+                    None => return err_reply("animation.stream_animation_8b requires 'blob'"),
+                }
+            };
+            match dev.stream_animation_8b(&blob).await {
+                Ok(true) => json!({"success": true, "result": true}),
+                Ok(false) => err_reply("stream_animation_8b: empty blob"),
+                Err(e) => err_reply(&format!("stream_animation_8b failed: {e}")),
+            }
+        }
         _ => err_reply("unimplemented basic command"),
     }
 }

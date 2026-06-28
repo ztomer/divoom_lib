@@ -123,7 +123,7 @@ impl Daemon {
         let _ = self.self_weak.set(weak);
     }
 
-    async fn dispatch(&self, req: Request) -> Value {
+    pub(crate) async fn dispatch(&self, req: Request) -> Value {
         match req.command.as_str() {
             "ping" => json!({"success": true, "pong": true}),
 
@@ -347,6 +347,24 @@ impl Daemon {
                 { return crate::macos_notifications::set_routing(&req.args).await; }
                 #[cfg(not(target_os = "macos"))]
                 json!({"success": true})
+            }
+
+            "fetch_gallery" => {
+                let classify = match req.args.get("classify").and_then(|v| v.as_i64()) {
+                    Some(c) => c,
+                    None => return err_reply("fetch_gallery requires 'classify'"),
+                };
+                let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
+                let file_sort = req.args.get("file_sort").and_then(|v| v.as_i64()).unwrap_or(1);
+                let file_size = req.args.get("file_size").and_then(|v| v.as_i64()).unwrap_or(127);
+
+                match crate::cloud::fetch_gallery(classify, limit, file_sort, file_size).await {
+                    Ok(res) => json!({
+                        "success": true,
+                        "result": res
+                    }),
+                    Err(e) => err_reply(&e),
+                }
             }
 
             "get_credentials" => {

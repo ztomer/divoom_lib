@@ -122,6 +122,9 @@ async fn main() {
     let daemon = Arc::new(Daemon::new_with_mac(args.mac));
     daemon.initialize_self_weak(Arc::downgrade(&daemon));
 
+    // Spawn monthly best background sync task
+    tokio::spawn(divoomd::monthly_best::monthly_best_loop_task(daemon.clone()));
+
     let unix_fut = serve(listener, daemon.clone());
 
     if let (Some(l), Some(t)) = (tcp_listener, tcp_token) {

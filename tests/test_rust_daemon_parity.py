@@ -349,3 +349,25 @@ def test_rust_cloud_auth_endpoints(rust_daemon_ctx):
     assert "utc" in reply
 
 
+def test_rust_fetch_gallery(rust_daemon_ctx):
+    client = rust_daemon_ctx
+
+    # Query gallery classify=18 (Recommend), limit=3
+    reply = client.send_command("fetch_gallery", {
+        "classify": 18,
+        "limit": 3
+    })
+    assert reply["success"] is True
+    assert "result" in reply
+    res = reply["result"]
+    assert res.get("ReturnCode") == 0
+    assert "FileList" in res
+    files = res["FileList"]
+    assert isinstance(files, list)
+    if len(files) > 0:
+        first = files[0]
+        assert "FileId" in first
+        assert "FileName" in first
+
+
+
