@@ -17,7 +17,6 @@ use std::sync::{Arc, Weak, OnceLock};
 
 use crate::command_queue::CommandQueue;
 
-#[cfg(feature = "ble")]
 use crate::native_encode::NativeEncoder;
 use crate::protocol::{err_reply, Request};
 use crate::socket_server::Handler;
@@ -41,7 +40,6 @@ pub struct Daemon {
     #[cfg(feature = "ble")]
     central: Mutex<Option<Adapter>>,
     // C image encoder (libdivoom_compact FFI); loaded once, cached for lifetime.
-    #[cfg(feature = "ble")]
     encoder: OnceLock<Option<NativeEncoder>>,
     pub(crate) tx: tokio::sync::broadcast::Sender<Value>,
     pub live_jobs: Arc<crate::live_jobs::LiveJobCoordinator>,
@@ -74,7 +72,6 @@ impl Daemon {
             device_id: Mutex::new(default_mac),
             #[cfg(feature = "ble")]
             central: Mutex::new(None),
-            #[cfg(feature = "ble")]
             encoder: OnceLock::new(),
             tx,
             live_jobs: Arc::new(crate::live_jobs::LiveJobCoordinator::new()),
@@ -86,7 +83,6 @@ impl Daemon {
     }
 
     /// Find the libdivoom_compact dylib: env override, then relative to the binary.
-    #[cfg(feature = "ble")]
     fn find_encoder_lib() -> Option<std::path::PathBuf> {
         if let Ok(p) = std::env::var("DIVOOMD_ENCODER_LIB") {
             let pb = std::path::PathBuf::from(&p);
@@ -102,7 +98,6 @@ impl Daemon {
     }
 
     /// Get (or lazy-init) the cached NativeEncoder. Returns None if the dylib is absent.
-    #[cfg(feature = "ble")]
     pub(crate) fn encoder(&self) -> Option<&NativeEncoder> {
         self.encoder.get_or_init(|| {
             Self::find_encoder_lib().and_then(|p| NativeEncoder::load(p).ok())

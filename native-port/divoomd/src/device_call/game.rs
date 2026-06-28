@@ -3,7 +3,6 @@ use std::time::Duration;
 use crate::protocol::err_reply;
 use super::CallCtx;
 
-#[cfg(feature = "ble")]
 pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
     let dev = ctx.dev;
     let args = ctx.args;

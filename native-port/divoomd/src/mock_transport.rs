@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use crate::ble::BleResult;
+use crate::transport::BleResult;
 
 #[derive(Clone, Debug)]
 pub struct MockTransport {

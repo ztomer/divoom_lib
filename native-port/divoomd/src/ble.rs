@@ -33,7 +33,7 @@ const NOTIFY_UUID: Uuid = Uuid::from_u128(0x49535343_1e4d_4bd9_ba61_23c647249616
 
 const DEVICE_NAME_HINTS: &[&str] = &["Pixoo", "Divoom", "Tivoo", "Timoo", "Ditoo", "Timebox"];
 
-pub type BleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+pub use crate::transport::BleResult;
 
 /// A device discovered during a scan.
 #[derive(Debug, Clone)]

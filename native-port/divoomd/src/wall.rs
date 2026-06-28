@@ -251,11 +251,12 @@ impl DivoomWall {
                     }
                 }
 
-                if let DeviceTransport::Ble(ble_dev) = &*dev {
-                    let _ = ble_dev.send_command(0x45, &[0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0], false).await;
-                    ble_dev.stream_animation_8b(&blob).await.map_err(|e| e.to_string())
-                } else {
-                    Err("LAN not supported for wall show_image".to_string())
+                match &*dev {
+                    DeviceTransport::Lan(_) => Err("LAN not supported for wall show_image".to_string()),
+                    _ => {
+                        let _ = dev.send_command(0x45, &[0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0], false).await;
+                        dev.stream_animation_8b(&blob).await.map_err(|e| e.to_string())
+                    }
                 }
             }));
         }
@@ -315,10 +316,9 @@ impl DivoomWall {
                 let dev_clone = dev.clone();
                 let args_vec = args.to_vec();
                 tasks.push(tokio::spawn(async move {
-                    if let DeviceTransport::Ble(ref b) = &*dev_clone {
-                        b.send_command(command_id, &args_vec, true).await.is_ok()
-                    } else {
-                        false
+                    match &*dev_clone {
+                        DeviceTransport::Lan(_) => false,
+                        _ => dev_clone.send_command(command_id, &args_vec, true).await.is_ok(),
                     }
                 }));
             }

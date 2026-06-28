@@ -4,7 +4,6 @@ use crate::daemon::{Daemon, DeviceTransport};
 use crate::protocol::Request;
 
 
-#[cfg(feature = "ble")]
 pub struct CallCtx<'a> {
     pub daemon: &'a Daemon,
     pub dev: &'a DeviceTransport,
@@ -15,23 +14,14 @@ pub struct CallCtx<'a> {
     pub timeout: Duration,
 }
 
-#[cfg(feature = "ble")]
 pub mod basic;
-#[cfg(feature = "ble")]
 pub mod alarm;
-#[cfg(feature = "ble")]
 pub mod sleep;
-#[cfg(feature = "ble")]
 pub mod timeplan;
-#[cfg(feature = "ble")]
 pub mod tools;
-#[cfg(feature = "ble")]
 pub mod text;
-#[cfg(feature = "ble")]
 pub mod game;
-#[cfg(feature = "ble")]
 pub mod design;
-#[cfg(feature = "ble")]
 pub mod system;
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
@@ -92,9 +82,10 @@ pub async fn handle_device_call(
         }
     }
 
-    #[cfg(feature = "ble")]
+    // LAN devices are handled above; everything else (BLE / SPP / Mock) routes
+    // through the build-agnostic DeviceTransport method layer.
     {
-        if matches!(dev, DeviceTransport::Ble(_) | DeviceTransport::Spp(_) | DeviceTransport::Mock(_)) {
+        if !matches!(dev, DeviceTransport::Lan(_)) {
             let kwargs = req.args.get("kwargs").and_then(|v| v.as_object());
             let ctx = CallCtx {
                 daemon: _daemon,
@@ -231,13 +222,8 @@ pub async fn handle_device_call(
                 m => crate::protocol::err_reply(&format!("device_call method not ported yet: {m}")),
             }
         } else {
-            crate::protocol::err_reply("method only supported on BLE device")
+            crate::protocol::err_reply("method only supported on a BLE/SPP device")
         }
-    }
-
-    #[cfg(not(feature = "ble"))]
-    {
-        crate::protocol::err_reply("BLE support is disabled")
     }
 }
 
