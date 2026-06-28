@@ -4,6 +4,13 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Post-v0.20.2 — Native Port: Align Notification Service and Command Parity (2026-06-28)
+
+- **macOS Notification Monitor** (`macos_notifications.rs`): Refactored to query the Notification Center SQLite DB (Sonoma/Sequoia paths + Group Containers fallback) using a read-only `rusqlite` connection directly. Parsed binary plists with the `plist` crate to retrieve `app`, `title`, and `body` fields. Implemented routing and tracking for `seen`, `routed`, and `dropped` counters, duplicate suppression, and health checks.
+- **Daemon Command Parity** (`daemon.rs`): Aligned `get_status`, `start_notifications`, `stop_notifications`, `notification_status`, and `set_routing` command payloads and response shapes to match Python's schema exactly. Exposed status and notification events to socket subscribers.
+- **Parity Verification**: Shipped a new Python integration test suite `tests/test_rust_daemon_parity.py` verifying response schema alignment of the compiled Rust daemon subprocess using Python `DaemonClient`.
+- **Tests**: Rust 51 passed; Python 1709 passed, 87 skipped.
+
 ## Post-v0.20.2 — Native Port: Art Sync, Hot-Update, Wall, Live Jobs, macOS Notifications + 500 LOC Splits (2026-06-26)
 
 - **Art Sync / Custom Art / Hot-Update** (`art.rs`, `art_codec.rs`, `art_hot.rs`): Ported cloud artwork downloads

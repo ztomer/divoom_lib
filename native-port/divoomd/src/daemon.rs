@@ -189,12 +189,28 @@ impl Daemon {
         match req.command.as_str() {
             "ping" => json!({"success": true, "pong": true}),
 
-            "get_status" => json!({
-                "success": true,
-                "state": "idle",
-                "uptime_s": self.started.elapsed().as_secs(),
-                "counters": {},
-            }),
+            "get_status" => {
+                #[cfg(target_os = "macos")]
+                let status = crate::macos_notifications::status_event().await;
+                #[cfg(not(target_os = "macos"))]
+                let status = json!({
+                    "state": "idle",
+                    "counters": {"seen": 0, "routed": 0, "dropped": 0}
+                });
+
+                let mut res = json!({
+                    "success": true,
+                    "uptime_s": self.started.elapsed().as_secs(),
+                });
+                if let Some(obj) = res.as_object_mut() {
+                    if let Some(st_obj) = status.as_object() {
+                        for (k, v) in st_obj {
+                            obj.insert(k.clone(), v.clone());
+                        }
+                    }
+                }
+                res
+            },
 
             "device_status" => self.device_status().await,
 
@@ -347,26 +363,53 @@ impl Daemon {
                 {
                     if let Some(w) = self.self_weak.get().and_then(|w| w.upgrade()) {
                         crate::macos_notifications::start_monitor(w).await;
-                        return json!({"success": true});
+                        let mut status = crate::macos_notifications::status_event().await;
+                        status["success"] = json!(true);
+                        return status;
                     }
                 }
-                json!({"success": false, "error": "notifications not available on this platform"})
+                json!({
+                    "success": false,
+                    "error": "notifications not available on this platform",
+                    "state": "idle",
+                    "counters": {"seen": 0, "routed": 0, "dropped": 0},
+                    "unsupported": true
+                })
             }
 
             "stop_notifications" => {
                 #[cfg(target_os = "macos")]
-                crate::macos_notifications::stop_monitor().await;
-                json!({"success": true})
+                {
+                    crate::macos_notifications::stop_monitor().await;
+                    let mut status = crate::macos_notifications::status_event().await;
+                    status["success"] = json!(true);
+                    return status;
+                }
+                #[cfg(not(target_os = "macos"))]
+                json!({
+                    "success": true,
+                    "state": "idle",
+                    "counters": {"seen": 0, "routed": 0, "dropped": 0}
+                })
             }
 
             "notification_status" => {
                 #[cfg(target_os = "macos")]
                 { return crate::macos_notifications::notification_status().await; }
                 #[cfg(not(target_os = "macos"))]
-                json!({"success": true, "running": false, "platform": "non-macos"})
+                json!({
+                    "success": true,
+                    "state": "idle",
+                    "counters": {"seen": 0, "routed": 0, "dropped": 0}
+                })
             }
 
-            "set_routing" => json!({"success": true}),  // no-op in native daemon
+            "set_routing" => {
+                #[cfg(target_os = "macos")]
+                { return crate::macos_notifications::set_routing(&req.args).await; }
+                #[cfg(not(target_os = "macos"))]
+                json!({"success": true})
+            }
 
             other => err_reply(&format!(
                 "command not implemented in the native daemon yet: {other}"
