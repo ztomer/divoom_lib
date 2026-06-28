@@ -94,6 +94,24 @@ See `docs/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
 
 ---
 
+## Native Rust Port Roadmap (Goal: Complete Parity & Python Archival)
+
+To deprecate and archive the Python daemon (`divoom_daemon`) and library backend in favor of the compiled Rust daemon (`divoomd`), the following items must be implemented in the Rust port:
+
+### 1. Divoom Cloud Authentication
+- **Port Auth Endpoints**: Implement `/UserLogin`, `/User/NewGuest`, and `/APP/GetServerUTC` HTTP API requests in Rust.
+- **Credential Storage & Caching**: Port the HMAC-MD5 signing, configuration loading from `config.ini`, and session token caching/validation logic to Rust.
+
+### 2. Gallery Browsing & Community API
+- **Gallery Integration**: Implement `/GetCategoryFileListV2` (fetching, sorting, filtering, and page streaming of animation files from Divoom community).
+- **Monthly Best Ticker**: Port the background polling scheduler loop (`monthly_best_daemon.py`) to Rust to periodically download and cycle monthly best animations on connected displays.
+
+### 3. Verification & Cleanup
+- **Cross-Platform Verification**: Verify `btleplug` BLE stability on non-macOS platforms (Windows/Linux) under various network environments.
+- **Python Backend Deprecation**: Switch all default commands/launchers to target the Rust binary by default, eventually dropping/archiving the Python daemon and helper source trees.
+
+---
+
 ## Planning docs by round
 
 | Round | Doc | Status |
