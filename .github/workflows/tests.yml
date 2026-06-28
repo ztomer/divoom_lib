@@ -38,3 +38,33 @@ jobs:
 
       - name: Run tests (C + Python encoder parity enforced via dual-impl suite)
         run: python3 -m pytest -q
+
+  rust-core:
+    # The hardware-/platform-free gate for the native daemon. Builds + tests the
+    # protocol/transport core WITHOUT the `ble` feature (no btleplug), on Linux —
+    # this is what regressed unnoticed in e4bd424 because no CI ran cargo.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native-port/divoomd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build core without BLE
+        run: cargo build --no-default-features --locked
+      - name: Test core without BLE
+        run: cargo test --no-default-features --locked
+
+  rust-ble:
+    # Full native daemon build with the `ble` feature (btleplug against
+    # CoreBluetooth). macOS so clang builds the libdivoom dylib and the FFI
+    # encoder-parity test runs instead of skipping.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build native dylib (FFI encoder parity test dependency)
+        run: bash scripts/build_libdivoom.sh
+      - name: Build + test with BLE
+        working-directory: native-port/divoomd
+        run: cargo test --locked
