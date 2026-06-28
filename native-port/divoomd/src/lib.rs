@@ -33,3 +33,4 @@ pub mod art;
 pub mod macos_notifications;
 pub mod transport;
 pub mod spp;
+pub mod cloud;

@@ -4,6 +4,13 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native Port: Divoom Cloud Authentication & Caching (2026-06-28)
+
+- **Divoom Cloud Authentication** (`src/cloud.rs`, `src/lib.rs`, `src/daemon.rs`, `Cargo.toml`): Ported the email login (`POST /UserLogin`), guest HMAC-MD5 signing (`POST /User/NewGuest`), server UTC time sync, configuration parser (`config.ini`), cache manager (`auth_token.json` with 0o600 file write), and failure cooldown mechanism from Python to Rust. Added new dependencies (`md-5` and `hmac`) for standard cryptographic operations.
+- **IPC Dispatch Command Registration**: Exposed `"get_credentials"` and `"get_cached_credentials"` endpoints in `daemon.rs` to allow the GUI/clients to retrieve cloud tokens directly over the UNIX socket, reducing client dependencies on Python crypto/auth stacks.
+- **Parity Verification**: Shipped 5 inline Rust unit tests verifying hashing signatures, configuration parsing, caching validity/expiration, and cooldown timers. Added `test_rust_cloud_auth_endpoints` in `tests/test_rust_daemon_parity.py` to assert socket auth endpoint retrieval.
+- **Tests**: Rust 56 passed; Python 1703 passed, 87 skipped. (Verified with new unit and integration tests).
+
 ### Post-v0.20.2 — Native Port: Bluetooth Classic SPP Integration (2026-06-28)
 
 - **Bluetooth Classic SPP Transport** (`spp_bridge.py`, `spp.rs`, `transport.rs`, `daemon_connect.rs`): Integrated full Bluetooth Classic SPP transport support into the native Rust daemon using a lightweight Python standard input/output bridge subprocess. Reuses Python's proven `BTSppTransport` to bypass private ObjC `IOBluetooth` bindings in Rust, enabling connection, command execution, and `0x8B` animation streaming.

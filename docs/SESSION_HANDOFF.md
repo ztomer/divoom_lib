@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE PORT: DIVOOM CLOUD AUTHENTICATION & CACHING (2026-06-28):**
+  Successfully implemented native Divoom Cloud Authentication and guest session token caching in the Rust daemon (`divoomd`), matching the Python auth stack (`divoom_auth.py`). This allows the Rust daemon to run completely standalone without requiring Python imports or dependencies for credential checking.
+
+  **Changes shipped:**
+  - `src/cloud.rs` [NEW]: Ports email login (`POST /UserLogin`), guest HMAC-MD5 signing (`POST /User/NewGuest`), UTC time sync, configuration parser (`config.ini`), cache manager (`auth_token.json` with 0o600 file write), and failure cooldown mechanism. Contains 5 inline unit tests verifying crypt/cache lifecycles.
+  - `src/lib.rs`: Registered `cloud` module.
+  - `src/daemon.rs`: Exposed `"get_credentials"` and `"get_cached_credentials"` socket dispatch endpoints.
+  - `Cargo.toml`: Added `md-5` and `hmac` dependencies, and `tempfile` and `lazy_static` dev-dependencies.
+  - `tests/test_rust_daemon_parity.py`: Shipped `test_rust_cloud_auth_endpoints` integration test verifying cached and fresh credentials socket calls.
+
+  **Tests:** Rust 56 passed; Python 1703 passed, 87 skipped. (Verified with new unit and integration tests).
+
 - **NATIVE PORT: BLUETOOTH CLASSIC SPP INTEGRATION VIA PYTHON SUBPROCESS BRIDGE (2026-06-28):**
   Successfully implemented Bluetooth Classic SPP support in the native Rust daemon (`divoomd`) using a lightweight Python subprocess bridge (`spp_bridge.py`). This allows the native daemon to connect to older classic SPP devices (e.g. Tivoo-Max) by reusing the proven Python `BTSppTransport` stack under the hood, bypassing complex Objective-C/IOBluetooth binding issues.
 

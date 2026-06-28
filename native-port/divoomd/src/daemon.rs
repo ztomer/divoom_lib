@@ -349,6 +349,38 @@ impl Daemon {
                 json!({"success": true})
             }
 
+            "get_credentials" => {
+                let force = req.args.get("force_refresh").and_then(|v| v.as_bool()).unwrap_or(false);
+                match crate::cloud::get_credentials(force).await {
+                    Ok(creds) => json!({
+                        "success": true,
+                        "token": creds.token,
+                        "user_id": creds.user_id,
+                        "email": creds.email,
+                        "utc": creds.utc,
+                    }),
+                    Err(e) => err_reply(&e),
+                }
+            }
+
+            "get_cached_credentials" => {
+                match crate::cloud::get_cached_credentials() {
+                    Some(creds) => json!({
+                        "success": true,
+                        "credentials": {
+                            "token": creds.token,
+                            "user_id": creds.user_id,
+                            "email": creds.email,
+                            "utc": creds.utc,
+                        }
+                    }),
+                    None => json!({
+                        "success": true,
+                        "credentials": serde_json::Value::Null
+                    })
+                }
+            }
+
             other => err_reply(&format!(
                 "command not implemented in the native daemon yet: {other}"
             )),

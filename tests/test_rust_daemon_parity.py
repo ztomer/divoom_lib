@@ -333,3 +333,19 @@ def test_rust_hardware_parity(request, rust_daemon_ctx):
     assert reply["success"] is True
 
 
+def test_rust_cloud_auth_endpoints(rust_daemon_ctx):
+    client = rust_daemon_ctx
+    
+    # 1. Query cached credentials (should succeed)
+    reply = client.send_command("get_cached_credentials")
+    assert reply["success"] is True
+    assert "credentials" in reply
+
+    # 2. Query credentials (which performs guest login fallback if cache is empty/invalid)
+    reply = client.send_command("get_credentials", {"force_refresh": False})
+    assert reply["success"] is True
+    assert "token" in reply
+    assert "user_id" in reply
+    assert "utc" in reply
+
+
