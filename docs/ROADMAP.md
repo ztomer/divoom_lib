@@ -37,8 +37,11 @@ See `docs/PLANNING_ROUND*.md` for detailed scope per round.
 | **R32** | Monthly Best reorg + Routines + device selector + Text fix | **1094/75/0** | gallery multi-select, per-device gallery style, 0x87→image text push |
 | **R33** | Sidebar reorg + Settings polish + per-device gallery style | **1094/75/0** | Routines nav, device dots, toggle-switch settings, appbar gear |
 | **R34** | Hot-channel sync fix + Routines polish + APK-aligned 0x8b upload | **1185/75/0** | `sync_read_timeout`, device-dot pulse, alarms week-table, device-driven 0x8b flow |
+| **R54** | Notifications, schemas, TCP/token auth & Rust auto-spawn | **1185/75/0** | `macos_notifications.rs`, `socket_server.rs`, `daemon_client.py` |
+| **R55** | Bluetooth Classic SPP subprocess bridge integration | **1185/75/0** | `spp_bridge.py`, `spp.rs`, `transport.rs`, `daemon_connect.rs` |
+| **R56** | Cloud Auth, Category Gallery API & Monthly Best Loop | **1703/87/0** | `cloud.rs`, `monthly_best.rs`, `daemon.rs`, `basic.rs` |
 
-Suite: **1185 passed / 75 skipped / 0 failed** (current).
+Suite: Rust 58 passed / Python 1703 passed / 87 skipped.
 
 ---
 
@@ -98,13 +101,13 @@ See `docs/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
 
 To deprecate and archive the Python daemon (`divoom_daemon`) and library backend in favor of the compiled Rust daemon (`divoomd`), the following items must be implemented in the Rust port:
 
-### 1. Divoom Cloud Authentication
-- **Port Auth Endpoints**: Implement `/UserLogin`, `/User/NewGuest`, and `/APP/GetServerUTC` HTTP API requests in Rust.
-- **Credential Storage & Caching**: Port the HMAC-MD5 signing, configuration loading from `config.ini`, and session token caching/validation logic to Rust.
+### 1. Divoom Cloud Authentication [SHIPPED]
+- **Port Auth Endpoints**: Ported `/UserLogin`, `/User/NewGuest`, and `/APP/GetServerUTC` HTTP API requests.
+- **Credential Storage & Caching**: Ported HMAC-MD5 signing, configuration loading from `config.ini`, and session token caching/validation logic.
 
-### 2. Gallery Browsing & Community API
-- **Gallery Integration**: Implement `/GetCategoryFileListV2` (fetching, sorting, filtering, and page streaming of animation files from Divoom community).
-- **Monthly Best Ticker**: Port the background polling scheduler loop (`monthly_best_daemon.py`) to Rust to periodically download and cycle monthly best animations on connected displays.
+### 2. Gallery Browsing & Community API [SHIPPED]
+- **Gallery Integration**: Ported `/GetCategoryFileListV2` (fetching, sorting, filtering, and page streaming of animation files from Divoom community).
+- **Monthly Best Ticker**: Ported the background polling scheduler loop (`monthly_best_daemon.py`) to Rust to periodically download and cycle monthly best animations on connected displays.
 
 ### 3. Verification & Cleanup
 - **Cross-Platform Verification**: Verify `btleplug` BLE stability on non-macOS platforms (Windows/Linux) under various network environments.
@@ -138,6 +141,9 @@ To deprecate and archive the Python daemon (`divoom_daemon`) and library backend
 | R30 | `docs/PLANNING_ROUND30.md` | current |
 | R31 | `docs/PLANNING_ROUND31.md` | current |
 | R32 | `docs/PLANNING_ROUND32.md` | current |
-| R34 | `docs/PLANNING_ROUND34.md` | current |
-| R46 | `docs/PLANNING_ROUND46.md` | current |
+| R34 | `docs/PLANNING_ROUND34.md` | archived |
+| R46 | `docs/PLANNING_ROUND46.md` | archived |
+| R54 | `docs/PLANNING_ROUND54.md` | archived |
+| R55 | `docs/PLANNING_ROUND55.md` | archived |
+| R56 | `docs/PLANNING_ROUND56.md` | archived |
 
