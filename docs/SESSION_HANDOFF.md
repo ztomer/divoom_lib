@@ -27,10 +27,10 @@ Claude) should read this on entry and **update it at the end of every round**
   - `native-port/divoomd/src/transport.rs`: Added the `Spp` variant to `DeviceTransport` and delegated all relevant transport calls.
   - `native-port/divoomd/src/daemon_connect.rs`: Routed connection requests to `SppTransport` when `use_ios_le_protocol` is `false`.
   - Exhaustive match coverage updated across `daemon.rs`, `live_jobs.rs`, `wall.rs`, `art.rs`, `art_hot.rs`, and `macos_notifications.rs` to handle `DeviceTransport::Spp` cleanly.
-  - `tests/test_rust_daemon_parity.py`: Shipped `test_rust_spp_connect_failure_integration` E2E test verifying dynamic python bridge subprocess spawning and SPP error propagation.
+  - `tests/test_rust_daemon_parity.py`: Shipped `test_rust_spp_connect_failure_integration` E2E test verifying dynamic python bridge subprocess spawning/error propagation, and added `test_rust_hardware_parity` executing live scans, connection, get/set brightness, and disconnection on real Divoom hardware (Tivoo-Max).
   - Renamed manual smoke-test `test_display_aliases.py` to `smoke_display_aliases.py` to fix pytest collection.
 
-  **Tests:** Rust 51 passed; Python 1701 passed, 87 skipped. (Verified with new integration tests).
+  **Tests:** Rust 51 passed; Python 1702 passed, 87 skipped. (Verified with new integration and hardware tests).
 
 - **NATIVE PORT: ALIGN NOTIFICATION SERVICE, COMMAND SCHEMAS, TCP/TOKEN AUTH, --mac OPTION & RUST AUTO-SPAWN (2026-06-28):**
   Aligned the native Rust daemon's macOS notification service monitor (`macos_notifications.rs`), routing, and command responses with the ground-truth Python daemon. Ported the headless TCP server listener, token authentication features, and `--mac` option default address configurations. Shipped the `DIVOOM_USE_RUST_DAEMON` auto-spawner integration in the Python clients and GUI launcher.

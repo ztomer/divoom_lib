@@ -29,6 +29,8 @@ Implement Bluetooth Classic SPP (Serial Port Profile) support in the native Rust
 
 ### Automated Tests
 - Run `python3 -m pytest tests/test_rust_daemon_parity.py` and verify `test_rust_spp_connect_failure_integration` passes.
+- Run `python3 -m pytest tests/test_rust_daemon_parity.py -s -v --run-hardware` and verify `test_rust_hardware_parity` successfully scans, connects, queries, set/gets brightness, and disconnects on live Divoom hardware (Tivoo-Max).
 
 ## Outcome
-- Successfully integrated SPP support using a subprocess helper bridge. Verified that invalid connection attempts correctly trigger the SPP bridge, execute Python's proven `BTSppTransport`, and propagate errors gracefully. All tests are green.
+- Successfully integrated SPP support using a subprocess helper bridge. Verified that invalid connection attempts correctly trigger the SPP bridge, execute Python's proven `BTSppTransport`, and propagate errors gracefully.
+- Successfully verified the native Rust daemon's end-to-end functionality against live physical hardware (Tivoo-Max) via the new `test_rust_hardware_parity` test. All tests are green.

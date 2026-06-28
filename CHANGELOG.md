@@ -8,8 +8,8 @@ shipped milestone (per the project planning docs).
 
 - **Bluetooth Classic SPP Transport** (`spp_bridge.py`, `spp.rs`, `transport.rs`, `daemon_connect.rs`): Integrated full Bluetooth Classic SPP transport support into the native Rust daemon using a lightweight Python standard input/output bridge subprocess. Reuses Python's proven `BTSppTransport` to bypass private ObjC `IOBluetooth` bindings in Rust, enabling connection, command execution, and `0x8B` animation streaming.
 - **Match Exhaustiveness**: Fixed exhaustive pattern-matching errors across all matching blocks (in `daemon.rs`, `live_jobs.rs`, `wall.rs`, `art.rs`, `art_hot.rs`, and `macos_notifications.rs`) to cleanly handle `DeviceTransport::Spp` alongside BLE and LAN.
-- **Parity Verification**: Shipped a new integration test `test_rust_spp_connect_failure_integration` verifying subprocess launching and error propagation of the SPP bridge, and renamed manual tests to fix test collection.
-- **Tests**: Rust 51 passed; Python 1701 passed, 87 skipped.
+- **Parity Verification**: Shipped a new integration test `test_rust_spp_connect_failure_integration` verifying SPP bridge error propagation, and added a physical hardware parity integration test `test_rust_hardware_parity` validating scans, connection, get/set brightness, and disconnection on live Divoom hardware. Renamed manual tests to fix test collection.
+- **Tests**: Rust 51 passed; Python 1702 passed, 87 skipped. (Verified with new integration and hardware tests).
 
 ### Post-v0.20.2 — Native Port: Align Notification Service, Command Parity, TCP/Token Auth, --mac Option & Rust Auto-Spawn (2026-06-28)
 
