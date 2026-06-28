@@ -16,6 +16,8 @@ jobs:
           python-version: "3.12"
       - name: Check for disallowed emoji
         run: python3 tools/check_no_emoji.py
+      - name: Check source files within 500-line house limit
+        run: python3 tools/check_file_size.py
 
   test:
     # macOS so clang builds the dylib and the native (C) encoder tests actually run.

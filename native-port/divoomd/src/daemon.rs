@@ -82,25 +82,10 @@ impl Daemon {
         }
     }
 
-    /// Find the libdivoom_compact dylib: env override, then relative to the binary.
-    fn find_encoder_lib() -> Option<std::path::PathBuf> {
-        if let Ok(p) = std::env::var("DIVOOMD_ENCODER_LIB") {
-            let pb = std::path::PathBuf::from(&p);
-            if pb.exists() {
-                return Some(pb);
-            }
-        }
-        // binary is at native-port/divoomd/target/release/divoomd — 5 parents = project root
-        let exe = std::env::current_exe().ok()?;
-        let root = exe.parent()?.parent()?.parent()?.parent()?.parent()?;
-        let candidate = root.join("divoom_lib").join("libdivoom_compact.dylib");
-        if candidate.exists() { Some(candidate) } else { None }
-    }
-
     /// Get (or lazy-init) the cached NativeEncoder. Returns None if the dylib is absent.
     pub(crate) fn encoder(&self) -> Option<&NativeEncoder> {
         self.encoder.get_or_init(|| {
-            Self::find_encoder_lib().and_then(|p| NativeEncoder::load(p).ok())
+            crate::native_encode::find_encoder_lib().and_then(|p| NativeEncoder::load(p).ok())
         }).as_ref()
     }
 

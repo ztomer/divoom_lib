@@ -11,6 +11,22 @@ use std::ffi::OsStr;
 
 use libloading::{Library, Symbol};
 
+/// Find the libdivoom_compact dylib: `DIVOOMD_ENCODER_LIB` env override, else
+/// relative to the running binary (project-root `divoom_lib/`).
+pub fn find_encoder_lib() -> Option<std::path::PathBuf> {
+    if let Ok(p) = std::env::var("DIVOOMD_ENCODER_LIB") {
+        let pb = std::path::PathBuf::from(&p);
+        if pb.exists() {
+            return Some(pb);
+        }
+    }
+    // binary is at native-port/divoomd/target/release/divoomd — 5 parents = project root
+    let exe = std::env::current_exe().ok()?;
+    let root = exe.parent()?.parent()?.parent()?.parent()?.parent()?;
+    let candidate = root.join("divoom_lib").join("libdivoom_compact.dylib");
+    if candidate.exists() { Some(candidate) } else { None }
+}
+
 // const u8* rgb, int w, int h, u16 time_ms, u8* out, int out_size -> int written
 type EncodeFrameFn = unsafe extern "C" fn(*const u8, i32, i32, u16, *mut u8, i32) -> i32;
 // const u8* rgb, int w, int h, u8* out, int out_size -> int written

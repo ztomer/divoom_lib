@@ -7,3 +7,7 @@ root="$(git rev-parse --show-toplevel)"
 python3 "$root/tools/check_no_emoji.py" --staged || {
     echo "pre-commit: disallowed emoji in staged files — only → ✓ ✗ ⚠ ↔ ↑ ↓ are allowed." >&2
     exit 1; }
+
+python3 "$root/tools/check_file_size.py" --staged || {
+    echo "pre-commit: staged source file over the 500-line house limit — split it." >&2
+    exit 1; }
