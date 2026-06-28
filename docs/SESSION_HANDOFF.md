@@ -18,15 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **NATIVE PORT: ALIGN NOTIFICATION SERVICE AND COMMAND SCHEMAS (2026-06-28):**
-  Aligned the native Rust daemon's macOS notification service monitor (`macos_notifications.rs`), routing, and command responses with the ground-truth Python daemon.
+- **NATIVE PORT: ALIGN NOTIFICATION SERVICE, COMMAND SCHEMAS, & TCP/TOKEN AUTH (2026-06-28):**
+  Aligned the native Rust daemon's macOS notification service monitor (`macos_notifications.rs`), routing, and command responses with the ground-truth Python daemon. Ported the headless TCP server listener and token authentication features.
 
   **Changes shipped:**
   - `src/macos_notifications.rs`: Refactored to query the Notification Center SQLite DB (Sonoma/Sequoia paths + Group Containers fallback) using a read-only `rusqlite` connection (removing `sqlite3` CLI subprocess calls). Parsed binary plists with the `plist` crate to retrieve `app`, `title`, and `body` fields. Implemented routing and tracking for `seen`, `routed`, and `dropped` counters, duplicate suppression, and health checks.
   - `src/daemon.rs`: Aligned `get_status`, `start_notifications`, `stop_notifications`, `notification_status`, and `set_routing` command payloads and response shapes to be identical to the Python daemon. Exposed status and notification events to socket subscribers. Relocated `DeviceTransport` to `src/transport.rs` and moved argument/blob parsing into `src/device_call/mod.rs` to keep `daemon.rs` strictly under 500 lines (at 443 lines).
-  - `tests/test_rust_daemon_parity.py`: Shipped a new Python integration test suite verifying the socket response shapes of the compiled Rust daemon subprocess using Python `DaemonClient`.
+  - `src/main.rs`: Supported `--host`, `--port`, `--token` CLI flags (with `DIVOOM_DAEMON_TOKEN` env variable fallback). Enforced token requirement when binding to a TCP port, and wired TCP listener concurrently with Unix listener.
+  - `src/socket_server.rs`: Made `serve_connection` generic over the stream type (`AsyncRead + AsyncWrite + Unpin`) to serve both Unix and TCP streams. Added `serve_tcp` and implemented constant-time comparison for token verification.
+  - `tests/test_rust_daemon_parity.py`: Shipped a new Python integration test suite verifying the socket response shapes of the compiled Rust daemon subprocess using Python `DaemonClient` over both Unix and TCP transports.
 
-  **Tests:** Rust 51 passed; Python 1709 passed, 87 skipped. (Verified with new integration tests).
+  **Tests:** Rust 51 passed; Python 1710 passed, 87 skipped. (Verified with new integration tests).
 
 - **NATIVE PORT: ART SYNC, HOT-UPDATE, WALL, LIVE JOBS, macOS NOTIFICATIONS + 500 LOC SPLITS (2026-06-26):**
   Ported the remaining high-level subsystems to the native Rust daemon (`divoomd`). All files comply with 500 LOC.
