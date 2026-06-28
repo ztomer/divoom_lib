@@ -150,15 +150,31 @@ def spawn_daemon(
 
     Caller waits until the socket is live (see :func:`ensure_daemon`).
     """
-    # In a py2app .app, sys.executable is the GUI stub — use the bundled python
-    # so `-m divoom_lib.cli` resolves; and DON'T disclaim, because the .app is
-    # already the BT-responsible process (its Info.plist declares the usage), so
-    # the daemon inherits a correct, granted responsibility.
-    bundle_py = bundle_python()
-    exe = bundle_py or python or sys.executable
-    cmd = [exe, "-m", "divoom_lib.cli", "daemon", "--socket", socket_path]
-    if mac:
-        cmd += ["--mac", mac]
+    use_rust = os.environ.get("DIVOOM_USE_RUST_DAEMON") in ("1", "true", "yes")
+    if use_rust:
+        bin_path = os.environ.get("DIVOOM_RUST_BINARY")
+        if not bin_path:
+            repo_root = Path(__file__).resolve().parents[2]
+            for folder in ["release", "debug"]:
+                p = repo_root / "native-port" / "divoomd" / "target" / folder / "divoomd"
+                if p.exists():
+                    bin_path = str(p)
+                    break
+        if not bin_path:
+            bin_path = "divoomd"
+        cmd = [bin_path, "--socket", socket_path]
+        if mac:
+            cmd += ["--mac", mac]
+    else:
+        # In a py2app .app, sys.executable is the GUI stub — use the bundled python
+        # so `-m divoom_lib.cli` resolves; and DON'T disclaim, because the .app is
+        # already the BT-responsible process (its Info.plist declares the usage), so
+        # the daemon inherits a correct, granted responsibility.
+        bundle_py = bundle_python()
+        exe = bundle_py or python or sys.executable
+        cmd = [exe, "-m", "divoom_lib.cli", "daemon", "--socket", socket_path]
+        if mac:
+            cmd += ["--mac", mac]
     log_path = os.environ.get("DIVOOM_DAEMON_LOG", "/tmp/divoom_daemon.log")
     try:
         with open(log_path, "a", buffering=1) as fh:
