@@ -4,6 +4,17 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Rust Hardening Phase 1+2: core build fix + CI gate (2026-06-28)
+
+- **Restored the `--no-default-features` build** (`f7e0e7c`): the hardware-free core had stopped compiling (regression in `e4bd424`). Root cause: the `DeviceTransport` device-I/O method layer was `ble`-gated despite delegating to non-ble Spp/Lan/Mock, and `BleResult` lived in the ble-gated module.
+  - Relocated `BleResult` to `src/transport.rs` (`ble.rs` re-exports it); `mock_transport.rs` imports it from there.
+  - Un-gated the `DeviceTransport` method layer, `NativeEncoder`/`Daemon::encoder()`, and the whole `device_call` dispatch + submodules; gated only the inner `DeviceTransport::Ble` match arms, routing the device gate through `!matches!(Lan)`.
+  - `wall.rs` `show_image`/`broadcast_command` now use the enum method layer instead of matching `DeviceTransport::Ble` (also fixes a latent Spp/Mock wall silent-fail).
+  - Result: the full command surface + MockTransport build/test hardware-free.
+- **Rust CI gate** (`762c6ad`): added `rust-core` (ubuntu, `cargo test --no-default-features --locked`) and `rust-ble` (macos, libdivoom dylib + `cargo test --locked`) jobs to `.github/workflows/tests.yml`. No CI previously ran cargo, which is why the regression slipped through.
+- **Phase 4 re-planned for autonomy** (`docs/PLANNING_NATIVE_PORT_HARDENING.md`): Tier A mock-driven E2E (CI, hardware-free), Tier B real-device via the pre-granted macOS `.app` (no per-run user action), Tier C Linux/Windows real-radio as the only human/device-bound residue.
+- **Tests**: `cargo test` = 62 green; `cargo test --no-default-features` = 62 green (was 8 compile errors).
+
 ### Post-v0.20.2 — Rust MockTransport & Test Coverage Infrastructure (2026-06-28)
 
 - **MockTransport** (`src/mock_transport.rs`): New `MockTransport` struct that logs `(cmd_id, payload)` tuples and simulates generic ACK responses, enabling offline command serialization testing without real hardware.

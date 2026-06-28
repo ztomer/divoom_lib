@@ -18,6 +18,36 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE PORT HARDENING — Phase 1+2 done; Phase 4 made autonomous (2026-06-28):**
+  - **Phase 1 (commit `f7e0e7c`):** fixed the broken `--no-default-features` build.
+    Root cause: the `DeviceTransport` device-I/O method layer was `ble`-gated even
+    though it delegates to non-ble Spp/Lan/Mock, and `BleResult` lived in the gated
+    `ble` module. Fix: relocated `BleResult` to `transport.rs` (ble.rs re-exports),
+    un-gated the method layer + `NativeEncoder`/`encoder()` + `device_call` (gating
+    only the inner `DeviceTransport::Ble` arms via `!matches!(Lan)`), and rewrote
+    `wall.rs` to use the enum method layer (also fixed a latent Spp/Mock wall
+    silent-fail). **`cargo test` = 62 green; `cargo test --no-default-features` = 62
+    green.** The full command surface + MockTransport now build/test hardware-free.
+  - **Phase 2 (commit `762c6ad`):** added `rust-core` (ubuntu, no-ble gate) and
+    `rust-ble` (macos, full ble) jobs to `.github/workflows/tests.yml`. This is the
+    gate that would have caught the e4bd424 regression.
+  - **Phase 4 re-planned for autonomy** (in `PLANNING_NATIVE_PORT_HARDENING.md`):
+    Tier A = mock-driven MCP + exclusive-mode E2E, fully hardware-free in CI; Tier B
+    = real-device on macOS via `open`-ing the pre-granted dev-daemon `.app` (no
+    per-run user action); Tier C = Linux/Windows real-radio, the only irreducible
+    human/device-bound residue (CI cross-build covers compile-only).
+
+### Open threads
+
+- **500-LOC house rule violated in the Rust tree:** `live_jobs.rs` (965),
+  `daemon.rs` (502). Hardening plan **Phase 3** (no hardware).
+- **Phase 4 verification** — Tier A (mock MCP + exclusive E2E in CI) and Tier B
+  (real Pixoo via the granted `.app`) are autonomous; Tier C (Linux/Windows real
+  radio) is the only user/device-bound item. See the hardening plan.
+- **Phase 5** — Python backend archival, gated on 3+4.
+- _(RESOLVED this round: the broken `--no-default-features` build + the no-CI-runs-
+  cargo gap — Phases 1+2.)_
+
 - **DOC CLEANUP — native-port docs retired/pruned (2026-06-28):** Retired the
   obsolete `docs/PLANNING_NATIVE_PORT.md` (original evaluate-and-plan doc, fully
   executed now that the port shipped R54–R56); its decision summary moved into
@@ -25,20 +55,6 @@ Claude) should read this on entry and **update it at the end of every round**
   Pruned this handoff's long R53.x-and-older tail (history retained in CHANGELOG +
   git). The active forward plan for the Rust port is
   `docs/PLANNING_NATIVE_PORT_HARDENING.md`.
-
-### Open threads
-
-- **Rust `--no-default-features` build is BROKEN** (regression in `e4bd424`): the
-  hardware-free core no longer compiles — `mock_transport.rs` imports `crate::ble`
-  unconditionally, and `wall.rs` / `live_jobs.rs` reference ble-gated items.
-  `cargo test` (default `ble`) is green (62 pass) so it slipped through, and **no
-  CI runs cargo at all**. Fix + add a Rust CI gate = Phase 1+2 of the hardening
-  plan.
-- **500-LOC house rule violated in the Rust tree:** `live_jobs.rs` (965),
-  `daemon.rs` (502). Hardening plan Phase 3.
-- **Hardware / cross-platform verification** (MCP-via-Rust, exclusive-mode-via-Rust,
-  Linux/Windows `btleplug`) — hardening plan Phase 4; needs the BLE harness (user
-  starts the daemon, agent drives it over the socket).
 
 - **RUST MOCK TRANSPORT & TEST COVERAGE INFRASTRUCTURE (2026-06-28):**
   Implemented MockTransport for offline Rust daemon testing and shipped 4 new E2E mock tests verifying wire byte patterns for core commands. This enables testing device_call serialization without real hardware.

@@ -51,6 +51,14 @@ both pass, restoring the documented "core builds/tests without BLE" invariant.
 
 **Exit:** both feature matrices build and test green.
 
+**STATUS: DONE (2026-06-28, commit `f7e0e7c`).** `cargo test` = 62 green;
+`cargo test --no-default-features` = 62 green (was 8 compile errors). The fix went
+further than 1.3 anticipated: rather than cfg-sprinkling `wall.rs`/`live_jobs.rs`,
+the `DeviceTransport` method layer + `NativeEncoder` + `device_call` were all
+un-gated (they only needed ble via the relocated `BleResult` + the `Ble` match
+arms, which are now individually gated). Net effect: the full command surface +
+MockTransport now build/test hardware-free — which is what unlocks Phase 4 Tier A.
+
 ---
 
 ## Phase 2 — CI gate so this cannot regress silently (no hardware needed)
@@ -71,6 +79,16 @@ both pass, restoring the documented "core builds/tests without BLE" invariant.
   alongside it (don't replace).
 
 **Exit:** a push that breaks the no-ble core turns CI red.
+
+**STATUS: DONE (2026-06-28, commit `762c6ad`).** Added two jobs to
+`.github/workflows/tests.yml`: `rust-core` (ubuntu, `cargo test
+--no-default-features --locked` — the regression gate, proves Linux-portable core
+without btleplug/libdbus) and `rust-ble` (macos, builds libdivoom dylib + `cargo
+test --locked` — full ble build on CoreBluetooth, FFI parity test active). Did not
+add `-D warnings` to the no-ble job: it has ~17 structural dead-code warnings (ble-
+only helpers in `art*`/encoder modules, legitimately unused without ble); gating on
+them would force noise-suppression churn. fmt/clippy on the default build is a
+future nicety, not required for the gate.
 
 ---
 
@@ -93,23 +111,69 @@ both pass, restoring the documented "core builds/tests without BLE" invariant.
 
 ## Phase 4 — Hardware & cross-platform verification (needs hardware / other OSes)
 
-**Goal:** prove real-device parity for the paths not yet exercised end-to-end.
-**Harness note:** per project memory, Claude cannot run BLE from the shell (TCC
-crash). The user starts the daemon (or the granted `.app`); the agent drives it
-over the Unix/TCP socket with `DaemonClient`.
+**Goal:** prove parity for the paths not yet exercised end-to-end — maximizing
+what runs WITHOUT user involvement, and isolating the irreducible
+needs-a-human/needs-a-device residue so it's the only thing left.
 
-- [ ] **4.1** MCP-via-Rust: drive `divoom-control mcp-server` against the Rust
-  daemon through a real device; confirm tools/list + tools/call round-trip.
-- [ ] **4.2** Exclusive-mode-via-Rust: run a multi-step exclusive sequence through
-  the proxy exclusive context against real hardware; confirm token gating + honest
-  steal-reject (parity with the Python fixes R53 round-25/HW rounds).
-- [ ] **4.3** `btleplug` stability on Linux and Windows: scan, connect, get/set
-  brightness, disconnect. Record per-OS results and any divergences.
-- [ ] **4.4** Re-run the existing Python parity suite against the Rust daemon
-  (`tests/test_rust_daemon_parity.py`) and the live `test_rust_hardware_parity`.
+**Key enabler (landed in Phase 1):** `device_call` + `MockTransport` now build and
+test without the `ble` feature, and the daemon exposes a `{"mock": true}` connect
+path. So the entire command surface — routing, wire-byte serialization, exclusive
+gating, MCP round-trips — can be driven over the socket with **no hardware, no TCC,
+no user**. Only *real-radio behavior on a real device on a real OS* genuinely needs
+hardware. That splits Phase 4 into three tiers by how autonomous each can be.
 
-**Exit:** documented green results for MCP, exclusive mode, and ≥1 non-macOS BLE
-platform.
+### Tier A — fully autonomous, no hardware (the bulk; runs in CI)
+
+Drives the real daemon binary over its socket with the device backed by
+`MockTransport`. Asserts wire bytes + response shapes + gating logic. No TCC, no
+device, no user. This is where most of "verification" actually lives.
+
+- [ ] **4A.1 MCP-via-Rust (mock):** start the Rust daemon (`{"mock": true}`
+  connect), run the MCP server against it, assert `tools/list` returns the full
+  catalog and representative `tools/call` invocations route through `device_call`
+  to the mock and produce the expected `(cmd_id, payload)` wire tuples.
+- [ ] **4A.2 Exclusive-mode (mock):** over the socket, exercise
+  acquire → second-acquire-rejected (honest steal-reject, no hang) → release →
+  re-acquire, plus a wrong-token `device_call` rejection. Pure `command_queue`
+  logic — hardware-independent (mirrors the Python R53 steal-reject teeth tests).
+- [ ] **4A.3** Fold A.1/A.2 into `cargo test` (extend `mock_device_tests.rs`) and/or
+  the Python `tests/test_rust_daemon_parity.py` so the Phase-2 CI gate covers them.
+
+### Tier B — autonomous on macOS via the pre-granted `.app` (real device)
+
+The TCC limit is that Claude's Bash-spawned BLE crashes (SIGABRT). The workaround
+is already proven: `open "dist/Divoom Dev Daemon.app"` launches the daemon under
+**its own** persisted Bluetooth grant (launchd, not a Bash child), then the agent
+drives it over `/tmp/divoom.sock` with `DaemonClient` — **no per-run user action**,
+provided the grant from the original one-time approval still holds for that binary.
+
+- [ ] **4B.1** `open` the granted dev-daemon `.app`; over the socket run the real
+  MCP-via-Rust and exclusive-mode sequences from Tier A against a real Pixoo —
+  confirms the mock results hold on real radio.
+- [ ] **4B.2** Run the live `test_rust_hardware_parity` (scan/connect/get+set
+  brightness/disconnect) against the `.app`-launched Rust daemon.
+- [ ] **4B.3** Autonomy caveat to record: if the `.app` is rebuilt/re-signed, its
+  TCC identity may reset → one-time user re-grant. Keep a stable signed dev-daemon
+  `.app` so Tier B stays user-free across runs. (This is the only place a human may
+  re-enter, and only on identity change — not per run.)
+
+### Tier C — not autonomable from this machine (cross-platform real radio)
+
+Linux/Windows `btleplug` *runtime* stability needs real devices on those OSes,
+which this macOS host can't provide. Automate everything short of the radio:
+
+- [ ] **4C.1** CI: `cargo build --target x86_64-unknown-linux-gnu` /
+  `x86_64-pc-windows-msvc` with `--features ble` (install `libdbus-1-dev` on the
+  Linux runner) — proves the btleplug backends *compile* per-OS. Build-only, no
+  device.
+- [ ] **4C.2** Real-radio smoke on Linux/Windows is the irreducible residue: either
+  offload to a self-hosted/cloud runner with a paired device, or accept as a
+  documented manual step before Phase 5. **`log()`/note this gap explicitly** — do
+  not let a green Tier-A/C build read as "cross-platform verified."
+
+**Exit:** Tier A green in CI; Tier B green on a real Pixoo via the `.app` (no
+per-run user action); Tier C compiles for Linux/Windows with the real-radio smoke
+explicitly tracked as the only remaining human/device-bound item.
 
 ---
 
@@ -134,15 +198,17 @@ platform.
 ## Sequencing & dependencies
 
 ```
-Phase 1 (fix core build) ──► Phase 2 (CI gate) ──► Phase 3 (LOC) ──► Phase 4 (HW/x-platform) ──► Phase 5 (archive)
-        no hardware              no hardware          no hardware         needs hardware            gated on all
+Phase 1 (core build) ──► Phase 2 (CI gate) ──► Phase 3 (LOC) ──► Phase 4 ──► Phase 5 (archive)
+   [DONE]                   [DONE]               no hardware       tiered      gated on all
 ```
 
-Phases 1–3 are pure code/tooling and can land now. Phase 4 needs the user-driven
-BLE harness and other OSes. Phase 5 is gated on 1–4.
+Phases 1 + 2 are **DONE** (committed). Phase 3 is pure code/tooling. Phase 4 is now
+mostly autonomous — Tier A runs hardware-free in CI, Tier B is user-free on macOS
+via the granted `.app`, and only Tier C's cross-platform real-radio smoke is
+genuinely human/device-bound. Phase 5 is gated on 1–4.
 
-**Recommended first unit of work:** Phase 1 + Phase 2 together — fix the regression
-*and* add the gate that would have caught it, in one logical change.
+**Recommended next unit of work:** Phase 3 (LOC splits) then Phase 4 Tier A
+(mock-driven MCP + exclusive-mode E2E in CI) — both land with no hardware.
 
 ---
 
@@ -154,5 +220,3 @@ After each phase lands:
 3. Commit each logical change; keep tests green and record pass/skip counts for
    **both** `cargo test` and `cargo test --no-default-features`, plus the Python
    suite (`python3 -m pytest`).
-</content>
-</invoke>
