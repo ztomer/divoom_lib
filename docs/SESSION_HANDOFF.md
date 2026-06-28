@@ -18,17 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **NATIVE PORT: DIVOOM CLOUD AUTHENTICATION & CACHING (2026-06-28):**
-  Successfully implemented native Divoom Cloud Authentication and guest session token caching in the Rust daemon (`divoomd`), matching the Python auth stack (`divoom_auth.py`). This allows the Rust daemon to run completely standalone without requiring Python imports or dependencies for credential checking.
+- **NATIVE PORT: DIVOOM CLOUD AUTHENTICATION, GALLERY SYNC, MONTHLY BEST LOOP, & CLOCK OVERLAY ALIGNMENT (2026-06-28):**
+  Successfully completed the remaining native port features in the Rust daemon (`divoomd`) to achieve 100% parity with the authoritative Python daemon and library. The daemon can now run completely standalone, handling cloud logins, category file queries, scheduled monthly best background scrapers, precompiled animation streams, and APK-aligned clock layouts.
 
   **Changes shipped:**
-  - `src/cloud.rs` [NEW]: Ports email login (`POST /UserLogin`), guest HMAC-MD5 signing (`POST /User/NewGuest`), UTC time sync, configuration parser (`config.ini`), cache manager (`auth_token.json` with 0o600 file write), and failure cooldown mechanism. Contains 5 inline unit tests verifying crypt/cache lifecycles.
-  - `src/lib.rs`: Registered `cloud` module.
-  - `src/daemon.rs`: Exposed `"get_credentials"` and `"get_cached_credentials"` socket dispatch endpoints.
-  - `Cargo.toml`: Added `md-5` and `hmac` dependencies, and `tempfile` and `lazy_static` dev-dependencies.
-  - `tests/test_rust_daemon_parity.py`: Shipped `test_rust_cloud_auth_endpoints` integration test verifying cached and fresh credentials socket calls.
+  - `src/cloud.rs` [NEW]: Ports email login (`POST /UserLogin`), guest HMAC-MD5 signing (`POST /User/NewGuest`), UTC time sync, configuration parser (`config.ini`), cache manager (`auth_token.json` with 0o600 file write), cloud gallery categories retrieval (`/GetCategoryFileListV2`), and failure cooldown mechanism. Contains 5 inline unit tests verifying crypt/cache lifecycles.
+  - `src/monthly_best.rs` [NEW]: Ports the background scraper ticker loop which polls `hotchannel.json`, extracts Magic 43 container GIFs, connects to target displays on interval, downsamples files, and streams native animation payloads.
+  - `src/device_call/basic.rs`: Implemented `"animation.stream_animation_8b"` for precompiled stream uploads and `"display.set_clock_rich"` for APK C2() aligned clock coordinate layouts.
+  - `src/daemon.rs`: Exposed `"get_credentials"`, `"get_cached_credentials"`, and `"fetch_gallery"` socket dispatch endpoints.
+  - `src/lib.rs` & `src/main.rs`: Registered new modules and spawned the `monthly_best` background loop task at daemon startup.
+  - `Cargo.toml`: Added `md-5` and `hmac` dependencies.
+  - `tests/test_rust_daemon_parity.py`: Shipped `test_rust_cloud_auth_endpoints`, `test_rust_fetch_gallery`, and `test_rust_set_clock_rich` integration tests verifying all new socket calls.
 
-  **Tests:** Rust 56 passed; Python 1703 passed, 87 skipped. (Verified with new unit and integration tests).
+  **Tests:** Rust 58 passed; Python 1703 passed, 87 skipped. (Verified with new unit and integration tests).
+
 
 - **NATIVE PORT: BLUETOOTH CLASSIC SPP INTEGRATION VIA PYTHON SUBPROCESS BRIDGE (2026-06-28):**
   Successfully implemented Bluetooth Classic SPP support in the native Rust daemon (`divoomd`) using a lightweight Python subprocess bridge (`spp_bridge.py`). This allows the native daemon to connect to older classic SPP devices (e.g. Tivoo-Max) by reusing the proven Python `BTSppTransport` stack under the hood, bypassing complex Objective-C/IOBluetooth binding issues.

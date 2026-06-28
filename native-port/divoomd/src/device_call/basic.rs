@@ -189,6 +189,32 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("display.show_clock failed: {e}")),
             }
         }
+        "display.set_clock_rich" => {
+            let style = kw.and_then(|v| v.get("style")).and_then(|v| v.as_i64())
+                .unwrap_or(0).clamp(0, 15) as u8;
+            let twentyfour = kw.and_then(|v| v.get("twentyfour")).and_then(|v| v.as_bool()).unwrap_or(true);
+            let humidity = kw.and_then(|v| v.get("humidity")).and_then(|v| v.as_bool()).unwrap_or(false);
+            let weather = kw.and_then(|v| v.get("weather")).and_then(|v| v.as_bool()).unwrap_or(false);
+            let date = kw.and_then(|v| v.get("date")).and_then(|v| v.as_bool()).unwrap_or(false);
+            let [r, g, b] = kw
+                .and_then(|v| v.get("color")).and_then(|v| v.as_str())
+                .and_then(parse_hex_color)
+                .unwrap_or([0xFF, 0xFF, 0xFF]);
+            let payload = [
+                0x00, // env = 0
+                twentyfour as u8,
+                style,
+                1u8, // clock active
+                humidity as u8,
+                weather as u8,
+                date as u8,
+                r, g, b,
+            ];
+            match dev.send_command(0x45, &payload, true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("display.set_clock_rich failed: {e}")),
+            }
+        }
         "display.show_design" => {
             match dev.send_command(0x45, &[0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0], false).await {
                 Ok(()) => json!({"success": true, "result": true}),

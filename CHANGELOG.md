@@ -4,12 +4,14 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
-### Post-v0.20.2 — Native Port: Divoom Cloud Authentication & Caching (2026-06-28)
+### Post-v0.20.2 — Native Port: Complete Rust Parity (2026-06-28)
 
-- **Divoom Cloud Authentication** (`src/cloud.rs`, `src/lib.rs`, `src/daemon.rs`, `Cargo.toml`): Ported the email login (`POST /UserLogin`), guest HMAC-MD5 signing (`POST /User/NewGuest`), server UTC time sync, configuration parser (`config.ini`), cache manager (`auth_token.json` with 0o600 file write), and failure cooldown mechanism from Python to Rust. Added new dependencies (`md-5` and `hmac`) for standard cryptographic operations.
-- **IPC Dispatch Command Registration**: Exposed `"get_credentials"` and `"get_cached_credentials"` endpoints in `daemon.rs` to allow the GUI/clients to retrieve cloud tokens directly over the UNIX socket, reducing client dependencies on Python crypto/auth stacks.
-- **Parity Verification**: Shipped 5 inline Rust unit tests verifying hashing signatures, configuration parsing, caching validity/expiration, and cooldown timers. Added `test_rust_cloud_auth_endpoints` in `tests/test_rust_daemon_parity.py` to assert socket auth endpoint retrieval.
-- **Tests**: Rust 56 passed; Python 1703 passed, 87 skipped. (Verified with new unit and integration tests).
+- **Divoom Cloud Authentication & Caching** (`src/cloud.rs`, `src/lib.rs`, `src/daemon.rs`, `Cargo.toml`): Ported email login (`POST /UserLogin`), guest HMAC-MD5 signing (`POST /User/NewGuest`), server UTC time sync, configuration parser (`config.ini`), cache manager (`auth_token.json` with 0o600 file write), and failure cooldown mechanism from Python to Rust. Added new dependencies (`md-5` and `hmac`) for cryptographic operations.
+- **Cloud Gallery Retrieval API**: Ported `/GetCategoryFileListV2` (fetching, sorting, filtering, and page streaming of animation files from Divoom community) with automatic credential refresh retry fallback on token expiration.
+- **Monthly Best background loop** (`src/monthly_best.rs`, `src/main.rs`): Implement background poll task looping on dynamic `hotchannel.json` configurations, extracting Magic 43 container GIFs, connecting to target displays on interval, downsampling files, and streaming native animation payloads.
+- **Precompiled Animation Streams & Clock Overlay Alignment** (`src/device_call/basic.rs`, `mod.rs`): Added `"animation.stream_animation_8b"` for precompiled stream uploads and `"display.set_clock_rich"` implementing the APK's C2() layout coordinates for weather, humidity, and calendar clock overlays.
+- **Parity Verification**: Shipped Rust unit tests verifying hashing signatures, configuration parsing, cache validity, cooldown timers, Magic 43 GIF extraction, and hotchannel configurations. Added integration tests (`test_rust_cloud_auth_endpoints`, `test_rust_fetch_gallery`, and `test_rust_set_clock_rich`) in `tests/test_rust_daemon_parity.py` to assert socket auth/gallery category/clock coordinate retrieval.
+- **Tests**: Rust 58 passed; Python 1703 passed, 87 skipped. (Verified with new unit and integration tests).
 
 ### Post-v0.20.2 — Native Port: Bluetooth Classic SPP Integration (2026-06-28)
 

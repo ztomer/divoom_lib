@@ -115,6 +115,7 @@ pub async fn handle_device_call(
                 "device.show_clock" | "show_clock" |
                 "device.show_image" | "show_image" |
                 "display.show_image" |
+                "display.set_clock_rich" |
                 "animation.stream_animation_8b" |
                 "display.show_clock" |
                 "display.show_design" |

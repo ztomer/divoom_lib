@@ -233,6 +233,7 @@ async fn ported_commands_route_to_device_call() {
         ("system.get_sound_control", json!([])),
         ("get_sound_control", json!([])),
         ("device.get_sound_control", json!([])),
+        ("display.set_clock_rich", json!([])),
     ];
 
     for (method, args) in methods {

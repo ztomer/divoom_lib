@@ -370,4 +370,24 @@ def test_rust_fetch_gallery(rust_daemon_ctx):
         assert "FileName" in first
 
 
+def test_rust_set_clock_rich(rust_daemon_ctx):
+    client = rust_daemon_ctx
+
+    reply = client.send_command("device_call", {
+        "method": "display.set_clock_rich",
+        "kw": {
+            "style": 3,
+            "twentyfour": True,
+            "humidity": True,
+            "weather": False,
+            "date": True,
+            "color": "#ff00ff"
+        }
+    })
+    assert reply["success"] is False
+    err = reply["error"].lower()
+    assert "no device connected" in err or "not connected" in err
+
+
+
 
