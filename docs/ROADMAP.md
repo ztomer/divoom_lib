@@ -58,10 +58,9 @@ Suite: Rust 58 passed / Python 1703 passed / 87 skipped.
 
 ### Near-term (next round)
 
-| Workstream | Depends on | Notes |
-|-----------|-----------|-------|
-| **MCP hardware-verify** | R28 (MCP-via-daemon) | Drive a real device through `divoom-control mcp-server` end-to-end. |
-| **Exclusive-mode hardware verify** | R29 | Drive a real multi-step sequence through the proxy exclusive context. |
+Native-port hardening is the active near-term track — see
+`docs/PLANNING_NATIVE_PORT_HARDENING.md`. The two hardware-verify items
+(MCP-via-Rust, exclusive-mode-via-Rust) moved there as Phase 4.
 
 ### Short-to-medium term
 
@@ -97,21 +96,35 @@ See `docs/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
 
 ---
 
-## Native Rust Port Roadmap (Goal: Complete Parity & Python Archival)
+## Native Rust Port (`native-port/divoomd`)
 
-To deprecate and archive the Python daemon (`divoom_daemon`) and library backend in favor of the compiled Rust daemon (`divoomd`), the following items must be implemented in the Rust port:
+**Goal:** deprecate and archive the Python daemon backend in favor of the compiled
+Rust daemon, at 100% socket + hardware parity.
 
-### 1. Divoom Cloud Authentication [SHIPPED]
-- **Port Auth Endpoints**: Ported `/UserLogin`, `/User/NewGuest`, and `/APP/GetServerUTC` HTTP API requests.
-- **Credential Storage & Caching**: Ported HMAC-MD5 signing, configuration loading from `config.ini`, and session token caching/validation logic.
+**Decision: Rust** (over C / C++ / Zig). `btleplug` is the one mature
+cross-platform BLE API (the bleak analog); `tokio` maps the asyncio-heavy daemon
+1:1; compile-time memory/thread safety suits a 24/7 hardware-owning binary frame
+parser; `serde` covers the NDJSON socket protocol. Footprint and single-device
+perf were a wash across all four candidates — cross-platform BLE + async broke the
+tie. The full language evaluation + phased plan lived in
+`docs/PLANNING_NATIVE_PORT.md`, removed 2026-06-28 once the port shipped; recover
+from git history if needed.
 
-### 2. Gallery Browsing & Community API [SHIPPED]
-- **Gallery Integration**: Ported `/GetCategoryFileListV2` (fetching, sorting, filtering, and page streaming of animation files from Divoom community).
-- **Monthly Best Ticker**: Ported the background polling scheduler loop (`monthly_best_daemon.py`) to Rust to periodically download and cycle monthly best animations on connected displays.
+**Architecture:** daemon-only port behind the unix-socket NDJSON seam — the Python
+GUI / menubar / CLI are unchanged clients, the Python daemon stays ground truth
+until parity, and the C encoders (`libdivoom`) are reused via FFI.
 
-### 3. Verification & Cleanup
-- **Cross-Platform Verification**: Verify `btleplug` BLE stability on non-macOS platforms (Windows/Linux) under various network environments.
-- **Python Backend Deprecation**: Switch all default commands/launchers to target the Rust binary by default, eventually dropping/archiving the Python daemon and helper source trees.
+**Status (2026-06-28): functionally complete.** Shipped R54–R56 — full
+`device_call.*` surface, cloud auth, gallery sync, monthly-best loop, macOS
+notifications, wall, live jobs, art/hot-update, SPP bridge, TCP+token auth, and
+Python auto-spawn (`DIVOOM_USE_RUST_DAEMON`). `cargo test` (default `ble`) = 62
+green.
+
+**Remaining work → `docs/PLANNING_NATIVE_PORT_HARDENING.md`** (active forward
+plan): fix the broken `--no-default-features` core build, add a Rust CI gate,
+500-LOC splits (`live_jobs.rs`, `daemon.rs`), hardware + cross-platform
+verification (MCP, exclusive mode, Linux/Windows `btleplug`), then Python backend
+archival.
 
 ---
 

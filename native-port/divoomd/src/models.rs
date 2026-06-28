@@ -1,5 +1,5 @@
 //! Protocol constants, ported verbatim from `divoom_lib/models` (the authoritative
-//! source — parallel-build strategy, see docs/PLANNING_NATIVE_PORT.md). Values are
+//! source — parallel-build strategy, see docs/ROADMAP.md). Values are
 //! pinned by the framing parity tests against Python-generated vectors.
 
 pub const MESSAGE_START_BYTE: u8 = 0x01;

@@ -1,6 +1,6 @@
 # divoom-spike-ble — Phase-1 native-port spike
 
-Throwaway proof for `docs/PLANNING_NATIVE_PORT.md` Phase 1. It answers the single
+Throwaway proof for `docs/ROADMAP.md` Phase 1. It answers the single
 question that gates the whole Rust port:
 
 > Can a **native binary** own a Divoom over BLE on macOS via `btleplug` + `tokio`,

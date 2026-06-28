@@ -6,7 +6,7 @@ Rust port (native-port/divoomd) can assert byte-for-byte parity in its tests.
 
 Writes native-port/divoomd/tests/framing_vectors.json. Re-run whenever the Python
 framing changes; the Rust tests then pin the new behavior. The Python framing is
-the AUTHORITATIVE source (parallel-build strategy — see docs/PLANNING_NATIVE_PORT.md).
+the AUTHORITATIVE source (parallel-build strategy — see docs/ROADMAP.md).
 """
 import json
 from pathlib import Path

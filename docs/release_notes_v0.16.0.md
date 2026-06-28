@@ -3,8 +3,7 @@
 This release packages a batch of fixes that were **validated against real
 hardware** (a live Pixoo-1, driven through the daemon over the socket), plus the
 revival of the native image-encoder fast path. It is the ground-truth Python
-release cut immediately before the native-daemon port work begins (see
-`docs/PLANNING_NATIVE_PORT.md`).
+release cut immediately before the native-daemon port work begins.
 
 Since v0.15.2:
 

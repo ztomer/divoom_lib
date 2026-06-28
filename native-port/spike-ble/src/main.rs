@@ -1,4 +1,4 @@
-//! Phase-1 spike for the native daemon port (see docs/PLANNING_NATIVE_PORT.md).
+//! Phase-1 spike for the native daemon port (see docs/ROADMAP.md).
 //!
 //! Goal: prove the single riskiest unknown before committing to the full port —
 //! that `btleplug` + `tokio` can own a Divoom device over BLE on macOS, and that

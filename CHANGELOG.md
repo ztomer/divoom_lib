@@ -178,8 +178,8 @@ ACK != device-confirmed honesty for custom-art + hot-update, the 0x8B animation
 retransmit dead-path fix, and the native C image-encoder divergence fix + fast-path
 revival. All validated against a live Pixoo-1; suite 1700 passed. New socket
 response fields (`device_confirmed`, `confirmed`) are additive. This is the
-ground-truth Python release cut before the native-daemon port (see
-`docs/PLANNING_NATIVE_PORT.md`). Full notes: `docs/release_notes_v0.16.0.md`.
+ground-truth Python release cut before the native-daemon port. Full notes:
+`docs/release_notes_v0.16.0.md`.
 
 ---
 ## R53.x HW round: native C image encoder — divergence fixed + revived (2026-06-22)
