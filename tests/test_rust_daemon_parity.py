@@ -124,3 +124,76 @@ def test_rust_set_routing(rust_daemon_ctx):
     ]
     reply = client.set_routing(rules)
     assert reply["success"] is True
+
+
+def test_rust_tcp_token_auth():
+    # Locate the compiled Rust binary
+    repo_root = Path(__file__).parent.parent
+    bin_path = repo_root / "native-port" / "divoomd" / "target" / "debug" / "divoomd"
+    if not bin_path.exists():
+        bin_path = repo_root / "native-port" / "divoomd" / "target" / "release" / "divoomd"
+    if not bin_path.exists():
+        pytest.skip(f"Rust binary not found at {bin_path}. Run cargo build first.")
+
+    sp = f"/tmp/divoomd_parity_tcp_{os.getpid()}.sock"
+    if os.path.exists(sp):
+        os.remove(sp)
+
+    host = "127.0.0.1"
+    port = 9099
+    token = "my_secret_token"
+
+    # Spawn divoomd with TCP listener enabled and token auth required
+    proc = subprocess.Popen(
+        [str(bin_path), "--socket", sp, "--host", host, "--port", str(port), "--token", token],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+
+    # Wait for the Unix socket (and TCP port) to be bound
+    bound = False
+    for _ in range(50):
+        if os.path.exists(sp):
+            bound = True
+            break
+        time.sleep(0.05)
+
+    if not bound:
+        proc.kill()
+        stdout, stderr = proc.communicate(timeout=1.0)
+        pytest.fail(f"Rust daemon failed to bind. stdout: {stdout}, stderr: {stderr}")
+
+    try:
+        # Test 1: Successful auth with correct token
+        client_ok = DaemonClient(host=host, port=port, token=token)
+        reply = client_ok.send_command("ping")
+        assert reply["success"] is True
+        assert reply.get("pong") is True
+
+        # Test 2: Unauthorized with wrong token
+        client_wrong = DaemonClient(host=host, port=port, token="wrong_token")
+        reply = client_wrong.send_command("ping")
+        assert reply["success"] is False
+        assert "unauthorized" in reply.get("error", "").lower()
+
+        # Test 3: Unauthorized with no token
+        client_none = DaemonClient(host=host, port=port, token=None)
+        reply = client_none.send_command("ping")
+        assert reply["success"] is False
+        assert "unauthorized" in reply.get("error", "").lower()
+
+    finally:
+        # Shutdown cleanly via Unix socket (unauthenticated)
+        try:
+            DaemonClient(sp).send_command("shutdown")
+        except Exception:
+            pass
+        proc.terminate()
+        try:
+            proc.wait(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        if os.path.exists(sp):
+            os.remove(sp)
+

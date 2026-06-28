@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{UnixListener, UnixStream};
+use tokio::net::UnixListener;
 
 use crate::protocol::{encode_message, err_reply, iter_messages, Request, MAX_REPLY_BYTES};
 
@@ -40,10 +40,33 @@ pub trait Handler: Send + Sync + 'static {
 /// dispatch each, and write back one reply line per request. Returns when the peer
 /// closes (EOF) or on an I/O error. A peer that never sends a newline can't grow
 /// the buffer past `MAX_REPLY_BYTES` (the connection is dropped instead).
-pub async fn serve_connection<H: Handler>(
-    mut stream: UnixStream,
+fn constant_time_eq(a: &str, b: &str) -> bool {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    if a_bytes.len() != b_bytes.len() {
+        return false;
+    }
+    let mut result = 0;
+    for (x, y) in a_bytes.iter().zip(b_bytes.iter()) {
+        result |= x ^ y;
+    }
+    result == 0
+}
+
+/// Serve a single connection: accumulate bytes, split into NDJSON requests,
+/// dispatch each, and write back one reply line per request. Returns when the peer
+/// closes (EOF) or on an I/O error. A peer that never sends a newline can't grow
+/// the buffer past `MAX_REPLY_BYTES` (the connection is dropped instead).
+pub async fn serve_connection<S, H>(
+    mut stream: S,
     handler: Arc<H>,
-) -> std::io::Result<()> {
+    require_auth: bool,
+    token: Option<String>,
+) -> std::io::Result<()>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    H: Handler,
+{
     let mut buf: Vec<u8> = Vec::new();
     let mut tmp = [0u8; 4096];
     loop {
@@ -66,6 +89,15 @@ pub async fn serve_connection<H: Handler>(
                     continue;
                 }
             };
+            if require_auth {
+                let supplied = req.token.as_deref().unwrap_or("");
+                let server_token = token.as_deref().unwrap_or("");
+                if server_token.is_empty() || !constant_time_eq(supplied, server_token) {
+                    let reply = err_reply("unauthorized");
+                    stream.write_all(&encode_message(&reply)).await?;
+                    continue;
+                }
+            }
             if req.command == "subscribe" {
                 if let Some(mut rx) = handler.subscribe() {
                     let initial = handler.initial_status();
@@ -105,7 +137,7 @@ pub async fn serve_connection<H: Handler>(
     }
 }
 
-/// Accept connections forever, serving each on its own task. Runs until the
+/// Accept connections forever on Unix socket, serving each on its own task. Runs until the
 /// listener errors unrecoverably (callers normally `tokio::spawn` this).
 pub async fn serve<H: Handler>(listener: UnixListener, handler: Arc<H>) {
     loop {
@@ -113,7 +145,27 @@ pub async fn serve<H: Handler>(listener: UnixListener, handler: Arc<H>) {
             Ok((stream, _addr)) => {
                 let h = handler.clone();
                 tokio::spawn(async move {
-                    let _ = serve_connection(stream, h).await;
+                    let _ = serve_connection(stream, h, false, None).await;
+                });
+            }
+            Err(_) => continue,
+        }
+    }
+}
+
+/// Accept connections forever on TCP socket, serving each on its own task.
+pub async fn serve_tcp<H: Handler>(
+    listener: tokio::net::TcpListener,
+    handler: Arc<H>,
+    token: String,
+) {
+    loop {
+        match listener.accept().await {
+            Ok((stream, _addr)) => {
+                let h = handler.clone();
+                let t = token.clone();
+                tokio::spawn(async move {
+                    let _ = serve_connection(stream, h, true, Some(t)).await;
                 });
             }
             Err(_) => continue,

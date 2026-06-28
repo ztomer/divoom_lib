@@ -8,24 +8,49 @@
 use std::sync::Arc;
 
 use divoomd::daemon::Daemon;
-use divoomd::socket_server::serve;
 use tokio::net::UnixListener;
 
-const DEFAULT_SOCKET: &str = "/tmp/divoomd.sock";
+struct ConfigArgs {
+    socket_path: String,
+    host: Option<String>,
+    port: Option<u16>,
+    token: Option<String>,
+}
 
-fn socket_path_from_args() -> String {
+fn parse_args() -> ConfigArgs {
     let args: Vec<String> = std::env::args().collect();
+    let mut socket_path = "/tmp/divoomd.sock".to_string();
+    let mut host = None;
+    let mut port = None;
+    let mut token = std::env::var("DIVOOM_DAEMON_TOKEN").ok();
+
     let mut i = 1;
     while i < args.len() {
         if let Some(p) = args[i].strip_prefix("--socket=") {
-            return p.to_string();
-        }
-        if args[i] == "--socket" && i + 1 < args.len() {
-            return args[i + 1].clone();
+            socket_path = p.to_string();
+        } else if args[i] == "--socket" && i + 1 < args.len() {
+            socket_path = args[i + 1].clone();
+            i += 1;
+        } else if let Some(h) = args[i].strip_prefix("--host=") {
+            host = Some(h.to_string());
+        } else if args[i] == "--host" && i + 1 < args.len() {
+            host = Some(args[i + 1].clone());
+            i += 1;
+        } else if let Some(p) = args[i].strip_prefix("--port=") {
+            port = p.parse().ok();
+        } else if args[i] == "--port" && i + 1 < args.len() {
+            port = args[i + 1].parse().ok();
+            i += 1;
+        } else if let Some(t) = args[i].strip_prefix("--token=") {
+            token = Some(t.to_string());
+        } else if args[i] == "--token" && i + 1 < args.len() {
+            token = Some(args[i + 1].clone());
+            i += 1;
         }
         i += 1;
     }
-    DEFAULT_SOCKET.to_string()
+
+    ConfigArgs { socket_path, host, port, token }
 }
 
 /// Single-instance + stale-socket handling: if the path exists and something is
@@ -42,9 +67,12 @@ fn bind(socket_path: &str) -> std::io::Result<UnixListener> {
     UnixListener::bind(socket_path)
 }
 
+use divoomd::socket_server::{serve, serve_tcp};
+
 #[tokio::main]
 async fn main() {
-    let socket_path = socket_path_from_args();
+    let args = parse_args();
+    let socket_path = args.socket_path;
     let listener = match bind(&socket_path) {
         Ok(l) => l,
         Err(e) => {
@@ -54,12 +82,56 @@ async fn main() {
     };
     eprintln!("divoomd listening on {socket_path}");
 
+    let mut tcp_listener = None;
+    let mut tcp_token = None;
+    if let Some(host) = args.host {
+        let port = match args.port {
+            Some(p) => p,
+            None => {
+                eprintln!("divoomd: TCP port is required when host is specified");
+                std::process::exit(1);
+            }
+        };
+        let token = match args.token {
+            Some(ref t) if !t.is_empty() => t.clone(),
+            _ => {
+                eprintln!("divoomd: TCP listener requested without a token; refusing to expose the daemon unauthenticated. Set DIVOOM_DAEMON_TOKEN or pass --token.");
+                std::process::exit(1);
+            }
+        };
+        let addr = format!("{host}:{port}");
+        let l = match tokio::net::TcpListener::bind(&addr).await {
+            Ok(listener) => listener,
+            Err(e) => {
+                eprintln!("divoomd: cannot bind TCP listener to {addr}: {e}");
+                std::process::exit(1);
+            }
+        };
+        eprintln!("divoomd listening on tcp://{addr} (token required)");
+        tcp_listener = Some(l);
+        tcp_token = Some(token);
+    }
+
     let daemon = Arc::new(Daemon::new());
     daemon.initialize_self_weak(Arc::downgrade(&daemon));
-    tokio::select! {
-        _ = serve(listener, daemon) => {}
-        sig = shutdown_signal() => {
-            eprintln!("divoomd: {sig} — shutting down");
+
+    let unix_fut = serve(listener, daemon.clone());
+
+    if let (Some(l), Some(t)) = (tcp_listener, tcp_token) {
+        let tcp_fut = serve_tcp(l, daemon.clone(), t);
+        tokio::select! {
+            _ = unix_fut => {}
+            _ = tcp_fut => {}
+            sig = shutdown_signal() => {
+                eprintln!("divoomd: {sig} — shutting down");
+            }
+        }
+    } else {
+        tokio::select! {
+            _ = unix_fut => {}
+            sig = shutdown_signal() => {
+                eprintln!("divoomd: {sig} — shutting down");
+            }
         }
     }
     let _ = std::fs::remove_file(&socket_path);
