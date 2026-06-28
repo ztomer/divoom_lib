@@ -270,3 +270,66 @@ def test_rust_spp_connect_failure_integration(rust_daemon_ctx):
     assert "spp" in reply.get("error", "").lower()
 
 
+def test_rust_hardware_parity(request, rust_daemon_ctx):
+    if not request.config.getoption("--run-hardware"):
+        pytest.skip("Requires --run-hardware flag")
+
+    client = rust_daemon_ctx
+
+    # 1. Scan for Divoom devices via the Rust daemon
+    reply = client.scan(timeout=8.0)
+    assert reply["success"] is True
+    devices = reply.get("devices", [])
+    if not devices:
+        pytest.skip("No physical Divoom devices found nearby")
+
+    dev = devices[0]
+    mac = dev["address"]
+    name = dev["name"]
+    print(f"\n[Hardware Test] Discovered device: {name} ({mac})")
+
+    # 2. Connect to the device via Rust daemon
+    reply = client.connect_device(mac=mac)
+    assert reply["success"] is True
+    assert reply["connected"] is True
+
+    # 3. Query status / read-back brightness
+    reply = client.send_command("device_status")
+    assert reply["success"] is True
+    assert reply["connected"] is True
+    assert reply["mac"] == mac
+
+    # Read current brightness
+    reply = client.send_command("device_call", {
+        "method": "display.get_brightness"
+    })
+    assert reply["success"] is True
+    orig_brightness = reply["result"]
+    assert isinstance(orig_brightness, int)
+
+    # 4. Modify state (Set brightness to 40)
+    reply = client.send_command("device_call", {
+        "method": "display.set_brightness",
+        "args": [40]
+    })
+    assert reply["success"] is True
+
+    # Verify new brightness
+    reply = client.send_command("device_call", {
+        "method": "display.get_brightness"
+    })
+    assert reply["success"] is True
+    assert reply["result"] == 40
+
+    # Restore original brightness
+    reply = client.send_command("device_call", {
+        "method": "display.set_brightness",
+        "args": [orig_brightness]
+    })
+    assert reply["success"] is True
+
+    # 5. Disconnect
+    reply = client.disconnect_device()
+    assert reply["success"] is True
+
+
