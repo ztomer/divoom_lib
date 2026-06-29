@@ -24,10 +24,11 @@ Claude) should read this on entry and **update it at the end of every round**
   work) → exclusive gating → MCP-via-Rust `set_brightness(level=65)` → disconnect.
   Two bugs surfaced + fixed HW-verified: BLE `connect` poll-until-found (was a single
   3s window → reconnect misses; 3/3 clean no-pre-scan reconnects now) and a missing
-  `shutdown` command (added; clean exit confirmed). Phase 5 is **gated**: a
-  command-parity audit found Rust still missing `probe_lan` + `sync_artwork` (closed
-  `shutdown` this round); the default-flip waits on those, and the irreversible
-  `divoom_daemon/` deletion waits on a soak + explicit user sign-off.
+  `shutdown` command (added; clean exit confirmed). Phase 5 is **gated** — see Open
+  threads: top-level commands reached parity (`shutdown`/`probe_lan`/`sync_artwork`)
+  but verification then exposed a deeper cloud image-decode gap (magic 9/18/26/0xAA),
+  and per user directive the Python backend is to be **archived as reference, never
+  deleted**.
   - **Phase 1 (commit `f7e0e7c`):** fixed the broken `--no-default-features` build.
     Root cause: the `DeviceTransport` device-I/O method layer was `ble`-gated even
     though it delegates to non-ble Spp/Lan/Mock, and `BleResult` lived in the gated
@@ -54,13 +55,36 @@ Claude) should read this on entry and **update it at the end of every round**
     Real-radio on those OSes is explicitly out of scope (no hardware) — never
     claimed verified.
 
+- **Phase 5 commands (2026-06-28 late):** added `probe_lan` + `sync_artwork`
+  (HW-verified) — top-level socket commands now match the Python daemon. BUT
+  verification exposed a deeper gap below.
+
 ### Open threads
 
-- **Phase 5 command parity** — implement Rust `probe_lan` (wire to `lan.rs::probe`)
-  and `sync_artwork` to match the Python daemon's socket surface. Prereq for the
-  default-flip.
-- **Phase 5 default-flip** — after parity, flip `DIVOOM_USE_RUST_DAEMON` default on
-  in `daemon_client.py` (reversible), then soak GUI/menubar/MCP.
+- **BLOCKER — cloud image-decode parity (the big one).** The native daemon only
+  resolves GIF/PNG/JPG + magic-43; real Pixoo gallery content is dominated by
+  **magic 9/18/26 (AES; 18/26 also LZO+tiled) and 0xAA (hot)** containers — 0 of 3
+  gallery pages were directly renderable. `sync_artwork`/`monthly_best` now
+  honest-error on these (no more device-bricking) but can't render them. Complete
+  parity requires porting `media_decoder.resolve_to_gif` fully: decode those
+  containers → frames → GIF-encode (image crate) so the unified `show_image` path
+  renders them. magic 18/26 needs an **LZO dependency** + `_compact_tiles`. Ground-
+  truth oracle available: the Alexlay magic-18 file + Python's decoded 32×32/6f GIF.
+  Verify per-format against Python, then on the 4 devices (Ditoo/Tivoo-Max/Timoo/
+  Pixoo). **Existing Rust decoders:** `art_codec` has AES-CBC + `decode_cloud_magic9`
+  + `decode_hot_file` (raw frames) + `decode_magic43`; MISSING: magic 18/26 LZO,
+  frame→GIF encode.
+- **device_call method-level parity audit** — top-level commands are at parity;
+  still owe a method-by-method diff of `device_call` (Rust `device_call/*` vs the
+  Python `Divoom` API surface) to confirm nothing else is missing.
+- **Phase 5 default-flip** — gated on the decode parity above; flip
+  `DIVOOM_USE_RUST_DAEMON` default on (prefer Rust when the binary exists, else
+  Python) in `daemon_client.py`, then soak GUI/menubar/MCP.
+- **Phase 5 archival = ARCHIVE, NOT DELETE (user directive 2026-06-28).** Keep the
+  Python `divoom_daemon`/`divoom_lib` as the **reference implementation** (it's
+  mostly complete and is the parity oracle). Do not delete it. "Archival" means
+  marking Rust authoritative in docs while Python stays in-tree for reference +
+  fallback.
 - **Phase 5 archival (NEEDS USER SIGN-OFF)** — moving/deleting `divoom_daemon/` is
   irreversible and breaks the GUI/menubar/CLI imports; hold until a green soak +
   explicit go. Will NOT be done autonomously.
