@@ -148,7 +148,7 @@ async fn sync_files_to_device(
     }
 
     let req_connect = Request {
-        command: "connect_device".to_string(),
+        command: "connect".to_string(),
         args: connect_args,
         token: None,
     };
@@ -243,7 +243,7 @@ async fn sync_files_to_device(
 
     // 3. Disconnect
     let req_disconnect = Request {
-        command: "disconnect_device".to_string(),
+        command: "disconnect".to_string(),
         args: json!({}),
         token: None,
     };

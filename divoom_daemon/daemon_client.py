@@ -150,18 +150,29 @@ def spawn_daemon(
 
     Caller waits until the socket is live (see :func:`ensure_daemon`).
     """
-    use_rust = os.environ.get("DIVOOM_USE_RUST_DAEMON") in ("1", "true", "yes")
+    # Resolve the native Rust daemon binary (env override, then the dev build tree).
+    rust_bin = os.environ.get("DIVOOM_RUST_BINARY")
+    if rust_bin and not Path(rust_bin).exists():
+        rust_bin = None
+    if not rust_bin:
+        repo_root = Path(__file__).resolve().parents[2]
+        for folder in ["release", "debug"]:
+            p = repo_root / "native-port" / "divoomd" / "target" / folder / "divoomd"
+            if p.exists():
+                rust_bin = str(p)
+                break
+    # Default to the native Rust daemon when its binary is available (it is now at
+    # parity with the Python daemon + cloud-decode-verified); fall back to the Python
+    # daemon otherwise — e.g. the packaged .app doesn't bundle `divoomd`. An explicit
+    # DIVOOM_USE_RUST_DAEMON=0/1 overrides the auto-detection (Python kept as the
+    # reference/fallback implementation, never removed).
+    _flag = os.environ.get("DIVOOM_USE_RUST_DAEMON")
+    if _flag is not None:
+        use_rust = _flag.lower() in ("1", "true", "yes")
+    else:
+        use_rust = rust_bin is not None
     if use_rust:
-        bin_path = os.environ.get("DIVOOM_RUST_BINARY")
-        if not bin_path:
-            repo_root = Path(__file__).resolve().parents[2]
-            for folder in ["release", "debug"]:
-                p = repo_root / "native-port" / "divoomd" / "target" / folder / "divoomd"
-                if p.exists():
-                    bin_path = str(p)
-                    break
-        if not bin_path:
-            bin_path = "divoomd"
+        bin_path = rust_bin or "divoomd"
         cmd = [bin_path, "--socket", socket_path]
         if mac:
             cmd += ["--mac", mac]
