@@ -147,6 +147,11 @@ pub struct DivoomApp {
     pub mem_minute: i64,
     pub mem_title: String,
     pub alarms_fetched: bool,
+    // --- Schedule: time plan (scheduled on/off) ---
+    pub tp_enabled: bool,
+    pub tp_hour: i64,
+    pub tp_minute: i64,
+    pub tp_week: u8,
     /// Replies to `Cmd::Raw`, keyed by tag (Settings/Schedule/gallery read these).
     pub replies: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -252,6 +257,10 @@ impl DivoomApp {
             mem_minute: 0,
             mem_title: String::new(),
             alarms_fetched: false,
+            tp_enabled: false,
+            tp_hour: 8,
+            tp_minute: 0,
+            tp_week: 0,
             replies: std::collections::HashMap::new(),
         }
     }
@@ -288,6 +297,7 @@ impl DivoomApp {
             ("get_brightness", "rb_brightness"),
             ("get_volume", "rb_volume"),
             ("get_device_name", "rb_name"),
+            ("get_scoreboard", "rb_score"),
         ] {
             self.raw("device_call", serde_json::json!({ "method": method, "args": [] }), tag);
         }
@@ -395,6 +405,16 @@ impl DivoomApp {
                             if let Some(s) = value.get("result").and_then(|v| v.as_str()) {
                                 if !s.is_empty() {
                                     self.device_name = s.to_string();
+                                }
+                            }
+                        }
+                        "rb_score" => {
+                            if let Some(r) = value.get("result") {
+                                if let Some(n) = r.get("red_score").and_then(|v| v.as_i64()) {
+                                    self.score_red = n;
+                                }
+                                if let Some(n) = r.get("blue_score").and_then(|v| v.as_i64()) {
+                                    self.score_blue = n;
                                 }
                             }
                         }

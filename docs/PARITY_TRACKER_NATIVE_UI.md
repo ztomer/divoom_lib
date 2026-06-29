@@ -20,15 +20,17 @@ never deleted._
 - [x] ✓ `get_brightness` → appbar slider (fetched on device-connect)
 - [x] ✓ `get_volume` → appbar slider
 - [x] ✓ `get_device_name` → Device Settings name field
-- [ ] ✗ `get_scoreboard_state` → scoreboard inputs
-- [ ] ✗ `get_alarms` → Schedule editor
-- [ ] ✗ `get_keep_daemon_alive` → Settings toggle
-- [ ] ✗ `get_work_mode` / `get_transport_status` → status display
+- [x] ✓ `get_scoreboard_state` → scoreboard inputs (rb_score on connect)
+- [x] ✓ `get_alarms` → Schedule editor (rb_alarms)
+- [x] ✓ `get_keep_daemon_alive` — N/A (native never shuts daemon)
+- [ ] ✗ `get_work_mode` / `get_transport_status` → status display (minor)
 
 ## Channels
 - [x] ✓ clock face, visualizer, VJ, ambient, scoreboard
 - [x] ✓ clock color (`set_clock_rich`) — fixed: now sends kwargs {style,twentyfour,color}
-- [ ] ✗ `switch_channel` not explicitly called (show_* covers most; verify text/score)
+- [x] ✓ `switch_channel` — covered: show_clock/effects/light/visualization are
+  0x45 channel commands that switch the device channel implicitly; scoreboard via
+  set_scoreboard. No redundant switch_channel needed.
 - [ ] ✗ Text push (`push_text`) — needs bitmap-font→image render
 - [x] ✓ Sessions panel: Sleep Aid (`sleep.show_sleep` kwargs), Stopwatch
   (`timer.set_timer` flag 1/0/2), Countdown (`countdown.set_countdown` flag 0/1 +
@@ -42,7 +44,7 @@ never deleted._
 - [x] ✓ alarms `set_alarm`
 - [x] ✓ `get_alarms` fetch into editor (alarm.get_alarm_time on connect → rb_alarms)
 - [x] ✓ `set_memorial` (Memorial Countdown card → alarm.set_memorial_time)
-- [ ] ✗ `set_timeplan` (time plan)
+- [x] ✓ `set_timeplan` (Time Plan card → timeplan.set_time_manage_info)
 
 ## Settings
 - [x] ✓ notifications start/stop/status, LAN probe
@@ -95,6 +97,9 @@ never deleted._
 - 2026-06-29 iter1: read-backs (brightness/volume/device-name) fetched on
   device-connect (status idle→active) + applied to UI; clock-color bug fixed
   (set_clock_rich now sends kwargs). Added app.call_kw helper. Build green.
+- 2026-06-29 iter5: scoreboard read-back (rb_score on connect), Time Plan card
+  (timeplan.set_time_manage_info), switch_channel confirmed covered by implicit
+  0x45 channel switching. Build green.
 - 2026-06-29 iter4: Temperature channel card (Live Widgets) + Schedule get_alarms
   read-back (parsed into editor on connect) + Memorial Countdown card. Reclassified
   keep-alive as N/A (native never shuts daemon). Flagged cloud-login + test-notif

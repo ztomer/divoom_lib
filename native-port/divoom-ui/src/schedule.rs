@@ -31,7 +31,40 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
         }
         ui.add_space(8.0);
         memorial(app, ui);
+        ui.add_space(8.0);
+        time_plan(app, ui);
     });
+}
+
+/// Time plan (scheduled on/off) → timeplan.set_time_manage_info {status,hour,minute,week}.
+fn time_plan(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    egui::Frame::none()
+        .fill(theme::CARD_BG)
+        .rounding(egui::Rounding::same(theme::RADIUS))
+        .stroke(egui::Stroke::new(1.0, theme::BORDER))
+        .inner_margin(egui::Margin::same(12.0))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.label(RichText::new("Time Plan (scheduled on/off)").size(13.5).color(theme::TEXT_MAIN).strong());
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut app.tp_enabled, "On");
+                ui.add(egui::DragValue::new(&mut app.tp_hour).range(0..=23).prefix("h "));
+                ui.add(egui::DragValue::new(&mut app.tp_minute).range(0..=59).prefix("m "));
+                for (d, label) in DAYS.iter().enumerate() {
+                    let bit = 1u8 << d;
+                    if ui.selectable_label(app.tp_week & bit != 0, *label).clicked() {
+                        app.tp_week ^= bit;
+                    }
+                }
+                if ui.button("Save").clicked() {
+                    app.call_kw("timeplan.set_time_manage_info", json!({
+                        "status": app.tp_enabled as i64,
+                        "hour": app.tp_hour, "minute": app.tp_minute, "week": app.tp_week as i64,
+                    }));
+                }
+            });
+        });
 }
 
 /// Memorial countdown → alarm.set_memorial_time [dialy_id, on_off, month, day, hour, minute, title].
