@@ -44,6 +44,14 @@ Claude) should read this on entry and **update it at the end of every round**
     animation methods are wire-tested but NOT hardware-verified (no device flows to
     exercise them). The connect-flakiness mitigation (poll-until-found) helps but
     BLE discovery can still miss a sleeping device.
+  - **Gotcha:** `tests/test_rust_daemon_parity.py` spawns `target/{debug,release}/
+    divoomd` and prefers debug — so `cargo test --no-default-features` (which builds
+    a NO-BLE debug binary) makes the BLE/SPP parity tests fail with "BLE support is
+    disabled". Run `cargo build` (default features) before the Python parity suite.
+  - **Parity verified complete across ALL dimensions:** top-level socket commands
+    (0 gaps, Rust superset), device_call methods (0 gaps — leaf + exact dotted
+    string; the few client calls to non-existent methods degrade identically),
+    LAN methods (0 gaps), cloud decode (byte-verified). The loop's goal is met.
 
 - **NATIVE PORT HARDENING — Phases 1–4 DONE; Phase 5 gated (2026-06-28):**
   Phase 4 Tier B was verified on a **real Timoo over BLE** via the granted `.app`
