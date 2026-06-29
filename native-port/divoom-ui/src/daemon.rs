@@ -25,6 +25,10 @@ pub enum Cmd {
     SetVolume(u8),
     /// Escape hatch / future tabs: a raw device_call.
     DeviceCall { method: String, args: Value },
+    /// Arbitrary top-level daemon command (not a device_call) with a reply tag,
+    /// e.g. mcp/notification/LAN settings, get_alarms, fetch_gallery. The reply
+    /// comes back as `Update::Reply { tag, value }`.
+    Raw { command: String, args: Value, tag: String },
 }
 
 #[derive(Default, Clone, Debug)]
@@ -39,6 +43,8 @@ pub enum Update {
     Devices(Vec<Device>),
     Error(String),
     Info(String),
+    /// Reply to a `Cmd::Raw`, correlated by `tag`.
+    Reply { tag: String, value: Value },
 }
 
 pub struct DaemonHandle {
@@ -131,6 +137,12 @@ fn handle(cmd: Cmd, conn: &mut Option<Conn>, upd: &Sender<Update>) {
         Cmd::SetBrightness(n) => device_call(conn, upd, "device.set_brightness", json!([n])),
         Cmd::SetVolume(n) => device_call(conn, upd, "music.set_volume", json!([n])),
         Cmd::DeviceCall { method, args } => device_call(conn, upd, &method, args),
+        Cmd::Raw { command, args, tag } => match call(conn, &command, args) {
+            Ok(value) => {
+                let _ = upd.send(Update::Reply { tag, value });
+            }
+            Err(e) => err(upd, format!("{command} failed: {e}")),
+        },
     }
 }
 

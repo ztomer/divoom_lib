@@ -94,6 +94,17 @@ pub struct DivoomApp {
     /// save it there, and exit. Used for headless visual verification.
     screenshot_path: Option<String>,
     frame_count: u32,
+    // --- Device Settings tab ---
+    pub device_name: String,
+    pub hour24: bool,
+    pub temp_f: bool,
+    pub low_power: bool,
+    pub auto_off_min: i64,
+    pub screen_dir: i64,
+    pub screen_mirror: bool,
+    pub confirm_reset: bool,
+    /// Replies to `Cmd::Raw`, keyed by tag (Settings/Schedule/gallery read these).
+    pub replies: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl DivoomApp {
@@ -103,7 +114,15 @@ impl DivoomApp {
         daemon.send(daemon::Cmd::Scan);
         Self {
             daemon,
-            tab: Tab::Channels,
+            tab: match std::env::var("DIVOOM_UI_TAB").as_deref() {
+                Ok("widgets") => Tab::Widgets,
+                Ok("pixelart") => Tab::PixelArt,
+                Ok("wall") => Tab::Wall,
+                Ok("schedule") => Tab::Schedule,
+                Ok("device") => Tab::DeviceSettings,
+                Ok("settings") => Tab::Settings,
+                _ => Tab::Channels,
+            },
             channel: match std::env::var("DIVOOM_UI_CHANNEL").as_deref() {
                 Ok("visualizer") => Channel::Visualizer,
                 Ok("vj") => Channel::Vj,
@@ -134,6 +153,15 @@ impl DivoomApp {
             text_color: [0, 255, 204],
             text_speed: 50,
             text_effect: 1,
+            device_name: String::new(),
+            hour24: true,
+            temp_f: false,
+            low_power: false,
+            auto_off_min: 0,
+            screen_dir: 0,
+            screen_mirror: false,
+            confirm_reset: false,
+            replies: std::collections::HashMap::new(),
         }
     }
 
@@ -141,6 +169,15 @@ impl DivoomApp {
     /// channel methods parse). Returns immediately; errors surface via `pump`.
     pub fn call(&self, method: &str, args: serde_json::Value) {
         self.daemon.send(daemon::Cmd::DeviceCall { method: method.to_string(), args });
+    }
+
+    /// Fire a top-level daemon command (not a device_call) with a reply tag.
+    pub fn raw(&self, command: &str, args: serde_json::Value, tag: &str) {
+        self.daemon.send(daemon::Cmd::Raw {
+            command: command.to_string(),
+            args,
+            tag: tag.to_string(),
+        });
     }
 
     /// Hex `#rrggbb` for an `[r,g,b]` (device_call color args parse a hex string).
@@ -191,6 +228,9 @@ impl DivoomApp {
                 }
                 Update::Error(e) => self.last_error = Some(e),
                 Update::Info(_) => {}
+                Update::Reply { tag, value } => {
+                    self.replies.insert(tag, value);
+                }
             }
         }
     }

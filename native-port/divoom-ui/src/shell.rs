@@ -233,6 +233,7 @@ pub fn content(app: &mut DivoomApp, ctx: &egui::Context) {
         ui.add_space(8.0);
         match app.tab {
             Tab::Channels => channels_tab(app, ui),
+            Tab::DeviceSettings => crate::device_settings::panel(app, ui),
             _ => placeholder(ui, app.tab.title()),
         }
         if let Some(err) = &app.last_error {

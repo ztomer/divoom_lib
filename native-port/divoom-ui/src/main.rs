@@ -9,6 +9,7 @@
 mod app;
 mod channels;
 mod daemon;
+mod device_settings;
 mod shell;
 mod theme;
 
