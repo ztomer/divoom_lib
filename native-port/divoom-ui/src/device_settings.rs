@@ -103,11 +103,16 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
             });
             sep(ui);
 
-            // Sync time — daemon gap.
-            ui.add_enabled(false, egui::Button::new("Update device time (daemon gap)"))
-                .on_disabled_hover_text(
-                    "sync_time isn't a device_call leaf yet — needs DateTimeCommand ported to divoomd.",
+            // Sync the device clock to this machine's local time → set_date_time
+            // (ported DateTimeCommand: cmd 0x18). Daemon gap closed.
+            if ui.button("Update device time").clicked() {
+                use chrono::{Datelike, Timelike};
+                let now = chrono::Local::now();
+                app.call(
+                    "set_date_time",
+                    json!([now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second()]),
                 );
+            }
         });
 
         ui.add_space(12.0);

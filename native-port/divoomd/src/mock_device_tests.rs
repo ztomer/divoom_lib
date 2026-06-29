@@ -109,6 +109,33 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn test_mock_set_date_time() {
+        let d = setup_mock_daemon().await;
+        // Ported from divoom_lib/system/date_time.py: cmd 0x18, payload
+        // [year%100, year//100, month, day, hour, minute, second, 0].
+        let call_res = d.handle(make_request("device_call", Some(json!({
+            "method": "set_date_time",
+            "kwargs": { "year": 2026, "month": 6, "day": 29, "hour": 19, "minute": 53, "second": 7 }
+        })), None)).await;
+
+        assert!(call_res["success"].as_bool().unwrap_or(false));
+        let device_lock = d.device.lock().await;
+        if let Some(ref transport_arc) = &*device_lock {
+            if let DeviceTransport::Mock(ref mock) = **transport_arc {
+                let cmds = mock.sent_commands.lock().unwrap();
+                assert_eq!(cmds.len(), 1);
+                let (cmd_id, payload) = &cmds[0];
+                assert_eq!(*cmd_id, 0x18);
+                assert_eq!(*payload, vec![26, 20, 6, 29, 19, 53, 7, 0]);
+            } else {
+                panic!("Expected Mock transport");
+            }
+        } else {
+            panic!("Expected connected device");
+        }
+    }
+
     /// Phase 4 Tier A: exclusive-mode gating end-to-end through the real daemon
     /// dispatch, hardware-free (mock transport). Mirrors the Python R53 steal-reject
     /// teeth tests: a second session's acquire is rejected IMMEDIATELY (no hang, no

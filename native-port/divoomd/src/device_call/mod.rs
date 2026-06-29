@@ -211,6 +211,7 @@ pub async fn handle_device_call(
                 }
 
                 // system.rs:
+                "system.set_date_time" | "set_date_time" | "sync_time" | "time.set_date_time" |
                 "time.set_hour_type" | "set_hour_type" | "system.set_hour_type" |
                 "bluetooth.set_bluetooth_password" | "set_bluetooth_password" | "system.set_bluetooth_password" |
                 "system.get_work_mode" | "get_work_mode" |

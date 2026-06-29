@@ -38,8 +38,9 @@ never deleted._
   m/s), Noise Meter (`noise.set_noise` flag 1/2)
 
 ## Device Settings
-- [x] ✓ name, 12/24h, temp, power, auto-off, orientation, mirror, factory reset
-- [ ] ✗ `sync_time` — daemon gap (DateTimeCommand not a device_call leaf; task chip)
+- [x] ✓ name, 12/24h, temp, power, auto-off, orientation, mirror, factory reset, FM
+- [x] ✓ `sync_time` — DAEMON GAP CLOSED: ported DateTimeCommand to divoomd
+  `set_date_time` (cmd 0x18, wire-byte test) + UI button computes local time (chrono)
 
 ## Schedule
 - [x] ✓ alarms `set_alarm`
@@ -126,6 +127,13 @@ Recommendation: the daemon gaps (cat. 1) are the only ones blocking real
 end-user features (cloud gallery auth, test notif, time sync, MCP). They're
 daemon-side work — surface to the user to authorize separately. Cats. 2–4 are
 low-value or unverifiable without hardware.
+
+## Daemon-gap closure run (2026-06-29, "close the gaps across daemon, menubar, app")
+- [x] ✓ **sync_time** — DateTimeCommand ported to divoomd `set_date_time` (0x18) +
+  wire-byte test + UI button (chrono local time).
+- [ ] ✗ test notification (`send_notification` daemon command)
+- [ ] ✗ cloud login (`save_credentials` daemon command + Divoom auth)
+- [ ] ✗ MCP server (Rust MCP in daemon — large)
 
 ## Progress log
 - 2026-06-29: audit done; tracker created; docs corrected. Starting gap closure.

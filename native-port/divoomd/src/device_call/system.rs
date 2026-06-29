@@ -19,6 +19,38 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_hour_type failed: {e}")),
             }
         }
+        // Sync the device clock. Ported from divoom_lib/system/date_time.py
+        // (DateTimeCommand): command 0x18, payload
+        //   [year%100, year//100, month, day, hour, minute, second, 0x00].
+        // The caller supplies local-time components (year, month, day, hour,
+        // minute, second) positionally or as kwargs.
+        "system.set_date_time" | "set_date_time" | "sync_time" | "time.set_date_time" => {
+            let g = |i: usize, k: &str, d: i64| {
+                args.get(i).copied()
+                    .or_else(|| kw.and_then(|v| v.get(k)).and_then(|v| v.as_i64()))
+                    .unwrap_or(d)
+            };
+            let year = g(0, "year", 2000);
+            let month = g(1, "month", 1);
+            let day = g(2, "day", 1);
+            let hour = g(3, "hour", 0);
+            let minute = g(4, "minute", 0);
+            let second = g(5, "second", 0);
+            let payload = [
+                (year % 100) as u8,
+                (year / 100) as u8,
+                month as u8,
+                day as u8,
+                hour as u8,
+                minute as u8,
+                second as u8,
+                0x00,
+            ];
+            match dev.send_command(0x18, &payload, true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("set_date_time failed: {e}")),
+            }
+        }
         "bluetooth.set_bluetooth_password" | "set_bluetooth_password" | "system.set_bluetooth_password" => {
             let control = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("control")).and_then(|v| v.as_i64()))
