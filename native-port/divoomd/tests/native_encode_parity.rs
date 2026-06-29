@@ -38,7 +38,16 @@ fn ffi_image_encoders_match_python() {
         eprintln!("SKIP: libdivoom_compact not built — run scripts/build_libdivoom.sh");
         return;
     }
-    let enc = NativeEncoder::load(&path).expect("load libdivoom_compact");
+    // Skip (don't panic) if the dylib can't be loaded — e.g. the repo ships a
+    // prebuilt macOS .dylib that the Linux no-ble CI job finds but can't dlopen
+    // ("invalid ELF header"). Wrong-arch == effectively "not built here".
+    let enc = match NativeEncoder::load(&path) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("SKIP: cannot load {path}: {e}");
+            return;
+        }
+    };
     let v = vectors();
 
     for c in v["frame"].as_array().unwrap() {

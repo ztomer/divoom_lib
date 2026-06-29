@@ -60,11 +60,14 @@ def _is_emoji(ch: str) -> bool:
 #   tui/lib.{sh,py}        — the self-contained Kare TUI style helpers.
 #   tools/check_no_emoji.py — the house emoji gate; it lists the permitted Kare
 #                             glyphs in its ALLOWED set + status messages.
+#   tools/check_file_size.py — the 500-line gate; uses the same Kare check/cross
+#                              glyphs in its status output.
 EXEMPT_FILES = {
     "scripts/hw_smoke.py",
     "tui/lib.sh",
     "tui/lib.py",
     "tools/check_no_emoji.py",
+    "tools/check_file_size.py",
 }
 
 
