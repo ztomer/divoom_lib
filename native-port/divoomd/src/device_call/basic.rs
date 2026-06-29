@@ -63,6 +63,27 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 _ => json!({"success": true, "result": Value::Null}),
             }
         }
+        // Full 0x46 light-mode read-back (Python Light.get_light_mode; GLM offsets).
+        "light.get_light_mode" | "get_light_mode" => {
+            match dev.send_command_and_wait(0x46, &[], timeout).await {
+                Some(r) if r.len() >= 20 => json!({"success": true, "result": {
+                    "current_light_effect_mode": r[0],
+                    "temperature_display_mode": r[1],
+                    "vj_selection_option": r[2],
+                    "rgb_color_values": [r[3], r[4], r[5]],
+                    "brightness_level": r[6],
+                    "lighting_mode_selection_option": r[7],
+                    "on_off_switch": r[8],
+                    "music_mode_selection_option": r[9],
+                    "system_brightness": r[10],
+                    "time_display_format_selection_option": r[11],
+                    "time_display_rgb_color_values": [r[12], r[13], r[14]],
+                    "time_display_mode": r[15],
+                    "time_checkbox_modes": [r[16], r[17], r[18], r[19]],
+                }}),
+                _ => json!({"success": true, "result": Value::Null}),
+            }
+        }
         "device.set_brightness" | "set_brightness" | "display.set_brightness" => {
             let val = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("brightness")).and_then(|v| v.as_i64()))
@@ -292,6 +313,23 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
             match dev.send_command(0x45, &payload, true).await {
                 Ok(()) => json!({"success": true, "result": true}),
                 Err(e) => err_reply(&format!("display.switch_channel failed: {e}")),
+            }
+        }
+        // Switch to the cloud/hot channel (Python HotUpdate.show_hot_channel):
+        // 0x45 [0x02], then optionally 0x85 [1, page] to select a page.
+        "hot_update.show_hot_channel" | "show_hot_channel" => {
+            if let Err(e) = dev.send_command(0x45, &[0x02], true).await {
+                return err_reply(&format!("show_hot_channel: 0x45 failed: {e}"));
+            }
+            let page = args.first().copied()
+                .or_else(|| kw.and_then(|v| v.get("page")).and_then(|v| v.as_i64()));
+            if let Some(p) = page {
+                match dev.send_command(0x85, &[1, p as u8], true).await {
+                    Ok(()) => json!({"success": true, "result": true}),
+                    Err(e) => err_reply(&format!("show_hot_channel: 0x85 failed: {e}")),
+                }
+            } else {
+                json!({"success": true, "result": true})
             }
         }
         "music.set_volume" | "set_volume" => {

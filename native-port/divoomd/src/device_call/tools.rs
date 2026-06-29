@@ -144,6 +144,33 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("show_notification_text failed: {e}")),
             }
         }
+        // Generic tool read-back (Python Tool.get_tool_info): 0x71 [tool_type] →
+        // parse per type (GTI offsets). Types: 0=timer 1=score 2=noise 3=countdown.
+        "tool.get_tool_info" | "get_tool_info" => {
+            let tool_type = args.first().copied()
+                .or_else(|| kw.and_then(|v| v.get("tool_type")).and_then(|v| v.as_i64()))
+                .unwrap_or(0);
+            match dev.send_command_and_wait(0x71, &[tool_type as u8], ctx.timeout).await {
+                Some(r) => {
+                    let result = match tool_type {
+                        0 if !r.is_empty() => json!({"status": r[0] as i64}),
+                        1 if r.len() >= 5 => json!({
+                            "on_off": r[0] as i64,
+                            "red_score": u16::from_le_bytes([r[1], r[2]]) as i64,
+                            "blue_score": u16::from_le_bytes([r[3], r[4]]) as i64,
+                        }),
+                        2 if !r.is_empty() => json!({"status": r[0] as i64}),
+                        3 if r.len() >= 3 => json!({
+                            "status": r[0] as i64, "minutes": r[1] as i64, "seconds": r[2] as i64,
+                        }),
+                        255 => json!({"status": "not in game mode"}),
+                        _ => Value::Null,
+                    };
+                    json!({"success": true, "result": result})
+                }
+                None => json!({"success": true, "result": Value::Null}),
+            }
+        }
         _ => err_reply("unimplemented tools command"),
     }
 }
