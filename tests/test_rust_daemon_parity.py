@@ -333,9 +333,11 @@ def test_rust_hardware_parity(request, rust_daemon_ctx):
     assert reply["success"] is True
 
 
-def test_rust_cloud_auth_endpoints(rust_daemon_ctx):
+def test_rust_cloud_auth_endpoints(request, rust_daemon_ctx):
+    if not request.config.getoption("--run-cloud"):
+        pytest.skip("requires live Divoom cloud access; run with --run-cloud")
     client = rust_daemon_ctx
-    
+
     # 1. Query cached credentials (should succeed)
     reply = client.send_command("get_cached_credentials")
     assert reply["success"] is True
@@ -349,7 +351,9 @@ def test_rust_cloud_auth_endpoints(rust_daemon_ctx):
     assert "utc" in reply
 
 
-def test_rust_fetch_gallery(rust_daemon_ctx):
+def test_rust_fetch_gallery(request, rust_daemon_ctx):
+    if not request.config.getoption("--run-cloud"):
+        pytest.skip("requires live Divoom cloud access; run with --run-cloud")
     client = rust_daemon_ctx
 
     # Query gallery classify=18 (Recommend), limit=3

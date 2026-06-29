@@ -93,6 +93,13 @@ def pytest_addoption(parser):
         default=False,
         help="Run integration tests that require a physically connected Divoom device.",
     )
+    parser.addoption(
+        "--run-cloud",
+        action="store_true",
+        default=False,
+        help="Run integration tests that require live Divoom cloud access "
+             "(network egress + guest login). Skipped in CI / offline.",
+    )
 
 
 def pytest_collection_modifyitems(config, items):
