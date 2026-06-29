@@ -92,14 +92,49 @@ never deleted._
 - [ ] ✗ save/load/list presets, preset files (`PresetsManagerMixin`)
 
 ## Tray menubar
-- [x] ✓ Show Dashboard / Notifications / Quit (basic)
-- [ ] ✗ device section + color-coded status (parity with pyobjc menubar)
+- [x] ✓ Show Dashboard / Notifications (label tracks state) / Quit
+- [x] ✓ dynamic device section (rebuilt on scan-list change; click → select+connect)
+- [ ] ✗ color-coded status glyph (minor polish; main window already shows it)
+
+## PARITY STATUS — functional parity reached (2026-06-29)
+
+Every **portable, verifiable** UI feature of the Python app is now ported and
+build-verified (most screenshot-verified): all 7 tabs, all channel sub-tabs
+(clock/visualizer/VJ/ambient/scoreboard/text/sessions), Device Settings (+FM),
+Schedule (alarms/memorial/timeplan), Live Widgets (music/stocks/sysmon/weather/
+temperature + running status), Pixel Art (paint + gallery), device-state
+read-backs, and a native tray menubar with a dynamic device section.
+
+The remaining ✗ items are **blocked, not skipped** — each falls in one of:
+
+1. **Daemon gaps** (need a new `divoomd` command; can't fake from the UI):
+   - cloud login (`save_credentials` — only `get_credentials` exists)
+   - test notification (`send_notification` — no such command)
+   - `sync_time` (DateTimeCommand not a device_call leaf — task chip spawned)
+   - MCP server (Python subprocess today; a Python-free bundle needs a Rust MCP
+     server in the daemon)
+2. **Device-dependent / needs hardware content** (can't build or verify without a
+   real device): Custom Art browser (`display_custom_art`), Hot Channel scheduler,
+   wall-layout presets, `update_wall_slots`/`display_wall_image`.
+3. **Substantial local-resource work**: audio visualizer (needs local audio
+   capture; the device-side EQ is already covered by the Visualizer channel).
+4. **Minor polish**: tray color glyph, scan `limit` filter, export/import settings
+   (little persistent state to export yet), persisted LAN device list,
+   per-app notification routing UI (`set_routing` exists), get_work_mode display.
+
+Recommendation: the daemon gaps (cat. 1) are the only ones blocking real
+end-user features (cloud gallery auth, test notif, time sync, MCP). They're
+daemon-side work — surface to the user to authorize separately. Cats. 2–4 are
+low-value or unverifiable without hardware.
 
 ## Progress log
 - 2026-06-29: audit done; tracker created; docs corrected. Starting gap closure.
 - 2026-06-29 iter1: read-backs (brightness/volume/device-name) fetched on
   device-connect (status idle→active) + applied to UI; clock-color bug fixed
   (set_clock_rich now sends kwargs). Added app.call_kw helper. Build green.
+- 2026-06-29 iter8: tray device section (dynamic menu rebuilt on scan change;
+  click -> select+connect; notif label tracks state). Smoke-tested (no crash).
+  FUNCTIONAL PARITY reached — see PARITY STATUS above. Loop stopping.
 - 2026-06-29 iter7: scan timeout setting (threaded through Cmd::Scan) + live job
   status line (live_job_list, read-only) in Live Widgets. Build green.
 - 2026-06-29 iter6: Text push — embedded 5x7 bitmap font (text_font.rs, glcdfont

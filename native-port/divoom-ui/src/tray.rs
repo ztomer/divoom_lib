@@ -1,84 +1,103 @@
-//! Native tray/menubar — the cross-platform replacement for `divoom_menubar/`
-//! (pyobjc NSStatusItem). Built with `tray-icon`; its menu/click events arrive on
-//! global channels that we poll from the eframe frame loop (`poll`). The tray
-//! lives in the same process as the window (the Python menubar was a separate
-//! process that spawned the GUI; here "Show Dashboard" just focuses our window).
+//! Native tray/menubar — cross-platform replacement for `divoom_menubar/` (pyobjc
+//! NSStatusItem). Built with `tray-icon`; menu/click events arrive on global
+//! channels polled from the eframe loop (`poll`). The menu has a dynamic device
+//! section (rebuilt via `set_devices` when the scan list changes), plus Show
+//! Dashboard / Notifications / Quit. Same-process: "Show Dashboard" focuses our
+//! window rather than spawning a subprocess.
 
-use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
+use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
 use tray_icon::{TrayIcon, TrayIconBuilder};
 
 pub struct Tray {
-    _icon: TrayIcon,
+    icon: TrayIcon,
     show_id: MenuId,
     notif_id: MenuId,
     quit_id: MenuId,
-    notif_item: MenuItem,
+    /// (menu id, device address) for the current device section.
+    device_ids: Vec<(MenuId, String)>,
+    notif_running: bool,
 }
 
-/// What the user picked from the tray menu this frame.
 pub enum TrayAction {
     ShowDashboard,
     ToggleNotifications,
+    SelectDevice(String),
     Quit,
 }
 
 impl Tray {
-    /// Build the tray icon + menu. Must run on the main thread with the event loop
-    /// already up (call lazily from the first `update`). Returns None if the
-    /// platform refuses (e.g. headless) — the app then runs window-only.
     pub fn build() -> Option<Tray> {
-        let menu = Menu::new();
-        let show = MenuItem::new("Show Dashboard", true, None);
-        let notif = MenuItem::new("Start Notifications", true, None);
-        let quit = MenuItem::new("Quit Divoom", true, None);
-        menu.append_items(&[
-            &show,
-            &PredefinedMenuItem::separator(),
-            &notif,
-            &PredefinedMenuItem::separator(),
-            &quit,
-        ])
-        .ok()?;
-        let icon = make_icon();
-        let tray = TrayIconBuilder::new()
-            .with_menu(Box::new(menu))
+        let icon = TrayIconBuilder::new()
             .with_tooltip("Divoom Control")
-            .with_icon(icon)
+            .with_icon(make_icon())
             .build()
             .ok()?;
-        Some(Tray {
-            show_id: show.id().clone(),
-            notif_id: notif.id().clone(),
-            quit_id: quit.id().clone(),
-            notif_item: notif,
-            _icon: tray,
-        })
+        let mut tray = Tray {
+            icon,
+            show_id: MenuId::new("show"),
+            notif_id: MenuId::new("notif"),
+            quit_id: MenuId::new("quit"),
+            device_ids: Vec::new(),
+            notif_running: false,
+        };
+        tray.rebuild(&[]);
+        Some(tray)
+    }
+
+    /// Rebuild the whole menu (device section + fixed items) and install it.
+    fn rebuild(&mut self, devices: &[(String, String)]) {
+        let menu = Menu::new();
+        self.device_ids.clear();
+        if devices.is_empty() {
+            let _ = menu.append(&MenuItem::new("No screens found", false, None));
+        } else {
+            for (name, addr) in devices {
+                let label = if name.is_empty() { addr.clone() } else { name.clone() };
+                let item = MenuItem::new(label, true, None);
+                self.device_ids.push((item.id().clone(), addr.clone()));
+                let _ = menu.append(&item);
+            }
+        }
+        let _ = menu.append(&PredefinedMenuItem::separator());
+        let show = MenuItem::with_id(self.show_id.clone(), "Show Dashboard", true, None);
+        let notif_label = if self.notif_running { "Stop Notifications" } else { "Start Notifications" };
+        let notif = MenuItem::with_id(self.notif_id.clone(), notif_label, true, None);
+        let quit = MenuItem::with_id(self.quit_id.clone(), "Quit Divoom", true, None);
+        let _ = menu.append_items(&[&show, &PredefinedMenuItem::separator(), &notif, &PredefinedMenuItem::separator(), &quit]);
+        self.icon.set_menu(Some(Box::new(menu)));
+    }
+
+    /// Update the device section (called when the scan list changes).
+    pub fn set_devices(&mut self, devices: &[(String, String)]) {
+        self.rebuild(devices);
+    }
+
+    pub fn set_notifications_running(&mut self, running: bool, devices: &[(String, String)]) {
+        if running != self.notif_running {
+            self.notif_running = running;
+            self.rebuild(devices);
+        }
     }
 
     /// Drain pending menu events; return the action if one of ours was clicked.
     pub fn poll(&self) -> Option<TrayAction> {
         let mut action = None;
-        while let Ok(ev) = MenuEvent::receiver().try_recv() {
+        while let Ok(ev) = tray_icon::menu::MenuEvent::receiver().try_recv() {
             if ev.id == self.show_id {
                 action = Some(TrayAction::ShowDashboard);
             } else if ev.id == self.notif_id {
                 action = Some(TrayAction::ToggleNotifications);
             } else if ev.id == self.quit_id {
                 action = Some(TrayAction::Quit);
+            } else if let Some((_, addr)) = self.device_ids.iter().find(|(id, _)| *id == ev.id) {
+                action = Some(TrayAction::SelectDevice(addr.clone()));
             }
         }
         action
     }
-
-    /// Reflect notification-listener state in the menu label.
-    pub fn set_notifications_running(&self, running: bool) {
-        self.notif_item
-            .set_text(if running { "Stop Notifications" } else { "Start Notifications" });
-    }
 }
 
-/// A 16x16 orange rounded square — the Braun accent, good enough as a tray glyph
-/// until a real icon asset is bundled.
+/// A 16x16 orange rounded square — the Braun accent, until a real icon ships.
 fn make_icon() -> tray_icon::Icon {
     const N: usize = 16;
     let mut rgba = vec![0u8; N * N * 4];

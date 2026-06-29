@@ -6,71 +6,7 @@
 use crate::daemon::{self, DaemonHandle, Device, Update};
 use crate::shell;
 
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum Tab {
-    Channels,
-    Widgets,
-    PixelArt,
-    Wall,
-    Schedule,
-    DeviceSettings,
-    Settings,
-}
-
-impl Tab {
-    /// Sidebar nav entries, in order (Settings is reached via the appbar gear).
-    pub const NAV: [(Tab, &'static str); 6] = [
-        (Tab::Channels, "Channels"),
-        (Tab::Widgets, "Live Widgets"),
-        (Tab::PixelArt, "Pixel Art"),
-        (Tab::Wall, "Virtual Wall"),
-        (Tab::Schedule, "Schedule"),
-        (Tab::DeviceSettings, "Device Settings"),
-    ];
-
-    pub fn title(self) -> &'static str {
-        match self {
-            Tab::Channels => "Channels",
-            Tab::Widgets => "Live Widgets",
-            Tab::PixelArt => "Pixel Art",
-            Tab::Wall => "Virtual Wall",
-            Tab::Schedule => "Schedule",
-            Tab::DeviceSettings => "Device Settings",
-            Tab::Settings => "Settings",
-        }
-    }
-}
-
-/// Sub-tabs inside the Pixel Art tab (web: Custom Art + Gallery + Hot Channel).
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum PixelSub {
-    Paint,
-    Gallery,
-}
-
-/// Channel sub-tabs inside the Channels tab (the control-panel row).
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum Channel {
-    Clock,
-    Visualizer,
-    Vj,
-    Ambient,
-    Scoreboard,
-    Text,
-    Sessions,
-}
-
-impl Channel {
-    pub const ALL: [(Channel, &'static str); 7] = [
-        (Channel::Clock, "Clock"),
-        (Channel::Visualizer, "Visualizer"),
-        (Channel::Vj, "VJ FX"),
-        (Channel::Ambient, "Ambient"),
-        (Channel::Scoreboard, "Scoreboard"),
-        (Channel::Text, "Text"),
-        (Channel::Sessions, "Sessions"),
-    ];
-}
+pub use crate::model::{Alarm, Channel, PixelSub, Tab};
 
 pub struct DivoomApp {
     pub daemon: DaemonHandle,
@@ -109,6 +45,7 @@ pub struct DivoomApp {
     frame_count: u32,
     tray: Option<crate::tray::Tray>,
     tray_inited: bool,
+    tray_device_sig: String,
     notif_running: bool,
     last_active: bool,
     // --- Device Settings tab ---
@@ -157,22 +94,6 @@ pub struct DivoomApp {
     pub replies: std::collections::HashMap<String, serde_json::Value>,
 }
 
-/// One alarm slot, mirroring `tools.set_alarm(index, enabled, hour, minute, week,
-/// mode, trigger_mode)`. `week` is a 7-bit day mask (bit0=Mon … bit6=Sun).
-#[derive(Clone)]
-pub struct Alarm {
-    pub enabled: bool,
-    pub hour: i64,
-    pub minute: i64,
-    pub week: u8,
-}
-
-impl Default for Alarm {
-    fn default() -> Self {
-        Alarm { enabled: false, hour: 8, minute: 0, week: 0 }
-    }
-}
-
 impl DivoomApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         crate::theme::apply(&cc.egui_ctx);
@@ -209,6 +130,7 @@ impl DivoomApp {
             frame_count: 0,
             tray: None,
             tray_inited: false,
+            tray_device_sig: String::new(),
             notif_running: false,
             last_active: false,
             clock_face: 0,
@@ -389,9 +311,7 @@ impl DivoomApp {
                                 .and_then(|r| r.as_bool())
                                 .or_else(|| value.get("state").and_then(|s| s.as_str()).map(|s| s == "running"))
                                 .unwrap_or(false);
-                            if let Some(t) = &self.tray {
-                                t.set_notifications_running(self.notif_running);
-                            }
+                            // tray notif label is synced in handle_tray.
                         }
                         "rb_brightness" => {
                             if let Some(n) = value.get("result").and_then(|v| v.as_i64()) {
@@ -477,6 +397,20 @@ impl DivoomApp {
                 }
             }
         }
+        // Sync the dynamic device section + notif label to current state.
+        let devices: Vec<(String, String)> =
+            self.devices.iter().map(|d| (d.name.clone(), d.address.clone())).collect();
+        let sig = devices.iter().map(|(_, a)| a.as_str()).collect::<Vec<_>>().join(",");
+        let sig_changed = sig != self.tray_device_sig;
+        let notif = self.notif_running;
+        if let Some(t) = self.tray.as_mut() {
+            if sig_changed {
+                t.set_devices(&devices);
+            }
+            t.set_notifications_running(notif, &devices);
+        }
+        self.tray_device_sig = sig;
+
         let Some(action) = self.tray.as_ref().and_then(|t| t.poll()) else { return };
         match action {
             crate::tray::TrayAction::ShowDashboard => {
@@ -486,6 +420,12 @@ impl DivoomApp {
             crate::tray::TrayAction::ToggleNotifications => {
                 let cmd = if self.notif_running { "stop_notifications" } else { "start_notifications" };
                 self.raw(cmd, serde_json::json!({}), "notif_status");
+            }
+            crate::tray::TrayAction::SelectDevice(addr) => {
+                if let Some(i) = self.devices.iter().position(|d| d.address == addr) {
+                    self.selected_device = Some(i);
+                }
+                self.daemon.send(daemon::Cmd::Connect(addr));
             }
             crate::tray::TrayAction::Quit => {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);

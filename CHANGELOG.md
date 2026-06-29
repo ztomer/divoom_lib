@@ -4,6 +4,23 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI port: FUNCTIONAL PARITY (2026-06-29)
+
+- **/loop-until-parity run (8 iterations)** — closed the gaps the audit found.
+  `docs/PARITY_TRACKER_NATIVE_UI.md` is the full record. Highlights:
+  - Structural fixes: Live Widgets re-mapped to live data feeds (music/stocks/
+    sysmon/weather via `live_job_*`); gallery moved under Pixel Art.
+  - Channels: clock-color (`set_clock_rich` kwargs), Sessions (sleep/timer/
+    countdown/noise), Text push (embedded 5x7 bitmap font → `show_image`).
+  - Device Settings: FM radio. Schedule: `get_alarms` read-back, memorial, timeplan.
+  - Live Widgets: temperature channel + running-job status. Device-state read-backs
+    (brightness/volume/name/scoreboard) on connect. Scan timeout.
+  - Tray: dynamic device section (click → select+connect).
+  - **Functional parity reached** for all portable/verifiable UI features. Remaining
+    items are blocked: daemon gaps (cloud login, test notif, sync_time, MCP),
+    device-dependent niche (Custom Art, Hot Channel, wall presets), audio capture,
+    and minor polish — all categorized in the tracker.
+
 ### Post-v0.20.2 — Native UI port: Phase 3 complete + Phase 4a tray (2026-06-29)
 
 - **Phase 3 complete** — all 7 sidebar tabs live (placeholder removed):

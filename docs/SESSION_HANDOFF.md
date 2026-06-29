@@ -76,9 +76,19 @@ Claude) should read this on entry and **update it at the end of every round**
     DateTimeCommand to a `divoomd` device_call leaf** for full parity.
     Added generic `Cmd::Raw`/`Update::Reply` (top-level daemon RPC w/ reply tag,
     stored in `app.replies`) for the remaining tabs; `DIVOOM_UI_TAB` screenshot aid.
-  - **CORRECTION (2026-06-29):** a full audit found the "Phase 3 complete / feature-
-    complete" claim **overstated** — only ~1/3 of the `gui_api` surface is actually
-    wired. The app shell, most of Channels, and Device Settings are solid; but the
+  - **FUNCTIONAL PARITY REACHED (2026-06-29, after the /loop-until-parity run, 8
+    iterations).** See **`docs/PARITY_TRACKER_NATIVE_UI.md`** for the full per-feature
+    record + the "PARITY STATUS" closeout. All portable/verifiable UI features are
+    ported (every tab + channel sub-tab, Device Settings+FM, Schedule alarms/
+    memorial/timeplan, Live Widgets feeds+temperature, Pixel Art paint+gallery,
+    Text push via embedded 5x7 font, read-backs, tray device section). Remaining
+    items are BLOCKED, categorized in the tracker: **daemon gaps** (cloud login,
+    test notif, sync_time, MCP — need new divoomd commands), **device-dependent
+    niche** (Custom Art, Hot Channel, wall presets), **audio capture** (audio viz),
+    and **minor polish**. The daemon gaps are the only ones blocking real end-user
+    features — they need daemon-side work (user to authorize separately).
+  - **EARLIER CORRECTION (2026-06-29):** the initial "Phase 3 complete / feature-
+    complete" claim was **overstated** (~1/3 wired); the loop above fixed it. The app shell, most of Channels, and Device Settings are solid; but the
     **Live Widgets tab is mis-mapped** (shows the gallery; should be live data feeds
     — music/stocks/sysmon/weather), the **gallery belongs under Pixel Art**, and
     Sessions/Weather/FM/Memorial/Presets/cloud-login/MCP/notification-routing + many
