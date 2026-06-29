@@ -107,6 +107,13 @@ future nicety, not required for the gate.
 
 **Exit:** `wc -l` over all `*.rs` shows max < 500; LOC rule is gated.
 
+**STATUS: DONE (2026-06-28).** Split `live_jobs.rs` (965) into
+`live_jobs/{mod(428),render(290),music(245)}.rs`; trimmed `daemon.rs` (502→482) by
+moving `find_encoder_lib` into `native_encode.rs`. Added `tools/check_file_size.py`
+(500-line gate over tracked source; tests/vendored/target exempt) wired into CI
+(`tests.yml`) + the pre-commit hook. No file violates (267 source files clean).
+Both matrices stayed 62→63 green.
+
 ---
 
 ## Phase 4 — Hardware & cross-platform verification (needs hardware / other OSes)
@@ -128,16 +135,22 @@ Drives the real daemon binary over its socket with the device backed by
 `MockTransport`. Asserts wire bytes + response shapes + gating logic. No TCC, no
 device, no user. This is where most of "verification" actually lives.
 
-- [ ] **4A.1 MCP-via-Rust (mock):** start the Rust daemon (`{"mock": true}`
-  connect), run the MCP server against it, assert `tools/list` returns the full
-  catalog and representative `tools/call` invocations route through `device_call`
-  to the mock and produce the expected `(cmd_id, payload)` wire tuples.
-- [ ] **4A.2 Exclusive-mode (mock):** over the socket, exercise
-  acquire → second-acquire-rejected (honest steal-reject, no hang) → release →
-  re-acquire, plus a wrong-token `device_call` rejection. Pure `command_queue`
-  logic — hardware-independent (mirrors the Python R53 steal-reject teeth tests).
-- [ ] **4A.3** Fold A.1/A.2 into `cargo test` (extend `mock_device_tests.rs`) and/or
-  the Python `tests/test_rust_daemon_parity.py` so the Phase-2 CI gate covers them.
+- [x] **4A.1 MCP-via-Rust (mock):** `test_rust_mcp_via_daemon`
+  (`tests/test_rust_daemon_parity.py`) spawns the Rust daemon, mock-connects, builds
+  `MCPServer` + `build_tool_catalog` over a `DaemonDeviceProxy`, then `tools/list`
+  builds the catalog and `tools/call(set_volume)` round-trips through the daemon's
+  `device_call` to success. (Over the socket only success is observable; exact wire
+  bytes are asserted in the Rust mock tests below.)
+- [x] **4A.2 Exclusive-mode (mock):** `test_mock_exclusive_mode_gating`
+  (`src/mock_device_tests.rs`) — acquire → immediate steal-reject (no hang) →
+  foreign-token `device_call` denied → owner call routes to the mock → release →
+  re-acquire; asserts only the owner's call reached the device, with correct bytes.
+- [x] **4A.3** Both run in the Phase-2 CI gate (`cargo test` + the Python `test`
+  job). Rust 63/63 both matrices; parity suite 12 passed / 1 skipped.
+
+**STATUS: Tier A DONE (2026-06-28).** Wire-byte serialization (4 commands +
+exclusive routing) is asserted in `mock_device_tests.rs`; the MCP→daemon→device
+round-trip is asserted in the Python parity suite. All hardware-free, in CI.
 
 ### Tier B — autonomous on macOS via the pre-granted `.app` (real device)
 
@@ -157,23 +170,26 @@ provided the grant from the original one-time approval still holds for that bina
   `.app` so Tier B stays user-free across runs. (This is the only place a human may
   re-enter, and only on identity change — not per run.)
 
-### Tier C — not autonomable from this machine (cross-platform real radio)
+### Tier C — cross-platform: best-effort compile-only (no Win/Linux hardware)
 
-Linux/Windows `btleplug` *runtime* stability needs real devices on those OSes,
-which this macOS host can't provide. Automate everything short of the radio:
+The maintainer has **no Windows or Linux machines**, so Linux/Windows `btleplug`
+*runtime* stability cannot be verified here — and we explicitly accept that. The
+"first in class" bar for cross-platform is therefore **compile-only, in CI,
+non-blocking**: prove the btleplug backends build on each OS; never claim the radio
+works there.
 
-- [ ] **4C.1** CI: `cargo build --target x86_64-unknown-linux-gnu` /
-  `x86_64-pc-windows-msvc` with `--features ble` (install `libdbus-1-dev` on the
-  Linux runner) — proves the btleplug backends *compile* per-OS. Build-only, no
-  device.
-- [ ] **4C.2** Real-radio smoke on Linux/Windows is the irreducible residue: either
-  offload to a self-hosted/cloud runner with a paired device, or accept as a
-  documented manual step before Phase 5. **`log()`/note this gap explicitly** — do
-  not let a green Tier-A/C build read as "cross-platform verified."
+- [x] **4C.1** CI best-effort native compile (`tests.yml`): `rust-ble-linux`
+  (ubuntu, install `libdbus-1-dev`, `cargo build --features ble`) and
+  `rust-ble-windows` (windows, `cargo build`) — both `continue-on-error: true` so a
+  per-OS toolchain quirk informs without blocking the gate. Build-only, no device.
+- [ ] **4C.2** Real-radio smoke on Linux/Windows is **out of scope** (no hardware).
+  If a device-equipped runner ever exists, drive `test_rust_hardware_parity` there;
+  until then this gap is documented, not pretended-away. A green CI must never be
+  read as "cross-platform radio verified" — only "compiles on Linux/Windows".
 
 **Exit:** Tier A green in CI; Tier B green on a real Pixoo via the `.app` (no
-per-run user action); Tier C compiles for Linux/Windows with the real-radio smoke
-explicitly tracked as the only remaining human/device-bound item.
+per-run user action); Tier C **compiles** on Linux/Windows (best-effort,
+non-blocking), with real-radio on those OSes explicitly accepted as untested.
 
 ---
 
@@ -198,17 +214,20 @@ explicitly tracked as the only remaining human/device-bound item.
 ## Sequencing & dependencies
 
 ```
-Phase 1 (core build) ──► Phase 2 (CI gate) ──► Phase 3 (LOC) ──► Phase 4 ──► Phase 5 (archive)
-   [DONE]                   [DONE]               no hardware       tiered      gated on all
+Phase 1 (core) ──► Phase 2 (CI) ──► Phase 3 (LOC) ──► Phase 4 ──► Phase 5 (archive)
+   [DONE]            [DONE]           [DONE]            A:DONE      gated on 4B
+                                                        B/C: below
 ```
 
-Phases 1 + 2 are **DONE** (committed). Phase 3 is pure code/tooling. Phase 4 is now
-mostly autonomous — Tier A runs hardware-free in CI, Tier B is user-free on macOS
-via the granted `.app`, and only Tier C's cross-platform real-radio smoke is
-genuinely human/device-bound. Phase 5 is gated on 1–4.
+Phases 1–3 are **DONE** (committed). Phase 4 **Tier A is DONE** (hardware-free
+E2E in CI); **Tier C is DONE as best-effort compile-only** (Linux/Windows compile
+jobs, non-blocking — no hardware to verify radio, by design). **Tier B** (real
+Pixoo via the granted macOS `.app`) is the remaining verification and the gate for
+Phase 5.
 
-**Recommended next unit of work:** Phase 3 (LOC splits) then Phase 4 Tier A
-(mock-driven MCP + exclusive-mode E2E in CI) — both land with no hardware.
+**Recommended next unit of work:** Phase 4 **Tier B** — `open` the granted
+dev-daemon `.app` and run the MCP + exclusive + brightness sequences against a real
+Pixoo over the socket (autonomous on macOS, no per-run user action). Then Phase 5.
 
 ---
 

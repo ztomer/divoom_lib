@@ -70,3 +70,33 @@ jobs:
       - name: Build + test with BLE
         working-directory: native-port/divoomd
         run: cargo test --locked
+
+  rust-ble-linux:
+    # Best-effort: prove the btleplug BlueZ backend COMPILES on Linux. No device,
+    # no runtime claim (maintainer has no Linux hardware). Non-blocking.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: native-port/divoomd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install BlueZ/D-Bus headers (btleplug build dep)
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+      - name: Build with BLE (compile-only)
+        run: cargo build --features ble --locked
+
+  rust-ble-windows:
+    # Best-effort: prove the btleplug WinRT backend COMPILES on Windows. No device,
+    # no runtime claim (maintainer has no Windows hardware). Non-blocking.
+    runs-on: windows-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: native-port/divoomd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build with BLE (compile-only)
+        run: cargo build --features ble --locked

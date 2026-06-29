@@ -18,7 +18,8 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **NATIVE PORT HARDENING — Phase 1+2 done; Phase 4 made autonomous (2026-06-28):**
+- **NATIVE PORT HARDENING — Phases 1–3 + Phase 4 Tier A & C done (2026-06-28):**
+  Only Phase 4 Tier B (real-device) and Phase 5 (archival) remain.
   - **Phase 1 (commit `f7e0e7c`):** fixed the broken `--no-default-features` build.
     Root cause: the `DeviceTransport` device-I/O method layer was `ble`-gated even
     though it delegates to non-ble Spp/Lan/Mock, and `BleResult` lived in the gated
@@ -31,22 +32,28 @@ Claude) should read this on entry and **update it at the end of every round**
   - **Phase 2 (commit `762c6ad`):** added `rust-core` (ubuntu, no-ble gate) and
     `rust-ble` (macos, full ble) jobs to `.github/workflows/tests.yml`. This is the
     gate that would have caught the e4bd424 regression.
-  - **Phase 4 re-planned for autonomy** (in `PLANNING_NATIVE_PORT_HARDENING.md`):
-    Tier A = mock-driven MCP + exclusive-mode E2E, fully hardware-free in CI; Tier B
-    = real-device on macOS via `open`-ing the pre-granted dev-daemon `.app` (no
-    per-run user action); Tier C = Linux/Windows real-radio, the only irreducible
-    human/device-bound residue (CI cross-build covers compile-only).
+  - **Phase 3 (500-LOC):** split `live_jobs.rs` (965) →
+    `live_jobs/{mod(428),render(290),music(245)}.rs`; trimmed `daemon.rs` (502→482,
+    moved `find_encoder_lib` into `native_encode.rs`). Added
+    `tools/check_file_size.py` (500-line gate) → CI + pre-commit. No file violates.
+  - **Phase 4 Tier A (hardware-free E2E):** `test_mock_exclusive_mode_gating`
+    (Rust: acquire/steal-reject/foreign-token-deny/release/re-acquire + wire bytes)
+    and `test_rust_mcp_via_daemon` (Python: MCPServer + DaemonDeviceProxy →
+    spawned Rust daemon → `device_call` round-trip). Rust 63/63 both matrices;
+    parity suite 12 passed / 1 skipped.
+  - **Phase 4 Tier C (best-effort, no Win/Linux hardware):** added
+    `rust-ble-linux` + `rust-ble-windows` `continue-on-error` compile-only CI jobs.
+    Real-radio on those OSes is explicitly out of scope (no hardware) — never
+    claimed verified.
 
 ### Open threads
 
-- **500-LOC house rule violated in the Rust tree:** `live_jobs.rs` (965),
-  `daemon.rs` (502). Hardening plan **Phase 3** (no hardware).
-- **Phase 4 verification** — Tier A (mock MCP + exclusive E2E in CI) and Tier B
-  (real Pixoo via the granted `.app`) are autonomous; Tier C (Linux/Windows real
-  radio) is the only user/device-bound item. See the hardening plan.
-- **Phase 5** — Python backend archival, gated on 3+4.
-- _(RESOLVED this round: the broken `--no-default-features` build + the no-CI-runs-
-  cargo gap — Phases 1+2.)_
+- **Phase 4 Tier B** (the remaining verification): drive a real Pixoo via the
+  pre-granted dev-daemon `.app` (`open` it, drive over the socket) — MCP +
+  exclusive + brightness. Autonomous on macOS (no per-run user action). Gates
+  Phase 5.
+- **Phase 5** — Python backend archival, gated on Tier B.
+- _(RESOLVED this round: Phases 1+2+3 and Phase 4 Tier A + Tier C.)_
 
 - **DOC CLEANUP — native-port docs retired/pruned (2026-06-28):** Retired the
   obsolete `docs/PLANNING_NATIVE_PORT.md` (original evaluate-and-plan doc, fully

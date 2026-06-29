@@ -4,6 +4,29 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Rust Hardening Phase 3 + Phase 4 Tier A/C (2026-06-28)
+
+- **Phase 3 — 500-LOC compliance + gate:** split `live_jobs.rs` (965) into
+  `live_jobs/{mod(428),render(290),music(245)}.rs`; trimmed `daemon.rs` (502→482)
+  by moving `find_encoder_lib` into `native_encode.rs`. Added
+  `tools/check_file_size.py` (deterministic 500-line gate over tracked source;
+  tests/vendored/target exempt), wired into CI + the pre-commit hook. 267 source
+  files clean.
+- **Phase 4 Tier A — hardware-free E2E (in CI):**
+  - `test_mock_exclusive_mode_gating` (`src/mock_device_tests.rs`): exclusive
+    acquire → immediate steal-reject → foreign-token `device_call` denied → owner
+    call routes to mock → release → re-acquire, with wire-byte assertion.
+  - `test_rust_mcp_via_daemon` (`tests/test_rust_daemon_parity.py`): MCPServer +
+    `build_tool_catalog` over a `DaemonDeviceProxy` bound to the spawned Rust
+    daemon (mock device); `tools/list` + `tools/call(set_volume)` round-trip to
+    success. Rust 63/63 both matrices; parity suite 12 passed / 1 skipped.
+- **Phase 4 Tier C — best-effort cross-platform (no Win/Linux hardware):** added
+  `rust-ble-linux` + `rust-ble-windows` `continue-on-error` compile-only CI jobs
+  (prove the BlueZ/WinRT btleplug backends build per-OS). Real-radio on those OSes
+  is explicitly out of scope and never claimed verified.
+- **Remaining:** Phase 4 Tier B (real Pixoo via the granted macOS `.app`) → Phase 5
+  (Python backend archival).
+
 ### Post-v0.20.2 — Rust Hardening Phase 1+2: core build fix + CI gate (2026-06-28)
 
 - **Restored the `--no-default-features` build** (`f7e0e7c`): the hardware-free core had stopped compiling (regression in `e4bd424`). Root cause: the `DeviceTransport` device-I/O method layer was `ble`-gated despite delegating to non-ble Spp/Lan/Mock, and `BleResult` lived in the ble-gated module.
