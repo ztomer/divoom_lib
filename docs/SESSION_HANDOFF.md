@@ -76,7 +76,16 @@ Claude) should read this on entry and **update it at the end of every round**
     DateTimeCommand to a `divoomd` device_call leaf** for full parity.
     Added generic `Cmd::Raw`/`Update::Reply` (top-level daemon RPC w/ reply tag,
     stored in `app.replies`) for the remaining tabs; `DIVOOM_UI_TAB` screenshot aid.
-  - **Phase 3 DONE (3a/3b/3c)** — all 7 sidebar tabs are live (placeholder removed):
+  - **CORRECTION (2026-06-29):** a full audit found the "Phase 3 complete / feature-
+    complete" claim **overstated** — only ~1/3 of the `gui_api` surface is actually
+    wired. The app shell, most of Channels, and Device Settings are solid; but the
+    **Live Widgets tab is mis-mapped** (shows the gallery; should be live data feeds
+    — music/stocks/sysmon/weather), the **gallery belongs under Pixel Art**, and
+    Sessions/Weather/FM/Memorial/Presets/cloud-login/MCP/notification-routing + many
+    read-backs are missing. See **`docs/PARITY_TRACKER_NATIVE_UI.md`** (the live
+    "/loop until parity" record). The per-tab bullets below describe what RENDERS,
+    not full parity.
+  - **Phase 3 (3a/3b/3c)** — all 7 sidebar tabs render (placeholder removed):
     `settings.rs` (notifications start/stop/status, LAN probe/connect, keep-alive,
     MCP deferred), `schedule.rs` (5 alarm slots → `alarm.set_alarm`), `pixel_art.rs`
     (16x16 paint editor → `show_image` rgb kwargs via `Cmd::Raw`), `wall.rs`

@@ -97,6 +97,7 @@ pub struct DivoomApp {
     tray: Option<crate::tray::Tray>,
     tray_inited: bool,
     notif_running: bool,
+    last_active: bool,
     // --- Device Settings tab ---
     pub device_name: String,
     pub hour24: bool,
@@ -172,6 +173,7 @@ impl DivoomApp {
             tray: None,
             tray_inited: false,
             notif_running: false,
+            last_active: false,
             clock_face: 0,
             clock_color: [255, 255, 255],
             viz_sel: 0,
@@ -217,6 +219,28 @@ impl DivoomApp {
         });
     }
 
+    /// device_call with KEYWORD args (the convention for methods like
+    /// `display.set_clock_rich` / `show_image` that read `kwargs`, not positional).
+    pub fn call_kw(&self, method: &str, kwargs: serde_json::Value) {
+        self.raw(
+            "device_call",
+            serde_json::json!({ "method": method, "args": [], "kwargs": kwargs }),
+            "_kw",
+        );
+    }
+
+    /// Read current device state into the UI (so controls reflect the device, not
+    /// hardcoded defaults). Only meaningful once a device is connected.
+    fn fetch_device_state(&self) {
+        for (method, tag) in [
+            ("get_brightness", "rb_brightness"),
+            ("get_volume", "rb_volume"),
+            ("get_device_name", "rb_name"),
+        ] {
+            self.raw("device_call", serde_json::json!({ "method": method, "args": [] }), tag);
+        }
+    }
+
     /// Hex `#rrggbb` for an `[r,g,b]` (device_call color args parse a hex string).
     pub fn hex(rgb: [u8; 3]) -> String {
         format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2])
@@ -251,10 +275,16 @@ impl DivoomApp {
 
     /// Drain worker updates into UI state.
     fn pump(&mut self) {
+        let mut became_active = false;
         while let Ok(upd) = self.daemon.rx.try_recv() {
             match upd {
                 Update::Status { connected, detail, .. } => {
                     self.daemon_connected = connected;
+                    let active = detail == "active";
+                    if active && !self.last_active {
+                        became_active = true; // device just connected → read its state
+                    }
+                    self.last_active = active;
                     self.status_detail = detail;
                 }
                 Update::Devices(d) => {
@@ -266,19 +296,42 @@ impl DivoomApp {
                 Update::Error(e) => self.last_error = Some(e),
                 Update::Info(_) => {}
                 Update::Reply { tag, value } => {
-                    if tag == "notif_status" {
-                        self.notif_running = value
-                            .get("running")
-                            .and_then(|r| r.as_bool())
-                            .or_else(|| value.get("state").and_then(|s| s.as_str()).map(|s| s == "running"))
-                            .unwrap_or(false);
-                        if let Some(t) = &self.tray {
-                            t.set_notifications_running(self.notif_running);
+                    match tag.as_str() {
+                        "notif_status" => {
+                            self.notif_running = value
+                                .get("running")
+                                .and_then(|r| r.as_bool())
+                                .or_else(|| value.get("state").and_then(|s| s.as_str()).map(|s| s == "running"))
+                                .unwrap_or(false);
+                            if let Some(t) = &self.tray {
+                                t.set_notifications_running(self.notif_running);
+                            }
                         }
+                        "rb_brightness" => {
+                            if let Some(n) = value.get("result").and_then(|v| v.as_i64()) {
+                                self.brightness = n.clamp(0, 100) as u8;
+                            }
+                        }
+                        "rb_volume" => {
+                            if let Some(n) = value.get("result").and_then(|v| v.as_i64()) {
+                                self.volume = n.clamp(0, 15) as u8;
+                            }
+                        }
+                        "rb_name" => {
+                            if let Some(s) = value.get("result").and_then(|v| v.as_str()) {
+                                if !s.is_empty() {
+                                    self.device_name = s.to_string();
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                     self.replies.insert(tag, value);
                 }
             }
+        }
+        if became_active {
+            self.fetch_device_state();
         }
     }
 }

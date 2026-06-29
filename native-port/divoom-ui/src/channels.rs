@@ -50,11 +50,16 @@ fn clock(app: &mut DivoomApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(RichText::new("Clock color").size(12.0).color(theme::TEXT_MUTED));
         if ui.color_edit_button_srgb(&mut app.clock_color).changed() {
-            // The plain show_clock face is white-only on the device; color is
-            // applied via the richer overlay path.
-            app.call(
+            // The plain show_clock face is white-only on the device; color +
+            // 24h/date overlays go through set_clock_rich, which reads KWARGS
+            // (style/twentyfour/color), not positional args.
+            app.call_kw(
                 "display.set_clock_rich",
-                serde_json::json!([app.clock_face]),
+                serde_json::json!({
+                    "style": app.clock_face,
+                    "twentyfour": app.hour24,
+                    "color": DivoomApp::hex(app.clock_color),
+                }),
             );
         }
     });
