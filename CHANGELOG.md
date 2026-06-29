@@ -4,6 +4,26 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Rust parity loop: cloud decode + device_call methods (2026-06-29)
+
+Driving the native daemon to full parity with the Python implementation.
+
+- **Cloud image decode parity** (the big one): ported `media_decoder.resolve_to_gif`
+  — magic 9/18/26 (AES + per-frame LZO1X via `minilzo-rs` + `_compact_tiles`) and
+  0xAA hot → frames → GIF (image crate); fixed a real 0xAA bpp bug. VERIFIED
+  byte-identical to Python via oracle fixtures (magic 9: 24f, magic 18: 6f LZO+tiled)
+  + resolve→GIF round-trip tests. HW-confirmed rendering a magic-18 gallery file on
+  a real Pixoo. sync_artwork/monthly_best route through it; honest-error (never
+  raw-stream) on truly-unknown magics — fixes the "device stuck in loading" bug.
+- **device_call method parity** (audit-driven): added display.show_effects/
+  show_visualization/show_scoreboard/set_temperature_channel/switch_channel/
+  display_image; control.set_light_mode/set_hot(0x26)/set_keyboard(0x23);
+  weather.set/set_temperature/set_weather. All ported verbatim from divoom_lib with
+  wire-byte mock tests. Audit: 54 → 42 genuine gaps remaining (animation 10,
+  drawing 14, music-SD 13, hot_update 2, light 1, tool 2).
+- **Bugs found via compare-to-Python:** monthly_best used wrong device_call arg keys
+  (`raw_args`/`kw`) + a non-existent `connect_device` command; 0xAA bpp under-count.
+
 ### Post-v0.20.2 — Rust Hardening Phase 4 Tier B (real device) + 2 fixes (2026-06-28)
 
 - **Phase 4 Tier B — verified on a real Timoo over BLE** via the granted

@@ -18,6 +18,32 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **PARITY LOOP IN PROGRESS (2026-06-29, /loop "until parity with Python"):**
+  - **Cloud image decode parity DONE + verified** (the dominant gap): ported
+    `media_decoder.resolve_to_gif` — magic 9/18/26 (AES + LZO1X via `minilzo-rs` +
+    `_compact_tiles`) + 0xAA → frames → GIF (`src/media.rs`, decoders in
+    `art_codec.rs`); fixed a real 0xAA bpp under-count. BYTE-PARITY tests vs Python
+    oracle fixtures (`tests/cloud_fixtures/`, magic 9 + 18) + resolve→GIF round-trip.
+    HW-confirmed: a magic-18 gallery file renders on a real Pixoo (was the
+    "stuck-in-loading" bug — caused by raw-streaming the undecodable AES container).
+  - **device_call methods added** (audit-driven, verbatim from divoom_lib + wire
+    tests): display.show_effects/show_visualization/show_scoreboard/
+    set_temperature_channel/switch_channel/display_image; control.set_light_mode/
+    set_hot(0x26)/set_keyboard(0x23); weather.set/set_temperature/set_weather.
+  - **Audit: 54 → 42 genuine device_call gaps remain.** By namespace: animation 10,
+    drawing 14, music-SD 13, hot_update 2, light 1 (get_light_mode, 0x46 read-back),
+    tool 2 (get/set_tool_info). Method to reproduce the audit is in git history of
+    this session (introspect Divoom facade, dedupe by underlying qualname, diff leaf
+    names vs Rust device_call match arms).
+  - **NEXT in the loop:** read-back parsers (light.get_light_mode 0x46,
+    tool.get_tool_info 0x71 — need response byte offsets); animation.* gif variants;
+    music SD-card subsystem; drawing.* subsystem; namespace aliases
+    (system./sound.* → existing handlers); fix monthly_best `connect_device`→`connect`
+    + arg keys; verify on the other 3 devices (Ditoo/Tivoo-Max/Timoo); then flip the
+    `DIVOOM_USE_RUST_DAEMON` default (prefer Rust when binary present). Python stays
+    as reference (never delete).
+  - cargo test 68/68 both matrices; all parity verified OFFLINE before device pushes.
+
 - **NATIVE PORT HARDENING — Phases 1–4 DONE; Phase 5 gated (2026-06-28):**
   Phase 4 Tier B was verified on a **real Timoo over BLE** via the granted `.app`
   (grant persisted, autonomous): scan → connect → brightness round-trip (read-backs
