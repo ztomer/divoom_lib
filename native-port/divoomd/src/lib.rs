@@ -35,5 +35,6 @@ pub mod transport;
 pub mod spp;
 pub mod cloud;
 pub mod monthly_best;
+pub mod sync_artwork;
 pub mod mock_transport;
 pub mod mock_device_tests;

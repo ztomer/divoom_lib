@@ -231,8 +231,11 @@ async fn sync_files_to_device(
                 command: "device_call".to_string(),
                 args: json!({
                     "method": "display.show_image",
-                    "raw_args": [temp_path.to_str().unwrap_or("")],
-                    "kw": {"size": 16}
+                    // device_call reads positional args from "args" and named from
+                    // "kwargs" (NOT "raw_args"/"kw") — using the wrong keys silently
+                    // dropped the path + size, so show_image errored.
+                    "args": [temp_path.to_str().unwrap_or("")],
+                    "kwargs": {"size": 16}
                 }),
                 token: None,
             };

@@ -10,6 +10,25 @@ use crate::protocol::{err_reply, Request};
 #[cfg(feature = "ble")]
 use crate::ble::{self, BleTransport};
 
+/// Handle `probe_lan` — check whether the connected device is reachable over its
+/// LAN HTTP API (Python-daemon parity). BLE/SPP devices report "no LAN configured".
+pub(crate) async fn probe_lan(daemon: &Daemon) -> Value {
+    let dev = {
+        let guard = daemon.device.lock().await;
+        match &*guard {
+            Some(d) => d.clone(),
+            None => return json!({"success": true, "reachable": false, "detail": "no device connected"}),
+        }
+    };
+    match dev.lan() {
+        Some(lan) => {
+            let reachable = lan.probe().await;
+            json!({"success": true, "reachable": reachable, "device_ip": lan.device_ip})
+        }
+        None => json!({"success": true, "reachable": false, "detail": "no LAN configured"}),
+    }
+}
+
 /// Handle `scan` command (BLE only).
 #[cfg(feature = "ble")]
 pub(crate) async fn cmd_scan(daemon: &Daemon, req: &Request) -> Value {

@@ -160,6 +160,10 @@ impl Daemon {
                 json!({"success": true, "shutting_down": true})
             }
 
+            "probe_lan" => crate::daemon_connect::probe_lan(self).await,
+
+            "sync_artwork" => crate::sync_artwork::sync_artwork(self, &req.args).await,
+
             #[cfg(feature = "ble")]
             "scan" => self.cmd_scan(&req).await,
             "connect" => self.cmd_connect(&req).await,
