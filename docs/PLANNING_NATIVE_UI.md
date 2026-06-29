@@ -1,12 +1,23 @@
 # PLANNING — Native Rust Menubar + UI
 
-Status: **planning** (no code yet). Goal: replace the Python presentation layer
-(pywebview GUI + pyobjc menubar) with native Rust, completing the native port so
-the shipped app has **no Python runtime at all**.
+Status: **Phase 0 done (2026-06-29)** — `native-port/divoom-ui/` scaffolded and
+rendering. Goal: replace the Python presentation layer (pywebview GUI + pyobjc
+menubar) with native Rust, completing the native port so the shipped app has **no
+Python runtime at all**.
 
 This continues the native-daemon work (`native-port/divoomd/`, now at parity with
 the Python daemon). The daemon is already the integration seam; this plan ports
 the two remaining Python surfaces that sit on top of it.
+
+### Decision log (constraints set by the user, in order)
+1. **Full native widgets**, not a hosted webview. (Overrides the original
+   webview-host recommendation below — that section is kept for the record but is
+   superseded by §2.)
+2. **Cross-platform** (macOS / Linux / Windows).
+3. **Permissive licensing**: ship MIT now, possibly closed-source commercial
+   later, **never pay a license fee**. → rules out Slint (GPL-or-pay).
+4. **Toolkit = egui/eframe** (MIT/Apache). The current `web_ui/` is the visual
+   reference for layout + look, reproduced in native widgets (not embedded).
 
 ---
 
@@ -60,184 +71,146 @@ socket client; we do not have to touch BLE, cloud, or codec logic.**
 
 ---
 
-## 2. The decision: webview-host vs. native-widgets
+## 2. The decision: native widgets via egui (SUPERSEDES the webview plan below)
 
-| Approach | GUI effort | Risk | Loses |
-|----------|-----------|------|-------|
-| **A. Rust-hosted webview** (keep `web_ui/` verbatim, reimplement bridge in Rust) | reimplement ~70 bridge methods | **low** | nothing — pixel-identical UI |
-| B. Native widgets (egui / slint / cacao) | rewrite all 9,172 LOC of UI | **high** | every CSS detail (glass tabs, appbar, animations), months of polish |
+The user requires **full native widgets** (no embedded browser) that are
+**cross-platform** and carry **no GPL/royalty obligation** (MIT now, maybe
+commercial later, never pay). Toolkit shortlist:
 
-**Decision: Approach A.** Rewriting the UI in native widgets throws away the
-single largest investment in the repo for no user-visible gain and high risk.
-Keeping the proven web frontend and replacing only its Python host is the
-parity-preserving move (consistent with the port-parity rule: the original
-`web_ui/` *is* the executable spec for the UI).
+| Toolkit | License | MIT app? | Commercial later? | Fidelity | Verdict |
+|---------|---------|----------|-------------------|----------|---------|
+| **Slint** | GPLv3 **or** paid **or** non-OSS royalty-free | ✗ | GPL or $ | high | **rejected** (licensing) |
+| **iced** | MIT | ✓ | ✓ | high | viable |
+| **egui/eframe** | MIT/Apache | ✓ | ✓ | good (theming, not pixel-perfect CSS) | **chosen** |
 
-### Stack (à la carte Tauri ecosystem, no Node build step)
-The frontend is static files with no bundler, so we use the webview crates
-directly rather than full Tauri (which assumes a JS build pipeline):
+**Decision: egui/eframe.** Permissive, biggest ecosystem, fastest to a working
+cross-platform app, trivial image grids + built-in widgets — and the user picked
+it over iced for pragmatism. The Braun dark look is reproduced via a custom egui
+theme (the palette is copied byte-for-byte from `web_ui/style.css`). The current
+`web_ui/` is the **visual reference**, not a shipped artifact — it is read for
+layout/look only and stays archived in-tree.
 
-- **`wry`** — the webview (WKWebView on macOS; same engine pywebview uses). Loads
-  `web_ui/` via a custom protocol handler; `with_ipc_handler` for JS→Rust;
-  `evaluate_script` for Rust→JS. This is exactly the pywebview `js_api` shape.
-- **`tao`** — windowing (frameless, sizing, multi-monitor — and tao handles the
-  multi-monitor drag correctly, so pywebview bug #1820's workaround is dropped).
-- **`tray-icon`** — the menubar `NSStatusItem` (cross-platform tray API).
-- **`muda`** — native menus for the tray (and a future app menu).
-- macOS specifics via **`objc2` + `objc2-app-kit`** where a crate's API is too
-  thin (e.g. rendering the device-thumbnail icon into the status item).
-
-All four (`wry`/`tao`/`tray-icon`/`muda`) are maintained by the Tauri team and
-designed to compose. Single Rust binary, no Python, no Node.
-
-> Full **Tauri 2.x** is the fallback if we later want auto-update, packaging, and
-> a plugin ecosystem — but it's heavier and wants a JS toolchain. Start
-> à la carte; promote to Tauri only if those features justify it.
+> The webview approach in §§ below (wry/tao + keep `web_ui/` verbatim) was the
+> earlier recommendation. It is **retained for the record but not pursued** — the
+> user explicitly chose native widgets. Skip to §4-native for the live plan.
 
 ---
 
-## 3. Target architecture
+## 3. Target architecture (native)
 
 ```
-┌─────────────────────────────────────────────┐
-│ divoom-ui  (new Rust binary, native-port/)   │
-│  ├─ tao window  → wry webview → web_ui/ (*)   │   (*) existing assets, unchanged
-│  │     └─ ipc_handler → bridge::dispatch()    │
-│  ├─ tray-icon + muda  → menubar               │
-│  └─ socket client ──────────┐                 │
-└─────────────────────────────┼─────────────────┘
-                              │ NDJSON unix socket (unchanged protocol)
-                       ┌──────▼───────┐
-                       │  divoomd     │  single BLE owner (already native)
-                       └──────────────┘
+┌──────────────────────────────────────────────────┐
+│ divoom-ui  (Rust/egui bin, native-port/divoom-ui) │
+│  ├─ eframe window (frameless, custom appbar)       │
+│  │    ├─ shell.rs  appbar + sidebar + content      │
+│  │    └─ theme.rs  Braun dark tokens (from CSS)    │
+│  └─ daemon.rs  socket client on a worker thread ─┐ │
+└──────────────────────────────────────────────────┼┘
+                       NDJSON socket (DIVOOM_SOCKET) │
+                       /tmp/divoom.sock              │
+                ┌──────▼───────┐                      
+                │  divoomd     │  single BLE owner (already native)
+                └──────────────┘
 ```
 
-- **Keep the daemon as a separate process** (matches today; daemon stays the sole
-  BLE owner; UI crash never drops the device connection). The UI binary spawns
-  `divoomd` if absent — reusing the bundled-resolution logic already in
-  `daemon_client.py`, reimplemented in Rust.
-- The bridge `dispatch(method, args) -> json` is a Rust match over the ~70 method
-  names, each forwarding to a shared `DaemonClient` (Rust) or handling local
-  state (presets, file dialogs via `rfd`).
-- Reuse `divoomd`'s existing modules in-crate where possible (media decode,
-  gallery) by factoring shared code into a `divoom-core` lib crate rather than
-  duplicating.
+- **Daemon stays a separate process** (sole BLE owner; a UI crash never drops the
+  device). UI is a pure client; all socket I/O is on a background worker thread
+  (`daemon.rs`) that talks to the UI over `mpsc` channels — the egui frame loop
+  never blocks on a socket.
+- **Protocol reuse, not code reuse (for now):** the wire format is trivial
+  (`{"command","args"}` + `\n`), so `daemon.rs` speaks it directly rather than
+  depending on the heavy `divoomd` lib (which pulls reqwest/rusqlite/btleplug).
+  A `divoom-core` extraction can come later if duplication grows.
+- **Cross-platform connection:** unix socket on macOS/Linux today; the daemon's
+  TCP+token transport (R54) covers Windows — only `ConnConnect::open()` changes.
 
 ---
 
-## 4. Phased plan
+## 4-native. Phased plan (egui)
 
-Each phase ends green (tests pass) and shippable (the Python UI remains the
-default until Phase 6 flips it), so we never have a broken `main`.
+Each phase ends compiling + verifiable; the Python UI stays default until cutover.
 
-### Phase 0 — Spike & validate (½–1 day)
-- New crate `native-port/divoom-ui/` (bin). Add `wry`, `tao`, `tray-icon`, `muda`.
-- Get a frameless `tao` window hosting `wry` that loads the **existing**
-  `web_ui/index.html` via a custom protocol, with one round-trip IPC method
-  (`get_transport_status`) forwarding to a real `divoomd`.
-- Get a `tray-icon` status item with a static title + Quit.
-- **Exit criteria**: the real dashboard renders pixel-identical in wry, and one
-  live device call works end-to-end. Proves Approach A before committing.
+### Phase 0 — Scaffold + shell + theme  ✓ DONE (2026-06-29)
+- Crate `native-port/divoom-ui/` (eframe/egui 0.29). `theme.rs` mirrors the
+  `web_ui` `:root` palette (Braun dark, `#ff5a1f` accent, 168px sidebar).
+- `shell.rs` renders the app shell: frameless integrated **appbar** (window
+  controls + brightness/volume sliders + Settings pill, window-drag), **sidebar**
+  (6 nav tabs with active orange accent bar + device panel pinned bottom),
+  **content** host with the Channels sub-tab row.
+- `daemon.rs` worker thread + the live-status/scan/device_call wiring.
+- **Verified**: compiles clean; renders faithfully to the reference (self-grabbed
+  framebuffer screenshot — egui `ViewportCommand::Screenshot`, no OS screen-record
+  permission needed, gated by `DIVOOM_UI_SCREENSHOT`); "daemon ready" shows live
+  against a no-BLE `divoomd` on `DIVOOM_SOCKET`.
 
-### Phase 1 — Rust `DaemonClient` + bridge skeleton
-- Port `DaemonClient` (NDJSON framing, RPC, event subscribe, reconnect) to Rust —
-  or expose `divoomd`'s existing client internals via the `divoom-core` lib crate.
-- Bridge dispatcher with the ~45 **thin forwarder** methods (device_call,
-  brightness/volume, clock, weather, alarms, channels, timers, MCP control…).
-- **Test**: a headless harness drives `dispatch()` against a `MockTransport`
-  daemon (reuse the existing mock) and asserts wire bytes — same parity bar we
-  held for the daemon.
+### Phase 1 — Daemon client hardening + live wiring (in progress)
+- Done: NDJSON request/reply, reconnect-once, 2s status poll, get_status / scan /
+  connect / device_call(set_brightness, music.set_volume).
+- Remaining: **event subscription** (`subscribe`) so status/devices update push
+  (not just poll); spawn `divoomd` if the socket is absent (port the bundled
+  binary resolution from `daemon_client.py`); Windows TCP path; surface
+  connect/exclusive errors in the UI.
 
-### Phase 2 — Menubar parity
-- Rebuild the menu structure in `muda`: dynamic device section (with thumbnail
-  icons via `objc2-app-kit`), Launch Dashboard, Notifications start/stop/open,
-  Quit. Color-coded live status from the event subscription.
-- Reconcile with the GUI window: "Launch Dashboard" shows the wry window instead
-  of spawning a subprocess (same process now). Single-instance behavior.
-- **Test**: status-derivation logic (`derive_state`/`format_status_title`) ported
-  with unit tests mirroring the Python ones.
+### Phase 2 — Channels tab (control-panel)
+- Port the channel panels (clock / visualizer / vj / ambient / scoreboard / text /
+  sessions) faithfully to `web_ui` layout, wired to `device_call`. Compare each to
+  the Python/`web_ui` behavior (port-parity rule) for arg/return shapes.
 
-### Phase 3 — The mixin logic (the residual)
-- **Presets** (`presets_manager.py`) → straight Rust port (local JSON CRUD, no
-  device I/O). Highest-value/lowest-risk.
-- **Media sync / custom art** → wire bridge methods to `divoomd`'s existing
-  `media::resolve_to_gif` + push path (already at parity; don't re-port).
-- **Scanner** → forward to the daemon's scan RPC (daemon already owns it).
-- **Gallery / hot-channel** → forward to daemon endpoints already ported.
-- File dialogs (`open_file_dialog`) → `rfd` crate.
-- **Compare to Python at each method** (port-parity rule): the `gui_api` method
-  body is the spec for args/return shape the JS expects — match it exactly so the
-  unchanged frontend keeps working.
+### Phase 3 — Remaining tabs
+- Live Widgets (gallery image grids — egui texture loading), Pixel Art editor,
+  Virtual Wall, Schedule (routines + alarms week-table), Device Settings, Settings.
+- Local state (presets) ported straight; media/gallery/scan forward to `divoomd`.
 
-### Phase 4 — Packaging
-- Build `divoom-ui` as a proper `.app` (replaces py2app). Embed the real
-  `Info.plist` (BT usage strings, `LSUIElement` per menubar/window mode) — native,
-  not the `-sectcreate` helper-binary hack the daemon needed.
-- Bundle `divoomd` + `web_ui/` + the encoder dylib as app Resources.
-- Codesign; rebuild the `.dmg`; update the Homebrew cask. New
-  `scripts/build_release_native.sh` alongside (not replacing) the Python one until
-  the cutover.
-- **The whole bundle is now Python-free.**
+### Phase 4 — Native tray/menubar + packaging + cutover
+- Cross-platform tray via **`tray-icon`** + **`muda`** mirroring `divoom_menubar`
+  (device section, color-coded status, Launch/Notifications/Quit). On macOS render
+  device-thumbnail icons via `objc2-app-kit` if `tray-icon`'s API is too coarse.
+- Package per-OS (macOS `.app` with a real `Info.plist` — BT strings + tray-mode
+  `LSUIElement`; the daemon's `-sectcreate` hack is unneeded for a real app).
+  Bundle `divoomd` + encoder dylib. Update build scripts + Homebrew cask.
+- Flip the default launcher to `divoom-ui`; archive the Python UI in-tree
+  (**never deleted** — reference implementation). The bundle is now Python-free.
 
-### Phase 5 — Hardware + cross-platform verification
+---
+
+## 5. Cross-platform / hardware verification (per phase)
 - macOS: BT grant prompt attributed to the native `.app` (the daemon's TCC
   problem disappears — a real bundled app is its own responsible process).
 - Verify on the physical devices (Pixoo / Tivoo-Max / Timoo) — same matrix used
   for the daemon parity sign-off.
-- Linux: `tray-icon`/`wry` use GTK; validate on the headless box's GUI path or
-  document as best-effort (BLE connect is already a known BlueZ limitation).
-
-### Phase 6 — Cutover
-- Flip the default launcher to `divoom-ui`. Keep the Python GUI/menubar **archived
-  in-tree** as the reference implementation (per standing rule — never delete).
-- Update `setup_app.py`/docs to mark the Python UI legacy; remove it from the
-  shipped bundle (but keep in the repo).
+- Verify on the physical devices (Pixoo / Tivoo-Max / Timoo) — same matrix used
+  for the daemon parity sign-off; the UI drives `device_call` over the socket.
+- Linux: `tray-icon` uses GTK/AppIndicator; eframe uses winit+glow (x11/wayland).
+  Validate on the headless box's GUI path or document best-effort (BLE *connect* is
+  already a known BlueZ limitation; scan works).
+- Windows: switch the socket client to the daemon's TCP+token transport.
 
 ---
 
-## 5. Risks & open questions
+## 6. Risks & open questions
 
-- **wry IPC ergonomics vs. pywebview `js_api`**: pywebview auto-exposes Python
-  methods as `pywebview.api.foo(...)` returning promises. wry's `ipc_handler` is a
-  single string channel — we need a tiny JS shim that marshals
-  `{id, method, args}` and resolves promises by id. **The frontend calls
-  `pywebview.api.*` in ~dozens of places** → either (a) inject a shim that
-  defines `window.pywebview.api` with the same method names (preferred — zero
-  frontend edits), or (b) edit call sites (rejected — breaks "frontend unchanged").
-  Phase 0 must prove the shim.
-- **Async bridge**: many methods are blocking socket RPCs; run them off the UI
-  thread and resolve the JS promise on completion (the shim handles this).
-- **Thumbnail rendering** in the status item needs `objc2-app-kit` (tray-icon's
-  API may be too coarse for per-row data-URL icons) — confirm in Phase 2.
-- **Linux/GTK** parity for wry is lower-fidelity than WKWebView; acceptable since
-  macOS is the primary target.
-- **`divoom-core` extraction**: factoring shared daemon/UI code is the clean path
-  but adds a refactor; if it balloons, the UI can just be a socket client and
-  duplicate the small client code.
+- **Fidelity ceiling**: egui is immediate-mode — the result reads as a faithful
+  reproduction of the Braun look (palette is exact), not pixel-identical CSS
+  (glass blur, font rendering, sub-pixel spacing differ). Accepted by the user in
+  choosing egui over iced/Slint.
+- **Custom fonts**: the web UI uses Outfit/Inter (CDN). egui ships its own default
+  proportional font; bundling Inter/Outfit TTFs is a small later polish, not a
+  blocker.
+- **Tray thumbnails**: per-device status icons in the tray may need
+  `objc2-app-kit` on macOS if `tray-icon`'s image API is too coarse — confirm in
+  Phase 4.
+- **Frameless window chrome**: custom appbar drag/resize via
+  `ViewportCommand::StartDrag` works on macOS; re-verify resize affordances on
+  Linux/Windows in Phase 4.
+- **`divoom-core` extraction**: if the client/codec duplication between `divoomd`
+  and `divoom-ui` grows, factor a shared lib crate; for now the UI duplicates the
+  tiny NDJSON client to avoid pulling `divoomd`'s heavy deps.
 
-## 6. Effort estimate (rough)
+## 7. Status / next action
 
-| Phase | Estimate |
-|-------|----------|
-| 0 spike | 0.5–1 d |
-| 1 client + thin bridge | 1–2 d |
-| 2 menubar | 1–2 d |
-| 3 mixin residual | 2–3 d |
-| 4 packaging | 1 d |
-| 5 hardware/x-plat | 1 d + device access |
-| 6 cutover | 0.5 d |
-
-The bulk of "UI work" is **avoided** by keeping `web_ui/`. The real cost is the
-bridge (Phases 1+3) and packaging.
-
----
-
-## 7. First action when work starts
-
-Phase 0 spike, gated on the **pywebview-API shim** proving out — if the unchanged
-frontend can't talk to a wry IPC handler via a `window.pywebview.api` shim, the
-"keep the frontend verbatim" premise fails and we revisit. Everything else is
-low-risk forwarding.
+- **Phase 0 done**: shell + theme + live daemon wiring, verified by self-grabbed
+  screenshot. Next: **Phase 1 remainder** — event subscription (push updates),
+  `divoomd` auto-spawn, then **Phase 2** (Channels panels).
 
 > Parked dependency: the v0.21.0 release (daemon BLE bundle) is still waiting on a
 > one-time user BT-grant click. This UI work is independent of that and can

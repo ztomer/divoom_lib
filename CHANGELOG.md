@@ -4,6 +4,25 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI port: Phase 0 (egui shell) (2026-06-29)
+
+- **New crate `native-port/divoom-ui/`** (eframe/egui 0.29) — first step of the
+  native cross-platform Rust UI that replaces the Python presentation layer
+  (pywebview GUI + pyobjc menubar), so the shipped app becomes Python-free.
+  - **Decisions** (`docs/PLANNING_NATIVE_UI.md`): full **native widgets** (not a
+    webview — supersedes the earlier wry plan); **cross-platform**; **permissive
+    licensing** (MIT now, maybe commercial later, never pay) -> **Slint rejected**
+    (GPL-or-pay), **egui/eframe chosen** (MIT/Apache). The `web_ui/` is the visual
+    reference only, archived in-tree.
+  - **Phase 0**: `theme.rs` (Braun dark palette copied from `web_ui/style.css`),
+    `shell.rs` (frameless appbar with brightness/volume + window-drag; 168px
+    sidebar with 6 nav tabs + device panel; Channels sub-tab row), `daemon.rs`
+    (NDJSON socket client on a worker thread; status poll + scan/connect/
+    device_call), `app.rs` (state + a `DIVOOM_UI_SCREENSHOT` self-screenshot path
+    for headless visual checks).
+  - **Verified**: compiles clean; renders faithfully to the reference; live
+    "daemon ready" against a no-BLE `divoomd`. Python UI untouched (still default).
+
 ### Post-v0.20.2 — Native UI/menubar plan (2026-06-29)
 
 - **Planned** the native-Rust replacement of the Python presentation layer

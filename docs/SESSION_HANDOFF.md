@@ -18,16 +18,40 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **NATIVE UI/MENUBAR PLAN (2026-06-29) — `docs/PLANNING_NATIVE_UI.md`:** new
-  plan to replace the Python presentation layer (pywebview GUI + pyobjc menubar)
-  with native Rust, making the shipped app Python-free. Survey done: the daemon is
-  the integration seam (UI is just a socket client); `web_ui/` is 9,172 LOC of
-  **plain static HTML/JS (no bundler)** so it ports verbatim; `gui_api`'s ~70
-  bridge methods are mostly thin daemon-forwarders. **Decision: Rust-hosted
-  webview** (`wry`/`tao`/`tray-icon`/`muda`, à la carte — no Node) over a native-
-  widget rewrite. 6 phases (spike → client+bridge → menubar → mixin residual →
-  packaging → cutover). **Key risk to prove in Phase 0:** a `window.pywebview.api`
-  JS shim over wry's `ipc_handler` so the frontend needs zero edits. No code yet.
+- **NATIVE UI PORT — Phase 0 DONE (2026-06-29) — `docs/PLANNING_NATIVE_UI.md`:**
+  building a native cross-platform Rust UI to replace the Python presentation
+  layer (pywebview GUI + pyobjc menubar), making the shipped app Python-free.
+  - **User constraints (locked):** full **native widgets** (NOT a webview — the
+    earlier wry/webview plan is superseded, kept in the doc for record);
+    **cross-platform** (macOS/Linux/Windows); **permissive licensing** — ship MIT
+    now, maybe commercial later, never pay → **rules out Slint** (GPL-or-pay).
+    **Toolkit chosen: egui/eframe** (MIT/Apache; picked over iced for pragmatism).
+    The current `web_ui/` is the **visual reference only** (read for layout/look),
+    not shipped; stays archived in-tree.
+  - **Built so far** (`native-port/divoom-ui/`, eframe/egui 0.29):
+    - `theme.rs` — Braun dark palette copied byte-for-byte from `web_ui/style.css`
+      (`#121316` bg, `#ff5a1f` accent, 168px sidebar).
+    - `shell.rs` — frameless integrated appbar (window controls + brightness/volume
+      sliders + Settings pill + window-drag), sidebar (6 nav tabs w/ active orange
+      accent + device panel pinned bottom), content host w/ Channels sub-tab row.
+    - `daemon.rs` — NDJSON socket client on a worker thread (UI never blocks);
+      `mpsc` to the egui loop. 2s status poll + scan/connect/device_call.
+      `DIVOOM_SOCKET` env overrides the path (default `/tmp/divoom.sock`).
+    - `app.rs` — state + frame orchestration; self-screenshot debug path
+      (`DIVOOM_UI_SCREENSHOT=path` → egui `ViewportCommand::Screenshot`, saves a
+      framebuffer PNG and exits; **no OS screen-record permission needed** — use
+      this to verify the UI headlessly).
+  - **Verified:** compiles clean; renders faithfully to the reference (screenshot);
+    "daemon ready" shows live against a **no-BLE** `divoomd`
+    (`cargo build --no-default-features`, run with `--socket /tmp/foo.sock`, point
+    the UI at it via `DIVOOM_SOCKET`). Probed protocol: `get_status` (state +
+    uptime_s), `device_call {method,args:[...]}` routes; `scan` is BLE-gated so the
+    no-BLE core returns "not implemented" (expected — UI surfaces it).
+  - **Next:** Phase 1 remainder — `subscribe` event push, `divoomd` auto-spawn,
+    Windows TCP path; then Phase 2 (Channels panels). Tray menubar is Phase 4.
+  - **Gotcha:** can't BLE-run `divoomd` from Claude's shell (TCC crash) — test the
+    UI against the **no-BLE** daemon build. `screencapture` CLI yields a black
+    frame (no Screen-Recording grant) → use the in-app self-screenshot instead.
 - **PARITY ACHIEVED (2026-06-29, /loop "until parity with Python") — COMPLETE:**
   - **device_call method parity: 54 → 0 gaps** vs the Python Divoom API (excluding
     internal `protocol.*` plumbing). New Rust submodules `device_call/{animation,
