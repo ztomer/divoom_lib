@@ -15,6 +15,7 @@ mod schedule;
 mod settings;
 mod shell;
 mod theme;
+mod tray;
 mod wall;
 mod widgets;
 

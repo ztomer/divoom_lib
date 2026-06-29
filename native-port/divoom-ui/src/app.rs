@@ -94,6 +94,9 @@ pub struct DivoomApp {
     /// save it there, and exit. Used for headless visual verification.
     screenshot_path: Option<String>,
     frame_count: u32,
+    tray: Option<crate::tray::Tray>,
+    tray_inited: bool,
+    notif_running: bool,
     // --- Device Settings tab ---
     pub device_name: String,
     pub hour24: bool,
@@ -166,6 +169,9 @@ impl DivoomApp {
             last_error: None,
             screenshot_path: std::env::var("DIVOOM_UI_SCREENSHOT").ok(),
             frame_count: 0,
+            tray: None,
+            tray_inited: false,
+            notif_running: false,
             clock_face: 0,
             clock_color: [255, 255, 255],
             viz_sel: 0,
@@ -260,6 +266,16 @@ impl DivoomApp {
                 Update::Error(e) => self.last_error = Some(e),
                 Update::Info(_) => {}
                 Update::Reply { tag, value } => {
+                    if tag == "notif_status" {
+                        self.notif_running = value
+                            .get("running")
+                            .and_then(|r| r.as_bool())
+                            .or_else(|| value.get("state").and_then(|s| s.as_str()).map(|s| s == "running"))
+                            .unwrap_or(false);
+                        if let Some(t) = &self.tray {
+                            t.set_notifications_running(self.notif_running);
+                        }
+                    }
                     self.replies.insert(tag, value);
                 }
             }
@@ -274,11 +290,44 @@ impl eframe::App for DivoomApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.pump();
+        self.handle_tray(ctx);
         shell::appbar(self, ctx);
         shell::sidebar(self, ctx);
         shell::content(self, ctx);
         self.maybe_screenshot(ctx);
         // Keep the live-status poll flowing even when idle.
         ctx.request_repaint_after(std::time::Duration::from_millis(200));
+    }
+}
+
+impl DivoomApp {
+    /// Lazily build the tray on the first frame (main thread, event loop up), then
+    /// poll its menu each frame. Skipped in screenshot mode / when DIVOOM_UI_NO_TRAY
+    /// is set (headless runs).
+    fn handle_tray(&mut self, ctx: &egui::Context) {
+        if !self.tray_inited {
+            self.tray_inited = true;
+            if self.screenshot_path.is_none() && std::env::var("DIVOOM_UI_NO_TRAY").is_err() {
+                self.tray = crate::tray::Tray::build();
+                if self.tray.is_some() {
+                    // Fetch notification state to label the menu correctly.
+                    self.raw("notification_status", serde_json::json!({}), "notif_status");
+                }
+            }
+        }
+        let Some(action) = self.tray.as_ref().and_then(|t| t.poll()) else { return };
+        match action {
+            crate::tray::TrayAction::ShowDashboard => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            }
+            crate::tray::TrayAction::ToggleNotifications => {
+                let cmd = if self.notif_running { "stop_notifications" } else { "start_notifications" };
+                self.raw(cmd, serde_json::json!({}), "notif_status");
+            }
+            crate::tray::TrayAction::Quit => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
     }
 }
