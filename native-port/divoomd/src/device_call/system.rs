@@ -60,13 +60,36 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_work_mode failed: {e}")),
             }
         }
-        "system.set_channel" | "set_channel" | "device.set_channel" => {
+        // control.set_light_mode is the same single-byte 0x45 channel select.
+        "system.set_channel" | "set_channel" | "device.set_channel"
+        | "control.set_light_mode" => {
             let channel_id = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("channel_id")).and_then(|v| v.as_i64()))
+                .or_else(|| kw.and_then(|v| v.get("channel")).and_then(|v| v.as_i64()))
                 .unwrap_or(0) as u8;
             match dev.send_command(0x45, &[channel_id], true).await {
                 Ok(()) => json!({"success": true, "result": true}),
                 Err(e) => err_reply(&format!("set_channel failed: {e}")),
+            }
+        }
+        // Control.set_hot (0x26): enable/disable hot mode.
+        "control.set_hot" | "set_hot" => {
+            let enabled = args.first().map(|v| *v != 0)
+                .or_else(|| kw.and_then(|v| v.get("enabled")).and_then(|v| v.as_bool()))
+                .unwrap_or(false);
+            match dev.send_command(0x26, &[enabled as u8], true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("set_hot failed: {e}")),
+            }
+        }
+        // Control.set_keyboard (0x23): single Ditoo key press.
+        "control.set_keyboard" | "set_keyboard" => {
+            let key = args.first().copied()
+                .or_else(|| kw.and_then(|v| v.get("key")).and_then(|v| v.as_i64()))
+                .unwrap_or(0) as u8;
+            match dev.send_command(0x23, &[key], true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("set_keyboard failed: {e}")),
             }
         }
         "system.send_sd_status" | "send_sd_status" | "device.send_sd_status" => {
@@ -181,12 +204,18 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 _ => json!({"success": true, "result": Value::Null}),
             }
         }
-        "system.send_current_temp" | "send_current_temp" | "device.send_current_temp" => {
+        // weather.set(temp, weather_type) is the same 0x5f command (two's-complement
+        // temp byte). set_temperature/set_weather are the stateful Python variants;
+        // mapped here too (caller passes both args).
+        "system.send_current_temp" | "send_current_temp" | "device.send_current_temp"
+        | "weather.set" | "weather.set_temperature" | "weather.set_weather" => {
             let temp = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("temp")).and_then(|v| v.as_i64()))
+                .or_else(|| kw.and_then(|v| v.get("temperature")).and_then(|v| v.as_i64()))
                 .unwrap_or(0) as i8;
             let weather = args.get(1).copied()
                 .or_else(|| kw.and_then(|v| v.get("weather")).and_then(|v| v.as_i64()))
+                .or_else(|| kw.and_then(|v| v.get("weather_type")).and_then(|v| v.as_i64()))
                 .unwrap_or(0) as u8;
             match dev.send_command(0x5f, &[temp as u8, weather], true).await {
                 Ok(()) => json!({"success": true, "result": true}),

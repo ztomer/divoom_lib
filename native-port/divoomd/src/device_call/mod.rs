@@ -208,6 +208,10 @@ pub async fn handle_device_call(
                 "system.get_work_mode" | "get_work_mode" |
                 "system.set_work_mode" | "set_work_mode" |
                 "system.set_channel" | "set_channel" | "device.set_channel" |
+                "control.set_light_mode" |
+                "control.set_hot" | "set_hot" |
+                "control.set_keyboard" | "set_keyboard" |
+                "weather.set" | "weather.set_temperature" | "weather.set_weather" |
                 "system.send_sd_status" | "send_sd_status" | "device.send_sd_status" |
                 "system.get_device_temp" | "get_device_temp" | "device.get_device_temp" |
                 "system.send_net_temp" | "send_net_temp" | "device.send_net_temp" |
