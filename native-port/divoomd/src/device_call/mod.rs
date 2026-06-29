@@ -16,6 +16,7 @@ pub struct CallCtx<'a> {
 
 pub mod basic;
 pub mod animation;
+pub mod music;
 pub mod alarm;
 pub mod sleep;
 pub mod timeplan;
@@ -230,6 +231,23 @@ pub async fn handle_device_call(
                 "system.set_sound_control" | "set_sound_control" | "device.set_sound_control" |
                 "system.get_sound_control" | "get_sound_control" | "device.get_sound_control" => {
                     system::handle(method, ctx).await
+                }
+
+                // music.rs (SD-card music control):
+                "music.app_need_get_music_list" | "app_need_get_music_list" |
+                "music.send_sd_list_over" | "send_sd_list_over" |
+                "music.set_play_status" | "set_play_status" |
+                "music.set_sd_last_next" | "set_sd_last_next" |
+                "music.set_sd_music_play_mode" | "set_sd_music_play_mode" |
+                "music.set_sd_music_position" | "set_sd_music_position" |
+                "music.set_sd_play_music_id" | "set_sd_play_music_id" |
+                "music.set_sd_music_info" | "set_sd_music_info" |
+                "music.get_play_status" | "get_play_status" |
+                "music.get_sd_music_list_total_num" | "get_sd_music_list_total_num" |
+                "music.get_sd_music_info" | "get_sd_music_info" |
+                "music.get_sd_play_name" | "get_sd_play_name" |
+                "music.get_sd_music_list" | "get_sd_music_list" => {
+                    music::handle(method, ctx).await
                 }
 
                 // animation.rs (gif/user-define upload primitives):

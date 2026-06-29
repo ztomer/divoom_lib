@@ -211,6 +211,22 @@ mod tests {
         assert_eq!(cmds[3], (0x8d, vec![0, 0x0A, 0, 0, 0, 2, 0x01, 0x02, 0x03, 0x04])); // file_size LE32, idx, file_id BE32
     }
 
+    /// SD-card music setters — wire-byte parity with divoom_lib/media/music.py.
+    #[tokio::test]
+    async fn test_mock_music_sd_payloads() {
+        let d = setup_mock_daemon().await;
+        let call = |m: serde_json::Value| { let d=&d; async move { d.handle(make_request("device_call", Some(m), None)).await } };
+        assert!(call(json!({"method":"music.set_play_status","args":[1]})).await["success"].as_bool().unwrap());
+        assert!(call(json!({"method":"music.set_sd_music_position","args":[60]})).await["success"].as_bool().unwrap());
+        assert!(call(json!({"method":"music.set_sd_music_info","kwargs":{"current_time":60,"music_id":1,"volume":10,"status":1,"play_mode":2}})).await["success"].as_bool().unwrap());
+        let device_lock = d.device.lock().await;
+        let DeviceTransport::Mock(ref mock) = **device_lock.as_ref().unwrap() else { panic!() };
+        let cmds = mock.sent_commands.lock().unwrap();
+        assert_eq!(cmds[0], (0x0a, vec![1]));
+        assert_eq!(cmds[1], (0xb8, vec![60, 0]));                       // position 60 LE16
+        assert_eq!(cmds[2], (0xb5, vec![60, 0, 1, 0, 10, 1, 2]));       // cur LE16, id LE16, vol, status, mode
+    }
+
     #[tokio::test]
     async fn test_mock_music_set_volume() {
         let d = setup_mock_daemon().await;
