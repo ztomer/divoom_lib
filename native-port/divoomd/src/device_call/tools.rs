@@ -171,6 +171,39 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 None => json!({"success": true, "result": Value::Null}),
             }
         }
+        // Generic tool setter (Python Tool.set_tool_info): 0x72 [game_mode_index,
+        // *per-type args]. 0=timer[ctrl_flag] 1=score[on_off, red LE16, blue LE16]
+        // 2=noise[ctrl_flag] 3=countdown[ctrl_flag, minutes, seconds].
+        "tool.set_tool_info" | "set_tool_info" => {
+            let gmi = args.first().copied()
+                .or_else(|| kw.and_then(|v| v.get("game_mode_index")).and_then(|v| v.as_i64()))
+                .unwrap_or(0);
+            let g = |n: &str| kw.and_then(|v| v.get(n)).and_then(|v| v.as_i64());
+            let mut payload = vec![gmi as u8];
+            match gmi {
+                0 | 2 => match g("ctrl_flag") {
+                    Some(c) => payload.push(c as u8),
+                    None => return err_reply("set_tool_info: timer/noise need 'ctrl_flag'"),
+                },
+                1 => match g("on_off") {
+                    Some(on_off) => {
+                        payload.push(on_off as u8);
+                        payload.extend_from_slice(&(g("red_score").unwrap_or(0) as u16).to_le_bytes());
+                        payload.extend_from_slice(&(g("blue_score").unwrap_or(0) as u16).to_le_bytes());
+                    }
+                    None => return err_reply("set_tool_info: score needs 'on_off'"),
+                },
+                3 => match (g("ctrl_flag"), g("minutes"), g("seconds")) {
+                    (Some(c), Some(m), Some(s)) => { payload.push(c as u8); payload.push(m as u8); payload.push(s as u8); }
+                    _ => return err_reply("set_tool_info: countdown needs ctrl_flag/minutes/seconds"),
+                },
+                _ => return err_reply(&format!("set_tool_info: unknown game_mode_index {gmi}")),
+            }
+            match dev.send_command(0x72, &payload, true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("set_tool_info failed: {e}")),
+            }
+        }
         _ => err_reply("unimplemented tools command"),
     }
 }

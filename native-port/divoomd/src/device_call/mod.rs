@@ -122,6 +122,7 @@ pub async fn handle_device_call(
                 "display.set_temperature_channel" | "set_temperature_channel" |
                 "display.switch_channel" | "switch_channel" |
                 "hot_update.show_hot_channel" | "show_hot_channel" |
+                "hot_update.update" |
                 "light.get_light_mode" | "get_light_mode" |
                 "music.set_volume" | "set_volume" |
                 "music.get_volume" | "get_volume" |
@@ -174,7 +175,8 @@ pub async fn handle_device_call(
                 "noise.get_noise" | "get_noise" |
                 "device.show_notification" | "show_notification" | "notification.show_notification" |
                 "device.show_notification_text" | "show_notification_text" | "notification.show_notification_text" |
-                "tool.get_tool_info" | "get_tool_info" => {
+                "tool.get_tool_info" | "get_tool_info" |
+                "tool.set_tool_info" | "set_tool_info" => {
                     tools::handle(method, ctx).await
                 }
 

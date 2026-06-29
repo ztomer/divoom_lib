@@ -332,6 +332,17 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 json!({"success": true, "result": true})
             }
         }
+        // hot_update.update routes to the existing top-level `hot_update` streamer
+        // (art_hot.rs) so the device_call alias reuses the verified implementation.
+        "hot_update.update" => {
+            let device_size = kw.and_then(|v| v.get("device_size")).and_then(|v| v.as_i64()).unwrap_or(16);
+            let req = crate::protocol::Request {
+                command: "hot_update".to_string(),
+                args: json!({"device_size": device_size}),
+                token: None,
+            };
+            Box::pin(ctx.daemon.dispatch(req)).await
+        }
         "music.set_volume" | "set_volume" => {
             let val = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("volume")).and_then(|v| v.as_i64()))
