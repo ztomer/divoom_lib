@@ -11,11 +11,10 @@ overstated (~1/3 of the surface actually wired). Python stays the reference,
 never deleted._
 
 ## Structural fixes (do first — these are WRONG, not just missing)
-- [ ] ↔ **Live Widgets tab** (`data-sources`): currently shows the cloud gallery;
-  should be **live data feeds** — music-cover sync, stocks ticker, system stats,
-  weather sync, custom tickers (`MediaSyncMixin` + `live_job_*`).
-- [ ] ↔ **Gallery** belongs under **Pixel Art** (web TAB 4 = "Custom Art + Gallery
-  + Hot Channel"), not as its own "Live Widgets" tab.
+- [x] ✓ **Live Widgets tab** re-mapped to live data feeds (music/sysmon/weather/
+  stocks toggles → `live_job_start`/`live_job_stop`). `widgets.rs` rewritten.
+- [x] ✓ **Gallery** moved under **Pixel Art** (Paint/Gallery sub-tabs). New
+  `gallery.rs`; `pixel_art.rs` gained the sub-tab row.
 
 ## Read-backs (UI currently shows hardcoded defaults, not device state)
 - [x] ✓ `get_brightness` → appbar slider (fetched on device-connect)
@@ -54,13 +53,13 @@ never deleted._
 - [ ] ✗ cloud login (`save_credentials`) — gallery can't auth without it
 - [ ] ✗ export/import settings (`PresetsManagerMixin`)
 
-## Live Widgets (data feeds) — the MediaSyncMixin (currently entirely missing)
-- [ ] ✗ `toggle_music_sync` + `push_music_cover_now` (album art)
-- [ ] ✗ `toggle_stocks_sync` + ticker config (`get/set_tickers`, `apply_stock_ticker`)
-- [ ] ✗ `toggle_sysmon_sync` (`apply_system_stats`, `get_system_stats_preview`)
-- [ ] ✗ `toggle_weather_sync`
+## Live Widgets (data feeds) — the MediaSyncMixin
+- [x] ✓ music sync (`live_job_start mac "music"`)
+- [x] ✓ stocks sync + symbol (`live_job_start mac "stocks" {symbol}`)
+- [x] ✓ system stats (`live_job_start mac "sysmon"`)
+- [x] ✓ weather sync (`live_job_start mac "weather"`)
 - [ ] ✗ audio visualizer (`toggle_audio_visualizer`, `get_audio_levels`)
-- [ ] ✗ `live_job_start`/`live_job_stop`/`live_job_list` plumbing
+- [ ] ✗ `live_job_list` (show running jobs) + per-feed params (interval)
 
 ## Weather
 - [ ] ✗ `push_weather` / `get_weather` / `set_temperature_channel` panel
@@ -70,8 +69,8 @@ never deleted._
 
 ## Pixel Art tab (web = Custom Art + Gallery + Hot Channel)
 - [x] ✓ paint editor + push (`show_image`)
+- [x] ✓ Gallery (cloud, `fetch_gallery`) — moved here (Gallery sub-tab)
 - [ ] ✗ Custom Art browser (`display_custom_art`)
-- [ ] ✗ Gallery (cloud, `fetch_gallery`) — move here from Live Widgets
 - [ ] ✗ Hot Channel scheduler
 
 ## Virtual Wall
@@ -90,3 +89,7 @@ never deleted._
 - 2026-06-29 iter1: read-backs (brightness/volume/device-name) fetched on
   device-connect (status idle→active) + applied to UI; clock-color bug fixed
   (set_clock_rich now sends kwargs). Added app.call_kw helper. Build green.
+- 2026-06-29 iter2: STRUCTURAL fix — Live Widgets re-mapped to live data feeds
+  (music/stocks/sysmon/weather toggles → live_job_start/stop, gated on a connected
+  device); gallery moved under Pixel Art (Paint/Gallery sub-tabs, new gallery.rs).
+  Added app.active_mac + toggle_live_job. Verified by screenshot. Build green.

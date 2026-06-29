@@ -1,9 +1,8 @@
-//! Live Widgets tab — the Divoom cloud gallery (Monthly Best / categories).
-//! `fetch_gallery(classify, limit, file_sort)` returns the cloud API's file list.
-//! Thumbnails are remote URLs that need the user's Divoom account (cloud auth) +
-//! an HTTP image fetch; full thumbnail rendering + apply is a later refinement
-//! (it depends on cloud credentials being configured). This panel loads the list
-//! and surfaces what came back, honestly noting the dependency.
+//! Live Widgets tab (web `data-sources`) — LIVE DATA FEEDS, not the gallery.
+//! Mirrors `MediaSyncMixin`: each toggle starts/stops a server-side push job via
+//! the daemon's `live_job_start(mac, kind, params)` / `live_job_stop(mac, kind)`
+//! (kinds music/stocks/sysmon/weather — verified in divoomd/src/live_jobs). The
+//! daemon owns the recurring render+push; the UI just toggles.
 
 use eframe::egui::{self, RichText};
 use serde_json::json;
@@ -11,62 +10,66 @@ use serde_json::json;
 use crate::app::DivoomApp;
 use crate::theme;
 
-// Divoom category ids (classify) — a small useful subset.
-const CATEGORIES: [(i64, &str); 3] = [(0, "Monthly Best"), (12, "Featured"), (16, "Recommend")];
-
 pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    egui::ScrollArea::vertical().show(ui, |ui| {
+        if app.active_mac().is_none() {
+            ui.colored_label(theme::WARN, "Connect a device to start live widgets.");
+            ui.add_space(10.0);
+        }
+        feed(app, ui, "Now Playing", "Album art from Music / Spotify.", "music", |a| a.music_sync, |a, v| a.music_sync = v, json!({}));
+        feed(app, ui, "System Stats", "CPU / RAM gauges on the device.", "sysmon", |a| a.sysmon_sync, |a, v| a.sysmon_sync = v, json!({}));
+        feed(app, ui, "Weather", "Live local weather.", "weather", |a| a.weather_sync, |a, v| a.weather_sync = v, json!({}));
+        stocks(app, ui);
+    });
+}
+
+#[allow(clippy::too_many_arguments)]
+fn feed(
+    app: &mut DivoomApp,
+    ui: &mut egui::Ui,
+    title: &str,
+    desc: &str,
+    kind: &str,
+    get: fn(&DivoomApp) -> bool,
+    set: fn(&mut DivoomApp, bool),
+    params: serde_json::Value,
+) {
     card(ui, |ui| {
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Category").size(12.0).color(theme::TEXT_MUTED));
-            for (classify, name) in CATEGORIES {
-                if ui.button(name).clicked() {
-                    app.raw(
-                        "fetch_gallery",
-                        json!({ "classify": classify, "limit": 30, "file_sort": 1 }),
-                        "gallery",
-                    );
+            ui.vertical(|ui| {
+                ui.label(RichText::new(title).size(14.0).color(theme::TEXT_MAIN).strong());
+                ui.label(RichText::new(desc).size(11.0).color(theme::TEXT_MUTED));
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let mut on = get(app);
+                if ui.add_enabled(app.active_mac().is_some(), egui::Checkbox::new(&mut on, "")).changed() {
+                    set(app, on);
+                    app.toggle_live_job(kind, on, params.clone());
                 }
+            });
+        });
+    });
+    ui.add_space(8.0);
+}
+
+fn stocks(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    card(ui, |ui| {
+        ui.label(RichText::new("Stocks Ticker").size(14.0).color(theme::TEXT_MAIN).strong());
+        ui.label(RichText::new("Scrolling price for a symbol.").size(11.0).color(theme::TEXT_MUTED));
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Symbol").size(11.0).color(theme::TEXT_MUTED));
+            ui.add(egui::TextEdit::singleline(&mut app.stocks_symbol).hint_text("AAPL").desired_width(90.0));
+            let mut on = app.stocks_sync;
+            let can = app.active_mac().is_some() && !app.stocks_symbol.trim().is_empty();
+            if ui.add_enabled(can || app.stocks_sync, egui::Checkbox::new(&mut on, "Sync")).changed() {
+                app.stocks_sync = on;
+                let sym = app.stocks_symbol.trim().to_uppercase();
+                app.toggle_live_job("stocks", on, json!({ "symbol": sym }));
             }
         });
-        ui.add_space(10.0);
-        match app.replies.get("gallery") {
-            None => {
-                ui.label(
-                    RichText::new("Pick a category to load the cloud gallery.")
-                        .size(12.0)
-                        .color(theme::TEXT_MUTED),
-                );
-            }
-            Some(v) if v.get("success").and_then(|s| s.as_bool()) == Some(true) => {
-                let count = v
-                    .get("result")
-                    .and_then(|r| r.get("FileList").or_else(|| r.as_array().map(|_| r)))
-                    .and_then(|f| f.as_array())
-                    .map(|a| a.len())
-                    .unwrap_or(0);
-                ui.colored_label(theme::ACCENT, format!("Loaded {count} gallery items."));
-                ui.add_space(4.0);
-                ui.label(
-                    RichText::new(
-                        "Thumbnail rendering + tap-to-push need cloud auth (your Divoom account) \
-                         and a remote image fetch — wired in a follow-up.",
-                    )
-                    .size(11.0)
-                    .color(theme::TEXT_MUTED),
-                );
-            }
-            Some(v) => {
-                let err = v.get("error").and_then(|e| e.as_str()).unwrap_or("unknown error");
-                ui.colored_label(theme::WARN, format!("Gallery unavailable: {err}"));
-                ui.add_space(4.0);
-                ui.label(
-                    RichText::new("This usually means Divoom cloud credentials aren't configured yet.")
-                        .size(11.0)
-                        .color(theme::TEXT_MUTED),
-                );
-            }
-        }
     });
+    ui.add_space(8.0);
 }
 
 fn card(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {

@@ -10,6 +10,7 @@ mod app;
 mod channels;
 mod daemon;
 mod device_settings;
+mod gallery;
 mod pixel_art;
 mod schedule;
 mod settings;

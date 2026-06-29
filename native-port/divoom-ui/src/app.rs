@@ -41,6 +41,13 @@ impl Tab {
     }
 }
 
+/// Sub-tabs inside the Pixel Art tab (web: Custom Art + Gallery + Hot Channel).
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum PixelSub {
+    Paint,
+    Gallery,
+}
+
 /// Channel sub-tabs inside the Channels tab (the control-panel row).
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Channel {
@@ -116,6 +123,13 @@ pub struct DivoomApp {
     // --- Pixel Art tab (16x16 editor) ---
     pub pixels: Vec<[u8; 3]>,
     pub paint_color: [u8; 3],
+    pub pixel_sub: PixelSub,
+    // --- Live Widgets tab (live data feeds → live_job_start/stop) ---
+    pub music_sync: bool,
+    pub stocks_sync: bool,
+    pub sysmon_sync: bool,
+    pub weather_sync: bool,
+    pub stocks_symbol: String,
     /// Replies to `Cmd::Raw`, keyed by tag (Settings/Schedule/gallery read these).
     pub replies: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -200,6 +214,12 @@ impl DivoomApp {
             alarms: vec![Alarm::default(); 5],
             pixels: vec![[0, 0, 0]; 16 * 16],
             paint_color: [255, 90, 31],
+            pixel_sub: PixelSub::Paint,
+            music_sync: false,
+            stocks_sync: false,
+            sysmon_sync: false,
+            weather_sync: false,
+            stocks_symbol: String::new(),
             replies: std::collections::HashMap::new(),
         }
     }
@@ -244,6 +264,28 @@ impl DivoomApp {
     /// Hex `#rrggbb` for an `[r,g,b]` (device_call color args parse a hex string).
     pub fn hex(rgb: [u8; 3]) -> String {
         format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2])
+    }
+
+    /// MAC/address of the currently-selected device, if any (live jobs need it).
+    pub fn active_mac(&self) -> Option<String> {
+        self.selected_device
+            .and_then(|i| self.devices.get(i))
+            .map(|d| d.address.clone())
+            .filter(|a| !a.is_empty())
+    }
+
+    /// Start/stop a server-side live-push job (music/stocks/sysmon/weather).
+    pub fn toggle_live_job(&self, kind: &str, enable: bool, params: serde_json::Value) {
+        let Some(mac) = self.active_mac() else { return };
+        if enable {
+            self.raw(
+                "live_job_start",
+                serde_json::json!({ "mac": mac, "kind": kind, "params": params }),
+                "live_job",
+            );
+        } else {
+            self.raw("live_job_stop", serde_json::json!({ "mac": mac, "kind": kind }), "live_job");
+        }
     }
 
     /// Headless visual check: request a framebuffer grab after the UI settles,

@@ -5,12 +5,30 @@
 use eframe::egui::{self, Color32, RichText, Sense, Stroke, Vec2};
 use serde_json::json;
 
-use crate::app::DivoomApp;
+use crate::app::{DivoomApp, PixelSub};
 use crate::theme;
 
 const GRID: usize = 16;
 
 pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    // Sub-tabs: Paint editor + cloud Gallery (web TAB 4 also has Custom Art + Hot
+    // Channel — tracked as remaining).
+    ui.horizontal(|ui| {
+        if ui.selectable_label(app.pixel_sub == PixelSub::Paint, "Paint").clicked() {
+            app.pixel_sub = PixelSub::Paint;
+        }
+        if ui.selectable_label(app.pixel_sub == PixelSub::Gallery, "Gallery").clicked() {
+            app.pixel_sub = PixelSub::Gallery;
+        }
+    });
+    ui.add_space(10.0);
+    match app.pixel_sub {
+        PixelSub::Paint => paint(app, ui),
+        PixelSub::Gallery => crate::gallery::panel(app, ui),
+    }
+}
+
+fn paint(app: &mut DivoomApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(RichText::new("Color").size(12.0).color(theme::TEXT_MUTED));
         ui.color_edit_button_srgb(&mut app.paint_color);
