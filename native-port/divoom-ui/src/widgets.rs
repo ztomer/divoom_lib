@@ -11,11 +11,19 @@ use crate::app::DivoomApp;
 use crate::theme;
 
 pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    // Lazily read which jobs the daemon reports running (status, read-only — does
+    // not drive the toggles, to avoid fighting user input).
+    if let Some(mac) = app.active_mac() {
+        if !app.replies.contains_key("live_jobs") {
+            app.raw("live_job_list", json!({ "mac": mac }), "live_jobs");
+        }
+    }
     egui::ScrollArea::vertical().show(ui, |ui| {
         if app.active_mac().is_none() {
             ui.colored_label(theme::WARN, "Connect a device to start live widgets.");
             ui.add_space(10.0);
         }
+        running_status(app, ui);
         feed(app, ui, "Now Playing", "Album art from Music / Spotify.", "music", |a| a.music_sync, |a, v| a.music_sync = v, json!({}));
         feed(app, ui, "System Stats", "CPU / RAM gauges on the device.", "sysmon", |a| a.sysmon_sync, |a, v| a.sysmon_sync = v, json!({}));
         feed(app, ui, "Weather", "Live local weather.", "weather", |a| a.weather_sync, |a, v| a.weather_sync = v, json!({}));
@@ -91,6 +99,37 @@ fn stocks(app: &mut DivoomApp, ui: &mut egui::Ui) {
                 app.toggle_live_job("stocks", on, json!({ "symbol": sym }));
             }
         });
+    });
+    ui.add_space(8.0);
+}
+
+/// Read-only "what's running" line from live_job_list, with a refresh.
+fn running_status(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    let running: Vec<String> = app
+        .replies
+        .get("live_jobs")
+        .and_then(|v| v.get("jobs"))
+        .and_then(|j| j.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|j| j.get("kind").and_then(|k| k.as_str()))
+                .filter(|k| *k != "idle")
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default();
+    ui.horizontal(|ui| {
+        let txt = if running.is_empty() {
+            "Running: none".to_string()
+        } else {
+            format!("Running: {}", running.join(", "))
+        };
+        ui.label(RichText::new(txt).size(11.0).color(theme::TEXT_MUTED));
+        if ui.small_button("Refresh").clicked() {
+            if let Some(mac) = app.active_mac() {
+                app.raw("live_job_list", json!({ "mac": mac }), "live_jobs");
+            }
+        }
     });
     ui.add_space(8.0);
 }

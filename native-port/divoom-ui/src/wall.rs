@@ -20,7 +20,7 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
         if app.devices.is_empty() {
             ui.label(RichText::new("No devices found — run a scan first.").size(12.0).color(theme::WARN));
             if ui.button("Scan").clicked() {
-                app.daemon.send(crate::daemon::Cmd::Scan);
+                app.daemon.send(crate::daemon::Cmd::Scan(app.scan_timeout));
             }
             return;
         }

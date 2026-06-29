@@ -125,6 +125,7 @@ pub struct DivoomApp {
     pub lan_ip: String,
     pub lan_token: String,
     pub keep_alive: bool,
+    pub scan_timeout: f64,
     // --- Schedule tab (alarm slots) ---
     pub alarms: Vec<Alarm>,
     // --- Pixel Art tab (16x16 editor) ---
@@ -176,7 +177,7 @@ impl DivoomApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         crate::theme::apply(&cc.egui_ctx);
         let daemon = daemon::start();
-        daemon.send(daemon::Cmd::Scan);
+        daemon.send(daemon::Cmd::Scan(8.0));
         Self {
             daemon,
             tab: match std::env::var("DIVOOM_UI_TAB").as_deref() {
@@ -239,6 +240,7 @@ impl DivoomApp {
             lan_ip: String::new(),
             lan_token: String::new(),
             keep_alive: true,
+            scan_timeout: 8.0,
             alarms: vec![Alarm::default(); 5],
             pixels: vec![[0, 0, 0]; 16 * 16],
             paint_color: [255, 90, 31],

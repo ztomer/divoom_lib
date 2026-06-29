@@ -55,7 +55,8 @@ never deleted._
 - [ ] ✗ `save_notification_routing` (`set_routing` exists; per-app routing UI deferred)
 - [ ] ✗ `send_notification` (test) — **DAEMON GAP** (no `send_notification` command)
 - [ ] ✗ MCP server start/stop/status (subprocess)
-- [ ] ✗ scan settings (`get_scan_settings`/`save_scan_settings`)
+- [x] ✓ scan timeout (Settings -> Application; threaded into the scan command).
+  `limit` is a GUI-side result filter (minor, deferred).
 - [ ] ✗ cloud login (`save_credentials`) — **DAEMON GAP** (only `get_credentials`
   exists; no login/save command). Gallery can't auth without it.
 - [ ] ✗ export/import settings (`PresetsManagerMixin`)
@@ -65,8 +66,9 @@ never deleted._
 - [x] ✓ stocks sync + symbol (`live_job_start mac "stocks" {symbol}`)
 - [x] ✓ system stats (`live_job_start mac "sysmon"`)
 - [x] ✓ weather sync (`live_job_start mac "weather"`)
-- [ ] ✗ audio visualizer (`toggle_audio_visualizer`, `get_audio_levels`)
-- [ ] ✗ `live_job_list` (show running jobs) + per-feed params (interval)
+- [ ] ✗ audio visualizer (`toggle_audio_visualizer`, `get_audio_levels`) — needs
+  local audio capture (substantial; device-side EQ already covered via Visualizer)
+- [x] ✓ `live_job_list` — read-only "Running: …" status line + Refresh
 
 ## Weather
 - [x] ✓ `set_temperature_channel` (Temperature card in Live Widgets, kwargs celsius+color)
@@ -98,6 +100,8 @@ never deleted._
 - 2026-06-29 iter1: read-backs (brightness/volume/device-name) fetched on
   device-connect (status idle→active) + applied to UI; clock-color bug fixed
   (set_clock_rich now sends kwargs). Added app.call_kw helper. Build green.
+- 2026-06-29 iter7: scan timeout setting (threaded through Cmd::Scan) + live job
+  status line (live_job_list, read-only) in Live Widgets. Build green.
 - 2026-06-29 iter6: Text push — embedded 5x7 bitmap font (text_font.rs, glcdfont
   subset A-Z/0-9/punct, unit-tested) rendered to a 16x16 RGB frame + live preview
   in the Text panel; Push -> show_image. Verified by screenshot ("AB1" legible).

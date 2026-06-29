@@ -219,7 +219,7 @@ fn device_panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
         ui.painter().circle_filled(r.center(), 4.0, dot);
         ui.label(RichText::new(txt).size(10.5).color(theme::TEXT_MUTED));
         if ui.small_button("Scan").clicked() {
-            app.daemon.send(Cmd::Scan);
+            app.daemon.send(Cmd::Scan(app.scan_timeout));
         }
     });
 }

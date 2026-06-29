@@ -19,7 +19,7 @@ const POLL_INTERVAL: Duration = Duration::from_secs(2);
 /// Commands the UI sends to the worker.
 pub enum Cmd {
     Refresh,
-    Scan,
+    Scan(f64),
     Connect(String),
     SetBrightness(u8),
     SetVolume(u8),
@@ -121,8 +121,8 @@ fn worker(cmd_rx: Receiver<Cmd>, upd: Sender<Update>) {
 fn handle(cmd: Cmd, conn: &mut Option<Conn>, upd: &Sender<Update>) {
     match cmd {
         Cmd::Refresh => refresh(conn, upd),
-        Cmd::Scan => {
-            match call(conn, "scan", json!({})) {
+        Cmd::Scan(timeout) => {
+            match call(conn, "scan", json!({ "timeout": timeout })) {
                 Ok(v) => upd_devices(&v, upd),
                 Err(e) => err(upd, format!("scan failed: {e}")),
             }
