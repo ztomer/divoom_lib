@@ -114,17 +114,18 @@ from git history if needed.
 GUI / menubar / CLI are unchanged clients, the Python daemon stays ground truth
 until parity, and the C encoders (`libdivoom`) are reused via FFI.
 
-**Status (2026-06-28): functionally complete.** Shipped R54–R56 — full
-`device_call.*` surface, cloud auth, gallery sync, monthly-best loop, macOS
-notifications, wall, live jobs, art/hot-update, SPP bridge, TCP+token auth, and
-Python auto-spawn (`DIVOOM_USE_RUST_DAEMON`). `cargo test` (default `ble`) = 62
-green.
+**Status (2026-06-28): functionally complete + hardware-verified.** Shipped R54–R56
+— full `device_call.*` surface, cloud auth, gallery sync, monthly-best loop, macOS
+notifications, wall, live jobs, art/hot-update, SPP bridge, TCP+token auth, Python
+auto-spawn (`DIVOOM_USE_RUST_DAEMON`). Hardening Phases 1–4 done: hardware-free core
+build restored + CI-gated (both feature matrices), 500-LOC compliance gated, E2E
+verified hardware-free (CI) and on a **real Timoo over BLE** (connect/brightness/
+exclusive/MCP/disconnect). `cargo test` 63/63 both matrices.
 
-**Remaining work → `docs/PLANNING_NATIVE_PORT_HARDENING.md`** (active forward
-plan): fix the broken `--no-default-features` core build, add a Rust CI gate,
-500-LOC splits (`live_jobs.rs`, `daemon.rs`), hardware + cross-platform
-verification (MCP, exclusive mode, Linux/Windows `btleplug`), then Python backend
-archival.
+**Remaining → `docs/PLANNING_NATIVE_PORT_HARDENING.md`** (Phase 5, gated): close the
+last command-parity gaps (`probe_lan`, `sync_artwork`; `shutdown` done), flip the
+Rust default after a soak, then archive the Python daemon backend — the irreversible
+archival held for explicit user sign-off.
 
 ---
 

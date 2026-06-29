@@ -18,8 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **NATIVE PORT HARDENING — Phases 1–3 + Phase 4 Tier A & C done (2026-06-28):**
-  Only Phase 4 Tier B (real-device) and Phase 5 (archival) remain.
+- **NATIVE PORT HARDENING — Phases 1–4 DONE; Phase 5 gated (2026-06-28):**
+  Phase 4 Tier B was verified on a **real Timoo over BLE** via the granted `.app`
+  (grant persisted, autonomous): scan → connect → brightness round-trip (read-backs
+  work) → exclusive gating → MCP-via-Rust `set_brightness(level=65)` → disconnect.
+  Two bugs surfaced + fixed HW-verified: BLE `connect` poll-until-found (was a single
+  3s window → reconnect misses; 3/3 clean no-pre-scan reconnects now) and a missing
+  `shutdown` command (added; clean exit confirmed). Phase 5 is **gated**: a
+  command-parity audit found Rust still missing `probe_lan` + `sync_artwork` (closed
+  `shutdown` this round); the default-flip waits on those, and the irreversible
+  `divoom_daemon/` deletion waits on a soak + explicit user sign-off.
   - **Phase 1 (commit `f7e0e7c`):** fixed the broken `--no-default-features` build.
     Root cause: the `DeviceTransport` device-I/O method layer was `ble`-gated even
     though it delegates to non-ble Spp/Lan/Mock, and `BleResult` lived in the gated
@@ -48,12 +56,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ### Open threads
 
-- **Phase 4 Tier B** (the remaining verification): drive a real Pixoo via the
-  pre-granted dev-daemon `.app` (`open` it, drive over the socket) — MCP +
-  exclusive + brightness. Autonomous on macOS (no per-run user action). Gates
-  Phase 5.
-- **Phase 5** — Python backend archival, gated on Tier B.
-- _(RESOLVED this round: Phases 1+2+3 and Phase 4 Tier A + Tier C.)_
+- **Phase 5 command parity** — implement Rust `probe_lan` (wire to `lan.rs::probe`)
+  and `sync_artwork` to match the Python daemon's socket surface. Prereq for the
+  default-flip.
+- **Phase 5 default-flip** — after parity, flip `DIVOOM_USE_RUST_DAEMON` default on
+  in `daemon_client.py` (reversible), then soak GUI/menubar/MCP.
+- **Phase 5 archival (NEEDS USER SIGN-OFF)** — moving/deleting `divoom_daemon/` is
+  irreversible and breaks the GUI/menubar/CLI imports; hold until a green soak +
+  explicit go. Will NOT be done autonomously.
+- _(RESOLVED this round: all of Phase 4 — Tier A, B (real device), C; plus the BLE
+  connect-robustness bug and the `shutdown` parity gap.)_
 
 - **DOC CLEANUP — native-port docs retired/pruned (2026-06-28):** Retired the
   obsolete `docs/PLANNING_NATIVE_PORT.md` (original evaluate-and-plan doc, fully

@@ -4,6 +4,24 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Rust Hardening Phase 4 Tier B (real device) + 2 fixes (2026-06-28)
+
+- **Phase 4 Tier B — verified on a real Timoo over BLE** via the granted
+  `Divoom Daemon (rs).app` (grant persisted from Jun 23, autonomous — no per-run
+  user action): scan → connect → brightness round-trip (get 60 → 30 → 80,
+  read-backs work) → exclusive gating (steal-reject + token-deny + owner success) →
+  MCP-via-Rust `set_brightness(level=65)` → `{"ok":true,"level":65}` → disconnect.
+- **fix: robust BLE (re)connect** — `connect` used a single 3s scan window that
+  intermittently missed the device on reconnect; now polls the discovered set to a
+  10s deadline (3/3 clean no-pre-scan reconnects on hardware).
+- **feat: `shutdown` command** (Python-daemon parity) — `Notify` on `Daemon` fired
+  by `shutdown`, awaited by the main loop with a 150ms reply-flush grace; clean exit
+  + socket unlink confirmed live.
+- **Phase 5 readiness audit:** Rust daemon still missing `probe_lan` + `sync_artwork`
+  vs the Python daemon (closed `shutdown`). The default-flip waits on those; the
+  irreversible `divoom_daemon/` archival waits on a soak + explicit user sign-off.
+- **Tests:** cargo 63/63 both matrices.
+
 ### Post-v0.20.2 — Rust Hardening Phase 3 + Phase 4 Tier A/C (2026-06-28)
 
 - **Phase 3 — 500-LOC compliance + gate:** split `live_jobs.rs` (965) into

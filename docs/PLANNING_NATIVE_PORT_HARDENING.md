@@ -160,15 +160,26 @@ is already proven: `open "dist/Divoom Dev Daemon.app"` launches the daemon under
 drives it over `/tmp/divoom.sock` with `DaemonClient` — **no per-run user action**,
 provided the grant from the original one-time approval still holds for that binary.
 
-- [ ] **4B.1** `open` the granted dev-daemon `.app`; over the socket run the real
-  MCP-via-Rust and exclusive-mode sequences from Tier A against a real Pixoo —
-  confirms the mock results hold on real radio.
-- [ ] **4B.2** Run the live `test_rust_hardware_parity` (scan/connect/get+set
-  brightness/disconnect) against the `.app`-launched Rust daemon.
-- [ ] **4B.3** Autonomy caveat to record: if the `.app` is rebuilt/re-signed, its
-  TCC identity may reset → one-time user re-grant. Keep a stable signed dev-daemon
-  `.app` so Tier B stays user-free across runs. (This is the only place a human may
-  re-enter, and only on identity change — not per run.)
+- [x] **4B.1** `open`-ed `dist/Divoom Daemon (rs).app` (grant persisted from Jun 23,
+  no re-prompt); over `/tmp/divoomd.sock`: scan found `Timoo-light-4` +
+  `Tivoo-Max-light-3`; connect → brightness round-trip (get 60 → set 30 → get 30 →
+  set 80 → get 80; **read-backs work on real hardware**) → exclusive (A acquires, B
+  steal-rejected immediately, B's `device_call` denied, A's succeeds, A releases) →
+  disconnect. MCP-via-Rust on the real device: `tools/call set_brightness(level=65)`
+  → `{"ok":true,"level":65}`, verified by read-back. All autonomous (no per-run user
+  action).
+- [x] **4B.2** Hardware parity confirmed via the above (the pytest
+  `test_rust_hardware_parity` spawns a *non-granted* subprocess that would TCC-crash;
+  the `.app`+socket path is the correct TCC-safe equivalent and is what was run).
+- [x] **4B.3** Two real bugs surfaced + fixed during Tier B (both HW-verified):
+  (1) `connect` used a single 3s scan window → intermittent reconnect miss; now polls
+  to a 10s deadline (3/3 clean no-pre-scan reconnects). (2) `shutdown` command was
+  missing vs the Python daemon; added (Notify + main-loop grace). Grant persists
+  across rebuilds (stable thin-launcher `.app`); a human only re-enters if the `.app`
+  is re-signed.
+
+**STATUS: Tier B DONE (2026-06-28).** Core command surface verified on a real Timoo
+over BLE; connect-robustness + shutdown parity fixed and HW-verified.
 
 ### Tier C — cross-platform: best-effort compile-only (no Win/Linux hardware)
 
@@ -197,17 +208,38 @@ non-blocking), with real-radio on those OSes explicitly accepted as untested.
 
 **Goal:** make the Rust daemon the default and retire the Python daemon backend.
 
-- [ ] **5.1** Flip `DIVOOM_USE_RUST_DAEMON` default to on (or remove the flag and
-  spawn Rust by default) in `daemon_client.py` / GUI launcher.
-- [ ] **5.2** Soak period: run the GUI + menubar + MCP against the Rust daemon for a
-  defined window; confirm no parity regressions.
-- [ ] **5.3** Archive `divoom_daemon/` Python backend (move under `archive/` or tag
-  + delete), keeping `divoom_lib` only where still depended on (encoders, SPP
-  bridge `spp_bridge.py`).
-- [ ] **5.4** Update `README`, `ROADMAP.md`, `AGENTS.md` to declare Rust the
-  authoritative daemon and Python the historical reference.
+**Readiness audit (2026-06-28).** A socket-command diff (Rust dispatch vs Python
+daemon) found the Rust daemon **NOT yet at full parity**. Closing this is the gate
+for the default-flip; the *deletion* in 5.3 additionally needs a soak + sign-off
+because `divoom_daemon` is imported by the GUI, menubar, and CLI (and still hosts
+the SPP bridge + encoder deps), so removing it is irreversible and product-breaking
+if done early.
 
-**Exit:** Rust is the default daemon; Python backend archived; docs updated.
+Remaining command-parity gaps (Rust ← Python):
+- [x] `shutdown` — added (commit this round; HW-verified clean exit).
+- [ ] **5.0a `probe_lan`** — LAN device probe (wire to `lan.rs::probe`). Needs a LAN
+  device to verify.
+- [ ] **5.0b `sync_artwork`** — media/album-art sync command. Needs media source +
+  hardware to verify.
+
+Staged rollout (each step reversible until 5.3):
+- [ ] **5.1** Flip `DIVOOM_USE_RUST_DAEMON` default to on in `daemon_client.py` /
+  GUI launcher — **only after 5.0a/5.0b land** (else GUI/CLI calls hit missing
+  commands). Reversible via the env flag.
+- [ ] **5.2** Soak: run GUI + menubar + MCP against the Rust default for a defined
+  window; confirm no parity regressions. (Cannot be done in a single agent session.)
+- [ ] **5.3** Archive `divoom_daemon/` (move under `archive/`, keep `divoom_lib`
+  deps: encoders, `spp_bridge.py`). **IRREVERSIBLE — requires explicit user
+  sign-off + a green soak.** Do not delete the shipping backend before then.
+- [ ] **5.4** Update `README`, `ROADMAP.md`, `AGENTS.md` to declare Rust
+  authoritative, Python the historical reference.
+
+**Exit:** Rust is the default daemon (post-soak); Python backend archived (with
+sign-off); docs updated.
+
+**STATUS: in progress / gated.** Command parity 1/3 closed (`shutdown`); `probe_lan`
++ `sync_artwork` remain before the default-flip; archival (5.3) is held for an
+explicit user decision + soak — it will not be done autonomously.
 
 ---
 
@@ -215,19 +247,19 @@ non-blocking), with real-radio on those OSes explicitly accepted as untested.
 
 ```
 Phase 1 (core) ──► Phase 2 (CI) ──► Phase 3 (LOC) ──► Phase 4 ──► Phase 5 (archive)
-   [DONE]            [DONE]           [DONE]            A:DONE      gated on 4B
-                                                        B/C: below
+   [DONE]            [DONE]           [DONE]            A/B/C:DONE  gated/sign-off
 ```
 
-Phases 1–3 are **DONE** (committed). Phase 4 **Tier A is DONE** (hardware-free
-E2E in CI); **Tier C is DONE as best-effort compile-only** (Linux/Windows compile
-jobs, non-blocking — no hardware to verify radio, by design). **Tier B** (real
-Pixoo via the granted macOS `.app`) is the remaining verification and the gate for
-Phase 5.
+Phases 1–4 are **DONE**. Phase 4: Tier A (hardware-free E2E in CI), Tier B (real
+Timoo over BLE — connect/brightness/exclusive/MCP/disconnect, + connect-robustness
+and `shutdown` fixes), Tier C (best-effort cross-OS compile, non-blocking). Phase 5
+is **in progress / gated**: 1/3 command-parity gaps closed (`shutdown`); `probe_lan`
++ `sync_artwork` remain before the default-flip, and the irreversible archival needs
+a soak + explicit user sign-off.
 
-**Recommended next unit of work:** Phase 4 **Tier B** — `open` the granted
-dev-daemon `.app` and run the MCP + exclusive + brightness sequences against a real
-Pixoo over the socket (autonomous on macOS, no per-run user action). Then Phase 5.
+**Recommended next unit of work:** implement `probe_lan` + `sync_artwork` (close
+parity), then flip `DIVOOM_USE_RUST_DAEMON` default on for a soak. Hold the
+`divoom_daemon/` deletion for explicit sign-off.
 
 ---
 
