@@ -174,8 +174,77 @@ fn text_effect_name(v: i64) -> &'static str {
     }
 }
 
-fn sessions(_app: &mut DivoomApp, ui: &mut egui::Ui) {
-    hint(ui, "Sleep Aid + session tools — ported in Phase 3.");
+fn sessions(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    use eframe::egui::{Frame, Margin, Rounding, Stroke};
+    let card = |ui: &mut egui::Ui, title: &str, body: &mut dyn FnMut(&mut egui::Ui)| {
+        Frame::none()
+            .fill(theme::CARD_BG)
+            .rounding(Rounding::same(theme::RADIUS))
+            .stroke(Stroke::new(1.0, theme::BORDER))
+            .inner_margin(Margin::same(12.0))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.label(RichText::new(title).size(13.5).color(theme::TEXT_MAIN).strong());
+                ui.add_space(6.0);
+                body(ui);
+            });
+        ui.add_space(8.0);
+    };
+
+    // Sleep Aid → sleep.show_sleep {sleeptime, on, volume, color} (kwargs).
+    card(ui, "Sleep Aid", &mut |ui| {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Minutes").size(11.0).color(theme::TEXT_MUTED));
+            ui.add(egui::DragValue::new(&mut app.sleep_minutes).range(1..=120));
+            ui.label(RichText::new("Volume").size(11.0).color(theme::TEXT_MUTED));
+            ui.add(egui::DragValue::new(&mut app.sleep_volume).range(0..=16));
+            ui.label(RichText::new("Fade to").size(11.0).color(theme::TEXT_MUTED));
+            ui.color_edit_button_srgb(&mut app.sleep_color);
+        });
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            if ui.button("Start").clicked() {
+                app.call_kw("sleep.show_sleep", serde_json::json!({
+                    "sleeptime": app.sleep_minutes, "on": 1,
+                    "volume": app.sleep_volume, "color": DivoomApp::hex(app.sleep_color),
+                }));
+            }
+            if ui.button("Stop").clicked() {
+                app.call_kw("sleep.show_sleep", serde_json::json!({ "on": 0 }));
+            }
+        });
+    });
+
+    // Stopwatch/Timer → timer.set_timer [ctrl_flag]  (start=1, pause=0, reset=2).
+    card(ui, "Stopwatch", &mut |ui| {
+        ui.horizontal(|ui| {
+            if ui.button("Start").clicked() { app.call("timer.set_timer", serde_json::json!([1])); }
+            if ui.button("Pause").clicked() { app.call("timer.set_timer", serde_json::json!([0])); }
+            if ui.button("Reset").clicked() { app.call("timer.set_timer", serde_json::json!([2])); }
+        });
+    });
+
+    // Countdown → countdown.set_countdown [ctrl_flag, min, sec]  (start=0, cancel=1).
+    card(ui, "Countdown", &mut |ui| {
+        ui.horizontal(|ui| {
+            ui.add(egui::DragValue::new(&mut app.countdown_min).range(0..=99).prefix("m "));
+            ui.add(egui::DragValue::new(&mut app.countdown_sec).range(0..=59).prefix("s "));
+            if ui.button("Start").clicked() {
+                app.call("countdown.set_countdown", serde_json::json!([0, app.countdown_min, app.countdown_sec]));
+            }
+            if ui.button("Cancel").clicked() {
+                app.call("countdown.set_countdown", serde_json::json!([1, app.countdown_min, app.countdown_sec]));
+            }
+        });
+    });
+
+    // Noise meter → noise.set_noise [ctrl_flag]  (start=1, stop=2).
+    card(ui, "Noise Meter", &mut |ui| {
+        ui.horizontal(|ui| {
+            if ui.button("Start").clicked() { app.call("noise.set_noise", serde_json::json!([1])); }
+            if ui.button("Stop").clicked() { app.call("noise.set_noise", serde_json::json!([2])); }
+        });
+    });
 }
 
 // --- shared widgets ----------------------------------------------------------

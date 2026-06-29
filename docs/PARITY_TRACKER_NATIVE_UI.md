@@ -30,7 +30,9 @@ never deleted._
 - [x] ✓ clock color (`set_clock_rich`) — fixed: now sends kwargs {style,twentyfour,color}
 - [ ] ✗ `switch_channel` not explicitly called (show_* covers most; verify text/score)
 - [ ] ✗ Text push (`push_text`) — needs bitmap-font→image render
-- [ ] ✗ Sessions panel: `start_sleep`/`stop_sleep`/`set_timer`/`set_countdown`/`set_noise`
+- [x] ✓ Sessions panel: Sleep Aid (`sleep.show_sleep` kwargs), Stopwatch
+  (`timer.set_timer` flag 1/0/2), Countdown (`countdown.set_countdown` flag 0/1 +
+  m/s), Noise Meter (`noise.set_noise` flag 1/2)
 
 ## Device Settings
 - [x] ✓ name, 12/24h, temp, power, auto-off, orientation, mirror, factory reset
@@ -65,7 +67,7 @@ never deleted._
 - [ ] ✗ `push_weather` / `get_weather` / `set_temperature_channel` panel
 
 ## FM radio
-- [ ] ✗ `set_fm_frequency`
+- [x] ✓ `set_fm_frequency` → `radio.set_radio_frequency [freq_x10]` (in Device Settings)
 
 ## Pixel Art tab (web = Custom Art + Gallery + Hot Channel)
 - [x] ✓ paint editor + push (`show_image`)
@@ -89,6 +91,9 @@ never deleted._
 - 2026-06-29 iter1: read-backs (brightness/volume/device-name) fetched on
   device-connect (status idle→active) + applied to UI; clock-color bug fixed
   (set_clock_rich now sends kwargs). Added app.call_kw helper. Build green.
+- 2026-06-29 iter3: Sessions sub-tab built (Sleep Aid/Stopwatch/Countdown/Noise,
+  correct device_call leaves + STI flags) + FM radio in Device Settings. Build
+  green; Sessions verified by screenshot.
 - 2026-06-29 iter2: STRUCTURAL fix — Live Widgets re-mapped to live data feeds
   (music/stocks/sysmon/weather toggles → live_job_start/stop, gated on a connected
   device); gallery moved under Pixel Art (Paint/Gallery sub-tabs, new gallery.rs).

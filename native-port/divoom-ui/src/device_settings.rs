@@ -93,6 +93,16 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
             });
             sep(ui);
 
+            // FM radio frequency → radio.set_radio_frequency [freq_x10].
+            row(ui, "FM radio (MHz)", |ui| {
+                if ui.button("Tune").clicked() {
+                    let x10 = (app.fm_freq * 10.0).round() as i64;
+                    app.call("radio.set_radio_frequency", json!([x10]));
+                }
+                ui.add(egui::DragValue::new(&mut app.fm_freq).range(76.0..=108.0).speed(0.1).fixed_decimals(1));
+            });
+            sep(ui);
+
             // Sync time — daemon gap.
             ui.add_enabled(false, egui::Button::new("Update device time (daemon gap)"))
                 .on_disabled_hover_text(

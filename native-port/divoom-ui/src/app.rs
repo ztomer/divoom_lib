@@ -96,6 +96,12 @@ pub struct DivoomApp {
     pub text_color: [u8; 3],
     pub text_speed: i64,
     pub text_effect: i64,
+    // --- Sessions sub-tab ---
+    pub sleep_minutes: i64,
+    pub sleep_color: [u8; 3],
+    pub sleep_volume: i64,
+    pub countdown_min: i64,
+    pub countdown_sec: i64,
     /// Debug self-screenshot: if `DIVOOM_UI_SCREENSHOT` is set, render a few
     /// frames, grab the framebuffer (no OS screen-recording permission needed),
     /// save it there, and exit. Used for headless visual verification.
@@ -113,6 +119,7 @@ pub struct DivoomApp {
     pub auto_off_min: i64,
     pub screen_dir: i64,
     pub screen_mirror: bool,
+    pub fm_freq: f32,
     pub confirm_reset: bool,
     // --- Settings tab ---
     pub lan_ip: String,
@@ -200,6 +207,11 @@ impl DivoomApp {
             text_color: [0, 255, 204],
             text_speed: 50,
             text_effect: 1,
+            sleep_minutes: 30,
+            sleep_color: [0x20, 0x40, 0xff],
+            sleep_volume: 10,
+            countdown_min: 5,
+            countdown_sec: 0,
             device_name: String::new(),
             hour24: true,
             temp_f: false,
@@ -207,6 +219,7 @@ impl DivoomApp {
             auto_off_min: 0,
             screen_dir: 0,
             screen_mirror: false,
+            fm_freq: 87.5,
             confirm_reset: false,
             lan_ip: String::new(),
             lan_token: String::new(),
