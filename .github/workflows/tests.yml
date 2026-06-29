@@ -38,7 +38,14 @@ jobs:
       - name: Build native dylib
         run: bash scripts/build_libdivoom.sh
 
-      - name: Run tests (C + Python encoder parity enforced via dual-impl suite)
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build native divoomd (ble) for the Rust-daemon parity suite
+        # Without this, tests/test_rust_daemon_parity.py skips (no binary) so the
+        # Rust↔Python parity tests never run in CI. Default features include `ble`.
+        working-directory: native-port/divoomd
+        run: cargo build --locked
+
+      - name: Run tests (C + Python encoder parity + Rust-daemon parity suite)
         run: python3 -m pytest -q
 
   rust-core:
