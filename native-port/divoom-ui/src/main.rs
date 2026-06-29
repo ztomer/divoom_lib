@@ -10,10 +10,13 @@ mod app;
 mod channels;
 mod daemon;
 mod device_settings;
+mod pixel_art;
 mod schedule;
 mod settings;
 mod shell;
 mod theme;
+mod wall;
+mod widgets;
 
 use app::DivoomApp;
 

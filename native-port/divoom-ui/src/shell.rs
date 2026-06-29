@@ -236,7 +236,9 @@ pub fn content(app: &mut DivoomApp, ctx: &egui::Context) {
             Tab::DeviceSettings => crate::device_settings::panel(app, ui),
             Tab::Settings => crate::settings::panel(app, ui),
             Tab::Schedule => crate::schedule::panel(app, ui),
-            _ => placeholder(ui, app.tab.title()),
+            Tab::PixelArt => crate::pixel_art::panel(app, ui),
+            Tab::Wall => crate::wall::panel(app, ui),
+            Tab::Widgets => crate::widgets::panel(app, ui),
         }
         if let Some(err) = &app.last_error {
             ui.add_space(8.0);
@@ -271,16 +273,5 @@ fn channels_tab(app: &mut DivoomApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             crate::channels::panel(app, ui);
-        });
-}
-
-fn placeholder(ui: &mut egui::Ui, name: &str) {
-    Frame::none()
-        .fill(theme::CARD_BG)
-        .rounding(Rounding::same(theme::RADIUS))
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .inner_margin(Margin::same(20.0))
-        .show(ui, |ui| {
-            ui.label(RichText::new(format!("{name} — coming in a later phase")).color(theme::TEXT_MUTED));
         });
 }

@@ -109,6 +109,9 @@ pub struct DivoomApp {
     pub keep_alive: bool,
     // --- Schedule tab (alarm slots) ---
     pub alarms: Vec<Alarm>,
+    // --- Pixel Art tab (16x16 editor) ---
+    pub pixels: Vec<[u8; 3]>,
+    pub paint_color: [u8; 3],
     /// Replies to `Cmd::Raw`, keyed by tag (Settings/Schedule/gallery read these).
     pub replies: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -187,6 +190,8 @@ impl DivoomApp {
             lan_token: String::new(),
             keep_alive: true,
             alarms: vec![Alarm::default(); 5],
+            pixels: vec![[0, 0, 0]; 16 * 16],
+            paint_color: [255, 90, 31],
             replies: std::collections::HashMap::new(),
         }
     }
