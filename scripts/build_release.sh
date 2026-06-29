@@ -43,6 +43,20 @@ echo "Building Divoom Control v${VERSION}"
 echo "→ building native dylib"
 bash scripts/build_libdivoom.sh
 
+# 1b. Native Rust daemon — shipped INSIDE the bundle (setup_app.py data_files) so
+#     the app runs the native `divoomd` (now at full parity with the Python daemon),
+#     not the Python fallback. setup_app skips it if the binary is absent.
+echo "→ building native rust daemon (divoomd)"
+if ! command -v cargo >/dev/null 2>&1 && [ -x "${HOME}/.cargo/bin/cargo" ]; then
+  export PATH="${HOME}/.cargo/bin:${PATH}"
+fi
+if command -v cargo >/dev/null 2>&1; then
+  ( cd native-port/divoomd && cargo build --release )
+else
+  echo "ERROR: cargo not found — needed to bundle the native daemon (divoomd)." >&2
+  exit 1
+fi
+
 # 2. py2app. setuptools auto-merges pyproject's [project] deps into the py2app
 #    setup() → "install_requires is no longer supported"; hide it for the build.
 echo "→ py2app build"
@@ -53,6 +67,17 @@ trap restore_pyproject EXIT
 "${PYBUILD}" setup_app.py py2app
 restore_pyproject
 trap - EXIT
+
+# 2b. Ensure the native daemon landed in the bundle + is executable (a data_files
+#     copy can drop the +x bit).
+DIVOOMD_IN_APP="dist/Divoom.app/Contents/Resources/divoomd"
+if [[ -f "${DIVOOMD_IN_APP}" ]]; then
+  chmod +x "${DIVOOMD_IN_APP}"
+  echo "→ bundled native daemon: $(ls -lh "${DIVOOMD_IN_APP}" | awk '{print $5}')"
+else
+  echo "ERROR: divoomd was not bundled into the .app (expected ${DIVOOMD_IN_APP})." >&2
+  exit 1
+fi
 
 # 3. Guard: the reverse-engineered APK / references must never be in the bundle.
 if find dist/Divoom.app \( -iname '*smali*' -o -path '*references*' -o -iname '*.apk' \) | grep -q .; then

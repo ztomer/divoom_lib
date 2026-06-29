@@ -52,6 +52,19 @@ AE_DESC = ("Divoom Control reads the now-playing track from Music and Spotify to
 
 APP = ["divoom_gui/gui_main.py"]
 
+# Ship the native Rust daemon + its encoder dylib at the bundle's Resources root
+# (Contents/Resources/) so the app runs `divoomd` instead of the Python fallback.
+# daemon_client.spawn_daemon finds them via RESOURCEPATH and points
+# DIVOOMD_ENCODER_LIB at the bundled dylib. Skipped if divoomd isn't built (the
+# Python daemon then ships as the fallback). build_release.sh builds divoomd first.
+_RES_FILES = [
+    p for p in (
+        "native-port/divoomd/target/release/divoomd",
+        "divoom_lib/libdivoom_compact.dylib",
+    ) if os.path.exists(p)
+]
+DATA_FILES = [("", _RES_FILES)] if _RES_FILES else []
+
 OPTIONS = {
     "argv_emulation": False,
     # Listing the runtime packages as `packages` copies each as a real directory
@@ -87,6 +100,7 @@ setup(
     name="Divoom",
     app=APP,
     version=VERSION,
+    data_files=DATA_FILES,
     options={"py2app": OPTIONS},
     setup_requires=["py2app"],
 )

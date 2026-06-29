@@ -150,10 +150,22 @@ def spawn_daemon(
 
     Caller waits until the socket is live (see :func:`ensure_daemon`).
     """
-    # Resolve the native Rust daemon binary (env override, then the dev build tree).
+    # Resolve the native Rust daemon binary: env override, then the py2app .app
+    # bundle (Contents/Resources via RESOURCEPATH), then the dev build tree.
     rust_bin = os.environ.get("DIVOOM_RUST_BINARY")
     if rust_bin and not Path(rust_bin).exists():
         rust_bin = None
+    rust_env_extra: dict[str, str] = {}
+    _rp = os.environ.get("RESOURCEPATH")  # set by py2app inside the .app bundle
+    if not rust_bin and _rp:
+        cand = Path(_rp) / "divoomd"
+        if cand.exists():
+            rust_bin = str(cand)
+            # The bundled daemon can't find the encoder dylib by relative path —
+            # point it at the copy shipped alongside it in Resources.
+            dylib = Path(_rp) / "libdivoom_compact.dylib"
+            if dylib.exists():
+                rust_env_extra["DIVOOMD_ENCODER_LIB"] = str(dylib)
     if not rust_bin:
         repo_root = Path(__file__).resolve().parents[2]
         for folder in ["release", "debug"]:
@@ -163,14 +175,16 @@ def spawn_daemon(
                 break
     # Default to the native Rust daemon when its binary is available (it is now at
     # parity with the Python daemon + cloud-decode-verified); fall back to the Python
-    # daemon otherwise — e.g. the packaged .app doesn't bundle `divoomd`. An explicit
-    # DIVOOM_USE_RUST_DAEMON=0/1 overrides the auto-detection (Python kept as the
-    # reference/fallback implementation, never removed).
+    # daemon otherwise. An explicit DIVOOM_USE_RUST_DAEMON=0/1 overrides the
+    # auto-detection (Python kept as the reference/fallback implementation).
     _flag = os.environ.get("DIVOOM_USE_RUST_DAEMON")
     if _flag is not None:
         use_rust = _flag.lower() in ("1", "true", "yes")
     else:
         use_rust = rust_bin is not None
+    # Resolve the bundled python up front: it's None outside a py2app .app, and the
+    # disclaim decision below reads it for BOTH daemon kinds.
+    bundle_py = bundle_python()
     if use_rust:
         bin_path = rust_bin or "divoomd"
         cmd = [bin_path, "--socket", socket_path]
@@ -181,7 +195,6 @@ def spawn_daemon(
         # so `-m divoom_lib.cli` resolves; and DON'T disclaim, because the .app is
         # already the BT-responsible process (its Info.plist declares the usage), so
         # the daemon inherits a correct, granted responsibility.
-        bundle_py = bundle_python()
         exe = bundle_py or python or sys.executable
         cmd = [exe, "-m", "divoom_lib.cli", "daemon", "--socket", socket_path]
         if mac:
@@ -193,7 +206,10 @@ def spawn_daemon(
     except OSError:
         pass
 
-    if sys.platform == "darwin" and bundle_py is None:
+    # TCC disclaim is a Python-daemon device: it re-attributes the spawned python to
+    # the granted python identity. The native divoomd is a distinct binary — don't
+    # disclaim it; spawn it directly so a bundle child inherits the .app's BT grant.
+    if sys.platform == "darwin" and bundle_py is None and not use_rust:
         try:
             pid = _spawn_disclaimed_macos(cmd, log_path)
             logger.info("Spawned daemon (TCC-disclaimed, granted python identity) pid=%s", pid)
@@ -207,9 +223,11 @@ def spawn_daemon(
     except OSError:
         _out = _err = subprocess.DEVNULL
     logger.info("Spawning daemon (Popen, detach=%s): %s", detach, " ".join(cmd))
+    spawn_env = os.environ.copy()
+    spawn_env.update(rust_env_extra)  # e.g. DIVOOMD_ENCODER_LIB for the bundled daemon
     return subprocess.Popen(
         cmd, stdout=_out, stderr=_err, stdin=subprocess.DEVNULL,
-        start_new_session=detach, env=os.environ.copy(),
+        start_new_session=detach, env=spawn_env,
     )
 
 
