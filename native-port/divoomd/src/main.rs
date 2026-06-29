@@ -122,8 +122,14 @@ async fn main() {
     let daemon = Arc::new(Daemon::new_with_mac(args.mac));
     daemon.initialize_self_weak(Arc::downgrade(&daemon));
 
-    // Spawn monthly best background sync task
-    tokio::spawn(divoomd::monthly_best::monthly_best_loop_task(daemon.clone()));
+    // Monthly-best background sync is OPT-IN (parity: in Python it is a SEPARATE
+    // daemon, not the main one). Without this gate the main daemon would push
+    // gallery animations to every configured device on each startup. Enable with
+    // DIVOOMD_MONTHLY_BEST=1.
+    if matches!(std::env::var("DIVOOMD_MONTHLY_BEST").as_deref(), Ok("1") | Ok("true") | Ok("yes")) {
+        eprintln!("divoomd: monthly-best background sync enabled");
+        tokio::spawn(divoomd::monthly_best::monthly_best_loop_task(daemon.clone()));
+    }
 
     let unix_fut = serve(listener, daemon.clone());
 
