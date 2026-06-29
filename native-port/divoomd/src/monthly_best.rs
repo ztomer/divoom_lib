@@ -205,7 +205,7 @@ async fn sync_files_to_device(
         // NOT raw-stream undecodable containers (magic 9/18/26 AES, 0xAA hot) — the
         // device can't parse them and sticks in its loading animation. Those need
         // the frame→GIF / LZO decoders that are not yet ported; skip honestly.
-        let success = match crate::art_codec::resolve_to_image_bytes(&file_bytes) {
+        let success = match crate::media::resolve_to_gif(&file_bytes) {
             Some(img) => {
                 let req_show = Request {
                     command: "device_call".to_string(),

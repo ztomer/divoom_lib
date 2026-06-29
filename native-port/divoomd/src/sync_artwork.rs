@@ -15,8 +15,8 @@
 use base64::Engine;
 use serde_json::{json, Value};
 
-use crate::art_codec::resolve_to_image_bytes;
 use crate::daemon::Daemon;
+use crate::media::resolve_to_gif;
 use crate::protocol::{err_reply, Request};
 
 pub async fn sync_artwork(daemon: &Daemon, args: &Value) -> Value {
@@ -48,13 +48,12 @@ pub async fn sync_artwork(daemon: &Daemon, args: &Value) -> Value {
         return err_reply("sync_artwork: downloaded file too small");
     }
 
-    let img = match resolve_to_image_bytes(&file_bytes) {
+    let img = match resolve_to_gif(&file_bytes) {
         Some(b) => b,
         None => {
             return err_reply(&format!(
-                "sync_artwork: container magic {} not yet decodable in the native daemon \
-                 (GIF/PNG/JPG/magic-43 supported; magic 9/18/26 + 0xAA pending LZO/frame-GIF \
-                 port). Use the Python daemon for this file.",
+                "sync_artwork: unrecognized container magic {} (could not resolve to an image; \
+                 never raw-streamed to avoid sticking the device).",
                 file_bytes[0]
             ));
         }

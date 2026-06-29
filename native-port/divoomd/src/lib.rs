@@ -34,6 +34,7 @@ pub mod macos_notifications;
 pub mod transport;
 pub mod spp;
 pub mod cloud;
+pub mod media;
 pub mod monthly_best;
 pub mod sync_artwork;
 pub mod mock_transport;

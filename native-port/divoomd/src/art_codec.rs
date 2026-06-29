@@ -1,6 +1,8 @@
-//! Cloud-format codecs for art.rs: AES-CBC, magic-43/9/0xAA decoders,
+//! Cloud-format codecs for art.rs: AES-CBC, magic-43/9/18/26/0xAA decoders,
 //! image rescaling, SHA-1 hash. These are pure functions; split from
 //! art.rs to keep both files under the 500-LOC ground rule.
+
+use minilzo_rs::LZO;
 
 // ── AES-CBC cloud container decoder (magic 9/18/26) ──────────────────────
 
@@ -182,6 +184,71 @@ pub(crate) fn decode_cloud_magic9(data: &[u8]) -> Option<(Vec<Vec<u8>>, u32)> {
     Some((frames, if speed >= 10 { speed } else { 100 }))
 }
 
+/// Decode a magic 18/26 cloud container: header `>BHBB`
+/// `[magic][total_frames][speed:2 BE][row_count][column_count]`, then AES-CBC over
+/// the rest, then per frame `[size:4 BE]` + LZO1X-compressed payload that inflates
+/// to `row*col*768` bytes, reassembled via `compact_tiles`. Returns
+/// `(frames, width, height, duration_ms)` — each frame is `width*height*3` RGB.
+/// Mirrors Python `media_decoder.decode_cloud_frames` (magic 18/26).
+pub(crate) fn decode_cloud_magic18_26(data: &[u8]) -> Option<(Vec<Vec<u8>>, u32, u32, u32)> {
+    if data.len() < 6 { return None; }
+    let magic = data[0];
+    if magic != 18 && magic != 26 { return None; }
+    let total_frames = data[1] as usize;
+    let speed = u16::from_be_bytes([data[2], data[3]]) as u32;
+    let row_count = data[4] as usize;
+    let column_count = data[5] as usize;
+    if row_count == 0 || column_count == 0 { return None; }
+    let decrypted = aes_cbc_decrypt(&data[6..])?;
+    let uncompressed = row_count * column_count * 768;
+    let lzo = LZO::init().ok()?;
+    let mut frames = Vec::new();
+    let mut pos = 0usize;
+    for _ in 0..total_frames.min(24) {
+        if pos + 4 > decrypted.len() { break; }
+        let frame_size =
+            u32::from_be_bytes([decrypted[pos], decrypted[pos + 1], decrypted[pos + 2], decrypted[pos + 3]]) as usize;
+        pos += 4;
+        if pos + frame_size > decrypted.len() { break; }
+        let compressed = &decrypted[pos..pos + frame_size];
+        pos += frame_size;
+        let raw = lzo.decompress_safe(compressed, uncompressed).ok()?;
+        frames.push(compact_tiles(&raw, row_count, column_count));
+    }
+    if frames.is_empty() { return None; }
+    let width = (column_count * 16) as u32;
+    let height = (row_count * 16) as u32;
+    Some((frames, width, height, if speed >= 10 { speed } else { 100 }))
+}
+
+/// Reassemble `row_count×column_count` 16×16 tiles (concatenated in grid order,
+/// each tile row-major RGB) into one `(col*16)×(row*16)` RGB frame. Pure-Python
+/// `_compact_tiles` fallback ported byte-for-byte.
+fn compact_tiles(data: &[u8], row_count: usize, column_count: usize) -> Vec<u8> {
+    let width = column_count * 16;
+    let height = row_count * 16;
+    let mut out = vec![0u8; width * height * 3];
+    let mut pos = 0usize;
+    for grid_y in 0..row_count {
+        for grid_x in 0..column_count {
+            for y in 0..16 {
+                for x in 0..16 {
+                    if pos + 3 <= data.len() {
+                        let px = grid_x * 16 + x;
+                        let py = grid_y * 16 + y;
+                        let oidx = (py * width + px) * 3;
+                        out[oidx] = data[pos];
+                        out[oidx + 1] = data[pos + 1];
+                        out[oidx + 2] = data[pos + 2];
+                        pos += 3;
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Decode a 0xAA hot-file format into raw 768-byte RGB frames.
 pub(crate) fn decode_hot_file(data: &[u8]) -> Option<Vec<(Vec<u8>, u32)>> {
     if data.len() < 7 || data[0] != 0xAA { return None; }
@@ -206,7 +273,13 @@ pub(crate) fn decode_hot_file(data: &[u8]) -> Option<Vec<(Vec<u8>, u32)>> {
             for _ in 0..n_colors_raw { palette.push([data[pos], data[pos+1], data[pos+2]]); pos += 3; }
         }
         if palette.is_empty() { break; }
-        let bpp = (palette.len().saturating_sub(1)).next_power_of_two().trailing_zeros() as usize;
+        // bits-per-pixel = (palette_len - 1).bit_length() — ceil(log2) of the index
+        // space. (The old next_power_of_two().trailing_zeros() under-counted for
+        // non-power-of-two palette sizes, e.g. len 3 gave 1 instead of 2.)
+        let bpp = {
+            let x = palette.len() - 1;
+            if x == 0 { 0 } else { (usize::BITS - x.leading_zeros()) as usize }
+        };
         let indices: Vec<usize> = if bpp == 0 {
             vec![0usize; 256]
         } else {
@@ -226,4 +299,54 @@ pub(crate) fn decode_hot_file(data: &[u8]) -> Option<Vec<(Vec<u8>, u32)>> {
 }
 
 // ── encode one animation frame body using the C dylib ────────────────────
+
+#[cfg(test)]
+mod parity_tests {
+    //! Byte-for-byte parity against the Python `media_decoder` oracle. Fixtures in
+    //! `tests/cloud_fixtures/` are real cloud files + their Python-decoded frames
+    //! (see the fixture generator in the round notes). These prove the Rust cloud
+    //! decoders match Python BEFORE anything is pushed to a device.
+    use super::*;
+    use std::path::PathBuf;
+
+    fn fpath(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/cloud_fixtures").join(name)
+    }
+    fn raw(name: &str) -> Vec<u8> {
+        std::fs::read(fpath(name)).expect("fixture .bin")
+    }
+    fn oracle(name: &str) -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(fpath(name)).expect("fixture .json")).expect("json")
+    }
+    fn unhex(s: &str) -> Vec<u8> {
+        (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+    }
+
+    #[test]
+    fn magic9_matches_python_oracle() {
+        let (frames, dur) = decode_cloud_magic9(&raw("magic9.bin")).expect("magic9 decode");
+        let o = oracle("magic9.json");
+        let exp = o["frames"].as_array().unwrap();
+        assert_eq!(dur, o["dur"].as_u64().unwrap() as u32, "duration");
+        assert_eq!(frames.len(), exp.len(), "frame count");
+        for (i, (got, e)) in frames.iter().zip(exp).enumerate() {
+            assert_eq!(*got, unhex(e.as_str().unwrap()), "magic9 frame {i} bytes differ from Python");
+        }
+    }
+
+    #[test]
+    fn magic18_matches_python_oracle() {
+        let (frames, w, h, dur) = decode_cloud_magic18_26(&raw("magic18.bin")).expect("magic18 decode");
+        let o = oracle("magic18.json");
+        let size = o["size"].as_array().unwrap();
+        assert_eq!(w, size[0].as_u64().unwrap() as u32, "width");
+        assert_eq!(h, size[1].as_u64().unwrap() as u32, "height");
+        assert_eq!(dur, o["dur"].as_u64().unwrap() as u32, "duration");
+        let exp = o["frames"].as_array().unwrap();
+        assert_eq!(frames.len(), exp.len(), "frame count");
+        for (i, (got, e)) in frames.iter().zip(exp).enumerate() {
+            assert_eq!(*got, unhex(e.as_str().unwrap()), "magic18 frame {i} bytes differ from Python");
+        }
+    }
+}
 

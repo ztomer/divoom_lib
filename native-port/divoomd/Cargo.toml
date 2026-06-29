@@ -36,6 +36,9 @@ plist = "1"
 sysinfo = "0.30"
 md-5 = "0.10"
 hmac = "0.12"
+# LZO1X decompression for magic 18/26 cloud containers (parity with the Python
+# daemon's lzallright/liblzo2). Pure Rust port of minilzo.
+minilzo-rs = "0.6"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "test-util"] }
