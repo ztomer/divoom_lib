@@ -4,6 +4,18 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI port: Phase 3a (Device Settings) (2026-06-29)
+
+- **`divoom-ui/src/device_settings.rs`** (new): the Device Settings tab — device
+  name, clock format (12/24h), temp unit, power mode, auto power-off, orientation,
+  mirror/flip, confirm-gated factory reset; each wired to the device_call leaf the
+  Python `ToolsApi` uses (verified vs the Rust dispatch). `sync_time` is a real
+  daemon gap (Python uses `DateTimeCommand`, not a device_call leaf) → button
+  disabled with a note (no faked method).
+- Added a generic `Cmd::Raw`/`Update::Reply` daemon-RPC path (reply tag → stored in
+  `app.replies`) for the upcoming Settings/Schedule/gallery tabs; `DIVOOM_UI_TAB`
+  screenshot aid. Verified by self-screenshot.
+
 ### Post-v0.20.2 — Native UI port: Phase 1+2 (events + Channels) (2026-06-29)
 
 - **Phase 1** (`divoom-ui/src/daemon.rs`): `subscribe` event thread for live

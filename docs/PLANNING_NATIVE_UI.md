@@ -161,9 +161,12 @@ Each phase ends compiling + verifiable; the Python UI stays default until cutove
   `LightingApi._render_text_png`), **Sessions** (Sleep Aid), and clock color
   (`set_clock_rich` richness — `show_clock` is white-only on device).
 
-### Phase 3 — Remaining tabs
-- Live Widgets (gallery image grids — egui texture loading), Pixel Art editor,
-  Virtual Wall, Schedule (routines + alarms week-table), Device Settings, Settings.
+### Phase 3 — Remaining tabs (in progress)
+- **Device Settings ✓ DONE (3a)** — `device_settings.rs`, all controls wired to
+  device_call leaves; `sync_time` flagged as a daemon gap (port `DateTimeCommand`).
+- Remaining: Settings (app-level RPCs via `Cmd::Raw`), Schedule (alarms week-table),
+  Live Widgets (gallery image grids — egui texture loading), Pixel Art editor,
+  Virtual Wall, + Channels Text push / Sessions.
 - Local state (presets) ported straight; media/gallery/scan forward to `divoomd`.
 
 ### Phase 4 — Native tray/menubar + packaging + cutover

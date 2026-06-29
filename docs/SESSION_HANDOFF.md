@@ -67,9 +67,23 @@ Claude) should read this on entry and **update it at the end of every round**
   - **Verified** by self-screenshots: clock/ambient/scoreboard panels render
     faithfully against a no-BLE daemon (device_call returns "no device" — expected
     without hardware; wiring is correct).
-  - **Next:** Phase 3 (Live Widgets/gallery, Pixel Art, Wall, Schedule, Device
-    Settings, Settings; + Text/Sessions) then Phase 4 (tray menubar + packaging +
-    cutover). Hardware exercise needs the user to start the BLE daemon.
+  - **Phase 3a DONE** (`device_settings.rs`, new): the **Device Settings** tab —
+    device name, clock format (12/24h), temp unit, power mode, auto power-off,
+    orientation (0/90/180/270), mirror/flip, confirm-gated factory reset; each
+    wired to the device_call leaf the Python `ToolsApi` uses (verified vs Rust
+    dispatch). **`sync_time` is a real daemon gap** (Python uses `DateTimeCommand`
+    directly, not a device_call leaf) → button disabled w/ note; **TODO: port
+    DateTimeCommand to a `divoomd` device_call leaf** for full parity.
+    Added generic `Cmd::Raw`/`Update::Reply` (top-level daemon RPC w/ reply tag,
+    stored in `app.replies`) for the remaining tabs; `DIVOOM_UI_TAB` screenshot aid.
+  - **Next (Phase 3 remainder):** Settings tab (app-level: notifications toggle via
+    start/stop_notifications + notification_status; LAN via probe_lan/save_lan_config;
+    keep-alive; MCP server is a subprocess — GUI-local, defer), Schedule
+    (get_alarms/set_alarm week-table), Live Widgets (gallery grids — needs egui
+    texture loading + fetch_gallery), Pixel Art editor, Virtual Wall, and Channels
+    Text push (needs the bitmap-font→image render) + Sessions. Then Phase 4 (tray
+    menubar via tray-icon/muda + per-OS packaging + cutover). Hardware exercise
+    needs the user to start the BLE daemon (Claude's shell can't BLE-run it).
   - **Gotcha:** can't BLE-run `divoomd` from Claude's shell (TCC crash) — test the
     UI against the **no-BLE** daemon build. `screencapture` CLI yields a black
     frame (no Screen-Recording grant) → use the in-app self-screenshot instead.
