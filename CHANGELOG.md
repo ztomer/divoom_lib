@@ -7,6 +7,24 @@ shipped milestone (per the project planning docs).
 ### Post-v0.20.2 — Rust parity loop: cloud decode + device_call methods (2026-06-29)
 
 Driving the native daemon to full parity with the Python implementation.
+**RESULT: device_call method parity COMPLETE (0 gaps vs the Python Divoom API).**
+
+- **device_call parity finished** (54 → 0 gaps). Beyond the earlier display/control/
+  weather batch, ported verbatim with wire-byte tests: light/tool read-backs +
+  hot_update.show_hot_channel; the full `animation` subsystem (10 — gif/user-define
+  upload primitives, control-word handlers, LE/BE orders); `music` SD-card (13 —
+  setters + read-backs); the `drawing` subsystem (14 — pads/movie/sand/scan;
+  pic_scan_ctrl flagged UNVERIFIED per the APK audit); tool.set_tool_info;
+  hot_update.update (routes to the top-level streamer).
+- **monthly_best fixed**: used non-existent connect_device/disconnect_device (could
+  never connect); now connect/disconnect. Also **gated behind DIVOOMD_MONTHLY_BEST**
+  (default off) — parity: Python's monthly-best is a separate opt-in daemon, not the
+  main one (avoids fleet-wide auto-push on startup).
+- **Rust daemon is now the default** (`DIVOOM_USE_RUST_DAEMON` defaults on when the
+  divoomd binary is present; Python kept as reference/fallback, never removed).
+- **Device verification**: the decoded magic-18 cloud animation renders on Pixoo,
+  Tivoo-Max, and Timoo (Ditoo was off-air during the run). cargo test 70/70 both
+  matrices.
 
 - **Cloud image decode parity** (the big one): ported `media_decoder.resolve_to_gif`
   — magic 9/18/26 (AES + per-frame LZO1X via `minilzo-rs` + `_compact_tiles`) and

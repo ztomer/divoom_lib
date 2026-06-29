@@ -18,31 +18,32 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **PARITY LOOP IN PROGRESS (2026-06-29, /loop "until parity with Python"):**
+- **PARITY ACHIEVED (2026-06-29, /loop "until parity with Python") — COMPLETE:**
+  - **device_call method parity: 54 → 0 gaps** vs the Python Divoom API (excluding
+    internal `protocol.*` plumbing). New Rust submodules `device_call/{animation,
+    music,drawing}.rs` + additions to basic/system/tools, all ported verbatim from
+    `divoom_lib` with wire-byte mock tests pinning payloads + LE/BE orders. Covers
+    display channels, control, weather, light/tool read-backs, hot_update, the
+    animation gif/user-define primitives, SD-card music, and the drawing-pad
+    subsystem (`pic_scan_ctrl` 0x35 ported but flagged UNVERIFIED — no 0x35 in the
+    APK). Re-run the audit any time: introspect the Divoom facade, dedupe by
+    underlying qualname, diff leaf names vs the Rust `device_call` match arms.
   - **Cloud image decode parity DONE + verified** (the dominant gap): ported
     `media_decoder.resolve_to_gif` — magic 9/18/26 (AES + LZO1X via `minilzo-rs` +
-    `_compact_tiles`) + 0xAA → frames → GIF (`src/media.rs`, decoders in
-    `art_codec.rs`); fixed a real 0xAA bpp under-count. BYTE-PARITY tests vs Python
-    oracle fixtures (`tests/cloud_fixtures/`, magic 9 + 18) + resolve→GIF round-trip.
-    HW-confirmed: a magic-18 gallery file renders on a real Pixoo (was the
-    "stuck-in-loading" bug — caused by raw-streaming the undecodable AES container).
-  - **device_call methods added** (audit-driven, verbatim from divoom_lib + wire
-    tests): display.show_effects/show_visualization/show_scoreboard/
-    set_temperature_channel/switch_channel/display_image; control.set_light_mode/
-    set_hot(0x26)/set_keyboard(0x23); weather.set/set_temperature/set_weather.
-  - **Audit: 54 → 42 genuine device_call gaps remain.** By namespace: animation 10,
-    drawing 14, music-SD 13, hot_update 2, light 1 (get_light_mode, 0x46 read-back),
-    tool 2 (get/set_tool_info). Method to reproduce the audit is in git history of
-    this session (introspect Divoom facade, dedupe by underlying qualname, diff leaf
-    names vs Rust device_call match arms).
-  - **NEXT in the loop:** read-back parsers (light.get_light_mode 0x46,
-    tool.get_tool_info 0x71 — need response byte offsets); animation.* gif variants;
-    music SD-card subsystem; drawing.* subsystem; namespace aliases
-    (system./sound.* → existing handlers); fix monthly_best `connect_device`→`connect`
-    + arg keys; verify on the other 3 devices (Ditoo/Tivoo-Max/Timoo); then flip the
-    `DIVOOM_USE_RUST_DAEMON` default (prefer Rust when binary present). Python stays
-    as reference (never delete).
-  - cargo test 68/68 both matrices; all parity verified OFFLINE before device pushes.
+    `_compact_tiles`) + 0xAA → frames → GIF (`src/media.rs`); fixed a real 0xAA bpp
+    bug. BYTE-PARITY tests vs Python oracle fixtures (`tests/cloud_fixtures/`).
+  - **monthly_best fixed** (connect/disconnect command names) + **gated behind
+    `DIVOOMD_MONTHLY_BEST`** (default off; parity with Python's separate opt-in
+    daemon).
+  - **Rust is now the default daemon** (`DIVOOM_USE_RUST_DAEMON` defaults on when
+    `divoomd` is present; Python kept as reference/fallback, **never deleted**).
+  - **Device-verified**: the decoded magic-18 cloud animation renders on **Pixoo,
+    Tivoo-Max, Timoo** (Ditoo was off-air). `cargo test` 70/70 both matrices; all
+    parity verified offline before device pushes.
+  - **Open**: re-verify Ditoo when it's back in range; the niche drawing/SD-music/
+    animation methods are wire-tested but NOT hardware-verified (no device flows to
+    exercise them). The connect-flakiness mitigation (poll-until-found) helps but
+    BLE discovery can still miss a sleeping device.
 
 - **NATIVE PORT HARDENING — Phases 1–4 DONE; Phase 5 gated (2026-06-28):**
   Phase 4 Tier B was verified on a **real Timoo over BLE** via the granted `.app`

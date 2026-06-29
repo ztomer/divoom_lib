@@ -122,10 +122,16 @@ build restored + CI-gated (both feature matrices), 500-LOC compliance gated, E2E
 verified hardware-free (CI) and on a **real Timoo over BLE** (connect/brightness/
 exclusive/MCP/disconnect). `cargo test` 63/63 both matrices.
 
-**Remaining → `docs/PLANNING_NATIVE_PORT_HARDENING.md`** (Phase 5, gated): close the
-last command-parity gaps (`probe_lan`, `sync_artwork`; `shutdown` done), flip the
-Rust default after a soak, then archive the Python daemon backend — the irreversible
-archival held for explicit user sign-off.
+**Parity (2026-06-29): COMPLETE.** Full `device_call` method parity (54 → 0 gaps vs
+the Python Divoom API) + full cloud image-decode parity (magic 9/18/26 AES/LZO +
+0xAA → GIF, byte-verified vs the Python oracle, rendered on Pixoo/Tivoo-Max/Timoo).
+The Rust daemon is now the **default** (`DIVOOM_USE_RUST_DAEMON` on when `divoomd`
+is present); the Python backend is **kept as the reference/fallback implementation,
+never deleted** (per user directive). Niche subsystems (drawing-pad, SD-music,
+animation gif-chunk primitives) are wire-tested but not hardware-verified.
+
+**Remaining (optional):** re-verify Ditoo when in range; hardware-exercise the niche
+subsystems if/when those device flows are available.
 
 ---
 
