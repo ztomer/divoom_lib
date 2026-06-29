@@ -4,6 +4,21 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI port: Phase 3 complete + Phase 4a tray (2026-06-29)
+
+- **Phase 3 complete** — all 7 sidebar tabs live (placeholder removed):
+  `settings.rs` (notifications/LAN/keep-alive via `Cmd::Raw`), `schedule.rs` (5
+  alarm slots → `alarm.set_alarm`), `pixel_art.rs` (16x16 paint editor → `show_image`
+  rgb kwargs), `wall.rs` (device slots → `wall_configure`), `widgets.rs` (gallery
+  `fetch_gallery` — count + cloud-auth note; thumbnails deferred). Verified by
+  self-screenshot. Deferred (documented): gallery thumbnail render, Channels Text
+  push (bitmap font), Sessions, clock color.
+- **Phase 4a** — `tray.rs`: cross-platform native tray/menubar via `tray-icon`
+  (MIT) mirroring `divoom_menubar` (Show Dashboard / Start-Stop Notifications /
+  Quit; label tracks live state; same-process). Builds + runs without crash.
+- **Remaining (user-gated):** per-OS packaging + cutover (flip default launcher) —
+  needs the macOS BT grant + user review; Python UI stays the reference.
+
 ### Post-v0.20.2 — Native UI port: Phase 3a (Device Settings) (2026-06-29)
 
 - **`divoom-ui/src/device_settings.rs`** (new): the Device Settings tab — device

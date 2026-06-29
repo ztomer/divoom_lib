@@ -1,7 +1,8 @@
 # PLANNING — Native Rust Menubar + UI
 
-Status: **Phases 0-2 done (2026-06-29)** — `native-port/divoom-ui/` scaffolded,
-rendering, with live daemon events and the Channels tab wired to `device_call`. Goal: replace the Python presentation layer (pywebview GUI + pyobjc
+Status: **Phases 0-3 done + Phase 4a (tray) done (2026-06-29)** —
+`native-port/divoom-ui/` is feature-complete across all 7 tabs + a native tray
+menubar. Remaining: Phase 4b packaging + cutover (user-gated). Goal: replace the Python presentation layer (pywebview GUI + pyobjc
 menubar) with native Rust, completing the native port so the shipped app has **no
 Python runtime at all**.
 
@@ -170,14 +171,18 @@ Each phase ends compiling + verifiable; the Python UI stays default until cutove
 - Local state (presets) ported straight; media/gallery/scan forward to `divoomd`.
 
 ### Phase 4 — Native tray/menubar + packaging + cutover
-- Cross-platform tray via **`tray-icon`** + **`muda`** mirroring `divoom_menubar`
-  (device section, color-coded status, Launch/Notifications/Quit). On macOS render
-  device-thumbnail icons via `objc2-app-kit` if `tray-icon`'s API is too coarse.
-- Package per-OS (macOS `.app` with a real `Info.plist` — BT strings + tray-mode
-  `LSUIElement`; the daemon's `-sectcreate` hack is unneeded for a real app).
-  Bundle `divoomd` + encoder dylib. Update build scripts + Homebrew cask.
-- Flip the default launcher to `divoom-ui`; archive the Python UI in-tree
-  (**never deleted** — reference implementation). The bundle is now Python-free.
+- **4a ✓ DONE** — `tray.rs`: cross-platform tray via **`tray-icon`** mirroring
+  `divoom_menubar` (Show Dashboard / Start-Stop Notifications / Quit; label tracks
+  live state). Built lazily on first frame; events polled from the eframe loop;
+  same-process (Show Dashboard focuses the window). Device-section thumbnails +
+  color-coded status are a later polish (objc2-app-kit if needed).
+- **4b — REMAINING, USER-GATED:** package per-OS (macOS `.app` with a real
+  `Info.plist` — BT strings + tray-mode `LSUIElement`; the daemon's `-sectcreate`
+  hack is unneeded for a real app). Bundle `divoomd` + encoder dylib. Update build
+  scripts + Homebrew cask. **Then cutover:** flip the default launcher to
+  `divoom-ui`; archive the Python UI in-tree (**never deleted**). Cutover changes
+  what ships and needs the macOS BT grant (physical click) + user review → not done
+  autonomously.
 
 ---
 

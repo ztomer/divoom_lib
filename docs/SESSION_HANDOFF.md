@@ -76,14 +76,34 @@ Claude) should read this on entry and **update it at the end of every round**
     DateTimeCommand to a `divoomd` device_call leaf** for full parity.
     Added generic `Cmd::Raw`/`Update::Reply` (top-level daemon RPC w/ reply tag,
     stored in `app.replies`) for the remaining tabs; `DIVOOM_UI_TAB` screenshot aid.
-  - **Next (Phase 3 remainder):** Settings tab (app-level: notifications toggle via
-    start/stop_notifications + notification_status; LAN via probe_lan/save_lan_config;
-    keep-alive; MCP server is a subprocess — GUI-local, defer), Schedule
-    (get_alarms/set_alarm week-table), Live Widgets (gallery grids — needs egui
-    texture loading + fetch_gallery), Pixel Art editor, Virtual Wall, and Channels
-    Text push (needs the bitmap-font→image render) + Sessions. Then Phase 4 (tray
-    menubar via tray-icon/muda + per-OS packaging + cutover). Hardware exercise
-    needs the user to start the BLE daemon (Claude's shell can't BLE-run it).
+  - **Phase 3 DONE (3a/3b/3c)** — all 7 sidebar tabs are live (placeholder removed):
+    `settings.rs` (notifications start/stop/status, LAN probe/connect, keep-alive,
+    MCP deferred), `schedule.rs` (5 alarm slots → `alarm.set_alarm`), `pixel_art.rs`
+    (16x16 paint editor → `show_image` rgb kwargs via `Cmd::Raw`), `wall.rs`
+    (device slots → `wall_configure`), `widgets.rs` (gallery `fetch_gallery` — item
+    count + honest cloud-auth note; thumbnail render deferred). All verified by
+    self-screenshot. **Deferred (documented):** gallery thumbnail render + apply
+    (needs cloud auth + remote image fetch), Channels Text push (needs bitmap-font
+    →image render), Channels Sessions (Sleep Aid), clock color (`set_clock_rich`).
+  - **Phase 4a DONE** — `tray.rs`: cross-platform native tray/menubar via
+    **tray-icon** (MIT) mirroring `divoom_menubar` — Show Dashboard / Start-Stop
+    Notifications (label tracks live state) / Quit. Built lazily on first frame,
+    events polled from the eframe loop; same-process (Show Dashboard focuses the
+    window). Builds + runs without crash; **the system-menubar item needs USER
+    visual confirmation** (can't be captured by the in-app framebuffer screenshot).
+  - **REMAINING — Phase 4b (USER-GATED, not done autonomously):** per-OS packaging
+    (macOS `.app` + real Info.plist w/ BT strings + `LSUIElement`; codesign; dmg;
+    Homebrew cask) and **cutover** (flip the default launcher from the Python GUI to
+    `divoom-ui`). Cutover changes what ships + needs the macOS BT grant (physical
+    click) + user review — left for the user. Python UI stays the reference, never
+    deleted. Also pending: the `sync_time` daemon device_call leaf (task chip
+    spawned) to re-enable Device Settings' "Update device time".
+  - **How to run/verify the UI:** `cargo build` in `native-port/divoom-ui`; start a
+    no-BLE daemon (`divoomd --socket /tmp/x.sock` from a `--no-default-features`
+    build) and run `DIVOOM_SOCKET=/tmp/x.sock ./target/debug/divoom-ui`. Headless
+    screenshot: add `DIVOOM_UI_SCREENSHOT=out.png` (+ `DIVOOM_UI_TAB=`/`DIVOOM_UI_
+    CHANNEL=` to pick the view). Real-device exercise needs the user to start the
+    BLE daemon (Claude's shell can't BLE-run it — TCC crash).
   - **Gotcha:** can't BLE-run `divoomd` from Claude's shell (TCC crash) — test the
     UI against the **no-BLE** daemon build. `screencapture` CLI yields a black
     frame (no Screen-Recording grant) → use the in-app self-screenshot instead.
