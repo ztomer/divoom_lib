@@ -6,7 +6,7 @@
 //! module can't be unit-tested (it needs a device); its verification is over the
 //! socket against a real Pixoo/Ditoo once the daemon `.app` holds the BT grant.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use btleplug::api::{
     Central, CharPropFlags, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
@@ -79,16 +79,28 @@ impl BleTransport {
     /// services, subscribes to notifications, spawns the frame-parsing task, and
     /// runs the autoprobe to pick the framing.
     pub async fn connect(central: &Adapter, id: &str) -> BleResult<Self> {
-        // ensure the peripheral is known to the adapter
+        // Ensure the peripheral is known to the adapter. A single fixed scan window
+        // intermittently misses a device on macOS (its next advertisement may not
+        // land inside the window) — most visibly on RECONNECT after a disconnect.
+        // Poll the discovered set until the target appears or a deadline passes,
+        // mirroring the Python daemon's reconnect-scan retries.
         central.start_scan(ScanFilter::default()).await?;
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut found = None;
+        while Instant::now() < deadline {
+            if let Some(p) = central
+                .peripherals()
+                .await?
+                .into_iter()
+                .find(|p| p.id().to_string() == id)
+            {
+                found = Some(p);
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(400)).await;
+        }
         central.stop_scan().await?;
-        let peripheral = central
-            .peripherals()
-            .await?
-            .into_iter()
-            .find(|p| p.id().to_string() == id)
-            .ok_or("device not found in scan")?;
+        let peripheral = found.ok_or("device not found in scan")?;
 
         peripheral.connect().await?;
         peripheral.discover_services().await?;
