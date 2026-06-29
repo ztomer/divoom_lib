@@ -102,6 +102,14 @@ impl BleTransport {
         central.stop_scan().await?;
         let peripheral = found.ok_or("device not found in scan")?;
 
+        // NOTE (Linux/BlueZ): these dual-mode Divoom devices also advertise the
+        // classic SPP profile (UUID 0x1101), and BlueZ routes connect() to BR/EDR —
+        // returning org.bluez.Error.BREDR.ProfileUnavailable ("No more profiles to
+        // connect to") or a D-Bus "Timeout waiting for reply", even though the LE
+        // GATT link briefly comes up. CoreBluetooth (macOS) connects fine. Making
+        // BLE connect reliable on Linux needs forcing the LE transport / pairing /
+        // disabling BR/EDR — tracked in scripts/linux_remote/README.md. Scan works
+        // on Linux today; connect does not.
         peripheral.connect().await?;
         peripheral.discover_services().await?;
         let chars = peripheral.characteristics();
