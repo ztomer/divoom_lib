@@ -1,17 +1,22 @@
-//! `sync_artwork` command — Python-daemon parity. Download a cloud artwork by
-//! `file_id`, resolve it to a renderable payload, and show it on the currently
-//! connected device. Mirrors `device_owner.sync_artwork`: GIF / magic-43 container
-//! → `display.show_image`; anything else → raw `animation.stream_animation_8b`.
+//! `sync_artwork` command — Python-daemon parity (`device_owner.sync_artwork` +
+//! `media_decoder.resolve_to_gif`). Download a cloud artwork by `file_id`, resolve
+//! it to a renderable image, and show it on the connected device via
+//! `display.show_image` (which resizes NEAREST to the device size and 0x8B-streams,
+//! matching the Python resize-then-show path).
 //!
-//! Routes through `device_call` (so it targets the already-connected device and
-//! reuses the exclusive gate + encoder), passing the payload as an in-memory blob
-//! (no temp files, and the correct `blobs`/`kwargs` keys the dispatcher reads).
+//! PARITY NOTE: Python's `resolve_to_gif` also decodes AES cloud containers
+//! (magic 9/18/26) and 0xAA hot files. The native daemon currently resolves
+//! GIF/PNG/JPG and magic-43 (which covers files the device can render directly);
+//! magic 9/18/26 (AES, +LZO for 18/26) and 0xAA decode to raw RGB frame lists and
+//! are NOT yet ported. For those we return an HONEST error rather than raw-streaming
+//! undecodable bytes — raw-streaming a container the device can't parse leaves it
+//! stuck in its loading animation (observed on a Timoo with a magic-18 file).
 
 use base64::Engine;
 use serde_json::{json, Value};
 
+use crate::art_codec::resolve_to_image_bytes;
 use crate::daemon::Daemon;
-use crate::monthly_best::extract_gif_from_magic_43;
 use crate::protocol::{err_reply, Request};
 
 pub async fn sync_artwork(daemon: &Daemon, args: &Value) -> Value {
@@ -43,37 +48,27 @@ pub async fn sync_artwork(daemon: &Daemon, args: &Value) -> Value {
         return err_reply("sync_artwork: downloaded file too small");
     }
 
-    let has_gif = file_bytes.starts_with(b"GIF");
-    let has_m43 = file_bytes.starts_with(&[43]); // magic-43 container
-
-    let dispatch_args = if has_gif || has_m43 {
-        // Resolve to a plain GIF and render via display.show_image (the APK path).
-        let gif = if has_m43 {
-            match extract_gif_from_magic_43(&file_bytes) {
-                Some(g) => g,
-                None => return err_reply("sync_artwork: magic-43 container decode failed"),
-            }
-        } else {
-            file_bytes
-        };
-        json!({
-            "method": "display.show_image",
-            "kwargs": {"size": size},
-            "blobs": {"0": base64::engine::general_purpose::STANDARD.encode(&gif)},
-        })
-    } else {
-        // Unknown magic: last-resort raw 0x8B stream (matches the Python fallback).
-        json!({
-            "method": "animation.stream_animation_8b",
-            "blobs": {"0": base64::engine::general_purpose::STANDARD.encode(&file_bytes)},
-        })
+    let img = match resolve_to_image_bytes(&file_bytes) {
+        Some(b) => b,
+        None => {
+            return err_reply(&format!(
+                "sync_artwork: container magic {} not yet decodable in the native daemon \
+                 (GIF/PNG/JPG/magic-43 supported; magic 9/18/26 + 0xAA pending LZO/frame-GIF \
+                 port). Use the Python daemon for this file.",
+                file_bytes[0]
+            ));
+        }
     };
 
-    // Box the recursive dispatch (sync_artwork is itself reached via dispatch) so
-    // the async future has a finite size.
+    // display.show_image resizes (NEAREST) to `size` and 0x8B-streams. Box the
+    // recursive dispatch (sync_artwork is itself reached via dispatch).
     let res = Box::pin(daemon.dispatch(Request {
         command: "device_call".to_string(),
-        args: dispatch_args,
+        args: json!({
+            "method": "display.show_image",
+            "kwargs": {"size": size},
+            "blobs": {"0": base64::engine::general_purpose::STANDARD.encode(&img)},
+        }),
         token: None,
     }))
     .await;

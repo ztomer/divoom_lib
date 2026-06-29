@@ -121,6 +121,38 @@ pub(crate) fn aes128cbc_decrypt_impl(ct: &[u8], key: &[u8; 16], iv: &[u8; 16]) -
 
 // ── payload decoders (ported from divoom_lib/media_decoder.py) ────────────
 
+/// True if `d` begins with a GIF/PNG/JPG file signature.
+pub(crate) fn is_image_header(d: &[u8]) -> bool {
+    d.starts_with(b"GIF89a")
+        || d.starts_with(b"GIF87a")
+        || d.starts_with(b"\x89PNG\r\n\x1a\n")
+        || d.starts_with(b"\xff\xd8")
+}
+
+/// Resolve a downloaded cloud payload to displayable image-file bytes
+/// (GIF/PNG/JPG) the `image` crate can decode — the subset of Python's
+/// `media_decoder.resolve_to_gif` that yields a directly-renderable file.
+///
+/// Returns None for containers whose decoders produce raw RGB frame lists:
+/// magic 9/18/26 (AES; 18/26 also LZO) and 0xAA (hot). Those need a frame→GIF
+/// encode (and an LZO decoder for 18/26) that is not yet ported — callers must
+/// fail honestly rather than stream undecodable bytes (which sticks the device).
+pub(crate) fn resolve_to_image_bytes(data: &[u8]) -> Option<Vec<u8>> {
+    if data.len() < 4 {
+        return None;
+    }
+    if is_image_header(data) {
+        return Some(data.to_vec());
+    }
+    if data[0] == 43 {
+        let inner = decode_magic43(data)?;
+        if is_image_header(&inner) {
+            return Some(inner);
+        }
+    }
+    None
+}
+
 /// Decode a "magic 43" cloud container — returns the embedded GIF/PNG/JPG bytes.
 pub(crate) fn decode_magic43(data: &[u8]) -> Option<Vec<u8>> {
     if data.len() < 10 || data[0] != 43 { return None; }

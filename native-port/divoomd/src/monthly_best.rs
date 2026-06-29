@@ -201,63 +201,33 @@ async fn sync_files_to_device(
             continue;
         }
 
-        // Determine if file is a native binary payload or a GIF
-        let has_gif_magic = file_bytes.starts_with(b"GIF");
-        let has_m43_magic = file_bytes.starts_with(&[43]); // magic 43 container
-        
-        let is_gif = has_gif_magic || has_m43_magic;
-
-        let success = if is_gif {
-            // It is a GIF/image. Save to a temp file and send display.show_image.
-            let gif_data = if has_m43_magic {
-                match extract_gif_from_magic_43(&file_bytes) {
-                    Some(g) => g,
-                    None => {
-                        eprintln!("[ Wrn ] Failed to extract GIF from magic 43 container");
-                        continue;
-                    }
-                }
-            } else {
-                file_bytes
-            };
-
-            let temp_path = std::env::temp_dir().join(format!("mb_sync_temp_{}.gif", idx));
-            if let Err(e) = std::fs::write(&temp_path, &gif_data) {
-                eprintln!("[ Wrn ] Failed to write temp GIF file: {}", e);
-                continue;
+        // Resolve to a displayable image (GIF/PNG/JPG/magic-43) and show it. Do
+        // NOT raw-stream undecodable containers (magic 9/18/26 AES, 0xAA hot) — the
+        // device can't parse them and sticks in its loading animation. Those need
+        // the frame→GIF / LZO decoders that are not yet ported; skip honestly.
+        let success = match crate::art_codec::resolve_to_image_bytes(&file_bytes) {
+            Some(img) => {
+                let req_show = Request {
+                    command: "device_call".to_string(),
+                    args: json!({
+                        "method": "display.show_image",
+                        "kwargs": {"size": 16},
+                        "blobs": {
+                            "0": base64::engine::general_purpose::STANDARD.encode(&img)
+                        }
+                    }),
+                    token: None,
+                };
+                let res_show = daemon.dispatch(req_show).await;
+                res_show.get("success").and_then(|v| v.as_bool()).unwrap_or(false)
             }
-
-            let req_show = Request {
-                command: "device_call".to_string(),
-                args: json!({
-                    "method": "display.show_image",
-                    // device_call reads positional args from "args" and named from
-                    // "kwargs" (NOT "raw_args"/"kw") — using the wrong keys silently
-                    // dropped the path + size, so show_image errored.
-                    "args": [temp_path.to_str().unwrap_or("")],
-                    "kwargs": {"size": 16}
-                }),
-                token: None,
-            };
-
-            let res_show = daemon.dispatch(req_show).await;
-            res_show.get("success").and_then(|v| v.as_bool()).unwrap_or(false)
-        } else {
-            // Native binary payload. Stream it directly.
-            // Insert the binary payload into blob_map at index 0
-            // and dispatch animation.stream_animation_8b.
-            let req_stream = Request {
-                command: "device_call".to_string(),
-                args: json!({
-                    "method": "animation.stream_animation_8b",
-                    "blobs": {
-                        "0": base64::engine::general_purpose::STANDARD.encode(&file_bytes)
-                    }
-                }),
-                token: None,
-            };
-            let res_stream = daemon.dispatch(req_stream).await;
-            res_stream.get("success").and_then(|v| v.as_bool()).unwrap_or(false)
+            None => {
+                eprintln!(
+                    "[ Wrn ] {} (magic {}) not decodable in native daemon; skipping (no raw-stream)",
+                    file_name, file_bytes[0]
+                );
+                false
+            }
         };
 
         if success {
