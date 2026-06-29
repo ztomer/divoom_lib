@@ -103,8 +103,30 @@ pub struct DivoomApp {
     pub screen_dir: i64,
     pub screen_mirror: bool,
     pub confirm_reset: bool,
+    // --- Settings tab ---
+    pub lan_ip: String,
+    pub lan_token: String,
+    pub keep_alive: bool,
+    // --- Schedule tab (alarm slots) ---
+    pub alarms: Vec<Alarm>,
     /// Replies to `Cmd::Raw`, keyed by tag (Settings/Schedule/gallery read these).
     pub replies: std::collections::HashMap<String, serde_json::Value>,
+}
+
+/// One alarm slot, mirroring `tools.set_alarm(index, enabled, hour, minute, week,
+/// mode, trigger_mode)`. `week` is a 7-bit day mask (bit0=Mon … bit6=Sun).
+#[derive(Clone)]
+pub struct Alarm {
+    pub enabled: bool,
+    pub hour: i64,
+    pub minute: i64,
+    pub week: u8,
+}
+
+impl Default for Alarm {
+    fn default() -> Self {
+        Alarm { enabled: false, hour: 8, minute: 0, week: 0 }
+    }
 }
 
 impl DivoomApp {
@@ -161,6 +183,10 @@ impl DivoomApp {
             screen_dir: 0,
             screen_mirror: false,
             confirm_reset: false,
+            lan_ip: String::new(),
+            lan_token: String::new(),
+            keep_alive: true,
+            alarms: vec![Alarm::default(); 5],
             replies: std::collections::HashMap::new(),
         }
     }

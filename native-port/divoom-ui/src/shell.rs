@@ -234,6 +234,8 @@ pub fn content(app: &mut DivoomApp, ctx: &egui::Context) {
         match app.tab {
             Tab::Channels => channels_tab(app, ui),
             Tab::DeviceSettings => crate::device_settings::panel(app, ui),
+            Tab::Settings => crate::settings::panel(app, ui),
+            Tab::Schedule => crate::schedule::panel(app, ui),
             _ => placeholder(ui, app.tab.title()),
         }
         if let Some(err) = &app.last_error {
