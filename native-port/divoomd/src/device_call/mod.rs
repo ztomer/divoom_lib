@@ -17,6 +17,7 @@ pub struct CallCtx<'a> {
 pub mod basic;
 pub mod animation;
 pub mod music;
+pub mod drawing;
 pub mod alarm;
 pub mod sleep;
 pub mod timeplan;
@@ -231,6 +232,24 @@ pub async fn handle_device_call(
                 "system.set_sound_control" | "set_sound_control" | "device.set_sound_control" |
                 "system.get_sound_control" | "get_sound_control" | "device.get_sound_control" => {
                     system::handle(method, ctx).await
+                }
+
+                // drawing.rs (drawing-pad / sand-paint / movie / scan):
+                "drawing.set_light_pic" | "set_light_pic" |
+                "drawing.drawing_pad_exit" | "drawing_pad_exit" |
+                "drawing.drawing_mul_encode_gif_play" | "drawing_mul_encode_gif_play" |
+                "drawing.drawing_ctrl_movie_play" | "drawing_ctrl_movie_play" |
+                "drawing.drawing_mul_pad_enter" | "drawing_mul_pad_enter" |
+                "drawing.drawing_pad_ctrl" | "drawing_pad_ctrl" |
+                "drawing.drawing_mul_pad_ctrl" | "drawing_mul_pad_ctrl" |
+                "drawing.drawing_big_pad_ctrl" | "drawing_big_pad_ctrl" |
+                "drawing.drawing_mul_encode_single_pic" | "drawing_mul_encode_single_pic" |
+                "drawing.drawing_mul_encode_pic" | "drawing_mul_encode_pic" |
+                "drawing.drawing_encode_movie_play" | "drawing_encode_movie_play" |
+                "drawing.drawing_mul_encode_movie_play" | "drawing_mul_encode_movie_play" |
+                "drawing.sand_paint_ctrl" | "sand_paint_ctrl" |
+                "drawing.pic_scan_ctrl" | "pic_scan_ctrl" => {
+                    drawing::handle(method, ctx).await
                 }
 
                 // music.rs (SD-card music control):
