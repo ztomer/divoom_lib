@@ -73,7 +73,16 @@ trap - EXIT
 DIVOOMD_IN_APP="dist/Divoom.app/Contents/Resources/divoomd"
 if [[ -f "${DIVOOMD_IN_APP}" ]]; then
   chmod +x "${DIVOOMD_IN_APP}"
-  echo "→ bundled native daemon: $(ls -lh "${DIVOOMD_IN_APP}" | awk '{print $5}')"
+  # Re-sign the bundled copy so the adhoc signature covers the binary as shipped
+  # (py2app copies it post-build). The embedded __info_plist (NSBluetoothAlways…)
+  # lets macOS TCC attribute a Bluetooth grant to the daemon.
+  codesign --force --sign - "${DIVOOMD_IN_APP}" 2>/dev/null \
+    && echo "→ bundled native daemon: $(ls -lh "${DIVOOMD_IN_APP}" | awk '{print $5}') (re-signed)" \
+    || echo "WARN: codesign of ${DIVOOMD_IN_APP} failed"
+  if ! otool -s __TEXT __info_plist "${DIVOOMD_IN_APP}" | grep -q .; then
+    echo "ERROR: bundled divoomd is missing the embedded __info_plist (TCC BT grant won't work)." >&2
+    exit 1
+  fi
 else
   echo "ERROR: divoomd was not bundled into the .app (expected ${DIVOOMD_IN_APP})." >&2
   exit 1
