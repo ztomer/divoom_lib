@@ -109,6 +109,57 @@ mod tests {
         }
     }
 
+    /// Phase 4 Tier A: exclusive-mode gating end-to-end through the real daemon
+    /// dispatch, hardware-free (mock transport). Mirrors the Python R53 steal-reject
+    /// teeth tests: a second session's acquire is rejected IMMEDIATELY (no hang, no
+    /// steal), foreign-token device_calls are denied while held, and the slot frees
+    /// on release.
+    #[tokio::test]
+    async fn test_mock_exclusive_mode_gating() {
+        let d = setup_mock_daemon().await;
+
+        // Session A acquires the exclusive slot.
+        let a = d.handle(make_request("exclusive_start", Some(json!({"token": "sessA"})), None)).await;
+        assert!(a["success"].as_bool().unwrap_or(false), "A should acquire the slot");
+
+        // Session B's acquire is rejected immediately (steal-reject, no hang).
+        let b = d.handle(make_request("exclusive_start", Some(json!({"token": "sessB"})), None)).await;
+        assert!(!b["success"].as_bool().unwrap_or(true), "B's steal must be rejected");
+
+        // A device_call carrying B's token is denied while A holds the slot.
+        let denied = d.handle(make_request("device_call", Some(json!({
+            "method": "device.set_brightness", "args": [50], "token": "sessB"
+        })), None)).await;
+        assert!(!denied["success"].as_bool().unwrap_or(true), "B's call must be denied while A holds");
+
+        // A's own device_call routes through to the device.
+        let ok = d.handle(make_request("device_call", Some(json!({
+            "method": "device.set_brightness", "args": [50], "token": "sessA"
+        })), None)).await;
+        assert!(ok["success"].as_bool().unwrap_or(false), "A's own call should pass");
+
+        // A releases; B can now acquire.
+        let end = d.handle(make_request("exclusive_end", Some(json!({"token": "sessA"})), None)).await;
+        assert!(end["success"].as_bool().unwrap_or(false), "A should release");
+        let b2 = d.handle(make_request("exclusive_start", Some(json!({"token": "sessB"})), None)).await;
+        assert!(b2["success"].as_bool().unwrap_or(false), "B should acquire after release");
+
+        // Exactly one device_call (A's) reached the device, with the right wire bytes.
+        let device_lock = d.device.lock().await;
+        if let Some(ref transport_arc) = &*device_lock {
+            if let DeviceTransport::Mock(ref mock) = **transport_arc {
+                let cmds = mock.sent_commands.lock().unwrap();
+                assert_eq!(cmds.len(), 1, "only A's call should reach the device");
+                assert_eq!(cmds[0].0, 0x74);
+                assert_eq!(cmds[0].1, vec![50]);
+            } else {
+                panic!("Expected Mock transport");
+            }
+        } else {
+            panic!("Expected connected device");
+        }
+    }
+
     #[tokio::test]
     async fn test_mock_music_set_volume() {
         let d = setup_mock_daemon().await;

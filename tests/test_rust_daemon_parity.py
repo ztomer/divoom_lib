@@ -389,5 +389,43 @@ def test_rust_set_clock_rich(rust_daemon_ctx):
     assert "no device connected" in err or "not connected" in err
 
 
+def test_rust_mcp_via_daemon(rust_daemon_ctx):
+    """Phase 4 Tier A: MCP server -> DaemonDeviceProxy -> Rust daemon (mock device).
+
+    Drives the MCP layer end-to-end against the *Rust* daemon, hardware-free:
+    tools/list builds the catalog over a daemon-routing proxy, and a tools/call
+    round-trips through the Rust daemon's device_call to a mock device. (Exact wire
+    bytes are asserted in the Rust mock_device_tests; over the socket we can only
+    observe success, which is what this verifies.)
+    """
+    import asyncio
+    from divoom_daemon.daemon_client import DaemonDeviceProxy
+    from divoom_lib.mcp_server import MCPServer
+    from divoom_lib.mcp_tools import build_tool_catalog
+
+    client = rust_daemon_ctx
+    conn = client.send_command("connect", {"mock": True})
+    assert conn.get("success") is True, conn
+
+    proxy = DaemonDeviceProxy(client)
+    server = MCPServer(server_info={"name": "divoom-control", "version": "test"})
+    server.tools = build_tool_catalog(proxy)
+
+    async def drive():
+        listed = await server.handle(
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        names = {t["name"] for t in listed["result"]["tools"]}
+        assert "set_volume" in names and "set_brightness" in names, names
+
+        return await server.handle({
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "set_volume", "arguments": {"level": 8}},
+        })
+
+    called = asyncio.run(drive())
+    assert "result" in called, called
+    assert called["result"].get("isError") in (None, False), called
+
+
 
 
