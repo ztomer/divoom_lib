@@ -31,7 +31,8 @@ never deleted._
 - [x] ✓ `switch_channel` — covered: show_clock/effects/light/visualization are
   0x45 channel commands that switch the device channel implicitly; scoreboard via
   set_scoreboard. No redundant switch_channel needed.
-- [ ] ✗ Text push (`push_text`) — needs bitmap-font→image render
+- [x] ✓ Text push — embedded 5x7 bitmap font (`text_font.rs`) → render to 16x16 RGB
+  → `show_image`; live preview in the panel. Long text clipped (scroll: follow-up).
 - [x] ✓ Sessions panel: Sleep Aid (`sleep.show_sleep` kwargs), Stopwatch
   (`timer.set_timer` flag 1/0/2), Countdown (`countdown.set_countdown` flag 0/1 +
   m/s), Noise Meter (`noise.set_noise` flag 1/2)
@@ -97,6 +98,9 @@ never deleted._
 - 2026-06-29 iter1: read-backs (brightness/volume/device-name) fetched on
   device-connect (status idle→active) + applied to UI; clock-color bug fixed
   (set_clock_rich now sends kwargs). Added app.call_kw helper. Build green.
+- 2026-06-29 iter6: Text push — embedded 5x7 bitmap font (text_font.rs, glcdfont
+  subset A-Z/0-9/punct, unit-tested) rendered to a 16x16 RGB frame + live preview
+  in the Text panel; Push -> show_image. Verified by screenshot ("AB1" legible).
 - 2026-06-29 iter5: scoreboard read-back (rb_score on connect), Time Plan card
   (timeplan.set_time_manage_info), switch_channel confirmed covered by implicit
   0x45 channel switching. Build green.

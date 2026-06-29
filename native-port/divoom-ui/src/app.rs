@@ -218,7 +218,7 @@ impl DivoomApp {
             ambient_color: [0, 255, 204],
             score_blue: 0,
             score_red: 0,
-            text_content: String::new(),
+            text_content: std::env::var("DIVOOM_UI_TEXT").unwrap_or_default(),
             text_color: [0, 255, 204],
             text_speed: 50,
             text_effect: 1,

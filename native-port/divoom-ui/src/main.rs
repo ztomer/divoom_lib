@@ -15,6 +15,7 @@ mod pixel_art;
 mod schedule;
 mod settings;
 mod shell;
+mod text_font;
 mod theme;
 mod tray;
 mod wall;

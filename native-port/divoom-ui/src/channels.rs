@@ -159,9 +159,48 @@ fn text(app: &mut DivoomApp, ui: &mut egui::Ui) {
         ui.add(egui::Slider::new(&mut app.text_speed, 1..=100).show_value(false));
     });
     ui.add_space(12.0);
-    // push_text renders a bitmap font to an image on the GUI side (LightingApi
-    // ._render_text_png) then show_image — that font port is Phase 3.
-    ui.add_enabled(false, egui::Button::new("Push to Device (Phase 3)"));
+    // Live preview of the rendered 16x16 frame (also what gets pushed).
+    let frame = crate::text_font::render(&app.text_content, app.text_color, 16);
+    ui.horizontal(|ui| {
+        preview(ui, &frame, 16);
+        ui.add_space(12.0);
+        ui.vertical(|ui| {
+            ui.label(RichText::new("16x16 preview").size(11.0).color(theme::TEXT_MUTED));
+            if ui.button("Push to Device").clicked() {
+                let rgb: Vec<u8> = frame.iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
+                app.raw(
+                    "device_call",
+                    serde_json::json!({
+                        "method": "show_image", "args": [],
+                        "kwargs": { "w": 16, "h": 16, "time_ms": 100, "rgb": rgb }
+                    }),
+                    "text_push",
+                );
+            }
+            ui.label(RichText::new("Long text is clipped (scroll: follow-up).").size(10.0).color(theme::TEXT_MUTED));
+        });
+    });
+}
+
+fn preview(ui: &mut egui::Ui, frame: &[[u8; 3]], size: usize) {
+    let cell = 9.0;
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(cell * size as f32), egui::Sense::hover());
+    let p = ui.painter_at(rect);
+    p.rect_filled(rect, Rounding::ZERO, Color32::BLACK);
+    for y in 0..size {
+        for x in 0..size {
+            let c = frame[y * size + x];
+            if c != [0, 0, 0] {
+                let min = rect.left_top() + Vec2::new(x as f32 * cell, y as f32 * cell);
+                p.rect_filled(
+                    egui::Rect::from_min_size(min, Vec2::splat(cell)),
+                    Rounding::ZERO,
+                    Color32::from_rgb(c[0], c[1], c[2]),
+                );
+            }
+        }
+    }
+    p.rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, theme::BORDER));
 }
 
 fn text_effect_name(v: i64) -> &'static str {
