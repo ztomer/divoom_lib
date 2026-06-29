@@ -15,6 +15,7 @@ pub struct CallCtx<'a> {
 }
 
 pub mod basic;
+pub mod animation;
 pub mod alarm;
 pub mod sleep;
 pub mod timeplan;
@@ -229,6 +230,20 @@ pub async fn handle_device_call(
                 "system.set_sound_control" | "set_sound_control" | "device.set_sound_control" |
                 "system.get_sound_control" | "get_sound_control" | "device.get_sound_control" => {
                     system::handle(method, ctx).await
+                }
+
+                // animation.rs (gif/user-define upload primitives):
+                "animation.set_gif_speed" | "set_gif_speed" |
+                "animation.set_light_phone_gif" | "set_light_phone_gif" |
+                "animation.set_rhythm_gif" | "set_rhythm_gif" |
+                "animation.app_send_eq_gif" | "app_send_eq_gif" |
+                "animation.app_new_send_gif_cmd" | "app_new_send_gif_cmd" |
+                "animation.set_user_gif" | "set_user_gif" |
+                "animation.app_new_user_define" | "app_new_user_define" |
+                "animation.app_big64_user_define" | "app_big64_user_define" |
+                "animation.modify_user_gif_items" | "modify_user_gif_items" |
+                "animation.app_get_user_define_info" | "app_get_user_define_info" => {
+                    animation::handle(method, ctx).await
                 }
 
                 m => crate::protocol::err_reply(&format!("device_call method not ported yet: {m}")),

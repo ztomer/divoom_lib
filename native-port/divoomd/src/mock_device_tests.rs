@@ -191,6 +191,26 @@ mod tests {
         assert_eq!(cmds[4], (0x45, vec![0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
     }
 
+    /// Animation upload primitives — verify exact wire bytes incl. LE/BE orders
+    /// (parity with divoom_lib/display/animation*.py).
+    #[tokio::test]
+    async fn test_mock_animation_payloads() {
+        let d = setup_mock_daemon().await;
+        let call = |m: serde_json::Value| { let d=&d; async move { d.handle(make_request("device_call", Some(m), None)).await } };
+        assert!(call(json!({"method":"animation.set_gif_speed","args":[100]})).await["success"].as_bool().unwrap());
+        assert!(call(json!({"method":"animation.set_rhythm_gif","kwargs":{"pos":1,"total_length":512,"gif_id":2,"data":[170,187]}})).await["success"].as_bool().unwrap());
+        assert!(call(json!({"method":"animation.app_new_send_gif_cmd","kwargs":{"control_word":0,"file_size":300}})).await["success"].as_bool().unwrap());
+        assert!(call(json!({"method":"animation.app_big64_user_define","kwargs":{"control_word":0,"file_size":10,"index":2,"file_id":16909060}})).await["success"].as_bool().unwrap());
+
+        let device_lock = d.device.lock().await;
+        let DeviceTransport::Mock(ref mock) = **device_lock.as_ref().unwrap() else { panic!() };
+        let cmds = mock.sent_commands.lock().unwrap();
+        assert_eq!(cmds[0], (0x16, vec![0x64, 0x00]));                              // speed 100 LE16
+        assert_eq!(cmds[1], (0xb7, vec![1, 0x00, 0x02, 2, 0xAA, 0xBB]));           // pos, len 512 LE16, id, data
+        assert_eq!(cmds[2], (0x8b, vec![0, 0x2C, 0x01, 0x00, 0x00]));             // cw0, file_size 300 LE32
+        assert_eq!(cmds[3], (0x8d, vec![0, 0x0A, 0, 0, 0, 2, 0x01, 0x02, 0x03, 0x04])); // file_size LE32, idx, file_id BE32
+    }
+
     #[tokio::test]
     async fn test_mock_music_set_volume() {
         let d = setup_mock_daemon().await;
