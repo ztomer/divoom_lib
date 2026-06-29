@@ -127,6 +127,7 @@ async fn main() {
 
     let unix_fut = serve(listener, daemon.clone());
 
+    let shutdown = daemon.shutdown.clone();
     if let (Some(l), Some(t)) = (tcp_listener, tcp_token) {
         let tcp_fut = serve_tcp(l, daemon.clone(), t);
         tokio::select! {
@@ -135,12 +136,21 @@ async fn main() {
             sig = shutdown_signal() => {
                 eprintln!("divoomd: {sig} — shutting down");
             }
+            _ = shutdown.notified() => {
+                eprintln!("divoomd: shutdown command — shutting down");
+                // brief grace so the command's reply flushes to the client
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+            }
         }
     } else {
         tokio::select! {
             _ = unix_fut => {}
             sig = shutdown_signal() => {
                 eprintln!("divoomd: {sig} — shutting down");
+            }
+            _ = shutdown.notified() => {
+                eprintln!("divoomd: shutdown command — shutting down");
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
             }
         }
     }

@@ -50,6 +50,9 @@ pub struct Daemon {
     pub wall: Mutex<Option<crate::wall::DivoomWall>>,
     /// The slot config last used for the wall (for delta reconfiguration).
     pub wall_slots: Mutex<serde_json::Map<String, Value>>,
+    /// Fired by the `shutdown` command; the main loop awaits this to exit cleanly
+    /// (socket unlink) the same way it does for SIGINT/SIGTERM.
+    pub shutdown: Arc<tokio::sync::Notify>,
 }
 
 impl Default for Daemon {
@@ -79,6 +82,7 @@ impl Daemon {
             hot_progress: Arc::new(crate::art::HotProgress::default()),
             wall: Mutex::new(None),
             wall_slots: Mutex::new(serde_json::Map::new()),
+            shutdown: Arc::new(tokio::sync::Notify::new()),
         }
     }
 
@@ -148,6 +152,13 @@ impl Daemon {
                 }
                 None => err_reply("exclusive_end requires 'token'"),
             },
+
+            // Graceful stop (Python-daemon parity): signal the main loop, which
+            // unlinks the socket and exits after letting this reply flush.
+            "shutdown" => {
+                self.shutdown.notify_one();
+                json!({"success": true, "shutting_down": true})
+            }
 
             #[cfg(feature = "ble")]
             "scan" => self.cmd_scan(&req).await,
