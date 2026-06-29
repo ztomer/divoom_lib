@@ -160,6 +160,37 @@ mod tests {
         }
     }
 
+    /// Display channel methods (parity with Python Display.*): each is a 0x45
+    /// "set light mode" with a specific payload. Asserts exact wire bytes.
+    #[tokio::test]
+    async fn test_mock_display_channels() {
+        let d = setup_mock_daemon().await;
+        let call = |m: serde_json::Value| {
+            let d = &d;
+            async move { d.handle(make_request("device_call", Some(m), None)).await }
+        };
+        // show_effects(2) -> 0x45 [0x03, 3, 0×8]
+        assert!(call(json!({"method":"display.show_effects","args":[2]})).await["success"].as_bool().unwrap());
+        // show_visualization(1) -> 0x45 [0x04, 1, 0×8]
+        assert!(call(json!({"method":"display.show_visualization","args":[1]})).await["success"].as_bool().unwrap());
+        // show_scoreboard -> 0x45 [0x06, 0×9]
+        assert!(call(json!({"method":"display.show_scoreboard"})).await["success"].as_bool().unwrap());
+        // set_temperature_channel(celsius=false, #ff0000) -> 0x45 [0x01,1,ff,00,00,00]
+        assert!(call(json!({"method":"display.set_temperature_channel","kwargs":{"celsius":false,"color":"#ff0000"}})).await["success"].as_bool().unwrap());
+        // switch_channel("design") -> 0x45 [0x05, 0×9]
+        assert!(call(json!({"method":"display.switch_channel","args":["design"]})).await["success"].as_bool().unwrap());
+
+        let device_lock = d.device.lock().await;
+        let DeviceTransport::Mock(ref mock) = **device_lock.as_ref().unwrap() else { panic!("expected Mock") };
+        let cmds = mock.sent_commands.lock().unwrap();
+        assert_eq!(cmds.len(), 5);
+        assert_eq!(cmds[0], (0x45, vec![0x03, 0x03, 0, 0, 0, 0, 0, 0, 0, 0]));
+        assert_eq!(cmds[1], (0x45, vec![0x04, 0x01, 0, 0, 0, 0, 0, 0, 0, 0]));
+        assert_eq!(cmds[2], (0x45, vec![0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+        assert_eq!(cmds[3], (0x45, vec![0x01, 0x01, 0xFF, 0x00, 0x00, 0x00]));
+        assert_eq!(cmds[4], (0x45, vec![0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+    }
+
     #[tokio::test]
     async fn test_mock_music_set_volume() {
         let d = setup_mock_daemon().await;

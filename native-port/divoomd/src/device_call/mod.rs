@@ -105,7 +105,7 @@ pub async fn handle_device_call(
                 "device.set_brightness" | "set_brightness" |
                 "device.show_clock" | "show_clock" |
                 "device.show_image" | "show_image" |
-                "display.show_image" |
+                "display.show_image" | "display.display_image" |
                 "display.set_clock_rich" |
                 "animation.stream_animation_8b" |
                 "display.show_clock" |
@@ -113,6 +113,11 @@ pub async fn handle_device_call(
                 "display.get_brightness" |
                 "display.set_brightness" |
                 "display.show_light" | "light.show_light" | "show_light" |
+                "display.show_effects" | "show_effects" |
+                "display.show_visualization" | "show_visualization" |
+                "display.show_scoreboard" | "show_scoreboard" |
+                "display.set_temperature_channel" | "set_temperature_channel" |
+                "display.switch_channel" | "switch_channel" |
                 "music.set_volume" | "set_volume" |
                 "music.get_volume" | "get_volume" |
                 "radio.set_radio_frequency" | "set_radio_frequency" | "radio.set_radio" | "set_radio" |

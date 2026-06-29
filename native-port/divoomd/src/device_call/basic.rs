@@ -109,7 +109,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("stream_animation_8b failed: {e}")),
             }
         }
-        "display.show_image" => {
+        "display.show_image" | "display.display_image" => {
             let size = kw.and_then(|v| v.get("size")).and_then(|v| v.as_u64()).unwrap_or(16) as u32;
             let default_time_ms = raw_args.get(1).and_then(|v| v.as_u64()).unwrap_or(100) as u16;
 
@@ -230,6 +230,68 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
             match dev.send_command(0x45, &payload, true).await {
                 Ok(()) => json!({"success": true, "result": true}),
                 Err(e) => err_reply(&format!("display.show_light failed: {e}")),
+            }
+        }
+        // VJ effects (1-indexed on BLE): 0x45 [0x03, number+1, 0×8] (Python show_effects).
+        "display.show_effects" | "show_effects" => {
+            let number = args.first().copied()
+                .or_else(|| kw.and_then(|v| v.get("number")).and_then(|v| v.as_i64()))
+                .unwrap_or(0);
+            let payload = [0x03u8, (number + 1) as u8, 0, 0, 0, 0, 0, 0, 0, 0];
+            match dev.send_command(0x45, &payload, true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("display.show_effects failed: {e}")),
+            }
+        }
+        // Visualization channel: 0x45 [0x04, number, 0×8] (Python show_visualization).
+        "display.show_visualization" | "show_visualization" => {
+            let number = args.first().copied()
+                .or_else(|| kw.and_then(|v| v.get("number")).and_then(|v| v.as_i64()))
+                .unwrap_or(0);
+            let payload = [0x04u8, number as u8, 0, 0, 0, 0, 0, 0, 0, 0];
+            match dev.send_command(0x45, &payload, true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("display.show_visualization failed: {e}")),
+            }
+        }
+        // Scoreboard channel: 0x45 [0x06, 0×9] (Python show_scoreboard).
+        "display.show_scoreboard" | "show_scoreboard" => {
+            let payload = [0x06u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            match dev.send_command(0x45, &payload, true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("display.show_scoreboard failed: {e}")),
+            }
+        }
+        // Temperature channel: 0x45 [0x01, temp_type, r, g, b, 0x00] (Python set_temperature_channel).
+        "display.set_temperature_channel" | "set_temperature_channel" => {
+            let celsius = kw.and_then(|v| v.get("celsius")).and_then(|v| v.as_bool()).unwrap_or(true);
+            let [r, g, b] = kw.and_then(|v| v.get("color")).and_then(|v| v.as_str())
+                .and_then(parse_hex_color)
+                .or_else(|| color_from_arg(&raw_args, kw))
+                .unwrap_or([0xFF, 0xFF, 0xFF]);
+            let temp_type = if celsius { 0u8 } else { 1u8 };
+            let payload = [0x01u8, temp_type, r, g, b, 0x00];
+            match dev.send_command(0x45, &payload, true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("display.set_temperature_channel failed: {e}")),
+            }
+        }
+        // Channel switch by name → the matching 0x45 channel payload (Python switch_channel).
+        "display.switch_channel" | "switch_channel" => {
+            let channel = raw_args.first().and_then(|v| v.as_str())
+                .or_else(|| kw.and_then(|v| v.get("channel")).and_then(|v| v.as_str()))
+                .unwrap_or("").to_lowercase();
+            let payload: [u8; 10] = match channel.as_str() {
+                "clock" => [0x00, 1, 0, 1, 0, 0, 0, 0xFF, 0xFF, 0xFF],
+                "visualizer" => [0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                "vj" => [0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                "design" => [0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                "scoreboard" => [0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                other => return err_reply(&format!("switch_channel: unknown channel '{other}'")),
+            };
+            match dev.send_command(0x45, &payload, true).await {
+                Ok(()) => json!({"success": true, "result": true}),
+                Err(e) => err_reply(&format!("display.switch_channel failed: {e}")),
             }
         }
         "music.set_volume" | "set_volume" => {
