@@ -1,7 +1,7 @@
 # PLANNING — Native Rust Menubar + UI
 
-Status: **Phase 0 done (2026-06-29)** — `native-port/divoom-ui/` scaffolded and
-rendering. Goal: replace the Python presentation layer (pywebview GUI + pyobjc
+Status: **Phases 0-2 done (2026-06-29)** — `native-port/divoom-ui/` scaffolded,
+rendering, with live daemon events and the Channels tab wired to `device_call`. Goal: replace the Python presentation layer (pywebview GUI + pyobjc
 menubar) with native Rust, completing the native port so the shipped app has **no
 Python runtime at all**.
 
@@ -143,18 +143,23 @@ Each phase ends compiling + verifiable; the Python UI stays default until cutove
   permission needed, gated by `DIVOOM_UI_SCREENSHOT`); "daemon ready" shows live
   against a no-BLE `divoomd` on `DIVOOM_SOCKET`.
 
-### Phase 1 — Daemon client hardening + live wiring (in progress)
-- Done: NDJSON request/reply, reconnect-once, 2s status poll, get_status / scan /
-  connect / device_call(set_brightness, music.set_volume).
-- Remaining: **event subscription** (`subscribe`) so status/devices update push
-  (not just poll); spawn `divoomd` if the socket is absent (port the bundled
-  binary resolution from `daemon_client.py`); Windows TCP path; surface
-  connect/exclusive errors in the UI.
+### Phase 1 — Daemon client hardening + live wiring  ✓ DONE (2026-06-29)
+- NDJSON request/reply, reconnect-once, status poll, get_status / scan / connect /
+  device_call(set_brightness, music.set_volume).
+- **`subscribe` event thread** (status push + auto-reconnect); **`divoomd`
+  auto-spawn** when the socket is absent (`DIVOOMD_BIN`/sibling-of-exe/PATH +
+  poll-connect).
+- Deferred: Windows TCP transport (folded into Phase 4 packaging).
 
-### Phase 2 — Channels tab (control-panel)
-- Port the channel panels (clock / visualizer / vj / ambient / scoreboard / text /
-  sessions) faithfully to `web_ui` layout, wired to `device_call`. Compare each to
-  the Python/`web_ui` behavior (port-parity rule) for arg/return shapes.
+### Phase 2 — Channels tab (control-panel)  ✓ DONE (2026-06-29)
+- `channels.rs`: per-channel panels reproduced from `web_ui`/`channels_grids.js`,
+  wired to the device_call leaf the Python facades use (positional args, verified
+  vs the Rust dispatch): clock face → `display.show_clock`; visualizer (12 EQ) →
+  `display.show_visualization`; VJ (16) → `display.show_effects`; ambient (5 modes
+  + color/swatches) → `display.show_light`; scoreboard → `set_scoreboard`.
+- Deferred to Phase 3: **Text push** (needs the bitmap-font→image render from
+  `LightingApi._render_text_png`), **Sessions** (Sleep Aid), and clock color
+  (`set_clock_rich` richness — `show_clock` is white-only on device).
 
 ### Phase 3 — Remaining tabs
 - Live Widgets (gallery image grids — egui texture loading), Pixel Art editor,

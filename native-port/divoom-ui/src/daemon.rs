@@ -52,15 +52,52 @@ impl DaemonHandle {
     }
 }
 
-/// Spawn the worker thread and return the channel handle.
+/// Spawn the worker + subscriber threads and return the channel handle.
 pub fn start() -> DaemonHandle {
     let (cmd_tx, cmd_rx) = mpsc::channel::<Cmd>();
     let (upd_tx, upd_rx) = mpsc::channel::<Update>();
+    let sub_tx = upd_tx.clone();
     std::thread::Builder::new()
         .name("divoom-daemon-client".into())
         .spawn(move || worker(cmd_rx, upd_tx))
         .expect("spawn daemon client thread");
+    std::thread::Builder::new()
+        .name("divoom-daemon-events".into())
+        .spawn(move || subscriber(sub_tx))
+        .expect("spawn daemon event thread");
     DaemonHandle { tx: cmd_tx, rx: upd_rx }
+}
+
+/// Stream daemon events (status pushes) over a dedicated `subscribe` connection,
+/// reconnecting on drop. Complements the worker's slower status poll.
+fn subscriber(upd: Sender<Update>) {
+    loop {
+        let _ = subscribe_once(&upd);
+        std::thread::sleep(Duration::from_secs(3)); // reconnect backoff
+    }
+}
+
+fn subscribe_once(upd: &Sender<Update>) -> std::io::Result<()> {
+    let (mut write, read) = <ConnStream as ConnConnect>::open()?;
+    write.write_all(b"{\"command\":\"subscribe\",\"args\":{}}\n")?;
+    write.flush()?;
+    let mut reader = BufReader::new(read);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line)? == 0 {
+            return Ok(()); // daemon closed → caller reconnects
+        }
+        if let Ok(v) = serde_json::from_str::<Value>(&line) {
+            if let Some(state) = v.get("state").and_then(|x| x.as_str()) {
+                let _ = upd.send(Update::Status {
+                    connected: true,
+                    uptime_s: 0,
+                    detail: state.to_string(),
+                });
+            }
+        }
+    }
 }
 
 fn worker(cmd_rx: Receiver<Cmd>, upd: Sender<Update>) {
@@ -213,9 +250,56 @@ trait ConnConnect: Sized {
 #[cfg(unix)]
 impl ConnConnect for UnixStream {
     fn open() -> std::io::Result<(UnixStream, UnixStream)> {
-        let path = std::env::var("DIVOOM_SOCKET").unwrap_or_else(|_| SOCKET_PATH.to_string());
-        let s = UnixStream::connect(path)?;
+        let path = socket_path();
+        let s = match UnixStream::connect(&path) {
+            Ok(s) => s,
+            Err(_) => {
+                // Daemon not up — spawn it (production path; in dev the user runs
+                // a daemon manually so the socket already exists and we skip this).
+                spawn_daemon(&path);
+                poll_connect(&path)?
+            }
+        };
         let r = s.try_clone()?;
         Ok((s, r))
     }
+}
+
+#[cfg(unix)]
+fn poll_connect(path: &str) -> std::io::Result<UnixStream> {
+    let deadline = std::time::Instant::now() + Duration::from_secs(4);
+    loop {
+        match UnixStream::connect(path) {
+            Ok(s) => return Ok(s),
+            Err(e) if std::time::Instant::now() >= deadline => return Err(e),
+            Err(_) => std::thread::sleep(Duration::from_millis(150)),
+        }
+    }
+}
+
+/// Spawn `divoomd` detached, pointed at `path`. Best-effort: errors are swallowed
+/// (poll_connect reports the real failure). Binary resolution mirrors the Python
+/// `daemon_client.spawn_daemon`: explicit env, then next to this executable
+/// (bundle), then `PATH`.
+#[cfg(unix)]
+fn spawn_daemon(path: &str) {
+    let bin = std::env::var("DIVOOMD_BIN").ok().unwrap_or_else(|| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|d| d.join("divoomd")))
+            .filter(|p| p.exists())
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "divoomd".to_string())
+    });
+    let _ = std::process::Command::new(bin)
+        .arg("--socket")
+        .arg(path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+fn socket_path() -> String {
+    std::env::var("DIVOOM_SOCKET").unwrap_or_else(|_| SOCKET_PATH.to_string())
 }

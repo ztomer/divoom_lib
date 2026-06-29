@@ -76,6 +76,19 @@ pub struct DivoomApp {
     pub daemon_connected: bool,
     pub status_detail: String,
     pub last_error: Option<String>,
+    // --- Channels tab control state (mirrors web_ui channel panels) ---
+    pub clock_face: i64,
+    pub clock_color: [u8; 3],
+    pub viz_sel: i64,
+    pub vj_sel: i64,
+    pub ambient_mode: i64,
+    pub ambient_color: [u8; 3],
+    pub score_blue: i64,
+    pub score_red: i64,
+    pub text_content: String,
+    pub text_color: [u8; 3],
+    pub text_speed: i64,
+    pub text_effect: i64,
     /// Debug self-screenshot: if `DIVOOM_UI_SCREENSHOT` is set, render a few
     /// frames, grab the framebuffer (no OS screen-recording permission needed),
     /// save it there, and exit. Used for headless visual verification.
@@ -91,7 +104,15 @@ impl DivoomApp {
         Self {
             daemon,
             tab: Tab::Channels,
-            channel: Channel::Clock,
+            channel: match std::env::var("DIVOOM_UI_CHANNEL").as_deref() {
+                Ok("visualizer") => Channel::Visualizer,
+                Ok("vj") => Channel::Vj,
+                Ok("ambient") => Channel::Ambient,
+                Ok("scoreboard") => Channel::Scoreboard,
+                Ok("text") => Channel::Text,
+                Ok("sessions") => Channel::Sessions,
+                _ => Channel::Clock,
+            },
             brightness: 80,
             volume: 7,
             devices: Vec::new(),
@@ -101,7 +122,30 @@ impl DivoomApp {
             last_error: None,
             screenshot_path: std::env::var("DIVOOM_UI_SCREENSHOT").ok(),
             frame_count: 0,
+            clock_face: 0,
+            clock_color: [255, 255, 255],
+            viz_sel: 0,
+            vj_sel: 0,
+            ambient_mode: 0,
+            ambient_color: [0, 255, 204],
+            score_blue: 0,
+            score_red: 0,
+            text_content: String::new(),
+            text_color: [0, 255, 204],
+            text_speed: 50,
+            text_effect: 1,
         }
+    }
+
+    /// Fire a device_call with positional args (the convention the Rust daemon's
+    /// channel methods parse). Returns immediately; errors surface via `pump`.
+    pub fn call(&self, method: &str, args: serde_json::Value) {
+        self.daemon.send(daemon::Cmd::DeviceCall { method: method.to_string(), args });
+    }
+
+    /// Hex `#rrggbb` for an `[r,g,b]` (device_call color args parse a hex string).
+    pub fn hex(rgb: [u8; 3]) -> String {
+        format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2])
     }
 
     /// Headless visual check: request a framebuffer grab after the UI settles,

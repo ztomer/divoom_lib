@@ -4,6 +4,23 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI port: Phase 1+2 (events + Channels) (2026-06-29)
+
+- **Phase 1** (`divoom-ui/src/daemon.rs`): `subscribe` event thread for live
+  status push (auto-reconnect) + `divoomd` auto-spawn when the socket is absent
+  (`DIVOOMD_BIN`/sibling-of-exe/PATH resolution + poll-connect). Windows TCP
+  transport deferred to packaging.
+- **Phase 2** (`divoom-ui/src/channels.rs`, new): the Channels tab renders real
+  per-channel panels reproduced from `web_ui` (`channels_grids.js`), each wired to
+  the same device_call leaf as the Python `LightingApi`/`ToolsApi` (positional
+  args, verified vs the Rust dispatch): clock face → `display.show_clock`;
+  visualizer (12 EQ) → `display.show_visualization`; VJ (16) →
+  `display.show_effects`; ambient (5 modes + color/swatches) →
+  `display.show_light`; scoreboard → `set_scoreboard`. Generic selector-grid /
+  swatch widgets; `DIVOOM_UI_CHANNEL` screenshot aid. Text push (bitmap-font
+  render) + Sessions panel deferred to Phase 3.
+- Verified by self-screenshots (clock/ambient/scoreboard). Python UI untouched.
+
 ### Post-v0.20.2 — Native UI port: Phase 0 (egui shell) (2026-06-29)
 
 - **New crate `native-port/divoom-ui/`** (eframe/egui 0.29) — first step of the

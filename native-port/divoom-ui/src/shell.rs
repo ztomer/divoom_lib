@@ -264,19 +264,10 @@ fn channels_tab(app: &mut DivoomApp, ui: &mut egui::Ui) {
         .fill(theme::CARD_BG)
         .rounding(Rounding::same(theme::RADIUS))
         .stroke(Stroke::new(1.0, theme::BORDER))
-        .inner_margin(Margin::same(14.0))
+        .inner_margin(crate::channels::card_margin())
         .show(ui, |ui| {
-            let name = Channel::ALL
-                .iter()
-                .find(|(c, _)| *c == app.channel)
-                .map(|(_, l)| *l)
-                .unwrap_or("");
-            ui.label(RichText::new(format!("{name} channel")).size(15.0).color(theme::TEXT_MAIN));
-            ui.add_space(4.0);
-            ui.label(
-                RichText::new("Controls for this channel land in Phase 2.")
-                    .color(theme::TEXT_MUTED),
-            );
+            ui.set_width(ui.available_width());
+            crate::channels::panel(app, ui);
         });
 }
 

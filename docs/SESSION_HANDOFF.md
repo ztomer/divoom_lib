@@ -47,8 +47,29 @@ Claude) should read this on entry and **update it at the end of every round**
     the UI at it via `DIVOOM_SOCKET`). Probed protocol: `get_status` (state +
     uptime_s), `device_call {method,args:[...]}` routes; `scan` is BLE-gated so the
     no-BLE core returns "not implemented" (expected — UI surfaces it).
-  - **Next:** Phase 1 remainder — `subscribe` event push, `divoomd` auto-spawn,
-    Windows TCP path; then Phase 2 (Channels panels). Tray menubar is Phase 4.
+  - **Phase 1 DONE** (`daemon.rs`): added a `subscribe` event thread (status
+    pushes, auto-reconnect) + `divoomd` auto-spawn when the socket is absent
+    (`DIVOOMD_BIN` / sibling-of-exe / PATH resolution + 4s poll-connect). Windows
+    TCP transport still deferred to Phase 4 packaging.
+  - **Phase 2 DONE** (`channels.rs`, new): the Channels tab now renders real
+    per-channel panels reproduced from `web_ui` + `channels_grids.js`, each wired
+    to the device_call leaf the Python `LightingApi`/`ToolsApi` use (verified vs
+    the Rust dispatch + positional-arg convention):
+    clock face → `display.show_clock [style]`; visualizer (12 EQ) →
+    `display.show_visualization [n]`; VJ (16) → `display.show_effects [n]`;
+    ambient (5 modes + color/swatches) → `display.show_light [hex,brightness,
+    true,mode]`; scoreboard → `set_scoreboard [1,red,blue]`. Generic
+    `selector_grid`/`cell_button`/`swatch` widgets. `DIVOOM_UI_CHANNEL` env picks
+    the initial channel (screenshot aid). **Deferred to Phase 3:** Text push
+    (needs the bitmap-font→image render from `LightingApi._render_text_png`) and
+    the Sessions panel (Sleep Aid). Clock color uses `set_clock_rich` (face is
+    white-only on the device via show_clock).
+  - **Verified** by self-screenshots: clock/ambient/scoreboard panels render
+    faithfully against a no-BLE daemon (device_call returns "no device" — expected
+    without hardware; wiring is correct).
+  - **Next:** Phase 3 (Live Widgets/gallery, Pixel Art, Wall, Schedule, Device
+    Settings, Settings; + Text/Sessions) then Phase 4 (tray menubar + packaging +
+    cutover). Hardware exercise needs the user to start the BLE daemon.
   - **Gotcha:** can't BLE-run `divoomd` from Claude's shell (TCC crash) — test the
     UI against the **no-BLE** daemon build. `screencapture` CLI yields a black
     frame (no Screen-Recording grant) → use the in-app self-screenshot instead.
