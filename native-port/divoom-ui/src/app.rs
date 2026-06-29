@@ -137,6 +137,16 @@ pub struct DivoomApp {
     pub sysmon_sync: bool,
     pub weather_sync: bool,
     pub stocks_symbol: String,
+    pub temp_celsius: bool,
+    pub temp_color: [u8; 3],
+    // --- Schedule: memorial slot + one-shot alarm fetch ---
+    pub mem_enabled: bool,
+    pub mem_month: i64,
+    pub mem_day: i64,
+    pub mem_hour: i64,
+    pub mem_minute: i64,
+    pub mem_title: String,
+    pub alarms_fetched: bool,
     /// Replies to `Cmd::Raw`, keyed by tag (Settings/Schedule/gallery read these).
     pub replies: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -233,6 +243,15 @@ impl DivoomApp {
             sysmon_sync: false,
             weather_sync: false,
             stocks_symbol: String::new(),
+            temp_celsius: true,
+            temp_color: [255, 255, 255],
+            mem_enabled: false,
+            mem_month: 1,
+            mem_day: 1,
+            mem_hour: 0,
+            mem_minute: 0,
+            mem_title: String::new(),
+            alarms_fetched: false,
             replies: std::collections::HashMap::new(),
         }
     }
@@ -379,6 +398,18 @@ impl DivoomApp {
                                 }
                             }
                         }
+                        "rb_alarms" => {
+                            if let Some(arr) = value.get("result").and_then(|v| v.as_array()) {
+                                for (i, a) in arr.iter().enumerate() {
+                                    if let Some(slot) = self.alarms.get_mut(i) {
+                                        slot.enabled = a.get("status").and_then(|v| v.as_i64()).unwrap_or(0) != 0;
+                                        slot.hour = a.get("hour").and_then(|v| v.as_i64()).unwrap_or(slot.hour);
+                                        slot.minute = a.get("minute").and_then(|v| v.as_i64()).unwrap_or(slot.minute);
+                                        slot.week = a.get("week").and_then(|v| v.as_i64()).unwrap_or(0) as u8;
+                                    }
+                                }
+                            }
+                        }
                         _ => {}
                     }
                     self.replies.insert(tag, value);
@@ -387,6 +418,7 @@ impl DivoomApp {
         }
         if became_active {
             self.fetch_device_state();
+            self.alarms_fetched = false; // re-read alarms when the Schedule tab opens
         }
     }
 }

@@ -20,7 +20,30 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
         feed(app, ui, "System Stats", "CPU / RAM gauges on the device.", "sysmon", |a| a.sysmon_sync, |a, v| a.sysmon_sync = v, json!({}));
         feed(app, ui, "Weather", "Live local weather.", "weather", |a| a.weather_sync, |a, v| a.weather_sync = v, json!({}));
         stocks(app, ui);
+        temperature(app, ui);
     });
+}
+
+/// One-shot: show the temperature channel on the device (color + unit).
+fn temperature(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    card(ui, |ui| {
+        ui.label(RichText::new("Temperature Channel").size(14.0).color(theme::TEXT_MAIN).strong());
+        ui.label(RichText::new("Switch the device to its temperature display.").size(11.0).color(theme::TEXT_MUTED));
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            if ui.selectable_label(app.temp_celsius, "°C").clicked() { app.temp_celsius = true; }
+            if ui.selectable_label(!app.temp_celsius, "°F").clicked() { app.temp_celsius = false; }
+            ui.label(RichText::new("Color").size(11.0).color(theme::TEXT_MUTED));
+            ui.color_edit_button_srgb(&mut app.temp_color);
+            if ui.button("Show on device").clicked() {
+                app.call_kw("display.set_temperature_channel", json!({
+                    "celsius": app.temp_celsius,
+                    "color": DivoomApp::hex(app.temp_color),
+                }));
+            }
+        });
+    });
+    ui.add_space(8.0);
 }
 
 #[allow(clippy::too_many_arguments)]

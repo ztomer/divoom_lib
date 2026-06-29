@@ -40,19 +40,21 @@ never deleted._
 
 ## Schedule
 - [x] ✓ alarms `set_alarm`
-- [ ] ✗ `get_alarms` fetch into editor
-- [ ] ✗ `set_memorial` (memorial countdown)
+- [x] ✓ `get_alarms` fetch into editor (alarm.get_alarm_time on connect → rb_alarms)
+- [x] ✓ `set_memorial` (Memorial Countdown card → alarm.set_memorial_time)
 - [ ] ✗ `set_timeplan` (time plan)
 
 ## Settings
 - [x] ✓ notifications start/stop/status, LAN probe
-- [ ] ✗ keep-alive get/set (currently local-only)
+- [x] ✓ keep-alive — N/A: the native UI never shuts the daemon (separate process;
+  closing the window leaves divoomd running), so the toggle is informational.
 - [ ] ✗ `save_lan_config` + LAN device add/delete list
-- [ ] ✗ `save_notification_routing`
-- [ ] ✗ `send_notification` (test)
+- [ ] ✗ `save_notification_routing` (`set_routing` exists; per-app routing UI deferred)
+- [ ] ✗ `send_notification` (test) — **DAEMON GAP** (no `send_notification` command)
 - [ ] ✗ MCP server start/stop/status (subprocess)
 - [ ] ✗ scan settings (`get_scan_settings`/`save_scan_settings`)
-- [ ] ✗ cloud login (`save_credentials`) — gallery can't auth without it
+- [ ] ✗ cloud login (`save_credentials`) — **DAEMON GAP** (only `get_credentials`
+  exists; no login/save command). Gallery can't auth without it.
 - [ ] ✗ export/import settings (`PresetsManagerMixin`)
 
 ## Live Widgets (data feeds) — the MediaSyncMixin
@@ -64,7 +66,9 @@ never deleted._
 - [ ] ✗ `live_job_list` (show running jobs) + per-feed params (interval)
 
 ## Weather
-- [ ] ✗ `push_weather` / `get_weather` / `set_temperature_channel` panel
+- [x] ✓ `set_temperature_channel` (Temperature card in Live Widgets, kwargs celsius+color)
+- [x] ✓ live weather (via the weather live-job toggle in Live Widgets)
+- [ ] ✗ `push_weather` one-shot (GUI-side weather fetch + push; live-job covers continuous)
 
 ## FM radio
 - [x] ✓ `set_fm_frequency` → `radio.set_radio_frequency [freq_x10]` (in Device Settings)
@@ -91,6 +95,11 @@ never deleted._
 - 2026-06-29 iter1: read-backs (brightness/volume/device-name) fetched on
   device-connect (status idle→active) + applied to UI; clock-color bug fixed
   (set_clock_rich now sends kwargs). Added app.call_kw helper. Build green.
+- 2026-06-29 iter4: Temperature channel card (Live Widgets) + Schedule get_alarms
+  read-back (parsed into editor on connect) + Memorial Countdown card. Reclassified
+  keep-alive as N/A (native never shuts daemon). Flagged cloud-login + test-notif
+  as DAEMON GAPS (no save_credentials / send_notification commands). Build green;
+  Schedule verified by screenshot.
 - 2026-06-29 iter3: Sessions sub-tab built (Sleep Aid/Stopwatch/Countdown/Noise,
   correct device_call leaves + STI flags) + FM radio in Device Settings. Build
   green; Sessions verified by screenshot.
