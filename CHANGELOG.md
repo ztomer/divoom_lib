@@ -4,6 +4,15 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI/menubar plan (2026-06-29)
+
+- **Planned** the native-Rust replacement of the Python presentation layer
+  (pywebview GUI + pyobjc menubar) → `docs/PLANNING_NATIVE_UI.md`. Decision:
+  Rust-hosted webview (`wry`/`tao`/`tray-icon`/`muda`) keeping the existing
+  `web_ui/` static frontend verbatim and reimplementing the ~70-method `gui_api`
+  bridge in Rust; 6 phases, gated on a Phase-0 `window.pywebview.api`-shim spike.
+  Planning only — no code yet. Completes the native port (Python-free bundle).
+
 ### Post-v0.20.2 — Rust parity loop: cloud decode + device_call methods (2026-06-29)
 
 Driving the native daemon to full parity with the Python implementation.

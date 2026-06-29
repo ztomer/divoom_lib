@@ -18,6 +18,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE UI/MENUBAR PLAN (2026-06-29) — `docs/PLANNING_NATIVE_UI.md`:** new
+  plan to replace the Python presentation layer (pywebview GUI + pyobjc menubar)
+  with native Rust, making the shipped app Python-free. Survey done: the daemon is
+  the integration seam (UI is just a socket client); `web_ui/` is 9,172 LOC of
+  **plain static HTML/JS (no bundler)** so it ports verbatim; `gui_api`'s ~70
+  bridge methods are mostly thin daemon-forwarders. **Decision: Rust-hosted
+  webview** (`wry`/`tao`/`tray-icon`/`muda`, à la carte — no Node) over a native-
+  widget rewrite. 6 phases (spike → client+bridge → menubar → mixin residual →
+  packaging → cutover). **Key risk to prove in Phase 0:** a `window.pywebview.api`
+  JS shim over wry's `ipc_handler` so the frontend needs zero edits. No code yet.
 - **PARITY ACHIEVED (2026-06-29, /loop "until parity with Python") — COMPLETE:**
   - **device_call method parity: 54 → 0 gaps** vs the Python Divoom API (excluding
     internal `protocol.*` plumbing). New Rust submodules `device_call/{animation,

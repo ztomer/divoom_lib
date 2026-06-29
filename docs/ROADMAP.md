@@ -133,6 +133,18 @@ animation gif-chunk primitives) are wire-tested but not hardware-verified.
 **Remaining (optional):** re-verify Ditoo when in range; hardware-exercise the niche
 subsystems if/when those device flows are available.
 
+### Next: native UI + menubar (planned) — `docs/PLANNING_NATIVE_UI.md`
+
+With the daemon ported, the last Python surfaces are the **pywebview GUI** and
+**pyobjc menubar**. Plan: replace both with a single native Rust binary
+(`native-port/divoom-ui/`) so the shipped bundle is Python-free. **Decision:
+Rust-hosted webview** (`wry`/`tao`/`tray-icon`/`muda`, à la carte — no Node)
+keeping the existing 9,172-LOC static `web_ui/` frontend **verbatim** and
+reimplementing the ~70-method `gui_api` bridge in Rust (mostly thin daemon-
+forwarders; UI stays a socket client of `divoomd`). 6 phases, gated on a Phase-0
+`window.pywebview.api`-shim spike. The Python UI is archived in-tree, never
+deleted. Independent of the parked v0.21.0 release (daemon BT grant).
+
 ---
 
 ## Planning docs by round
