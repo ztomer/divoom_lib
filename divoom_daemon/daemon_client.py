@@ -167,7 +167,10 @@ def spawn_daemon(
             if dylib.exists():
                 rust_env_extra["DIVOOMD_ENCODER_LIB"] = str(dylib)
     if not rust_bin:
-        repo_root = Path(__file__).resolve().parents[2]
+        # daemon_client.py lives at <repo>/divoom_daemon/daemon_client.py, so the
+        # repo root is parents[1] (parents[2] pointed one level too high, which is
+        # why dev runs silently fell back to the Python daemon).
+        repo_root = Path(__file__).resolve().parents[1]
         for folder in ["release", "debug"]:
             p = repo_root / "native-port" / "divoomd" / "target" / folder / "divoomd"
             if p.exists():
