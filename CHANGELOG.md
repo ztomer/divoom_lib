@@ -25,9 +25,10 @@ menubar. The egui UI is retired.
   adhoc-sign `divoom-menubar` alongside `divoomd` in the Python `.app`. The native
   egui app is gone: removed `native-port/divoom-ui/` and `scripts/build_native_app.sh`;
   the `divoom-control-native` cask/dmg is retired.
-- **Helper scripts** — `build_native.sh` now builds the daemon + menubar (+ encoder
-  dylib); `run_native.sh` launches the Python GUI (which spawns the daemon + menubar),
-  with a `--menubar` foreground smoke mode.
+- **Helper scripts** — `build.sh` builds the daemon + menubar (+ encoder dylib);
+  `run.sh` launches the Python GUI (which spawns the daemon + menubar), with a
+  `--menubar` foreground smoke mode. (Replaced the earlier `build_native.sh` /
+  `run_native.sh`.)
 
 ### Post-v0.20.2 — Native UI: cloud gallery thumbnails (2026-06-29)
 

@@ -30,10 +30,10 @@ Claude) should read this on entry and **update it at the end of every round**
     `divoom-control-native` cask/dmg retired (tap push pending user go-ahead).
   - Packaging: `setup_app.py` + `scripts/build_release.sh` bundle/sign `divoom-menubar`
     next to `divoomd` in the Python `.app`.
-- **Native dev helpers (root):** `./build_native.sh` builds the Rust daemon + menubar
-  (+ encoder dylib; `--debug` for debug). `./run_native.sh` launches the Python GUI
-  (which spawns the daemon + menubar); `--menubar` runs the tray alone for a smoke.
-  Both source `tui/lib.sh` (Kare style).
+- **Dev helpers (root):** `./build.sh` builds the Rust daemon + menubar (+ encoder
+  dylib; `--debug` for debug). `./run.sh` launches the Python GUI (which spawns the
+  daemon + menubar); `--menubar` runs the tray alone for a smoke. Both source
+  `tui/lib.sh` (Kare style). (Shippable `.app`: `scripts/build_release.sh`.)
 - **NOT DONE YET:** on-hardware verification of the new stack (GUI ↔ daemon ↔ menubar
   on the 4 devices) — needs the maintainer to start the BLE daemon (TCC). Docs
   (PLANNING_NATIVE_UI / ROADMAP / PARITY_TRACKER) still describe the egui direction

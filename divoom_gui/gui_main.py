@@ -314,7 +314,7 @@ def _spawn_menubar_agent() -> None:
         binary = _resolve_menubar_binary()
         if not binary:
             logger.warning("Native menu-bar binary (divoom-menubar) not found; "
-                           "build it with ./build_native.sh. No menu-bar this session.")
+                           "build it with ./build.sh. No menu-bar this session.")
             return
         # In a py2app .app, sys.executable is the GUI stub — hand the agent the
         # bundled python + this script so its "Launch Dashboard" reopens the GUI.

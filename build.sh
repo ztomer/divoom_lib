@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# build_native.sh — build the native (Rust) pieces of divoom-control:
+# build.sh — build divoom-control's runtime pieces: the Python UI's native
+# companions.
+#
+# The desktop UI is the Python pywebview GUI (run it with ./run.sh). At runtime
+# the GUI spawns two native Rust binaries — this script builds them, plus the C
+# encoder dylib they use:
 #   - divoomd        (the daemon)
 #   - divoom-menubar (the menubar/tray agent)
 #   - libdivoom_compact.dylib (C image encoder, macOS, via FFI)
 #
-# The desktop UI is the Python pywebview GUI (build it for release with
-# scripts/build_release.sh / py2app). This script only builds the Rust binaries
-# the GUI spawns at runtime.
+# For a shippable Python .app bundle, use scripts/build_release.sh (py2app).
 #
-#   ./build_native.sh           release binaries + encoder dylib
-#   ./build_native.sh --debug   debug build (faster compile, slower runtime)
+#   ./build.sh           release binaries + encoder dylib
+#   ./build.sh --debug   debug build (faster compile, slower runtime)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tui/lib.sh
@@ -20,7 +23,7 @@ PROFILE="release"; FLAG="--release"
 for a in "$@"; do
   case "$a" in
     --debug)   PROFILE="debug"; FLAG="" ;;
-    -h|--help) echo "usage: ./build_native.sh [--debug]"; exit 0 ;;
+    -h|--help) echo "usage: ./build.sh [--debug]"; exit 0 ;;
     *)         die "unknown option: $a (try --help)" ;;
   esac
 done
@@ -50,7 +53,7 @@ ok "divoom-menubar"
 section "Done"
 ok "binaries under native-port/*/target/$PROFILE/"
 if [[ "$PROFILE" == "debug" ]]; then
-  info "run the app with:  ./run_native.sh --debug"
+  info "run the app with:  ./run.sh --debug"
 else
-  info "run the app with:  ./run_native.sh"
+  info "run the app with:  ./run.sh"
 fi
