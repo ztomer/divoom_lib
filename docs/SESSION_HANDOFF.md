@@ -27,7 +27,14 @@ Claude) should read this on entry and **update it at the end of every round**
   - `divoom_gui/gui_main.py` spawns the Rust menubar (not the pyobjc one). pyobjc
     `divoom_menubar/` kept in-tree as reference only.
   - `native-port/divoom-ui/` (egui) DELETED; `scripts/build_native_app.sh` removed;
-    `divoom-control-native` cask/dmg retired (tap push pending user go-ahead).
+    `divoom-control-native` cask retired (tap pushed).
+- **RELEASED v0.21.0 (2026-06-30):** CI bumped to Python 3.14; version 0.20.2 → 0.21.0;
+  `scripts/build_release.sh` built `Divoom.app` + `Divoom-v0.21.0.dmg` (bundling +
+  re-signing both `divoomd` and `divoom-menubar`); pushed `main` + tag `v0.21.0`;
+  GitHub release created with the dmg; `divoom-control` Homebrew cask bumped to
+  0.21.0 (sha256 `ede091f3…`, verified against the live asset) + tap pushed. `brew`
+  confirms 0.21.0 is published. (Bundle is arm64, built on Apple Silicon — same as
+  prior releases.)
   - Packaging: `setup_app.py` + `scripts/build_release.sh` bundle/sign `divoom-menubar`
     next to `divoomd` in the Python `.app`.
 - **Dev helpers (root):** `./build.sh` builds the Rust daemon + menubar (+ encoder
