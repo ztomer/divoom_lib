@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **BLANK-GUI FIXED → v0.21.2 (2026-06-30):** the py2app `.app` opened a blank
+  dashboard — pywebview's WKWebView won't load the `file://` UI inside a py2app
+  bundle (renders fine as loose Python, so `./run.sh` always worked). Root-caused by
+  driving the real app (WKWebView `loadRequest:` for file:// is blocked in a signed
+  py2app `.app`; encoding/ATS/http-server/loadFileURL didn't help). **Fix: package
+  the macOS app with PyInstaller** (`divoom.spec`) — verified end-to-end (dashboard
+  renders, bundled `divoomd`+`divoom-menubar` spawn, Pixoo-1 connects).
+  - Resolvers (`gui_main` web_ui + menubar binary; `daemon_client` divoomd + encoder
+    dylib) are packaging-agnostic: PyInstaller `sys._MEIPASS` → py2app `RESOURCEPATH`
+    → dev tree. Menu-bar "Launch Dashboard" works frozen (`launch.rs` empty-script).
+  - `scripts/build_release.sh` builds via PyInstaller now; `setup_app.py` (py2app)
+    kept for reference. Build venv needs `pyinstaller` + `psutil`.
+  - Shipped: GitHub release v0.21.2 + Homebrew cask 0.21.2 (sha verified). v0.21.x
+    py2app dmgs are superseded (their GUI was blank).
+  - Known minor: web_ui logs a non-fatal `window.loadGalleryFilter is not a function`
+    (gallery.js:354) — pre-existing, page still renders.
+
 - **Deterministic mode test:** `scripts/hw_test_modes.py` walks every channel/mode +
   controls over the daemon socket with fixed args + read-back asserts (JSON report to
   test_reports/). Verified on Pixoo-1: full sweep **24/24** (6 clock faces, viz 0-2,
