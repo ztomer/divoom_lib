@@ -11,6 +11,7 @@ mod channels;
 mod channel_previews;
 mod daemon;
 mod device_settings;
+mod fonts;
 mod gallery;
 mod icons;
 mod model;
@@ -49,6 +50,8 @@ fn main() -> eframe::Result<()> {
         Box::new(|cc| {
             // Enable ui.image() loaders (file:// channel previews/icons, https gallery).
             egui_extras::install_image_loaders(&cc.egui_ctx);
+            // Bundled Inter typography (matches the web UI's Inter/Outfit stack).
+            fonts::install(&cc.egui_ctx);
             Ok(Box::new(DivoomApp::new(cc)))
         }),
     )

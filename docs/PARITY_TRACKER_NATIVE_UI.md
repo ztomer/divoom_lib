@@ -157,9 +157,10 @@ low-value or unverifiable without hardware.
 - [x] ✓ Clock previews (painted digital "12:00" + analog dials, per face)
 - [ ] ✗ Ambient color previews (paint mode swatches)
 - [x] ✓ Appbar icon glyphs (brightness sun / volume / gear pill)
-- [ ] ✗ Custom fonts (Inter/Outfit via FontDefinitions) for type parity
+- [x] ✓ Custom fonts — Inter (body) + Inter Display (headings) bundled (fonts.rs)
 
 ## Progress log
+- 2026-06-29 visual4: bundled Inter typography (Inter-Regular body + InterDisplay-SemiBold headings via FontDefinitions; OFL-1.1, attribution). Type now matches the web Inter stack. Verified by screenshot.
 - 2026-06-29 visual3: appbar glyphs (brightness/volume SVG + gear Settings pill) +
   painted clock-face previews (digital/analog per face). Verified by screenshot.
 - 2026-06-29 visual2: sidebar nav glyphs — Kare SVGs embedded (icons.rs), rendered
