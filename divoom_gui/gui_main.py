@@ -4,6 +4,19 @@ gui_main.py — Divoom Desktop GUI launcher.
 Launches the custom frameless PyWebView window.
 """
 
+# The py2app-bundled interpreter starts with NO locale applied and ignores
+# PYTHONUTF8, so locale.getpreferredencoding() is US-ASCII. That breaks any text
+# I/O that relies on it (e.g. the daemon spawn's env handling) with
+# UnicodeDecodeError on the non-ASCII Kare glyphs. Apply a UTF-8 locale FIRST,
+# before any other import does locale-sensitive I/O. (No-op when already UTF-8.)
+import locale as _locale
+for _loc in ("en_US.UTF-8", "C.UTF-8"):
+    try:
+        _locale.setlocale(_locale.LC_ALL, _loc)
+        break
+    except Exception:
+        pass
+
 import os
 import sys
 import threading
