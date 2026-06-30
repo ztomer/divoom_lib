@@ -18,6 +18,11 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Deterministic mode test:** `scripts/hw_test_modes.py` walks every channel/mode +
+  controls over the daemon socket with fixed args + read-back asserts (JSON report to
+  test_reports/). Verified on Pixoo-1: full sweep **24/24** (6 clock faces, viz 0-2,
+  vj 0-1, ambient r/g/b, scoreboard, solid+gradient image, brightness read-backs).
+  `--mac`/`--all`/`--dwell`/`--quick`.
 - **HARDWARE-VERIFIED the Rust daemon (2026-06-30):** against real Pixoo-1 over the
   socket — scan → connect → `get_device_name`="Pixoo-1" → `get_brightness`=75 →
   set 30/80 with read-back. (Getters error with a Python `AttributeError` on the
