@@ -54,7 +54,9 @@ never deleted._
   closing the window leaves divoomd running), so the toggle is informational.
 - [ ] ✗ `save_lan_config` + LAN device add/delete list
 - [ ] ✗ `save_notification_routing` (`set_routing` exists; per-app routing UI deferred)
-- [ ] ✗ `send_notification` (test) — **DAEMON GAP** (no `send_notification` command)
+- [x] ✓ `send_notification` (test) — NOT a daemon gap after all: the device_call
+  leaf `notification.show_notification[_text]` (cmd 0x50) already exists. Added a
+  "Send a test notification" control (icon 1-14 + text) to the Settings notif card.
 - [ ] ✗ MCP server start/stop/status (subprocess)
 - [x] ✓ scan timeout (Settings -> Application; threaded into the scan command).
   `limit` is a GUI-side result filter (minor, deferred).
@@ -133,10 +135,15 @@ low-value or unverifiable without hardware.
 - [x] ✓ **sync_time** — DateTimeCommand ported to divoomd `set_date_time` (0x18) +
   wire-byte test + UI button (chrono local time).
 - [x] ✓ cloud login (`save_credentials` daemon command + Settings login card)
-- [ ] ✗ test notification (`send_notification` daemon command)
-- [ ] ✗ MCP server (Rust MCP in daemon — large)
+- [x] ✓ test notification — was NOT a daemon gap; device_call leaf existed, added
+  the UI control (Settings notif card).
+- [ ] ✗ MCP server (Rust MCP in daemon — large; the one remaining real daemon gap)
 
 ## Progress log
+- 2026-06-29 gap-run: closed sync_time (daemon set_date_time 0x18 + UI), cloud
+  login (daemon save_credentials + Settings card; split cloud_store/cloud_cmds),
+  and test notification (UI control — leaf already existed). Only the MCP-server
+  daemon gap remains (large). Each ported from Python with a wire/behavior check.
 - 2026-06-29: audit done; tracker created; docs corrected. Starting gap closure.
 - 2026-06-29 iter1: read-backs (brightness/volume/device-name) fetched on
   device-connect (status idle→active) + applied to UI; clock-color bug fixed

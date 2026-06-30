@@ -57,6 +57,25 @@ fn notifications_card(app: &mut DivoomApp, ui: &mut egui::Ui) {
                 app.raw("notification_status", json!({}), "notif_status");
             }
         });
+        ui.add_space(8.0);
+        ui.separator();
+        ui.add_space(8.0);
+        // Send a test notification to the device (icon type 1-14 + optional text)
+        // → device_call notification.show_notification[_text] (cmd 0x50).
+        ui.label(RichText::new("Send a test notification").size(12.0).color(theme::TEXT_MUTED));
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Icon").size(11.0).color(theme::TEXT_MUTED));
+            ui.add(egui::DragValue::new(&mut app.notif_test_type).range(1..=14));
+            ui.add(egui::TextEdit::singleline(&mut app.notif_test_text).hint_text("optional text").desired_width(160.0));
+            if ui.button("Send").clicked() {
+                if app.notif_test_text.trim().is_empty() {
+                    app.call("notification.show_notification", json!([app.notif_test_type]));
+                } else {
+                    app.call("notification.show_notification_text", json!([app.notif_test_type, app.notif_test_text.trim()]));
+                }
+            }
+        });
     });
 }
 
