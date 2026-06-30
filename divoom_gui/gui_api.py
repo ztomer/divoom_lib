@@ -10,6 +10,7 @@ from divoom_lib import divoom_auth
 from divoom_gui.presets_manager import PresetsManagerMixin
 from divoom_gui.media_sync import MediaSyncMixin
 from divoom_gui.scanner_mixin import ScannerMixin
+from divoom_gui.debug_mixin import DebugMixin
 
 from divoom_gui.api import AsyncLoopThread
 from divoom_gui.api.connection import ConnectionApi
@@ -20,7 +21,7 @@ from divoom_gui.api.window import WindowApi
 
 logger = logging.getLogger("divoom_gui")
 
-class DivoomGuiAPI(MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
+class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
     """The PyWebView JS api bridge orchestrator."""
     def __init__(self) -> None:
         self.loop_thread = AsyncLoopThread()

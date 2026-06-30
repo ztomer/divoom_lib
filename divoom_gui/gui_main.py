@@ -234,7 +234,10 @@ def main():
             logger.debug(f"daemon shutdown skipped: {e}")
 
     window.events.closing += lambda: _stop_daemon_once("Dashboard closing")
-    webview.start()
+    # DIVOOM_GUI_DEBUG=1 → enable the WebKit inspector (right-click → Inspect
+    # Element) so a blank/broken page can be diagnosed from the JS console.
+    _debug = os.environ.get("DIVOOM_GUI_DEBUG") in ("1", "true", "yes")
+    webview.start(debug=_debug)
 
     # webview.start() blocks until the window closes. On close, when lifecycles
     # are shared, stop the daemon too (which broadcasts → the menu bar follows).

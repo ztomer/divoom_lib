@@ -3,11 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <script>
+        // Debug harness: capture JS errors early (before other scripts) and forward
+        // them to the Python api (js_log -> /tmp/divoom-gui-js.log) so failures are
+        // visible even in the packaged app, with no inspector. Buffer until the
+        // pywebview bridge is ready, then flush.
         window.__js_errors = [];
+        function __divoomFlush() {
+            try {
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.js_log) {
+                    while (window.__js_errors.length) {
+                        var e = window.__js_errors.shift();
+                        window.pywebview.api.js_log(
+                            "ERR: " + e.message + " @ " + (e.source || "") + ":" + (e.line || "") +
+                            (e.stack ? "\n" + e.stack : ""));
+                    }
+                }
+            } catch (_) { /* bridge not ready yet */ }
+        }
         window.onerror = function(message, source, lineno, colno, error) {
             window.__js_errors.push({message: message, source: source, line: lineno, col: colno, stack: error ? error.stack : ""});
+            __divoomFlush();
             return false;
         };
+        window.addEventListener("unhandledrejection", function(ev) {
+            window.__js_errors.push({message: "unhandledrejection: " + ((ev.reason && ev.reason.message) || ev.reason), source: "", line: 0, col: 0, stack: ev.reason && ev.reason.stack});
+            __divoomFlush();
+        });
+        window.addEventListener("pywebviewready", __divoomFlush);
+        setInterval(__divoomFlush, 1000);
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Divoom Desktop Controller & Wall Dashboard</title>
