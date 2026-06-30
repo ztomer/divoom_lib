@@ -4,6 +4,21 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Gap-closure run: daemon + menubar + app (2026-06-29)
+
+- **sync_time**: daemon `set_date_time` device_call leaf (cmd 0x18, ported from
+  date_time.py, wire-byte test) + UI "Update device time" button (chrono).
+- **Cloud login**: daemon `save_credentials` command (writes config.ini [divoom]
+  0600 + validates via UserLogin) + Settings login card. Unblocks the gallery.
+  Refactored cloud.rs → cloud_store.rs + daemon.rs → cloud_cmds.rs (500-line gate).
+- **Test notification**: was mis-classified as a daemon gap — the device_call leaf
+  `notification.show_notification[_text]` already existed; added the UI control.
+- **Menubar**: status-colored tray glyph (green/orange/red) — pyobjc-menubar parity.
+- All tractable gaps across daemon/menubar/app now closed. **Sole remaining real
+  gap: a native MCP server in the daemon** (large standalone workstream — needs a
+  go-ahead). Device-dependent niche (Custom Art, Hot Channel, audio viz, wall
+  presets) still need hardware. Python kept as reference (never deleted).
+
 ### Post-v0.20.2 — Native UI port: FUNCTIONAL PARITY (2026-06-29)
 
 - **/loop-until-parity run (8 iterations)** — closed the gaps the audit found.

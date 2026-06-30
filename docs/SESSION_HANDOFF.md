@@ -76,6 +76,16 @@ Claude) should read this on entry and **update it at the end of every round**
     DateTimeCommand to a `divoomd` device_call leaf** for full parity.
     Added generic `Cmd::Raw`/`Update::Reply` (top-level daemon RPC w/ reply tag,
     stored in `app.replies`) for the remaining tabs; `DIVOOM_UI_TAB` screenshot aid.
+  - **GAP-CLOSURE RUN (2026-06-29, "close the gaps across daemon/menubar/app"):**
+    closed the daemon gaps + menubar polish. **sync_time** (daemon `set_date_time`
+    0x18 + UI button), **cloud login** (daemon `save_credentials` + Settings card,
+    unblocks gallery; split cloud_store.rs/cloud_cmds.rs for the 500-line gate),
+    **test notification** (was an app gap — leaf existed; added UI control),
+    **menubar status-color glyph**. **Sole remaining real gap: a native MCP server
+    in divoomd** (the Python MCP is a `divoom_lib.cli mcp-server` subprocess; a
+    Python-free bundle needs a Rust MCP stdio JSON-RPC server, ~13 tools → a large
+    standalone workstream — needs an explicit go-ahead). Device-dependent niche
+    (Custom Art, Hot Channel, audio viz, wall presets) still need hardware.
   - **FUNCTIONAL PARITY REACHED (2026-06-29, after the /loop-until-parity run, 8
     iterations).** See **`docs/PARITY_TRACKER_NATIVE_UI.md`** for the full per-feature
     record + the "PARITY STATUS" closeout. All portable/verifiable UI features are
