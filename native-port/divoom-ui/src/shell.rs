@@ -107,14 +107,14 @@ pub fn sidebar(app: &mut DivoomApp, ctx: &egui::Context) {
 fn nav_menu(app: &mut DivoomApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
     for (tab, label) in Tab::NAV {
-        if nav_button(ui, app.tab == tab, label).clicked() {
+        if nav_button(ui, app.tab == tab, label, tab).clicked() {
             app.tab = tab;
         }
         ui.add_space(4.0);
     }
 }
 
-fn nav_button(ui: &mut egui::Ui, selected: bool, label: &str) -> egui::Response {
+fn nav_button(ui: &mut egui::Ui, selected: bool, label: &str, tab: crate::app::Tab) -> egui::Response {
     let desired = Vec2::new(ui.available_width(), 34.0);
     let (rect, resp) = ui.allocate_exact_size(desired, Sense::click());
     let painter = ui.painter();
@@ -132,8 +132,14 @@ fn nav_button(ui: &mut egui::Ui, selected: bool, label: &str) -> egui::Response 
         painter.rect_filled(bar, Rounding::same(2.0), theme::PRIMARY);
     }
     let text_color = if selected { theme::TEXT_MAIN } else { theme::TEXT_MUTED };
+    // Kare glyph (tinted to the nav state), then the label to its right.
+    let icon_rect = egui::Rect::from_center_size(
+        rect.left_center() + Vec2::new(18.0, 0.0),
+        crate::icons::ICON,
+    );
+    crate::icons::paint_nav(ui, tab, icon_rect, if selected { theme::PRIMARY } else { theme::TEXT_MUTED });
     painter.text(
-        rect.left_center() + Vec2::new(12.0, 0.0),
+        rect.left_center() + Vec2::new(34.0, 0.0),
         egui::Align2::LEFT_CENTER,
         label,
         egui::FontId::proportional(13.5),

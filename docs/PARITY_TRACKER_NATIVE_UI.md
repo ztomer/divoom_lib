@@ -145,7 +145,23 @@ low-value or unverifiable without hardware.
   tools/list/tools/call/ping verified end-to-end; catalog + maps unit-tested.
 - [x] ✓ menubar status-color glyph (parity with pyobjc menubar)
 
+## Visual parity (/loop "until visual parity") — egui mechanisms proven
+- [x] ✓ Native macOS traffic lights (ViewportBuilder fullsize_content_view)
+- [x] ✓ Channel previews (VJ/EQ webp via egui_extras image loader)
+- [x] ✓ Toggle switches (ui_widgets::toggle)
+- [x] ✓ Sidebar nav glyphs (Kare SVGs embedded, svg loader + tint — icons.rs)
+- [ ] ✗ Gallery thumbnails (https loader; needs cloud auth)
+- [ ] ✗ Virtual-wall canvas (painter grid + device-frame textures)
+- [ ] ✗ Live device-screen preview (sidebar — needs daemon to expose current frame)
+- [ ] ✗ Clock / Ambient / Scoreboard previews (paint; web used CSS, no assets)
+- [ ] ✗ Appbar icon glyphs (brightness sun / volume / gear)
+- [ ] ✗ Custom fonts (Inter/Outfit via FontDefinitions) for type parity
+
 ## Progress log
+- 2026-06-29 visual2: sidebar nav glyphs — Kare SVGs embedded (icons.rs), rendered
+  via egui_extras svg loader with per-state tint. Verified by screenshot.
+- 2026-06-29 visual1: egui_extras image loaders + webp; VJ/EQ channel previews,
+  toggle switches, macOS native traffic lights (traffic lights confirmed on-screen).
 - 2026-06-29 MCP: `divoomd mcp` native MCP stdio server (mcp.rs + mcp_tools.rs) —
   13 tools, daemon-routed device_call, verified end-to-end + unit-tested. This was
   the last real daemon gap. **ALL daemon/menubar/app gaps now closed**; the only
