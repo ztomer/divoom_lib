@@ -3,6 +3,10 @@
 # native Rust daemon (divoomd) and the native Rust menubar (divoom-menubar).
 # Build the native bits first with ./build.sh.
 #
+# Before launching, it finds and kills any existing divoom processes (Python +
+# Rust daemon, menubar, GUI) and clears stale sockets, so we always start from a
+# clean slate (otherwise the GUI's single-instance guard reuses a stale daemon).
+#
 #   ./run.sh            launch the GUI (auto-spawns daemon + menubar)
 #   ./run.sh --menubar  run ONLY the Rust menubar agent in the foreground
 #                       (quick tray smoke; needs a daemon for live status)
@@ -27,8 +31,25 @@ done
 
 MENUBAR="native-port/divoom-menubar/target/$PROFILE/divoom-menubar"
 
+# Find + stop processes whose command line matches $1 (TERM, then KILL stragglers).
+# Patterns are specific enough not to match this script (bash .../run.sh).
+kill_pat() {
+  local pat="$1" label="$2" pids
+  pids="$(pgrep -f "$pat" 2>/dev/null || true)"
+  [[ -z "$pids" ]] && return 0
+  info "stopping $label (${pids//$'\n'/ })"
+  # shellcheck disable=SC2086
+  kill $pids 2>/dev/null || true
+  sleep 0.3
+  pids="$(pgrep -f "$pat" 2>/dev/null || true)"
+  # shellcheck disable=SC2086
+  [[ -n "$pids" ]] && kill -9 $pids 2>/dev/null || true
+  return 0
+}
+
 if [[ "$MODE" == "menubar" ]]; then
   [[ -x "$MENUBAR" ]] || die "menubar not built — run ./build.sh${PROFILE/release/} first"
+  kill_pat "divoom-menubar" "existing menubar"
   section "Rust menubar (foreground)"
   info "Ctrl-C to quit. Launch Dashboard needs DIVOOM_GUI_PYTHON/SCRIPT (the GUI sets these)."
   export DIVOOM_GUI_PYTHON="${DIVOOM_GUI_PYTHON:-$(command -v python3)}"
@@ -36,8 +57,17 @@ if [[ "$MODE" == "menubar" ]]; then
   exec "$MENUBAR"
 fi
 
-# Default: launch the Python GUI (it spawns the daemon + menubar itself).
+# Default (GUI): clean slate, then launch. The GUI spawns the daemon + menubar.
 require_commands python3
+
+section "Cleanup — stopping any existing divoom processes"
+kill_pat "divoom_gui.gui_main" "GUI"
+kill_pat "divoom_lib.cli daemon" "Python daemon"
+kill_pat "divoomd"               "Rust daemon"
+kill_pat "divoom-menubar"        "menubar"
+rm -f /tmp/divoom.sock /tmp/divoomd.sock /tmp/divoom_gui.lock 2>/dev/null || true
+ok "clean slate"
+
 [[ -x "$MENUBAR" ]] || warn "menubar not built (no tray this run) — ./build.sh to enable it"
 section "Divoom GUI (Python) + native daemon/menubar"
 info "the GUI spawns divoomd + divoom-menubar; first BLE use prompts for Bluetooth"
