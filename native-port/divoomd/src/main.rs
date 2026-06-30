@@ -78,6 +78,16 @@ use divoomd::socket_server::{serve, serve_tcp};
 
 #[tokio::main]
 async fn main() {
+    // `divoomd mcp` runs the MCP stdio server (a client of the running daemon),
+    // not the daemon itself. Ported from the Python `divoom_lib.cli mcp-server`.
+    if std::env::args().nth(1).as_deref() == Some("mcp") {
+        if let Err(e) = divoomd::mcp::run().await {
+            eprintln!("divoomd mcp: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let args = parse_args();
     let socket_path = args.socket_path;
     let listener = match bind(&socket_path) {

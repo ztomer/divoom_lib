@@ -4,6 +4,19 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native MCP server (last daemon gap) (2026-06-29)
+
+- **`divoomd mcp`** — native MCP stdio JSON-RPC server (`mcp.rs` + `mcp_tools.rs`),
+  ported from `divoom_lib/mcp_server.py` + `mcp_tools.py`. It's a daemon-routed
+  bridge: connects to the daemon socket (DIVOOM_SOCKET) and forwards each
+  `tools/call` as a `device_call`/command — the same model as the Python
+  MCP-via-daemon. All 13 tools (set_volume/brightness/light_mode/weather/alarm/
+  radio/low_power/screen_orientation/show_image/push_animation/play_sound/
+  get_capabilities/get_device_state); file tools decode locally (image crate) and
+  push rgb. initialize/tools/list/tools/call/ping verified end-to-end; catalog +
+  light/weather maps unit-tested. Added tokio `io-std`. This closes the **last**
+  daemon gap — all daemon/menubar/app parity gaps are now closed.
+
 ### Post-v0.20.2 — Gap-closure run: daemon + menubar + app (2026-06-29)
 
 - **sync_time**: daemon `set_date_time` device_call leaf (cmd 0x18, ported from

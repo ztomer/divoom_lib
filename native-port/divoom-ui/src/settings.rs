@@ -154,8 +154,11 @@ fn app_card(app: &mut DivoomApp, ui: &mut egui::Ui) {
             ui.add(egui::DragValue::new(&mut app.scan_timeout).range(2.0..=30.0).speed(0.5).fixed_decimals(0));
         });
         ui.add_space(6.0);
-        ui.add_enabled(false, egui::Button::new("MCP server (subprocess — Phase 4)"))
-            .on_disabled_hover_text("The MCP stdio server runs as a separate process; wiring it is Phase 4.");
+        ui.label(
+            RichText::new("MCP server: run `divoomd mcp` (stdio) — point your MCP host at it.")
+                .size(11.0)
+                .color(theme::TEXT_MUTED),
+        );
         ui.add_space(8.0);
         ui.label(
             RichText::new("divoom-ui (native) — talks to divoomd over the local socket.")

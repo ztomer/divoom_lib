@@ -138,14 +138,19 @@ low-value or unverifiable without hardware.
 - [x] ✓ cloud login (`save_credentials` daemon command + Settings login card)
 - [x] ✓ test notification — was NOT a daemon gap; device_call leaf existed, added
   the UI control (Settings notif card).
-- [ ] ✗ MCP server (Rust MCP in daemon — large; **the one remaining real daemon
-  gap**). The Python MCP is a `python -m divoom_lib.cli mcp-server` subprocess; a
-  Python-free bundle needs a native MCP stdio JSON-RPC server in divoomd (~13 tools
-  → device_call). This is a standalone workstream (multi-hundred-line module) —
-  surfaced for an explicit go-ahead rather than ground out inside the loop.
+- [x] ✓ MCP server — DAEMON GAP CLOSED: `divoomd mcp` stdio JSON-RPC bridge
+  (`mcp.rs` + `mcp_tools.rs`), ported from `mcp_server.py`/`mcp_tools.py`. All 13
+  tools (tools/list parity), routes tools/call → daemon `device_call` over the
+  socket; file tools decode locally (image crate) → show_image. initialize/
+  tools/list/tools/call/ping verified end-to-end; catalog + maps unit-tested.
 - [x] ✓ menubar status-color glyph (parity with pyobjc menubar)
 
 ## Progress log
+- 2026-06-29 MCP: `divoomd mcp` native MCP stdio server (mcp.rs + mcp_tools.rs) —
+  13 tools, daemon-routed device_call, verified end-to-end + unit-tested. This was
+  the last real daemon gap. **ALL daemon/menubar/app gaps now closed**; the only
+  un-ported items are device-dependent niche (Custom Art browser, Hot Channel, wall
+  presets) + audio-capture (audio visualizer), which need hardware to build/verify.
 - 2026-06-29 gap-run: closed sync_time (daemon set_date_time 0x18 + UI), cloud
   login (daemon save_credentials + Settings card; split cloud_store/cloud_cmds),
   and test notification (UI control — leaf already existed). Only the MCP-server

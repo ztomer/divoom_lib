@@ -86,6 +86,14 @@ Claude) should read this on entry and **update it at the end of every round**
     Python-free bundle needs a Rust MCP stdio JSON-RPC server, ~13 tools → a large
     standalone workstream — needs an explicit go-ahead). Device-dependent niche
     (Custom Art, Hot Channel, audio viz, wall presets) still need hardware.
+  - **MCP GAP CLOSED (2026-06-29):** `divoomd mcp` — native MCP stdio JSON-RPC
+    server (`native-port/divoomd/src/mcp.rs` + `mcp_tools.rs`), ported from
+    `mcp_server.py`/`mcp_tools.py`. Daemon-routed bridge (connects to DIVOOM_SOCKET,
+    forwards tools/call → device_call); 13 tools; verified end-to-end + unit-tested;
+    added tokio `io-std`. **All daemon/menubar/app parity gaps are now closed.** The
+    only un-ported items are device-dependent niche (Custom Art browser, Hot Channel,
+    wall presets) + audio-capture (audio visualizer) — need hardware. To use the MCP
+    server, point an MCP host at `divoomd mcp` (it needs a running daemon).
   - **FUNCTIONAL PARITY REACHED (2026-06-29, after the /loop-until-parity run, 8
     iterations).** See **`docs/PARITY_TRACKER_NATIVE_UI.md`** for the full per-feature
     record + the "PARITY STATUS" closeout. All portable/verifiable UI features are
