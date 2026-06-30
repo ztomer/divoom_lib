@@ -351,7 +351,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setTimeout(() => {
         window.updateSyncTargetList();
-        window.loadGalleryFilter();
+        loadGalleryFilter();  // local fn in this closure (not exposed on window)
         window.loadPreferredGalleryStyle();
     }, 1500);
 });

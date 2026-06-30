@@ -4,6 +4,14 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.3 — fix gallery filter JS error (2026-06-30)
+
+- **fix(web_ui):** the gallery startup called `window.loadGalleryFilter()`, but
+  `loadGalleryFilter` is a local function in the `DOMContentLoaded` closure (not
+  exposed on `window`), so it threw `TypeError: window.loadGalleryFilter is not a
+  function` (gallery.js:354) on every launch. Call the local function directly.
+  Non-fatal before (the page rendered), now clean.
+
 ## v0.21.2 — fix blank GUI: PyInstaller packaging (2026-06-30)
 
 The v0.21.x packaged `.app` opened a **blank dashboard window**: pywebview's
