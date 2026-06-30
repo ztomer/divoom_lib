@@ -48,8 +48,21 @@ EMOJI_RANGES = [
 ]
 
 
+# The Kare icon set + approved typographic arrows / Mac-key glyphs are PERMITTED
+# everywhere — they are functional iconography, not decorative emoji. This mirrors
+# the authoritative house gate `tools/check_no_emoji.py` (its ALLOWED set) and the
+# rule in CLAUDE.md (→ ✓ ✗ ⚠ ↔ ↑ ↓ + ← ⌘ ⌥ ⌨). Listed by CODEPOINT so this file
+# never contains the literal glyphs.
+ALLOWED_CODEPOINTS = {
+    0x2192, 0x2713, 0x2717, 0x26A0, 0x2194, 0x2191, 0x2193,  # → ✓ ✗ ⚠ ↔ ↑ ↓
+    0x2190, 0x2318, 0x2325, 0x2328,                          # ← ⌘ ⌥ ⌨
+}
+
+
 def _is_emoji(ch: str) -> bool:
     cp = ord(ch)
+    if cp in ALLOWED_CODEPOINTS:
+        return False
     return any(lo <= cp <= hi for lo, hi in EMOJI_RANGES)
 
 
@@ -123,8 +136,12 @@ def test_emoji_range_table_includes_known_blocks() -> None:
     # Quick spot check: a few well-known emoji codepoints.
     assert _is_emoji("\U0001F697")  # 0x1F697 (transport)
     assert _is_emoji("\U0001F389")  # 0x1F389 (symbols)
-    assert _is_emoji("\u26a0")   # 0x26A0 (misc symbols, written as \u26A0 to avoid being a literal)
-    assert _is_emoji("\u2705")  # 0x2705 (dingbats, written as \u2705 to avoid being a literal)
+    assert _is_emoji("\u2600")   # 0x2600 sun (misc symbols, forbidden; \u-escaped)
+    assert _is_emoji("\u2705")  # 0x2705 check-mark-button (dingbats, forbidden; \u-escaped)
+    # ...but the permitted Kare icons are NOT flagged (mirror tools/check_no_emoji.py).
+    assert not _is_emoji("\u2713")  # \u2713 allowed
+    assert not _is_emoji("\u2717")  # \u2717 allowed
+    assert not _is_emoji("\u26A0")  # \u26A0 allowed
     # And some non-emoji Latin/ASCII characters should NOT be flagged.
     assert not _is_emoji("a")
     assert not _is_emoji("Z")
