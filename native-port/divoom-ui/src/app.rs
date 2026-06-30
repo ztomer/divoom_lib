@@ -279,7 +279,7 @@ impl DivoomApp {
         ctx.request_repaint(); // tick fast so async image loaders finish before capture
         self.frame_count += 1;
         if self.frame_count == 40 {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot);
+            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
         }
         let shot = ctx.input(|i| {
             i.events.iter().find_map(|e| match e {
@@ -389,15 +389,19 @@ impl eframe::App for DivoomApp {
         crate::theme::BG_BASE.to_normalized_gamma_f32()
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.pump();
         self.handle_tray(ctx);
-        shell::appbar(self, ctx);
-        shell::sidebar(self, ctx);
-        shell::content(self, ctx);
-        self.maybe_screenshot(ctx);
         // Keep the live-status poll flowing even when idle.
         ctx.request_repaint_after(std::time::Duration::from_millis(200));
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        shell::appbar(self, ui);
+        shell::sidebar(self, ui);
+        shell::content(self, ui);
+        let ctx = ui.ctx().clone();
+        self.maybe_screenshot(&ctx);
     }
 }
 

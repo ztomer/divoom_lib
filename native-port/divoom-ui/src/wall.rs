@@ -61,12 +61,12 @@ fn wall_canvas(app: &DivoomApp, ui: &mut egui::Ui) {
         let min = egui::pos2(x0 + i as f32 * (tile.x + gap), rect.top());
         let tr = egui::Rect::from_min_size(min, tile);
         // bezel + screen
-        p.rect(tr, egui::Rounding::same(8.0), theme::CARD_BG, egui::Stroke::new(1.0, theme::BORDER));
+        p.rect(tr, egui::CornerRadius::same(8), theme::CARD_BG, egui::Stroke::new(1.0, theme::BORDER), egui::StrokeKind::Inside);
         let screen = tr.shrink(8.0);
-        p.rect_filled(screen, egui::Rounding::same(3.0), theme::BG_BASE);
+        p.rect_filled(screen, egui::CornerRadius::same(3), theme::BG_BASE);
         let sel = app.selected_device == Some(i);
         if sel {
-            p.rect_stroke(screen, egui::Rounding::same(3.0), egui::Stroke::new(1.5, theme::PRIMARY));
+            p.rect_stroke(screen, egui::CornerRadius::same(3), egui::Stroke::new(1.5, theme::PRIMARY), egui::StrokeKind::Inside);
         }
         let name = if d.name.is_empty() { d.address.clone() } else { d.name.clone() };
         let short = name.split('-').next().unwrap_or(&name).to_string();
@@ -76,11 +76,11 @@ fn wall_canvas(app: &DivoomApp, ui: &mut egui::Ui) {
 }
 
 fn card(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(theme::CARD_BG)
-        .rounding(egui::Rounding::same(theme::RADIUS))
+        .corner_radius(egui::CornerRadius::same(theme::RADIUS as u8))
         .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .inner_margin(egui::Margin::same(14.0))
+        .inner_margin(egui::Margin::same(14))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             add(ui);

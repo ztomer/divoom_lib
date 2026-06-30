@@ -83,13 +83,14 @@ fn canvas(app: &mut DivoomApp, ui: &mut egui::Ui) {
             let cr = egui::Rect::from_min_size(min, Vec2::splat(cell));
             painter.rect(
                 cr,
-                egui::Rounding::ZERO,
+                egui::CornerRadius::ZERO,
                 Color32::from_rgb(p[0], p[1], p[2]),
                 Stroke::new(0.5, theme::BORDER),
+                egui::StrokeKind::Inside,
             );
         }
     }
-    painter.rect_stroke(rect, egui::Rounding::ZERO, Stroke::new(1.0, theme::BORDER));
+    painter.rect_stroke(rect, egui::CornerRadius::ZERO, Stroke::new(1.0, theme::BORDER), egui::StrokeKind::Inside);
 }
 
 fn push(app: &DivoomApp) {

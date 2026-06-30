@@ -9,7 +9,7 @@
 //!   scoreboard   → set_scoreboard          [on_off, red, blue]
 //!   text         → push_text (bitmap render) — deferred to Phase 3 (needs font)
 
-use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
+use eframe::egui::{self, Color32, RichText, CornerRadius, Stroke, Vec2};
 
 use crate::app::{Channel, DivoomApp};
 use crate::channel_previews::{ambient_grid, clock_grid, hint, image_grid, swatch};
@@ -198,7 +198,7 @@ fn preview(ui: &mut egui::Ui, frame: &[[u8; 3]], size: usize) {
     let cell = 9.0;
     let (rect, _) = ui.allocate_exact_size(Vec2::splat(cell * size as f32), egui::Sense::hover());
     let p = ui.painter_at(rect);
-    p.rect_filled(rect, Rounding::ZERO, Color32::BLACK);
+    p.rect_filled(rect, CornerRadius::ZERO, Color32::BLACK);
     for y in 0..size {
         for x in 0..size {
             let c = frame[y * size + x];
@@ -206,13 +206,13 @@ fn preview(ui: &mut egui::Ui, frame: &[[u8; 3]], size: usize) {
                 let min = rect.left_top() + Vec2::new(x as f32 * cell, y as f32 * cell);
                 p.rect_filled(
                     egui::Rect::from_min_size(min, Vec2::splat(cell)),
-                    Rounding::ZERO,
+                    CornerRadius::ZERO,
                     Color32::from_rgb(c[0], c[1], c[2]),
                 );
             }
         }
     }
-    p.rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, theme::BORDER));
+    p.rect_stroke(rect, CornerRadius::ZERO, Stroke::new(1.0, theme::BORDER), egui::StrokeKind::Inside);
 }
 
 fn text_effect_name(v: i64) -> &'static str {
@@ -226,13 +226,13 @@ fn text_effect_name(v: i64) -> &'static str {
 }
 
 fn sessions(app: &mut DivoomApp, ui: &mut egui::Ui) {
-    use eframe::egui::{Frame, Margin, Rounding, Stroke};
+    use eframe::egui::{Frame, Margin, CornerRadius, Stroke};
     let card = |ui: &mut egui::Ui, title: &str, body: &mut dyn FnMut(&mut egui::Ui)| {
-        Frame::none()
+        Frame::NONE
             .fill(theme::CARD_BG)
-            .rounding(Rounding::same(theme::RADIUS))
+            .corner_radius(CornerRadius::same(theme::RADIUS as u8))
             .stroke(Stroke::new(1.0, theme::BORDER))
-            .inner_margin(Margin::same(12.0))
+            .inner_margin(Margin::same(12))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.label(RichText::new(title).size(13.5).color(theme::TEXT_MAIN).strong());

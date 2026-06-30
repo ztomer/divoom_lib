@@ -4,6 +4,21 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI: egui 0.29 → 0.35 migration (2026-06-29)
+
+- **Upgraded the native UI to egui/eframe/egui_extras 0.35** (from 0.29). Ported all
+  breaking API changes: `Rounding`→`CornerRadius` (u8 args), `Margin` is now `i8`,
+  `Painter::rect`/`rect_stroke` gained a trailing `StrokeKind`, `Frame::none()`→
+  `Frame::NONE`, `FontData` wrapped in `Arc`, `ctx.style()/set_style`→`ctx.all_styles_mut`,
+  `ViewportCommand::Screenshot(UserData::default())`, the merged `egui::Panel`
+  (`Panel::{top,left,bottom}(id).exact_size(..).resizable(..).frame(..).show(ui,..)`
+  replacing `TopBottomPanel`/`SidePanel`), and `eframe::App` split (`update`→`logic(ctx)`
+  for non-UI work + `ui(&mut Ui)` for the panel tree). `show_inside`→`show`.
+- **Verified:** clean `cargo build` debug+release (only pre-existing dead-code warnings);
+  self-screenshot harness confirms the Channels tab renders identically (appbar sliders +
+  glyphs + Settings pill, sidebar nav glyphs + orange active accent, painted clock-face
+  preview grid, device panel, daemon-status row).
+
 ### Post-v0.20.2 — Native app VERIFIED on hardware + shipped alongside (2026-06-29)
 
 - **Verified the native bundle on real hardware** (computer-use, user-approved):

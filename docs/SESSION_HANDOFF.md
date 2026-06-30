@@ -28,7 +28,16 @@ Claude) should read this on entry and **update it at the end of every round**
     **Toolkit chosen: egui/eframe** (MIT/Apache; picked over iced for pragmatism).
     The current `web_ui/` is the **visual reference only** (read for layout/look),
     not shipped; stays archived in-tree.
-  - **Built so far** (`native-port/divoom-ui/`, eframe/egui 0.29):
+  - **egui 0.29 → 0.35 migration DONE (2026-06-29):** bumped eframe/egui/egui_extras
+    to 0.35; ported the breaking API changes — `Rounding`→`CornerRadius` (u8),
+    `Margin` is now `i8`, `painter.rect`/`rect_stroke` take a `StrokeKind`,
+    `Frame::none()`→`Frame::NONE`, `FontData` wrapped in `Arc`, `ctx.style()/set_style`
+    →`ctx.all_styles_mut`, `ViewportCommand::Screenshot(UserData)`, `TopBottomPanel`/
+    `SidePanel` merged into `egui::Panel::{top,left,bottom}(id).exact_size(..).show(ui,..)`,
+    and `eframe::App::update`→`logic(ctx)` (non-UI) + `ui(&mut Ui)` (panels). Clean
+    debug+release build (only pre-existing dead-code warnings); screenshot-verified the
+    Channels tab renders identically.
+  - **Built so far** (`native-port/divoom-ui/`, eframe/egui 0.35):
     - `theme.rs` — Braun dark palette copied byte-for-byte from `web_ui/style.css`
       (`#121316` bg, `#ff5a1f` accent, 168px sidebar).
     - `shell.rs` — frameless integrated appbar (window controls + brightness/volume

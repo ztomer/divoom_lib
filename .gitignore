@@ -56,3 +56,6 @@ references/
 
 # Native (Rust/egui) app bundle artifact (scripts/build_native_app.sh)
 dist-native/
+
+# Rust native UI build artifacts
+native-port/divoom-ui/target/

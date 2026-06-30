@@ -2,7 +2,7 @@
 //! host. Mirrors `divoom_gui/web_ui/index.html` (appbar + .sidebar + .main-content).
 
 use eframe::egui::{
-    self, Align, Color32, Frame, Layout, Margin, RichText, Rounding, Sense, Stroke, Vec2,
+    self, Align, Color32, Frame, Layout, Margin, RichText, CornerRadius, Sense, Stroke, Vec2,
 };
 
 use crate::app::{Channel, DivoomApp, Tab};
@@ -11,14 +11,16 @@ use crate::theme;
 
 // --- appbar ------------------------------------------------------------------
 
-pub fn appbar(app: &mut DivoomApp, ctx: &egui::Context) {
-    let frame = Frame::none()
+pub fn appbar(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    let ctx = ui.ctx().clone();
+    let frame = Frame::NONE
         .fill(theme::APPBAR_BG)
-        .inner_margin(Margin::symmetric(10.0, 6.0));
-    egui::TopBottomPanel::top("appbar")
-        .exact_height(theme::APPBAR_HEIGHT)
+        .inner_margin(Margin::symmetric(10, 6));
+    egui::Panel::top("appbar")
+        .exact_size(theme::APPBAR_HEIGHT)
+        .resizable(false)
         .frame(frame)
-        .show(ctx, |ui| {
+        .show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 // Reserve room for the native macOS traffic-light buttons (top-left).
                 #[cfg(target_os = "macos")]
@@ -81,7 +83,7 @@ fn settings_gear(app: &mut DivoomApp, ui: &mut egui::Ui) {
     // A round glass pill with the gear glyph + "Settings" (web R32 appbar gear).
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(76.0, 26.0), Sense::click());
     let stroke = Stroke::new(1.0, if selected || resp.hovered() { theme::PRIMARY } else { theme::BORDER });
-    ui.painter().rect(rect, Rounding::same(13.0), theme::CARD_BG, stroke);
+    ui.painter().rect(rect, CornerRadius::same(13), theme::CARD_BG, stroke, egui::StrokeKind::Inside);
     let gear = egui::Rect::from_center_size(rect.left_center() + Vec2::new(16.0, 0.0), Vec2::splat(13.0));
     crate::icons::paint_settings(ui, gear, color);
     ui.painter().text(
@@ -98,23 +100,24 @@ fn settings_gear(app: &mut DivoomApp, ui: &mut egui::Ui) {
 
 // --- sidebar -----------------------------------------------------------------
 
-pub fn sidebar(app: &mut DivoomApp, ctx: &egui::Context) {
-    let frame = Frame::none()
+pub fn sidebar(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    let frame = Frame::NONE
         .fill(theme::SIDEBAR_BG)
-        .inner_margin(Margin::same(10.0))
+        .inner_margin(Margin::same(10))
         .stroke(Stroke::new(1.0, theme::BORDER));
-    egui::SidePanel::left("sidebar")
-        .exact_width(theme::SIDEBAR_WIDTH)
+    egui::Panel::left("sidebar")
+        .exact_size(theme::SIDEBAR_WIDTH)
         .resizable(false)
         .frame(frame)
-        .show(ctx, |ui| {
+        .show(ui, |ui| {
             // Device panel pinned to the bottom; nav fills the rest.
-            egui::TopBottomPanel::bottom("device_panel")
-                .frame(Frame::none())
-                .show_inside(ui, |ui| device_panel(app, ui));
+            egui::Panel::bottom("device_panel")
+                .resizable(false)
+                .frame(Frame::NONE)
+                .show(ui, |ui| device_panel(app, ui));
             egui::CentralPanel::default()
-                .frame(Frame::none())
-                .show_inside(ui, |ui| nav_menu(app, ui));
+                .frame(Frame::NONE)
+                .show(ui, |ui| nav_menu(app, ui));
         });
 }
 
@@ -139,11 +142,11 @@ fn nav_button(ui: &mut egui::Ui, selected: bool, label: &str, tab: crate::app::T
     } else {
         Color32::TRANSPARENT
     };
-    painter.rect_filled(rect, Rounding::same(theme::RADIUS), bg);
+    painter.rect_filled(rect, CornerRadius::same(theme::RADIUS as u8), bg);
     if selected {
         // Orange left accent bar (the active-nav cue from the web UI).
         let bar = egui::Rect::from_min_size(rect.left_top(), Vec2::new(3.0, rect.height()));
-        painter.rect_filled(bar, Rounding::same(2.0), theme::PRIMARY);
+        painter.rect_filled(bar, CornerRadius::same(2), theme::PRIMARY);
     }
     let text_color = if selected { theme::TEXT_MAIN } else { theme::TEXT_MUTED };
     // Kare glyph (tinted to the nav state), then the label to its right.
@@ -164,21 +167,22 @@ fn nav_button(ui: &mut egui::Ui, selected: bool, label: &str, tab: crate::app::T
 
 fn device_panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
-    Frame::none()
+    Frame::NONE
         .fill(theme::CARD_BG)
         .stroke(Stroke::new(1.0, theme::BORDER))
-        .rounding(Rounding::same(theme::RADIUS))
-        .inner_margin(Margin::same(8.0))
+        .corner_radius(CornerRadius::same(theme::RADIUS as u8))
+        .inner_margin(Margin::same(8))
         .show(ui, |ui| {
             ui.vertical_centered(|ui| {
                 // Flat face-on screen preview (neutral bezel placeholder for now).
                 let (rect, _) =
                     ui.allocate_exact_size(Vec2::new(96.0, 96.0), Sense::hover());
-                ui.painter().rect_filled(rect, Rounding::same(4.0), theme::BG_BASE);
+                ui.painter().rect_filled(rect, CornerRadius::same(4), theme::BG_BASE);
                 ui.painter().rect_stroke(
                     rect,
-                    Rounding::same(4.0),
+                    CornerRadius::same(4),
                     Stroke::new(1.0, theme::BORDER),
+                    egui::StrokeKind::Inside,
                 );
                 ui.add_space(6.0);
                 let name = app
@@ -223,9 +227,9 @@ fn device_panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
 
 // --- content -----------------------------------------------------------------
 
-pub fn content(app: &mut DivoomApp, ctx: &egui::Context) {
-    let frame = Frame::none().inner_margin(Margin::same(14.0));
-    egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
+pub fn content(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    let frame = Frame::NONE.inner_margin(Margin::same(14));
+    egui::CentralPanel::default().frame(frame).show(ui, |ui| {
         ui.heading(RichText::new(app.tab.title()).color(theme::TEXT_MAIN));
         ui.add_space(8.0);
         match app.tab {
@@ -246,11 +250,11 @@ pub fn content(app: &mut DivoomApp, ctx: &egui::Context) {
 
 fn channels_tab(app: &mut DivoomApp, ui: &mut egui::Ui) {
     // Channel sub-tab row, sitting on its own glass pane (.tabs-section).
-    Frame::none()
+    Frame::NONE
         .fill(theme::SIDEBAR_BG)
-        .rounding(Rounding::same(theme::RADIUS))
+        .corner_radius(CornerRadius::same(theme::RADIUS as u8))
         .stroke(Stroke::new(1.0, theme::BORDER))
-        .inner_margin(Margin::symmetric(8.0, 4.0))
+        .inner_margin(Margin::symmetric(8, 4))
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 for (ch, label) in Channel::ALL {
@@ -262,9 +266,9 @@ fn channels_tab(app: &mut DivoomApp, ui: &mut egui::Ui) {
         });
     ui.add_space(theme::RADIUS);
 
-    Frame::none()
+    Frame::NONE
         .fill(theme::CARD_BG)
-        .rounding(Rounding::same(theme::RADIUS))
+        .corner_radius(CornerRadius::same(theme::RADIUS as u8))
         .stroke(Stroke::new(1.0, theme::BORDER))
         .inner_margin(crate::channel_previews::card_margin())
         .show(ui, |ui| {

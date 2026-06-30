@@ -3,17 +3,19 @@
 //! role). Inter is SIL OFL-1.1 (see fonts/ATTRIBUTION.txt). egui loads OTF/CFF via
 //! ttf-parser, so the .otf files work directly.
 
+use std::sync::Arc;
+
 use eframe::egui::{self, FontData, FontDefinitions, FontFamily, TextStyle};
 
 pub fn install(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
     fonts.font_data.insert(
         "inter".to_owned(),
-        FontData::from_static(include_bytes!("../fonts/Inter-Regular.otf")),
+        Arc::new(FontData::from_static(include_bytes!("../fonts/Inter-Regular.otf"))),
     );
     fonts.font_data.insert(
         "inter_display".to_owned(),
-        FontData::from_static(include_bytes!("../fonts/InterDisplay-SemiBold.otf")),
+        Arc::new(FontData::from_static(include_bytes!("../fonts/InterDisplay-SemiBold.otf"))),
     );
     // Inter is the primary proportional face (keep egui's fallbacks after it).
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "inter".to_owned());
@@ -25,9 +27,9 @@ pub fn install(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
 
     // Point the Heading text style at the display family.
-    let mut style = (*ctx.style()).clone();
-    if let Some(h) = style.text_styles.get_mut(&TextStyle::Heading) {
-        h.family = FontFamily::Name("display".into());
-    }
-    ctx.set_style(style);
+    ctx.all_styles_mut(|style| {
+        if let Some(h) = style.text_styles.get_mut(&TextStyle::Heading) {
+            h.family = FontFamily::Name("display".into());
+        }
+    });
 }

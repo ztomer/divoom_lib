@@ -139,11 +139,11 @@ fn running_status(app: &mut DivoomApp, ui: &mut egui::Ui) {
 }
 
 fn card(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(theme::CARD_BG)
-        .rounding(egui::Rounding::same(theme::RADIUS))
+        .corner_radius(egui::CornerRadius::same(theme::RADIUS as u8))
         .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .inner_margin(egui::Margin::same(14.0))
+        .inner_margin(egui::Margin::same(14))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             add(ui);

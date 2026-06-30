@@ -2,7 +2,7 @@
 //! (the Braun-style dark dashboard). The current web UI is the visual reference;
 //! these are the same hex values so the native port reads identically.
 
-use egui::{Color32, Rounding, Stroke, Visuals};
+use egui::{Color32, CornerRadius, Stroke, Visuals};
 
 // Palette — byte-for-byte from web_ui/style.css :root.
 pub const BG_BASE: Color32 = Color32::from_rgb(0x12, 0x13, 0x16);
@@ -31,44 +31,44 @@ pub fn apply(ctx: &egui::Context) {
     v.faint_bg_color = SIDEBAR_BG;
     v.override_text_color = Some(TEXT_MAIN);
     v.hyperlink_color = PRIMARY;
-    v.window_rounding = Rounding::same(RADIUS);
+    v.window_corner_radius = CornerRadius::same(RADIUS as u8);
     v.window_stroke = Stroke::new(1.0, BORDER);
     v.selection.bg_fill = PRIMARY.linear_multiply(0.35);
     v.selection.stroke = Stroke::new(1.0, PRIMARY);
 
-    let r = Rounding::same(RADIUS);
+    let r = CornerRadius::same(RADIUS as u8);
     // Resting widgets sit on the card colour with a hairline border.
     v.widgets.noninteractive.bg_fill = CARD_BG;
     v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, BORDER);
-    v.widgets.noninteractive.rounding = r;
+    v.widgets.noninteractive.corner_radius = r;
     v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, TEXT_MUTED);
 
     v.widgets.inactive.bg_fill = CARD_BG;
     v.widgets.inactive.weak_bg_fill = CARD_BG;
     v.widgets.inactive.bg_stroke = Stroke::new(1.0, BORDER);
-    v.widgets.inactive.rounding = r;
+    v.widgets.inactive.corner_radius = r;
     v.widgets.inactive.fg_stroke = Stroke::new(1.0, TEXT_MAIN);
 
     // Hover: orange border (matches --border-hover).
     v.widgets.hovered.bg_fill = CARD_BG;
     v.widgets.hovered.weak_bg_fill = CARD_BG;
     v.widgets.hovered.bg_stroke = Stroke::new(1.0, PRIMARY);
-    v.widgets.hovered.rounding = r;
+    v.widgets.hovered.corner_radius = r;
     v.widgets.hovered.fg_stroke = Stroke::new(1.0, TEXT_MAIN);
 
     // Active/pressed: filled orange.
     v.widgets.active.bg_fill = PRIMARY;
     v.widgets.active.weak_bg_fill = PRIMARY;
     v.widgets.active.bg_stroke = Stroke::new(1.0, PRIMARY);
-    v.widgets.active.rounding = r;
+    v.widgets.active.corner_radius = r;
     v.widgets.active.fg_stroke = Stroke::new(1.0, Color32::BLACK);
 
     ctx.set_visuals(v);
 
     // A touch more breathing room than egui's defaults (closer to the web spacing).
-    let mut style = (*ctx.style()).clone();
-    style.spacing.item_spacing = egui::vec2(8.0, 8.0);
-    style.spacing.button_padding = egui::vec2(10.0, 6.0);
-    style.spacing.slider_width = 120.0;
-    ctx.set_style(style);
+    ctx.all_styles_mut(|style| {
+        style.spacing.item_spacing = egui::vec2(8.0, 8.0);
+        style.spacing.button_padding = egui::vec2(10.0, 6.0);
+        style.spacing.slider_width = 120.0;
+    });
 }

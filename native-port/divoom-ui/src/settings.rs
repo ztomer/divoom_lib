@@ -171,11 +171,11 @@ fn app_card(app: &mut DivoomApp, ui: &mut egui::Ui) {
 // --- helpers -----------------------------------------------------------------
 
 fn card(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(theme::CARD_BG)
-        .rounding(egui::Rounding::same(theme::RADIUS))
+        .corner_radius(egui::CornerRadius::same(theme::RADIUS as u8))
         .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .inner_margin(egui::Margin::same(14.0))
+        .inner_margin(egui::Margin::same(14))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(RichText::new(title).size(14.0).color(theme::TEXT_MAIN).strong());

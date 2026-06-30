@@ -38,11 +38,11 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
 
 /// Time plan (scheduled on/off) → timeplan.set_time_manage_info {status,hour,minute,week}.
 fn time_plan(app: &mut DivoomApp, ui: &mut egui::Ui) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(theme::CARD_BG)
-        .rounding(egui::Rounding::same(theme::RADIUS))
+        .corner_radius(egui::CornerRadius::same(theme::RADIUS as u8))
         .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .inner_margin(egui::Margin::same(12.0))
+        .inner_margin(egui::Margin::same(12))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(RichText::new("Time Plan (scheduled on/off)").size(13.5).color(theme::TEXT_MAIN).strong());
@@ -69,11 +69,11 @@ fn time_plan(app: &mut DivoomApp, ui: &mut egui::Ui) {
 
 /// Memorial countdown → alarm.set_memorial_time [dialy_id, on_off, month, day, hour, minute, title].
 fn memorial(app: &mut DivoomApp, ui: &mut egui::Ui) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(theme::CARD_BG)
-        .rounding(egui::Rounding::same(theme::RADIUS))
+        .corner_radius(egui::CornerRadius::same(theme::RADIUS as u8))
         .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .inner_margin(egui::Margin::same(12.0))
+        .inner_margin(egui::Margin::same(12))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(RichText::new("Memorial Countdown").size(13.5).color(theme::TEXT_MAIN).strong());
@@ -99,11 +99,11 @@ fn memorial(app: &mut DivoomApp, ui: &mut egui::Ui) {
 }
 
 fn alarm_row(app: &mut DivoomApp, ui: &mut egui::Ui, idx: usize) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(theme::CARD_BG)
-        .rounding(egui::Rounding::same(theme::RADIUS))
+        .corner_radius(egui::CornerRadius::same(theme::RADIUS as u8))
         .stroke(egui::Stroke::new(1.0, theme::BORDER))
-        .inner_margin(egui::Margin::same(12.0))
+        .inner_margin(egui::Margin::same(12))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {

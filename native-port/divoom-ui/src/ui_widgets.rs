@@ -2,7 +2,7 @@
 //! (painted pill + animated knob), themed to the Braun palette — replaces the
 //! plain checkboxes so the UI matches the web_ui's switch controls.
 
-use eframe::egui::{self, Color32, Rounding, Sense, Stroke, Vec2};
+use eframe::egui::{self, Color32, CornerRadius, Sense, Stroke, Vec2};
 
 use crate::theme;
 
@@ -23,7 +23,7 @@ pub fn toggle(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
         theme::INPUT_BG
     };
     let stroke = Stroke::new(1.0, if *on { theme::PRIMARY } else { theme::BORDER });
-    ui.painter().rect(rect, Rounding::same(radius), bg, stroke);
+    ui.painter().rect(rect, CornerRadius::same(radius as u8), bg, stroke, egui::StrokeKind::Inside);
     let knob_x = egui::lerp((rect.left() + radius)..=(rect.right() - radius), how_on);
     ui.painter()
         .circle_filled(egui::pos2(knob_x, rect.center().y), radius - 3.0, Color32::WHITE);
