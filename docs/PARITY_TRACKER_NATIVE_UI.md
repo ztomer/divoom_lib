@@ -70,8 +70,10 @@ never deleted._
 - [x] ✓ stocks sync + symbol (`live_job_start mac "stocks" {symbol}`)
 - [x] ✓ system stats (`live_job_start mac "sysmon"`)
 - [x] ✓ weather sync (`live_job_start mac "weather"`)
-- [ ] ✗ audio visualizer (`toggle_audio_visualizer`, `get_audio_levels`) — needs
-  local audio capture (substantial; device-side EQ already covered via Visualizer)
+- [x] ✓ audio visualizer — N/A for parity: the on-screen visualizer was REMOVED
+  from the Python web UI ("visualizer removed: Rams #10", widgets.js:15) in favour
+  of live cover-art polling (which the native UI has). The device-side EQ is covered
+  by the Visualizer channel. No GUI visualizer to port.
 - [x] ✓ `live_job_list` — read-only "Running: …" status line + Refresh
 
 ## Weather
@@ -146,6 +148,12 @@ low-value or unverifiable without hardware.
 - [x] ✓ menubar status-color glyph (parity with pyobjc menubar)
 
 ## Visual parity (/loop "until visual parity") — egui mechanisms proven
+> **COMPLETE (2026-06-29).** Every visual element of the current Python web UI is
+> reproduced in the native egui UI. The lone open item — an on-screen audio
+> visualizer — was deliberately removed from the Python reference (Rams #10), so
+> there is nothing left to port. Live data for the gallery needs a Divoom cloud
+> login (Settings card), but the render path is done and verified.
+
 - [x] ✓ Native macOS traffic lights (ViewportBuilder fullsize_content_view)
 - [x] ✓ Channel previews (VJ/EQ webp via egui_extras image loader)
 - [x] ✓ Toggle switches (ui_widgets::toggle)
@@ -162,6 +170,12 @@ low-value or unverifiable without hardware.
 - [x] ✓ Custom fonts — Inter (body) + Inter Display (headings) bundled (fonts.rs)
 
 ## Progress log
+- 2026-06-29 visual-COMPLETE: confirmed the on-screen audio visualizer was removed
+  from the Python web UI (Rams #10, widgets.js:15 → live cover art instead), so it's
+  N/A for parity. With gallery thumbnails + live device preview + the egui 0.35
+  migration landed, ALL visual-parity items are now done. The /loop end condition is
+  met. Follow-up (not parity): refresh the `divoom-control-native` cask/dmg to a
+  release once the user wants to publish.
 - 2026-06-29 visual6: gallery thumbnails (web parity for the lazy-loaded gallery).
   New daemon command `get_animated_preview{file_id}` downloads the cloud file and
   decodes it to a base64 data-url, reusing the proven `media::resolve_to_gif`

@@ -28,6 +28,12 @@ Claude) should read this on entry and **update it at the end of every round**
     **Toolkit chosen: egui/eframe** (MIT/Apache; picked over iced for pragmatism).
     The current `web_ui/` is the **visual reference only** (read for layout/look),
     not shipped; stays archived in-tree.
+  - **VISUAL PARITY COMPLETE (2026-06-29):** every visual element of the current
+    Python web UI is now reproduced natively. The last open item, an on-screen audio
+    visualizer, was deliberately removed from the Python reference (Rams #10 — see
+    `web_ui/widgets.js:15`), so it's N/A. Remaining follow-up (NOT parity): refresh
+    the `divoom-control-native` Homebrew cask/dmg to a release when ready to publish
+    (outward-facing — needs user go-ahead).
   - **Cloud gallery thumbnails DONE (2026-06-29):** new daemon command
     `get_animated_preview{file_id}` downloads + decodes a cloud file to a base64
     data-url (reuses `media::resolve_to_gif`; offline-tested vs cloud_fixtures).
