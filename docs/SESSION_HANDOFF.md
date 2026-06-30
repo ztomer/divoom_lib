@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HARDWARE-VERIFIED the Rust daemon (2026-06-30):** against real Pixoo-1 over the
+  socket — scan → connect → `get_device_name`="Pixoo-1" → `get_brightness`=75 →
+  set 30/80 with read-back. (Getters error with a Python `AttributeError` on the
+  Python daemon, so this confirmed the Rust path.) The Rust **menubar** also runs
+  (spawned by the GUI); its tray visual is the only piece left for the maintainer to
+  eyeball.
+- **Bugfix:** `divoom_daemon/daemon_client.py` resolved the dev repo root with
+  `parents[2]` (one level too high) → dev runs silently used the **Python** daemon;
+  fixed to `parents[1]` so `./run.sh` spawns the **Rust** `divoomd`. (Bundle was
+  unaffected — it uses `RESOURCEPATH`.)
+- **`run.sh`** now kills any existing divoom processes (GUI / Python daemon / Rust
+  `divoomd` / menubar) + clears stale sockets before launch.
+- **CI fix:** `tests/test_no_emojis.py` diverged from the authoritative
+  `tools/check_no_emoji.py` (flagged the permitted Kare icons ✓ ✗ ⚠); reconciled —
+  CI green on Python 3.14.
+
+
 - **ARCHITECTURE PIVOT (2026-06-30):** the egui UI is retired. Shipping stack is now
   **Python pywebview GUI + Rust daemon (`divoomd`) + Rust menubar (`divoom-menubar`)**.
   - New crate `native-port/divoom-menubar` (tao + tray-icon): windowless tray agent;
