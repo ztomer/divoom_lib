@@ -52,6 +52,8 @@ if ! command -v cargo >/dev/null 2>&1 && [ -x "${HOME}/.cargo/bin/cargo" ]; then
 fi
 if command -v cargo >/dev/null 2>&1; then
   ( cd native-port/divoomd && cargo build --release )
+  echo "→ building native rust menubar (divoom-menubar)"
+  ( cd native-port/divoom-menubar && cargo build --release )
 else
   echo "ERROR: cargo not found — needed to bundle the native daemon (divoomd)." >&2
   exit 1
@@ -86,6 +88,18 @@ if [[ -f "${DIVOOMD_IN_APP}" ]]; then
 else
   echo "ERROR: divoomd was not bundled into the .app (expected ${DIVOOMD_IN_APP})." >&2
   exit 1
+fi
+
+# 2c. Same for the native menubar agent (spawned by the GUI; +x can be dropped by
+#     the data_files copy). Adhoc re-sign so it runs under the bundle's signature.
+MENUBAR_IN_APP="dist/Divoom.app/Contents/Resources/divoom-menubar"
+if [[ -f "${MENUBAR_IN_APP}" ]]; then
+  chmod +x "${MENUBAR_IN_APP}"
+  codesign --force --sign - "${MENUBAR_IN_APP}" 2>/dev/null \
+    && echo "→ bundled native menubar: $(ls -lh "${MENUBAR_IN_APP}" | awk '{print $5}') (re-signed)" \
+    || echo "WARN: codesign of ${MENUBAR_IN_APP} failed"
+else
+  echo "WARN: divoom-menubar not bundled (expected ${MENUBAR_IN_APP}) — no menu-bar in this build." >&2
 fi
 
 # 3. Guard: the reverse-engineered APK / references must never be in the bundle.

@@ -60,6 +60,10 @@ APP = ["divoom_gui/gui_main.py"]
 _RES_FILES = [
     p for p in (
         "native-port/divoomd/target/release/divoomd",
+        # The native Rust menubar agent — the GUI spawns it (see gui_main
+        # _resolve_menubar_binary, which finds it via RESOURCEPATH). Replaces the
+        # pyobjc menubar (divoom_menubar/ stays in-tree as reference).
+        "native-port/divoom-menubar/target/release/divoom-menubar",
         "divoom_lib/libdivoom_compact.dylib",
     ) if os.path.exists(p)
 ]

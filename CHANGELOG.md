@@ -4,6 +4,31 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Architecture pivot: Python UI + Rust daemon + Rust menubar (2026-06-30)
+
+Reversed the native-egui-UI direction per the maintainer: the desktop **UI is the
+Python pywebview GUI** again, the **daemon stays Rust** (`divoomd`), and the
+**menubar becomes a standalone Rust agent** (`divoom-menubar`) replacing the pyobjc
+menubar. The egui UI is retired.
+
+- **New `native-port/divoom-menubar` crate** — a windowless tray agent (tao event
+  loop + tray-icon) that polls `divoomd` over the socket (status colour + active
+  devices), and provides Launch Dashboard / Open Notifications / Start+Stop
+  Notifications / Quit. Faithful port of `divoom_menubar/menubar.py`'s contract;
+  launches the Python GUI via `DIVOOM_GUI_PYTHON`/`SCRIPT`, and Quit honours
+  `keep_daemon_alive` (shared lifecycle → daemon `shutdown`).
+- **GUI wiring** — `divoom_gui/gui_main.py` now spawns the Rust menubar
+  (`_resolve_menubar_binary`: env → bundle Resources → dev tree) instead of
+  `python -m divoom_lib.cli menubar`, handing it the GUI relaunch command via env.
+  `divoom_menubar/` (pyobjc) stays in-tree as reference, no longer the active agent.
+- **Packaging** — `setup_app.py` + `scripts/build_release.sh` bundle, chmod, and
+  adhoc-sign `divoom-menubar` alongside `divoomd` in the Python `.app`. The native
+  egui app is gone: removed `native-port/divoom-ui/` and `scripts/build_native_app.sh`;
+  the `divoom-control-native` cask/dmg is retired.
+- **Helper scripts** — `build_native.sh` now builds the daemon + menubar (+ encoder
+  dylib); `run_native.sh` launches the Python GUI (which spawns the daemon + menubar),
+  with a `--menubar` foreground smoke mode.
+
 ### Post-v0.20.2 — Native UI: cloud gallery thumbnails (2026-06-29)
 
 - **The cloud gallery (under Pixel Art) now shows decoded thumbnails** and pushes

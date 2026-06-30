@@ -58,5 +58,4 @@ references/
 dist-native/
 
 # Rust native crate build artifacts
-native-port/divoom-ui/target/
 native-port/divoom-menubar/target/

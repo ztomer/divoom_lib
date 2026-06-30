@@ -274,34 +274,62 @@ def _start_shutdown_follower(window) -> None:
     threading.Thread(target=_run, daemon=True, name="shutdown-follower").start()
 
 
+def _resolve_menubar_binary() -> "str | None":
+    """Locate the native Rust menubar binary (divoom-menubar), mirroring the
+    daemon resolver: env override → py2app bundle Resources → dev build tree."""
+    override = os.environ.get("DIVOOM_MENUBAR_BINARY")
+    if override and Path(override).exists():
+        return override
+    rp = os.environ.get("RESOURCEPATH")  # set by py2app inside the .app bundle
+    if rp:
+        cand = Path(rp) / "divoom-menubar"
+        if cand.exists():
+            return str(cand)
+    repo_root = Path(__file__).resolve().parents[1]
+    for folder in ("release", "debug"):
+        p = repo_root / "native-port" / "divoom-menubar" / "target" / folder / "divoom-menubar"
+        if p.exists():
+            return str(p)
+    return None
+
+
 def _spawn_menubar_agent() -> None:
-    """Best-effort: launch the macOS menu-bar agent alongside the GUI so its
-    status item appears on launch. Detached + dupe-guarded; never blocks or
-    fails the GUI if it can't start. macOS only."""
+    """Best-effort: launch the native Rust menu-bar agent (divoom-menubar)
+    alongside the GUI so its status item appears on launch. The agent talks to the
+    daemon over the socket and relaunches THIS GUI on demand, so we hand it our
+    launch command via env (DIVOOM_GUI_PYTHON/SCRIPT). Detached + dupe-guarded;
+    never blocks or fails the GUI if it can't start. macOS only."""
     if sys.platform != "darwin":
         return
     try:
         import subprocess
         # Don't spawn a second status item if one is already running.
         existing = subprocess.run(
-            ["pgrep", "-f", "divoom_lib.cli menubar"],
+            ["pgrep", "-f", "divoom-menubar"],
             capture_output=True, text=True,
         )
         if existing.returncode == 0 and existing.stdout.strip():
             logger.info("Menu-bar agent already running; not spawning another.")
             return
-        repo_root = Path(__file__).resolve().parents[1]
-        # In a py2app .app, sys.executable is the GUI stub — use the bundled
-        # python so `-m divoom_lib.cli` resolves.
+        binary = _resolve_menubar_binary()
+        if not binary:
+            logger.warning("Native menu-bar binary (divoom-menubar) not found; "
+                           "build it with ./build_native.sh. No menu-bar this session.")
+            return
+        # In a py2app .app, sys.executable is the GUI stub — hand the agent the
+        # bundled python + this script so its "Launch Dashboard" reopens the GUI.
         from divoom_daemon.daemon_client import bundle_python
-        menubar_py = bundle_python() or sys.executable
+        gui_python = bundle_python() or sys.executable
+        env = dict(os.environ)
+        env["DIVOOM_GUI_PYTHON"] = gui_python
+        env["DIVOOM_GUI_SCRIPT"] = str(Path(__file__).resolve())
         subprocess.Popen(
-            [menubar_py, "-m", "divoom_lib.cli", "menubar"],
-            cwd=str(repo_root),
+            [binary],
+            env=env,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
             start_new_session=True,
         )
-        logger.info("Launched macOS menu-bar agent.")
+        logger.info("Launched native Rust menu-bar agent (divoom-menubar).")
     except Exception as e:
         logger.warning(f"Could not launch menu-bar agent: {e}")
 

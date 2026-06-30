@@ -18,11 +18,26 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **Native dev helpers (root):** `./build_native.sh` (release binaries + encoder
-  dylib; `--app` for the macOS bundle, `--debug` for a debug build) and
-  `./run_native.sh` (dev: spawns `divoomd` on `/tmp/divoom.sock` + the UI, stops the
-  daemon on exit; `--app` opens the bundle, `--fake` runs the UI with seeded fake
-  devices/no daemon). Both source `tui/lib.sh` (Kare style).
+- **ARCHITECTURE PIVOT (2026-06-30):** the egui UI is retired. Shipping stack is now
+  **Python pywebview GUI + Rust daemon (`divoomd`) + Rust menubar (`divoom-menubar`)**.
+  - New crate `native-port/divoom-menubar` (tao + tray-icon): windowless tray agent;
+    polls the daemon socket for status/devices; Launch Dashboard / Open Notifications /
+    Start+Stop Notifications / Quit; launches the GUI via `DIVOOM_GUI_PYTHON`/`SCRIPT`;
+    Quit honours `keep_daemon_alive`. Ports `divoom_menubar/menubar.py`.
+  - `divoom_gui/gui_main.py` spawns the Rust menubar (not the pyobjc one). pyobjc
+    `divoom_menubar/` kept in-tree as reference only.
+  - `native-port/divoom-ui/` (egui) DELETED; `scripts/build_native_app.sh` removed;
+    `divoom-control-native` cask/dmg retired (tap push pending user go-ahead).
+  - Packaging: `setup_app.py` + `scripts/build_release.sh` bundle/sign `divoom-menubar`
+    next to `divoomd` in the Python `.app`.
+- **Native dev helpers (root):** `./build_native.sh` builds the Rust daemon + menubar
+  (+ encoder dylib; `--debug` for debug). `./run_native.sh` launches the Python GUI
+  (which spawns the daemon + menubar); `--menubar` runs the tray alone for a smoke.
+  Both source `tui/lib.sh` (Kare style).
+- **NOT DONE YET:** on-hardware verification of the new stack (GUI ↔ daemon ↔ menubar
+  on the 4 devices) — needs the maintainer to start the BLE daemon (TCC). Docs
+  (PLANNING_NATIVE_UI / ROADMAP / PARITY_TRACKER) still describe the egui direction
+  and need a pass.
 
 
 - **NATIVE UI PORT — Phase 0 DONE (2026-06-29) — `docs/PLANNING_NATIVE_UI.md`:**
