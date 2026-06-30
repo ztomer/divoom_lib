@@ -160,6 +160,11 @@ low-value or unverifiable without hardware.
 - [x] ✓ Custom fonts — Inter (body) + Inter Display (headings) bundled (fonts.rs)
 
 ## Progress log
+- 2026-06-29 egui35: migrated the native UI from egui/eframe 0.29 to 0.35 (user:
+  "the latest egui is 0.35"). Ported breaking changes — CornerRadius(u8)/Margin(i8),
+  Painter::rect StrokeKind, Frame::NONE, Arc<FontData>, all_styles_mut,
+  Screenshot(UserData), merged egui::Panel + App::ui/logic split. Clean
+  debug+release build; Channels tab screenshot-verified identical.
 - 2026-06-29 visual4: bundled Inter typography (Inter-Regular body + InterDisplay-SemiBold headings via FontDefinitions; OFL-1.1, attribution). Type now matches the web Inter stack. Verified by screenshot.
 - 2026-06-29 visual3: appbar glyphs (brightness/volume SVG + gear Settings pill) +
   painted clock-face previews (digital/analog per face). Verified by screenshot.
