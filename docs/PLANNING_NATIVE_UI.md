@@ -1,5 +1,12 @@
 # PLANNING — Native Rust Menubar + UI
 
+> **OUTCOME / SUPERSEDED (2026-06-30).** The full-native-egui-UI goal below was
+> reversed by the maintainer. Final architecture: **Python pywebview GUI** (the
+> desktop UI) + **Rust daemon** (`divoomd`) + **standalone Rust menubar**
+> (`native-port/divoom-menubar/`, replacing the pyobjc menubar). The egui crate
+> (`native-port/divoom-ui/`) was deleted. The plan below is kept for historical
+> context only; current state lives in `docs/SESSION_HANDOFF.md` + `CHANGELOG.md`.
+
 Status: **Phases 0-3 done + Phase 4a (tray) done (2026-06-29)** —
 `native-port/divoom-ui/` is feature-complete across all 7 tabs + a native tray
 menubar. Remaining: Phase 4b packaging + cutover (user-gated). Goal: replace the Python presentation layer (pywebview GUI + pyobjc

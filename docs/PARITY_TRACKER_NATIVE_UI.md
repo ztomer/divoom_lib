@@ -1,5 +1,11 @@
 # Native UI Parity Tracker (Rust egui vs Python)
 
+> **SUPERSEDED (2026-06-30).** The Rust egui UI (`native-port/divoom-ui/`) was
+> retired. The desktop UI is the Python pywebview GUI again; the daemon stays Rust
+> and the menubar is now a standalone Rust agent (`native-port/divoom-menubar/`).
+> This tracker is kept as a historical record of the egui parity effort — it no
+> longer reflects the shipped architecture. See `docs/SESSION_HANDOFF.md`.
+
 Living record for the "/loop until parity" run. The Python UI (`divoom_gui/` +
 `divoom_menubar/`) is the spec; this tracks each `gui_api`/mixin feature's status
 in the Rust UI (`native-port/divoom-ui/`). Updated every iteration.

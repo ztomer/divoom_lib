@@ -133,7 +133,16 @@ animation gif-chunk primitives) are wire-tested but not hardware-verified.
 **Remaining (optional):** re-verify Ditoo when in range; hardware-exercise the niche
 subsystems if/when those device flows are available.
 
-### Next: native UI + menubar (planned) — `docs/PLANNING_NATIVE_UI.md`
+### Native menubar (done) + UI decision (2026-06-30)
+
+**Final architecture:** the desktop **UI stays the Python pywebview GUI**; the
+**daemon is Rust** (`divoomd`); the **menubar is a standalone Rust agent**
+(`native-port/divoom-menubar/`) that replaces the pyobjc menubar. The Python `.app`
+bundles both Rust binaries. The native-egui-UI effort below (and its full
+Python-free goal) was **explored and then retired** — `native-port/divoom-ui/` is
+deleted. The text below is historical.
+
+### (Historical) Next: native UI + menubar (planned) — `docs/PLANNING_NATIVE_UI.md`
 
 With the daemon ported, the last Python surfaces are the **pywebview GUI** and
 **pyobjc menubar**. Plan: replace both with a single native Rust binary
