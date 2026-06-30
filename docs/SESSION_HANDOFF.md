@@ -86,6 +86,16 @@ Claude) should read this on entry and **update it at the end of every round**
     Python-free bundle needs a Rust MCP stdio JSON-RPC server, ~13 tools → a large
     standalone workstream — needs an explicit go-ahead). Device-dependent niche
     (Custom Art, Hot Channel, audio viz, wall presets) still need hardware.
+  - **NATIVE PACKAGING (2026-06-29, non-destructive part of Phase 4b):**
+    `scripts/build_native_app.sh` assembles `dist-native/Divoom Native.app`
+    (Python-free: `Contents/MacOS/{divoom-ui, divoomd, libdivoom_compact.dylib}` +
+    BT Info.plist, adhoc-signed). The UI spawns the sibling daemon and passes
+    `DIVOOMD_ENCODER_LIB` (sibling dylib) so encoding works in the bundle. Separate
+    `dist-native/` artifact (gitignored) — does NOT touch the py2app build / cask /
+    defaults. Verified assembly+sign+plist; NOT launched (bundled daemon is the BLE
+    build → TCC crash from a headless shell). **STILL USER-GATED:** first launch +
+    one-time Bluetooth grant, then the actual cutover (flip the default launcher to
+    the native app, update the Homebrew cask). Python UI stays the reference.
   - **MCP GAP CLOSED (2026-06-29):** `divoomd mcp` — native MCP stdio JSON-RPC
     server (`native-port/divoomd/src/mcp.rs` + `mcp_tools.rs`), ported from
     `mcp_server.py`/`mcp_tools.py`. Daemon-routed bridge (connects to DIVOOM_SOCKET,

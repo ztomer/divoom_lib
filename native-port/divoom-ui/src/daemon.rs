@@ -303,13 +303,25 @@ fn spawn_daemon(path: &str) {
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_else(|| "divoomd".to_string())
     });
-    let _ = std::process::Command::new(bin)
-        .arg("--socket")
+    let mut cmd = std::process::Command::new(bin);
+    cmd.arg("--socket")
         .arg(path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn();
+        .stderr(std::process::Stdio::null());
+    // In a bundle, the daemon's encoder dylib sits next to this executable; point
+    // the spawned daemon at it (so show_image/pixel-art/text encode) unless the
+    // user already set it. Dev runs (no sibling dylib) just skip this.
+    if std::env::var_os("DIVOOMD_ENCODER_LIB").is_none() {
+        if let Some(dylib) = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|d| d.join("libdivoom_compact.dylib")))
+            .filter(|p| p.exists())
+        {
+            cmd.env("DIVOOMD_ENCODER_LIB", dylib);
+        }
+    }
+    let _ = cmd.spawn();
 }
 
 fn socket_path() -> String {

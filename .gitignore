@@ -53,3 +53,6 @@ Divoom.app/
 
 # local-only reference material (reverse-engineered APK + third-party refs) — never track/publish
 references/
+
+# Native (Rust/egui) app bundle artifact (scripts/build_native_app.sh)
+dist-native/

@@ -4,6 +4,18 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native app packaging (non-destructive) (2026-06-29)
+
+- **`scripts/build_native_app.sh`** — assembles the fully-native, Python-free
+  `dist-native/Divoom Native.app`: `Contents/MacOS/{divoom-ui, divoomd,
+  libdivoom_compact.dylib}` + an `Info.plist` with the Bluetooth usage strings,
+  adhoc-codesigned. Self-contained: the UI spawns the sibling `divoomd` and now
+  passes `DIVOOMD_ENCODER_LIB` (sibling dylib) so image/text encoding works in the
+  bundle (`divoom-ui` spawn_daemon change). **Non-destructive** — a separate
+  `dist-native/` artifact; does NOT touch the Python py2app build, the Homebrew
+  cask, or any default (no cutover). Verified: bundle assembles + signs + has the
+  BT plist key. First launch + BT grant + the cutover remain user-gated.
+
 ### Post-v0.20.2 — Native MCP server (last daemon gap) (2026-06-29)
 
 - **`divoomd mcp`** — native MCP stdio JSON-RPC server (`mcp.rs` + `mcp_tools.rs`),
