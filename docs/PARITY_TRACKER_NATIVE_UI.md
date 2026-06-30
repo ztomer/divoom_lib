@@ -153,11 +153,14 @@ low-value or unverifiable without hardware.
 - [ ] ✗ Gallery thumbnails (https loader; needs cloud auth)
 - [ ] ✗ Virtual-wall canvas (painter grid + device-frame textures)
 - [ ] ✗ Live device-screen preview (sidebar — needs daemon to expose current frame)
-- [ ] ✗ Clock / Ambient / Scoreboard previews (paint; web used CSS, no assets)
-- [ ] ✗ Appbar icon glyphs (brightness sun / volume / gear)
+- [x] ✓ Clock previews (painted digital "12:00" + analog dials, per face)
+- [ ] ✗ Ambient color previews (paint mode swatches)
+- [x] ✓ Appbar icon glyphs (brightness sun / volume / gear pill)
 - [ ] ✗ Custom fonts (Inter/Outfit via FontDefinitions) for type parity
 
 ## Progress log
+- 2026-06-29 visual3: appbar glyphs (brightness/volume SVG + gear Settings pill) +
+  painted clock-face previews (digital/analog per face). Verified by screenshot.
 - 2026-06-29 visual2: sidebar nav glyphs — Kare SVGs embedded (icons.rs), rendered
   via egui_extras svg loader with per-state tint. Verified by screenshot.
 - 2026-06-29 visual1: egui_extras image loaders + webp; VJ/EQ channel previews,

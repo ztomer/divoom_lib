@@ -14,6 +14,27 @@ const SCHEDULE: &str = r#"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1
 const DEVICE: &str = r#"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='#ffffff' stroke-width='2'><circle cx='8' cy='8' r='2.5'/><path d='M8,1 L8,3 M8,13 L8,15 M1,8 L3,8 M13,8 L15,8 M3.2,3.2 L4.6,4.6 M11.4,11.4 L12.8,12.8 M3.2,12.8 L4.6,11.4 M11.4,4.6 L12.8,3.2'/></svg>"#;
 const SETTINGS: &str = r#"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='#ffffff'><path d='M8,6 C6.9,6 6,6.9 6,8 C6,9.1 6.9,10 8,10 C9.1,10 10,9.1 10,8 C10,6.9 9.1,6 8,6 Z M8,0 L6,3 L10,3 Z M8,16 L10,13 L6,13 Z M0,8 L3,6 L3,10 Z M16,8 L13,10 L13,6 Z'/></svg>"#;
 
+// Appbar glyphs (from web_ui index.html), white for tinting.
+const BRIGHTNESS: &str = r#"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='3' fill='#ffffff'/><path d='M8,1 L8,3 M8,13 L8,15 M1,8 L3,8 M13,8 L15,8 M3,3 L4.5,4.5 M11.5,11.5 L13,13 M3,13 L4.5,11.5 M11.5,4.5 L13,3' fill='none' stroke='#ffffff' stroke-width='2'/></svg>"#;
+const VOLUME: &str = r#"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M2,6 L2,10 L5,10 L9,14 L9,2 L5,6 Z' fill='#ffffff'/><path d='M11,5 C12.5,6 12.5,10 11,11' fill='none' stroke='#ffffff' stroke-width='1.5'/><path d='M13,3 C15.5,5 15.5,11 13,13' fill='none' stroke='#ffffff' stroke-width='1.5'/></svg>"#;
+
+/// Paint an appbar glyph (brightness / volume) tinted into `rect`.
+pub fn paint_appbar(ui: &egui::Ui, which: Appbar, rect: Rect, tint: Color32) {
+    let (uri, markup) = match which {
+        Appbar::Brightness => ("bytes://ab_brightness.svg", BRIGHTNESS),
+        Appbar::Volume => ("bytes://ab_volume.svg", VOLUME),
+    };
+    egui::Image::new(egui::ImageSource::Bytes { uri: uri.into(), bytes: markup.as_bytes().into() })
+        .tint(tint)
+        .paint_at(ui, rect);
+}
+
+#[derive(Clone, Copy)]
+pub enum Appbar {
+    Brightness,
+    Volume,
+}
+
 fn svg(tab: Tab) -> (&'static str, &'static str) {
     match tab {
         Tab::Channels => ("bytes://nav_channels.svg", CHANNELS),

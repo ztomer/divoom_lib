@@ -44,8 +44,13 @@ pub fn appbar(app: &mut DivoomApp, ctx: &egui::Context) {
         });
 }
 
+fn appbar_glyph(ui: &mut egui::Ui, which: crate::icons::Appbar) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
+    crate::icons::paint_appbar(ui, which, rect, theme::TEXT_MUTED);
+}
+
 fn brightness_control(app: &mut DivoomApp, ui: &mut egui::Ui) {
-    ui.label(RichText::new("Brightness").size(11.0).color(theme::TEXT_MUTED));
+    appbar_glyph(ui, crate::icons::Appbar::Brightness);
     let r = ui.add(
         egui::Slider::new(&mut app.brightness, 0..=100)
             .show_value(false)
@@ -58,7 +63,7 @@ fn brightness_control(app: &mut DivoomApp, ui: &mut egui::Ui) {
 }
 
 fn volume_control(app: &mut DivoomApp, ui: &mut egui::Ui) {
-    ui.label(RichText::new("Volume").size(11.0).color(theme::TEXT_MUTED));
+    appbar_glyph(ui, crate::icons::Appbar::Volume);
     let r = ui.add(
         egui::Slider::new(&mut app.volume, 0..=15)
             .show_value(false)
@@ -72,12 +77,21 @@ fn volume_control(app: &mut DivoomApp, ui: &mut egui::Ui) {
 
 fn settings_gear(app: &mut DivoomApp, ui: &mut egui::Ui) {
     let selected = app.tab == Tab::Settings;
-    let txt = RichText::new("Settings").size(12.0).color(if selected {
-        theme::PRIMARY
-    } else {
-        theme::TEXT_MAIN
-    });
-    if ui.add(egui::Button::new(txt).rounding(Rounding::same(12.0))).clicked() {
+    let color = if selected { theme::PRIMARY } else { theme::TEXT_MAIN };
+    // A round glass pill with the gear glyph + "Settings" (web R32 appbar gear).
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(76.0, 26.0), Sense::click());
+    let stroke = Stroke::new(1.0, if selected || resp.hovered() { theme::PRIMARY } else { theme::BORDER });
+    ui.painter().rect(rect, Rounding::same(13.0), theme::CARD_BG, stroke);
+    let gear = egui::Rect::from_center_size(rect.left_center() + Vec2::new(16.0, 0.0), Vec2::splat(13.0));
+    crate::icons::paint_settings(ui, gear, color);
+    ui.painter().text(
+        rect.left_center() + Vec2::new(28.0, 0.0),
+        egui::Align2::LEFT_CENTER,
+        "Settings",
+        egui::FontId::proportional(12.0),
+        color,
+    );
+    if resp.clicked() {
         app.tab = Tab::Settings;
     }
 }
