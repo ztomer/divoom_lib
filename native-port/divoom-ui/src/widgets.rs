@@ -73,7 +73,9 @@ fn feed(
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let mut on = get(app);
-                if ui.add_enabled(app.active_mac().is_some(), egui::Checkbox::new(&mut on, "")).changed() {
+                let enabled = app.active_mac().is_some();
+                let r = ui.add_enabled_ui(enabled, |ui| crate::ui_widgets::toggle(ui, &mut on)).inner;
+                if r.changed() {
                     set(app, on);
                     app.toggle_live_job(kind, on, params.clone());
                 }
@@ -93,7 +95,9 @@ fn stocks(app: &mut DivoomApp, ui: &mut egui::Ui) {
             ui.add(egui::TextEdit::singleline(&mut app.stocks_symbol).hint_text("AAPL").desired_width(90.0));
             let mut on = app.stocks_sync;
             let can = app.active_mac().is_some() && !app.stocks_symbol.trim().is_empty();
-            if ui.add_enabled(can || app.stocks_sync, egui::Checkbox::new(&mut on, "Sync")).changed() {
+            let r = ui.add_enabled_ui(can || app.stocks_sync, |ui| crate::ui_widgets::toggle(ui, &mut on)).inner;
+            ui.label(RichText::new("Sync").size(11.0).color(theme::TEXT_MUTED));
+            if r.changed() {
                 app.stocks_sync = on;
                 let sym = app.stocks_symbol.trim().to_uppercase();
                 app.toggle_live_job("stocks", on, json!({ "symbol": sym }));

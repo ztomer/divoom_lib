@@ -268,8 +268,9 @@ impl DivoomApp {
     /// save it, then close. No-op unless `DIVOOM_UI_SCREENSHOT` is set.
     fn maybe_screenshot(&mut self, ctx: &egui::Context) {
         let Some(path) = self.screenshot_path.clone() else { return };
+        ctx.request_repaint(); // tick fast so async image loaders finish before capture
         self.frame_count += 1;
-        if self.frame_count == 4 {
+        if self.frame_count == 40 {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot);
         }
         let shot = ctx.input(|i| {

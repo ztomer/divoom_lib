@@ -20,7 +20,9 @@ pub fn appbar(app: &mut DivoomApp, ctx: &egui::Context) {
         .frame(frame)
         .show(ctx, |ui| {
             ui.horizontal_centered(|ui| {
-                window_controls(ui, ctx);
+                // Reserve room for the native macOS traffic-light buttons (top-left).
+                #[cfg(target_os = "macos")]
+                ui.add_space(72.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     settings_gear(app, ui);
                     ui.add_space(10.0);
@@ -40,31 +42,6 @@ pub fn appbar(app: &mut DivoomApp, ctx: &egui::Context) {
                 });
             });
         });
-}
-
-fn window_controls(ui: &mut egui::Ui, ctx: &egui::Context) {
-    // macOS-style traffic order: close / minimize / maximize.
-    if win_btn(ui, "\u{00D7}", theme::ERROR).clicked() {
-        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-    }
-    if win_btn(ui, "\u{2013}", theme::TEXT_MUTED).clicked() {
-        ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
-    }
-    if win_btn(ui, "\u{25A2}", theme::TEXT_MUTED).clicked() {
-        let max = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
-        ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!max));
-    }
-}
-
-fn win_btn(ui: &mut egui::Ui, glyph: &str, hover: Color32) -> egui::Response {
-    let btn = egui::Button::new(RichText::new(glyph).size(15.0).color(theme::TEXT_MUTED))
-        .frame(false)
-        .min_size(Vec2::new(22.0, 22.0));
-    let r = ui.add(btn);
-    if r.hovered() {
-        ui.painter().rect_filled(r.rect, Rounding::same(4.0), hover.linear_multiply(0.25));
-    }
-    r
 }
 
 fn brightness_control(app: &mut DivoomApp, ui: &mut egui::Ui) {

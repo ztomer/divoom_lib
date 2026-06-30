@@ -67,9 +67,15 @@ fn clock(app: &mut DivoomApp, ui: &mut egui::Ui) {
 
 fn visualizer(app: &mut DivoomApp, ui: &mut egui::Ui) {
     hint(ui, "Music EQ / visualizer patterns.");
+    // EQ asset ids (channels_grids.js EQ_MAPPING); ids 1-10 are *_n3x/_y3x, 11-12 *_n/_y.
+    const EQ_IDS: [i64; 12] = [1, 6, 3, 5, 10, 13, 4, 14, 9, 2, 11, 12];
     let labels: Vec<String> = (1..=12).map(|i| format!("EQ {i:02}")).collect();
     let refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
-    if let Some(v) = selector_grid(ui, &refs, app.viz_sel) {
+    if let Some(v) = image_grid(ui, &refs, app.viz_sel, |i, on| {
+        let id = EQ_IDS[i as usize];
+        let s = if on { "y" } else { "n" };
+        vec![format!("icon_eq_{id}_{s}3x.webp"), format!("icon_eq_{id}_{s}.webp")]
+    }) {
         app.viz_sel = v;
         app.call("display.show_visualization", serde_json::json!([v]));
     }
@@ -77,7 +83,11 @@ fn visualizer(app: &mut DivoomApp, ui: &mut egui::Ui) {
 
 fn vj(app: &mut DivoomApp, ui: &mut egui::Ui) {
     hint(ui, "VJ light effects.");
-    if let Some(v) = selector_grid(ui, &VJ_EFFECTS, app.vj_sel) {
+    if let Some(v) = image_grid(ui, &VJ_EFFECTS, app.vj_sel, |i, on| {
+        let asset = (i + 2).min(16);
+        let s = if on { "y3x" } else { "n3x" };
+        vec![format!("icon_vj_{asset}_{s}.webp")]
+    }) {
         app.vj_sel = v;
         app.call("display.show_effects", serde_json::json!([v]));
     }
@@ -307,6 +317,63 @@ fn selector_grid(ui: &mut egui::Ui, labels: &[&str], selected: i64) -> Option<i6
             }
         });
     clicked
+}
+
+/// Like `selector_grid` but each cell shows a webp preview thumbnail above the
+/// label. `asset_fn(index, selected) -> candidate file names` (first that exists
+/// wins; falls back to a painted cell when no asset is found).
+fn image_grid(
+    ui: &mut egui::Ui,
+    labels: &[&str],
+    selected: i64,
+    asset_fn: impl Fn(i64, bool) -> Vec<String>,
+) -> Option<i64> {
+    let mut clicked = None;
+    let cell = Vec2::new(96.0, 92.0);
+    let per_row = ((ui.available_width() + 8.0) / (cell.x + 8.0)).floor().max(1.0) as usize;
+    egui::Grid::new("imggrid").spacing(Vec2::new(8.0, 8.0)).show(ui, |ui| {
+        for (i, label) in labels.iter().enumerate() {
+            let sel = selected == i as i64;
+            let uri = asset_fn(i as i64, sel)
+                .into_iter()
+                .find_map(|name| crate::ui_widgets::asset_uri(&name));
+            if image_cell(ui, label, sel, cell, uri.as_deref()).clicked() {
+                clicked = Some(i as i64);
+            }
+            if (i + 1) % per_row == 0 {
+                ui.end_row();
+            }
+        }
+    });
+    clicked
+}
+
+fn image_cell(ui: &mut egui::Ui, label: &str, selected: bool, size: Vec2, uri: Option<&str>) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
+    let stroke = if selected {
+        Stroke::new(1.5, theme::PRIMARY)
+    } else if resp.hovered() {
+        Stroke::new(1.0, theme::PRIMARY)
+    } else {
+        Stroke::new(1.0, theme::BORDER)
+    };
+    let bg = if selected { theme::PRIMARY.linear_multiply(0.18) } else { theme::CARD_BG };
+    ui.painter().rect(rect, Rounding::same(theme::RADIUS), bg, stroke);
+    // Thumbnail (top) — fall back to a small filled square if the asset is missing.
+    let img_rect = egui::Rect::from_min_size(rect.left_top() + Vec2::new((size.x - 60.0) / 2.0, 8.0), Vec2::splat(60.0));
+    if let Some(u) = uri {
+        egui::Image::new(u).rounding(Rounding::same(4.0)).paint_at(ui, img_rect);
+    } else {
+        ui.painter().rect_filled(img_rect, Rounding::same(4.0), theme::BG_BASE);
+    }
+    ui.painter().text(
+        egui::pos2(rect.center().x, rect.bottom() - 11.0),
+        egui::Align2::CENTER_CENTER,
+        label,
+        egui::FontId::proportional(11.0),
+        if selected { theme::TEXT_MAIN } else { theme::TEXT_MUTED },
+    );
+    resp
 }
 
 fn cell_button(ui: &mut egui::Ui, label: &str, selected: bool, size: Vec2) -> egui::Response {
