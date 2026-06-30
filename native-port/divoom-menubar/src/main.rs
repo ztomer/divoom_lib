@@ -16,14 +16,12 @@ use std::time::{Duration, Instant};
 use tao::event::{Event, StartCause};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tray_icon::menu::MenuEvent;
-use tray_icon::TrayIconEvent;
 
 use tray::{Tray, TrayAction};
 
-/// Events forwarded into the loop so it wakes on tray/menu interaction.
+/// Menu clicks forwarded into the loop so it wakes on interaction.
 enum UserEvent {
     Menu(MenuEvent),
-    Tray(TrayIconEvent),
 }
 
 const POLL: Duration = Duration::from_secs(2);
@@ -38,14 +36,10 @@ fn main() {
         event_loop.set_activation_policy(ActivationPolicy::Accessory);
     }
 
-    // Forward tray + menu events to the loop so it wakes on each.
+    // Forward menu events to the loop so it wakes on each click.
     let proxy = event_loop.create_proxy();
     MenuEvent::set_event_handler(Some(move |e| {
         let _ = proxy.send_event(UserEvent::Menu(e));
-    }));
-    let proxy = event_loop.create_proxy();
-    TrayIconEvent::set_event_handler(Some(move |e| {
-        let _ = proxy.send_event(UserEvent::Tray(e));
     }));
 
     let mut tray: Option<Tray> = None;
@@ -89,11 +83,9 @@ fn main() {
 /// macOS: nudge the main run loop so the status item paints on first show.
 #[cfg(target_os = "macos")]
 fn macos_wake() {
-    use objc2_core_foundation::{CFRunLoopGetMain, CFRunLoopWakeUp};
-    unsafe {
-        if let Some(rl) = CFRunLoopGetMain() {
-            CFRunLoopWakeUp(&rl);
-        }
+    use objc2_core_foundation::CFRunLoop;
+    if let Some(rl) = CFRunLoop::main() {
+        rl.wake_up();
     }
 }
 
