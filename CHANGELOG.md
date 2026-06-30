@@ -4,6 +4,22 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI: live device-screen preview (2026-06-29)
+
+- **Sidebar now shows the device's last-pushed frame** (web-UI parity for the flat
+  screen preview). New `native-port/divoom-ui/src/preview.rs`: encodes an RGB pixel
+  buffer to a `data:image/png;base64` URL and decodes any such data-url into an egui
+  texture (base64 + the `image` crate). The app polls the daemon's `get_device_activity`
+  (~1.5s) and renders `activity[mac].preview`; frames the UI itself pushes (pixel art)
+  seed a **client-side** preview that shows instantly and are persisted back via
+  `set_device_activity` (mirrors the web UI's localStorage + activity path). `NEAREST`
+  texture sampling keeps the low-res device grid crisp when upscaled. The daemon already
+  exposed the preview field — no daemon change needed.
+- **Tested:** unit tests for the encode/decode round-trip + edge cases (3 new, 5 total
+  green); screenshot-verified the sidebar render via a `DIVOOM_UI_FAKE_PREVIEW` debug
+  seed. Kept `app.rs`/`preview.rs` under the 500-line gate by housing the preview
+  methods in `preview.rs`.
+
 ### Post-v0.20.2 — Native UI: egui 0.29 → 0.35 migration (2026-06-29)
 
 - **Upgraded the native UI to egui/eframe/egui_extras 0.35** (from 0.29). Ported all

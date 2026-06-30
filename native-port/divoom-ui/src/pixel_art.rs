@@ -46,6 +46,12 @@ fn paint(app: &mut DivoomApp, ui: &mut egui::Ui) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui.button("Push to Device").clicked() {
                 push(app);
+                // Mirror the web UI: show the frame we just pushed in the sidebar.
+                if let Some(url) =
+                    crate::preview::rgb_to_data_url(GRID as u32, GRID as u32, &app.pixels)
+                {
+                    app.record_local_preview("image", url);
+                }
             }
         });
     });

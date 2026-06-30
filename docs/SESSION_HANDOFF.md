@@ -28,6 +28,14 @@ Claude) should read this on entry and **update it at the end of every round**
     **Toolkit chosen: egui/eframe** (MIT/Apache; picked over iced for pragmatism).
     The current `web_ui/` is the **visual reference only** (read for layout/look),
     not shipped; stays archived in-tree.
+  - **Live device-screen preview DONE (2026-06-29):** the sidebar now renders the
+    device's last-pushed frame (web parity). New `preview.rs` encodes RGB→data-url PNG
+    and decodes data-url→egui texture (base64 + `image`); the app polls
+    `get_device_activity` (~1.5s) and frames the UI pushes (pixel art) seed a
+    client-side preview + persist via `set_device_activity`. Unit-tested +
+    screenshot-verified (`DIVOOM_UI_FAKE_PREVIEW` debug seed). No daemon change.
+    Remaining visual-parity gaps: gallery thumbnails (needs cloud auth), audio
+    visualizer (needs local audio capture).
   - **egui 0.29 → 0.35 migration DONE (2026-06-29):** bumped eframe/egui/egui_extras
     to 0.35; ported the breaking API changes — `Rounding`→`CornerRadius` (u8),
     `Margin` is now `i8`, `painter.rect`/`rect_stroke` take a `StrokeKind`,

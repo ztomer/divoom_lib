@@ -153,13 +153,22 @@ low-value or unverifiable without hardware.
 - [ ] ✗ Gallery thumbnails (https loader; needs cloud auth)
 - [x] ✓ Virtual-wall canvas (painted device-screen tiles + slot labels)
 - [x] ✓ Ambient color previews (painted per-mode)
-- [ ] ✗ Live device-screen preview (sidebar — needs daemon to expose current frame)
+- [x] ✓ Live device-screen preview (sidebar — `get_device_activity` poll +
+  client-side preview for frames we push; base64 PNG → egui texture, preview.rs)
 - [x] ✓ Clock previews (painted digital "12:00" + analog dials, per face)
-- [ ] ✗ Ambient color previews (paint mode swatches)
 - [x] ✓ Appbar icon glyphs (brightness sun / volume / gear pill)
 - [x] ✓ Custom fonts — Inter (body) + Inter Display (headings) bundled (fonts.rs)
 
 ## Progress log
+- 2026-06-29 visual5: live device-screen preview in the sidebar (web parity for the
+  "last pushed image"). New `preview.rs`: rgb->data-url PNG encode + data-url->egui
+  texture decode (base64). App polls `get_device_activity` (~1.5s) and renders
+  `activity[mac].preview`; frames the UI pushes (pixel art) seed a client-side
+  preview instantly + persist via `set_device_activity` (mirrors the web localStorage
+  path). NEAREST sampling keeps the low-res device grid crisp. Unit-tested
+  (encode/decode round-trip + edge cases); screenshot-verified. Daemon already
+  exposed the field — no daemon change. Remaining: gallery thumbnails (cloud auth),
+  audio visualizer (local audio capture).
 - 2026-06-29 egui35: migrated the native UI from egui/eframe 0.29 to 0.35 (user:
   "the latest egui is 0.35"). Ported breaking changes — CornerRadius(u8)/Margin(i8),
   Painter::rect StrokeKind, Frame::NONE, Arc<FontData>, all_styles_mut,

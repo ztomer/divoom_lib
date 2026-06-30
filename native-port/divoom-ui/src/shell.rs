@@ -167,6 +167,8 @@ fn nav_button(ui: &mut egui::Ui, selected: bool, label: &str, tab: crate::app::T
 
 fn device_panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
     ui.add_space(8.0);
+    // Decode the active device's last-pushed frame (web-parity sidebar preview).
+    let preview = app.device_preview_texture(ui.ctx());
     Frame::NONE
         .fill(theme::CARD_BG)
         .stroke(Stroke::new(1.0, theme::BORDER))
@@ -174,10 +176,14 @@ fn device_panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
         .inner_margin(Margin::same(8))
         .show(ui, |ui| {
             ui.vertical_centered(|ui| {
-                // Flat face-on screen preview (neutral bezel placeholder for now).
+                // Flat face-on screen preview: last-pushed frame, else neutral bezel.
                 let (rect, _) =
                     ui.allocate_exact_size(Vec2::new(96.0, 96.0), Sense::hover());
                 ui.painter().rect_filled(rect, CornerRadius::same(4), theme::BG_BASE);
+                if let Some(tex) = &preview {
+                    let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+                    ui.painter().image(tex.id(), rect, uv, Color32::WHITE);
+                }
                 ui.painter().rect_stroke(
                     rect,
                     CornerRadius::same(4),

@@ -16,6 +16,7 @@ mod gallery;
 mod icons;
 mod model;
 mod pixel_art;
+mod preview;
 mod schedule;
 mod settings;
 mod shell;

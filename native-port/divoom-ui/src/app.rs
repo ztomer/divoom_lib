@@ -97,6 +97,14 @@ pub struct DivoomApp {
     pub tp_week: u8,
     /// Replies to `Cmd::Raw`, keyed by tag (Settings/Schedule/gallery read these).
     pub replies: std::collections::HashMap<String, serde_json::Value>,
+    // --- Device-screen preview (sidebar "last pushed image", web parity) ---
+    /// Throttle for the periodic `get_device_activity` poll.
+    pub last_activity_poll: Option<std::time::Instant>,
+    /// Client-side last-pushed preview per mac (mirrors the web UI's localStorage):
+    /// frames WE push show instantly, without waiting for the daemon round-trip.
+    pub local_previews: std::collections::HashMap<String, String>,
+    /// Decoded GPU texture cached by its source data-url (re-decoded only on change).
+    pub preview_tex: Option<(String, egui::TextureHandle)>,
 }
 
 impl DivoomApp {
@@ -104,7 +112,7 @@ impl DivoomApp {
         crate::theme::apply(&cc.egui_ctx);
         let daemon = daemon::start();
         daemon.send(daemon::Cmd::Scan(8.0));
-        Self {
+        let mut app = Self {
             daemon,
             tab: match std::env::var("DIVOOM_UI_TAB").as_deref() {
                 Ok("widgets") => Tab::Widgets,
@@ -204,7 +212,12 @@ impl DivoomApp {
             tp_minute: 0,
             tp_week: 0,
             replies: std::collections::HashMap::new(),
-        }
+            last_activity_poll: None,
+            local_previews: std::collections::HashMap::new(),
+            preview_tex: None,
+        };
+        app.apply_debug_seed();
+        app
     }
 
     /// Fire a device_call with positional args (the convention the Rust daemon's
@@ -392,6 +405,7 @@ impl eframe::App for DivoomApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.pump();
         self.handle_tray(ctx);
+        self.poll_device_activity();
         // Keep the live-status poll flowing even when idle.
         ctx.request_repaint_after(std::time::Duration::from_millis(200));
     }

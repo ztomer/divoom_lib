@@ -20,6 +20,9 @@ egui_extras = { version = "0.35", features = ["all_loaders"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+# Decode the daemon's base64 `data:image/png` device-preview frames + encode locally
+# pushed pixel art into the same form (parity with the web UI's last-pushed preview).
+base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # Cross-platform tray/menubar (MIT/Apache, Tauri ecosystem). Mirrors the pyobjc
 # NSStatusItem menubar; integrates with eframe's winit loop via its event channels.
