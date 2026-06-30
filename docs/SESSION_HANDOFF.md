@@ -18,6 +18,13 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **Native dev helpers (root):** `./build_native.sh` (release binaries + encoder
+  dylib; `--app` for the macOS bundle, `--debug` for a debug build) and
+  `./run_native.sh` (dev: spawns `divoomd` on `/tmp/divoom.sock` + the UI, stops the
+  daemon on exit; `--app` opens the bundle, `--fake` runs the UI with seeded fake
+  devices/no daemon). Both source `tui/lib.sh` (Kare style).
+
+
 - **NATIVE UI PORT — Phase 0 DONE (2026-06-29) — `docs/PLANNING_NATIVE_UI.md`:**
   building a native cross-platform Rust UI to replace the Python presentation
   layer (pywebview GUI + pyobjc menubar), making the shipped app Python-free.
