@@ -156,6 +156,20 @@ def spawn_daemon(
     if rust_bin and not Path(rust_bin).exists():
         rust_bin = None
     rust_env_extra: dict[str, str] = {}
+    # PyInstaller bundle: divoomd is collected under <_MEIPASS>/bin and the encoder
+    # dylib under <_MEIPASS>/divoom_lib (data lands in Resources for a .app).
+    _mei = getattr(sys, "_MEIPASS", None)
+    if not rust_bin and _mei:
+        for _bin in (Path(_mei) / "bin" / "divoomd",
+                     Path(_mei).parent / "Resources" / "bin" / "divoomd"):
+            if _bin.exists():
+                rust_bin = str(_bin)
+                for _dy in (Path(_mei) / "divoom_lib" / "libdivoom_compact.dylib",
+                            Path(_mei).parent / "Resources" / "divoom_lib" / "libdivoom_compact.dylib"):
+                    if _dy.exists():
+                        rust_env_extra["DIVOOMD_ENCODER_LIB"] = str(_dy)
+                        break
+                break
     _rp = os.environ.get("RESOURCEPATH")  # set by py2app inside the .app bundle
     if not rust_bin and _rp:
         cand = Path(_rp) / "divoomd"

@@ -80,6 +80,42 @@ def _pywebview_1820_bug_present() -> bool:
     return "self.screen.origin.x + x" in src
 
 
+def _resolve_web_ui() -> Path:
+    """Locate the web_ui directory. Source: next to this file. PyInstaller: data is
+    collected under divoom_gui/web_ui, which for a .app lives in Contents/Resources
+    while sys._MEIPASS is Contents/Frameworks — so search the likely roots and pick
+    the one that actually has index.html."""
+    here = Path(__file__).resolve().parent
+    cands = [here / "web_ui"]
+    mei = getattr(sys, "_MEIPASS", None)
+    if mei:
+        m = Path(mei)
+        cands += [m / "divoom_gui" / "web_ui", m / "web_ui",
+                  m.parent / "Resources" / "divoom_gui" / "web_ui"]
+    for c in cands:
+        if (c / "index.html").exists():
+            return c
+    return cands[0]
+
+
+def _resolve_bundled_binary(name: str) -> "str | None":
+    """Find a bundled Rust binary (divoomd / divoom-menubar) across packagings:
+    PyInstaller (sys._MEIPASS/bin), py2app (RESOURCEPATH), and the dev tree."""
+    override = os.environ.get("DIVOOM_RUST_BINARY" if name == "divoomd" else "DIVOOM_MENUBAR_BINARY")
+    if override and Path(override).exists():
+        return override
+    mei = getattr(sys, "_MEIPASS", None)
+    if mei:
+        for c in (Path(mei) / "bin" / name, Path(mei) / name,
+                  Path(mei).parent / "Resources" / "bin" / name):
+            if c.exists():
+                return str(c)
+    rp = os.environ.get("RESOURCEPATH")
+    if rp and (Path(rp) / name).exists():
+        return str(Path(rp) / name)
+    return None
+
+
 _GUI_LOCK_FH = None  # kept open for the process lifetime to hold the lock
 
 
@@ -121,7 +157,7 @@ def main():
         return
 
     api = DivoomGuiAPI()
-    web_ui_dir = Path(__file__).parent / "web_ui"
+    web_ui_dir = _resolve_web_ui()
     index_html = web_ui_dir / "index.html"
 
     # Optional headless control server surface (E2E testing)
@@ -291,16 +327,11 @@ def _start_shutdown_follower(window) -> None:
 
 
 def _resolve_menubar_binary() -> "str | None":
-    """Locate the native Rust menubar binary (divoom-menubar), mirroring the
-    daemon resolver: env override → py2app bundle Resources → dev build tree."""
-    override = os.environ.get("DIVOOM_MENUBAR_BINARY")
-    if override and Path(override).exists():
-        return override
-    rp = os.environ.get("RESOURCEPATH")  # set by py2app inside the .app bundle
-    if rp:
-        cand = Path(rp) / "divoom-menubar"
-        if cand.exists():
-            return str(cand)
+    """Locate the native Rust menubar binary (divoom-menubar): PyInstaller bundle,
+    py2app Resources, env override (via _resolve_bundled_binary), then dev tree."""
+    bundled = _resolve_bundled_binary("divoom-menubar")
+    if bundled:
+        return bundled
     repo_root = Path(__file__).resolve().parents[1]
     for folder in ("release", "debug"):
         p = repo_root / "native-port" / "divoom-menubar" / "target" / folder / "divoom-menubar"
@@ -332,13 +363,17 @@ def _spawn_menubar_agent() -> None:
             logger.warning("Native menu-bar binary (divoom-menubar) not found; "
                            "build it with ./build.sh. No menu-bar this session.")
             return
-        # In a py2app .app, sys.executable is the GUI stub — hand the agent the
-        # bundled python + this script so its "Launch Dashboard" reopens the GUI.
-        from divoom_daemon.daemon_client import bundle_python
-        gui_python = bundle_python() or sys.executable
+        # Tell the agent how to relaunch this GUI from "Launch Dashboard".
         env = dict(os.environ)
-        env["DIVOOM_GUI_PYTHON"] = gui_python
-        env["DIVOOM_GUI_SCRIPT"] = str(Path(__file__).resolve())
+        if getattr(sys, "frozen", False):
+            # PyInstaller .app: sys.executable IS the GUI launcher — run it alone
+            # (no script; the agent runs DIVOOM_GUI_PYTHON with no args).
+            env["DIVOOM_GUI_PYTHON"] = sys.executable
+            env["DIVOOM_GUI_SCRIPT"] = ""
+        else:
+            from divoom_daemon.daemon_client import bundle_python
+            env["DIVOOM_GUI_PYTHON"] = bundle_python() or sys.executable
+            env["DIVOOM_GUI_SCRIPT"] = str(Path(__file__).resolve())
         subprocess.Popen(
             [binary],
             env=env,

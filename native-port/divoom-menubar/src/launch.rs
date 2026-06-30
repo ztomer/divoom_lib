@@ -14,15 +14,22 @@ use crate::daemon;
 /// deep-link `--tab data-sources --card notifications`). The GUI's own
 /// single-instance guard prevents duplicate windows.
 pub fn dashboard(extra: &[&str]) {
-    let (Some(python), Some(script)) = (
-        std::env::var_os("DIVOOM_GUI_PYTHON"),
-        std::env::var_os("DIVOOM_GUI_SCRIPT"),
-    ) else {
-        eprintln!("divoom-menubar: DIVOOM_GUI_PYTHON/SCRIPT not set — can't launch the dashboard");
+    let Some(python) = std::env::var_os("DIVOOM_GUI_PYTHON") else {
+        eprintln!("divoom-menubar: DIVOOM_GUI_PYTHON not set — can't launch the dashboard");
         return;
     };
     let mut cmd = Command::new(python);
-    cmd.arg(script).args(extra);
+    // A non-empty DIVOOM_GUI_SCRIPT means a source/py2app launch (python <script>);
+    // an empty/unset one means a frozen PyInstaller .app where DIVOOM_GUI_PYTHON is
+    // itself the GUI launcher, so we run it directly with just the deep-link args.
+    match std::env::var_os("DIVOOM_GUI_SCRIPT") {
+        Some(s) if !s.is_empty() => {
+            cmd.arg(s).args(extra);
+        }
+        _ => {
+            cmd.args(extra);
+        }
+    }
     cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
     let _ = cmd.spawn();
 }

@@ -4,6 +4,31 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.2 — fix blank GUI: PyInstaller packaging (2026-06-30)
+
+The v0.21.x packaged `.app` opened a **blank dashboard window**: pywebview's
+WKWebView refuses to load the `file://` UI inside a py2app bundle (it works for a
+loose process, so `./run.sh` always rendered). Root-caused by driving the real app
+(WKWebView's `loadRequest:` for `file://` is blocked in a signed py2app `.app`;
+encoding/ATS/http-server/loadFileURL workarounds didn't help). **Fix: package the
+macOS app with PyInstaller** — pywebview's supported packager, whose WKWebView
+renders correctly. Verified end-to-end on hardware (dashboard renders; bundled
+`divoomd` + `divoom-menubar` spawn; Pixoo-1 connects).
+
+- **New `divoom.spec`** (PyInstaller): bundles the GUI + deps + `web_ui`, the C
+  encoder dylib, `divoom_lib` data (fonts), psutil, pyobjc (Foundation/AppKit/
+  WebKit/CoreBluetooth), and the Rust `divoomd` + `divoom-menubar` binaries; macOS
+  `.app` with the BT usage-string Info.plist.
+- **Resolvers made packaging-agnostic**: `gui_main` (`web_ui` + menubar binary) and
+  `daemon_client` (divoomd + encoder dylib) now resolve via PyInstaller
+  (`sys._MEIPASS`), py2app (`RESOURCEPATH`), and the dev tree.
+- **Menu-bar "Launch Dashboard"** works in the frozen app (relaunches the `.app`
+  executable directly; `launch.rs` handles an empty `DIVOOM_GUI_SCRIPT`).
+- **`scripts/build_release.sh`** reworked to build via PyInstaller (`divoom.spec`);
+  `setup_app.py` (py2app) is retained for reference but no longer used.
+- Carries the v0.21.1 startup `setlocale` UTF-8 fix (the py2app-ascii daemon-spawn
+  crash), which also applies under PyInstaller.
+
 ## v0.21.1 — daemon-resolution fix + hardware mode test (2026-06-30)
 
 Patch on v0.21.0 (same shipped architecture: Python UI + bundled native Rust
