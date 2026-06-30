@@ -86,6 +86,17 @@ Claude) should read this on entry and **update it at the end of every round**
     Python-free bundle needs a Rust MCP stdio JSON-RPC server, ~13 tools → a large
     standalone workstream — needs an explicit go-ahead). Device-dependent niche
     (Custom Art, Hot Channel, audio viz, wall presets) still need hardware.
+  - **PHASE 4b DONE — native app verified on hardware + shipped alongside
+    (2026-06-29):** drove the real `.app` via computer-use (user approved): launch →
+    UI spawns sibling `divoomd` → BLE scan found Tivoo-Max/Timoo/Pixoo (NO TCC
+    crash — the embedded Info.plist makes the bundle its own responsible process) →
+    connected to Tivoo-Max → UI controls hit the device (Rainbow clock; brightness
+    0→read 0→restored 54; volume read back 5/15 on connect). Shipped ALONGSIDE the
+    Python app (user picked "both"): `build_native_app.sh` makes
+    `Divoom-Native-v0.20.2.dmg`, uploaded to the v0.20.2 release; new cask
+    `divoom-control-native` (Projects/homebrew-tap, pushed, brew-style clean,
+    brew-fetch verified). Python `divoom-control` cask untouched.
+    Install: `brew install --cask ztomer/tap/divoom-control-native`.
   - **NATIVE PACKAGING (2026-06-29, non-destructive part of Phase 4b):**
     `scripts/build_native_app.sh` assembles `dist-native/Divoom Native.app`
     (Python-free: `Contents/MacOS/{divoom-ui, divoomd, libdivoom_compact.dylib}` +

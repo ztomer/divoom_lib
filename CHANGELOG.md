@@ -4,6 +4,22 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native app VERIFIED on hardware + shipped alongside (2026-06-29)
+
+- **Verified the native bundle on real hardware** (computer-use, user-approved):
+  launched `Divoom Native.app` → it spawned the sibling `divoomd` → BLE scan found
+  3 real devices (Tivoo-Max, Timoo, Pixoo) — **no TCC crash, the embedded Info.plist
+  worked** → connected to Tivoo-Max → UI controls reached the device (Rainbow clock;
+  brightness set 0 then 54, read back from the device; volume read back as 5/15 on
+  connect). The Bluetooth grant that blocked this for weeks is resolved by the real
+  `.app` being its own TCC responsible process.
+- **Shipped alongside the Python app** (per user choice — both, no replacement):
+  `build_native_app.sh` now also produces `Divoom-Native-v<version>.dmg`; uploaded
+  as an additional asset on the v0.20.2 release; added a second Homebrew cask
+  `divoom-control-native` (ztomer/tap) pointing at it. `brew style` clean,
+  `brew fetch` verifies the checksum. The Python `divoom-control` cask is untouched.
+  Install: `brew install --cask ztomer/tap/divoom-control-native`.
+
 ### Post-v0.20.2 — Native app packaging (non-destructive) (2026-06-29)
 
 - **`scripts/build_native_app.sh`** — assembles the fully-native, Python-free

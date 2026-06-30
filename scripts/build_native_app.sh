@@ -93,5 +93,18 @@ if find "${APP}" \( -iname '*smali*' -o -path '*references*' -o -iname '*.apk' \
   exit 1
 fi
 
+# 6. .dmg for the second Homebrew cask (divoom-control-native), shipped ALONGSIDE
+#    the Python Divoom.app — drag-install image with an /Applications symlink.
+DMG="dist-native/Divoom-Native-v${VERSION}.dmg"
+echo "-> packaging ${DMG}"
+STAGE="$(mktemp -d)"
+cp -R "${APP}" "${STAGE}/"
+ln -s /Applications "${STAGE}/Applications"
+rm -f "${DMG}"
+hdiutil create -volname "Divoom Native" -srcfolder "${STAGE}" -ov -format UDZO "${DMG}" >/dev/null
+rm -rf "${STAGE}"
+shasum -a 256 "${DMG}" | tee "${DMG}.sha256"
+
 echo "Done: ${APP}"
+echo "       ${DMG}"
 echo "Launch:  open '${APP}'    (first BLE use prompts for Bluetooth)"
