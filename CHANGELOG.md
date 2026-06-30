@@ -4,6 +4,23 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.0 — Python UI + native Rust daemon & menubar (2026-06-30)
+
+Shipping architecture: the desktop **UI is the Python pywebview app**, the
+**daemon and menubar are native Rust** (`divoomd` + `divoom-menubar`), both bundled
+inside the Python `.app`. Highlights since v0.20.2:
+
+- **Standalone Rust menubar** (`divoom-menubar`) replaces the pyobjc menubar; the
+  GUI spawns it and it talks to the daemon over the socket (status / devices /
+  notifications / launch-dashboard / quit).
+- **egui UI retired** — `native-port/divoom-ui/` removed; the `divoom-control-native`
+  cask is discontinued. One app again: the `divoom-control` cask.
+- **Python 3.14** — CI now tests on 3.14 (the version dev + the bundle ship);
+  `requires-python >= 3.10`.
+- Dev helpers `./build.sh` + `./run.sh`.
+
+Details below (grouped by the work since v0.20.2):
+
 ### Post-v0.20.2 — Architecture pivot: Python UI + Rust daemon + Rust menubar (2026-06-30)
 
 Reversed the native-egui-UI direction per the maintainer: the desktop **UI is the
