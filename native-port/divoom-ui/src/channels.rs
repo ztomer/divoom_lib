@@ -9,9 +9,10 @@
 //!   scoreboard   → set_scoreboard          [on_off, red, blue]
 //!   text         → push_text (bitmap render) — deferred to Phase 3 (needs font)
 
-use eframe::egui::{self, Color32, Margin, RichText, Rounding, Stroke, Vec2};
+use eframe::egui::{self, Color32, RichText, Rounding, Stroke, Vec2};
 
 use crate::app::{Channel, DivoomApp};
+use crate::channel_previews::{ambient_grid, clock_grid, hint, image_grid, swatch};
 use crate::theme;
 
 // Data tables — values + labels straight from channels_grids.js.
@@ -95,7 +96,8 @@ fn vj(app: &mut DivoomApp, ui: &mut egui::Ui) {
 
 fn ambient(app: &mut DivoomApp, ui: &mut egui::Ui) {
     hint(ui, "Ambient light effect + color.");
-    if let Some(v) = selector_grid(ui, &AMBIENT_MODES, app.ambient_mode) {
+    let plain = app.ambient_color;
+    if let Some(v) = ambient_grid(ui, &AMBIENT_MODES, app.ambient_mode, plain) {
         app.ambient_mode = v;
         apply_ambient(app);
     }
@@ -296,203 +298,3 @@ fn sessions(app: &mut DivoomApp, ui: &mut egui::Ui) {
     });
 }
 
-// --- shared widgets ----------------------------------------------------------
-
-/// A responsive grid of selectable cells (the web `.selector-grid`). Returns the
-/// newly-clicked value, if any.
-fn selector_grid(ui: &mut egui::Ui, labels: &[&str], selected: i64) -> Option<i64> {
-    let mut clicked = None;
-    let cell = Vec2::new(118.0, 40.0);
-    let per_row = ((ui.available_width() + 8.0) / (cell.x + 8.0)).floor().max(1.0) as usize;
-    egui::Grid::new("selgrid")
-        .spacing(Vec2::new(8.0, 8.0))
-        .show(ui, |ui| {
-            for (i, label) in labels.iter().enumerate() {
-                if cell_button(ui, label, selected == i as i64, cell).clicked() {
-                    clicked = Some(i as i64);
-                }
-                if (i + 1) % per_row == 0 {
-                    ui.end_row();
-                }
-            }
-        });
-    clicked
-}
-
-/// Clock-face grid: each cell paints a mini preview of the face (digital "12:00"
-/// or an analog dial), mirroring the web_ui CLOCK_PREVIEWS.
-fn clock_grid(ui: &mut egui::Ui, labels: &[&str], selected: i64) -> Option<i64> {
-    let mut clicked = None;
-    let cell = Vec2::new(100.0, 88.0);
-    let per_row = ((ui.available_width() + 8.0) / (cell.x + 8.0)).floor().max(1.0) as usize;
-    egui::Grid::new("clockgrid").spacing(Vec2::new(8.0, 8.0)).show(ui, |ui| {
-        for (i, label) in labels.iter().enumerate() {
-            let sel = selected == i as i64;
-            if clock_cell(ui, label, i as i64, sel, cell).clicked() {
-                clicked = Some(i as i64);
-            }
-            if (i + 1) % per_row == 0 {
-                ui.end_row();
-            }
-        }
-    });
-    clicked
-}
-
-fn clock_cell(ui: &mut egui::Ui, label: &str, face: i64, selected: bool, size: Vec2) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
-    let stroke = if selected {
-        Stroke::new(1.5, theme::PRIMARY)
-    } else if resp.hovered() {
-        Stroke::new(1.0, theme::PRIMARY)
-    } else {
-        Stroke::new(1.0, theme::BORDER)
-    };
-    let bg = if selected { theme::PRIMARY.linear_multiply(0.18) } else { theme::CARD_BG };
-    let p = ui.painter();
-    p.rect(rect, Rounding::same(theme::RADIUS), bg, stroke);
-    let pv = egui::Rect::from_min_size(rect.left_top() + Vec2::new((size.x - 64.0) / 2.0, 8.0), Vec2::new(64.0, 56.0));
-    p.rect_filled(pv, Rounding::same(4.0), theme::BG_BASE);
-    paint_clock_preview(p, pv, face);
-    p.text(
-        egui::pos2(rect.center().x, rect.bottom() - 10.0),
-        egui::Align2::CENTER_CENTER,
-        label,
-        egui::FontId::proportional(10.5),
-        if selected { theme::TEXT_MAIN } else { theme::TEXT_MUTED },
-    );
-    resp
-}
-
-fn paint_clock_preview(p: &egui::Painter, r: egui::Rect, face: i64) {
-    use eframe::egui::{Color32, FontId, Pos2};
-    let c = r.center();
-    match face {
-        // 3 = Analog Square, 5 = Analog Round
-        3 | 5 => {
-            let radius = 18.0;
-            if face == 5 {
-                p.circle_stroke(c, radius, Stroke::new(1.5, theme::TEXT_MAIN));
-            } else {
-                p.rect_stroke(egui::Rect::from_center_size(c, Vec2::splat(radius * 2.0)), Rounding::same(2.0), Stroke::new(1.5, theme::TEXT_MAIN));
-            }
-            p.line_segment([c, c + Vec2::new(0.0, -radius * 0.7)], Stroke::new(2.0, theme::TEXT_MAIN));
-            p.line_segment([c, c + Vec2::new(radius * 0.55, 0.0)], Stroke::new(1.5, theme::TEXT_MUTED));
-        }
-        _ => {
-            // Digital "12:00". Rainbow=1 → orange; Neg=4 → dark on light plate.
-            if face == 4 {
-                p.rect_filled(r.shrink(6.0), Rounding::same(2.0), theme::TEXT_MAIN);
-            }
-            if face == 2 {
-                p.rect_stroke(r.shrink(6.0), Rounding::same(2.0), Stroke::new(1.0, theme::TEXT_MUTED));
-            }
-            let col = match face {
-                1 => theme::PRIMARY,
-                4 => Color32::BLACK,
-                _ => theme::TEXT_MAIN,
-            };
-            p.text(c, egui::Align2::CENTER_CENTER, "12:00", FontId::proportional(15.0), col);
-        }
-    }
-    let _ = Pos2::new(0.0, 0.0);
-}
-
-/// Like `selector_grid` but each cell shows a webp preview thumbnail above the
-/// label. `asset_fn(index, selected) -> candidate file names` (first that exists
-/// wins; falls back to a painted cell when no asset is found).
-fn image_grid(
-    ui: &mut egui::Ui,
-    labels: &[&str],
-    selected: i64,
-    asset_fn: impl Fn(i64, bool) -> Vec<String>,
-) -> Option<i64> {
-    let mut clicked = None;
-    let cell = Vec2::new(96.0, 92.0);
-    let per_row = ((ui.available_width() + 8.0) / (cell.x + 8.0)).floor().max(1.0) as usize;
-    egui::Grid::new("imggrid").spacing(Vec2::new(8.0, 8.0)).show(ui, |ui| {
-        for (i, label) in labels.iter().enumerate() {
-            let sel = selected == i as i64;
-            let uri = asset_fn(i as i64, sel)
-                .into_iter()
-                .find_map(|name| crate::ui_widgets::asset_uri(&name));
-            if image_cell(ui, label, sel, cell, uri.as_deref()).clicked() {
-                clicked = Some(i as i64);
-            }
-            if (i + 1) % per_row == 0 {
-                ui.end_row();
-            }
-        }
-    });
-    clicked
-}
-
-fn image_cell(ui: &mut egui::Ui, label: &str, selected: bool, size: Vec2, uri: Option<&str>) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
-    let stroke = if selected {
-        Stroke::new(1.5, theme::PRIMARY)
-    } else if resp.hovered() {
-        Stroke::new(1.0, theme::PRIMARY)
-    } else {
-        Stroke::new(1.0, theme::BORDER)
-    };
-    let bg = if selected { theme::PRIMARY.linear_multiply(0.18) } else { theme::CARD_BG };
-    ui.painter().rect(rect, Rounding::same(theme::RADIUS), bg, stroke);
-    // Thumbnail (top) — fall back to a small filled square if the asset is missing.
-    let img_rect = egui::Rect::from_min_size(rect.left_top() + Vec2::new((size.x - 60.0) / 2.0, 8.0), Vec2::splat(60.0));
-    if let Some(u) = uri {
-        egui::Image::new(u).rounding(Rounding::same(4.0)).paint_at(ui, img_rect);
-    } else {
-        ui.painter().rect_filled(img_rect, Rounding::same(4.0), theme::BG_BASE);
-    }
-    ui.painter().text(
-        egui::pos2(rect.center().x, rect.bottom() - 11.0),
-        egui::Align2::CENTER_CENTER,
-        label,
-        egui::FontId::proportional(11.0),
-        if selected { theme::TEXT_MAIN } else { theme::TEXT_MUTED },
-    );
-    resp
-}
-
-fn cell_button(ui: &mut egui::Ui, label: &str, selected: bool, size: Vec2) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
-    let p = ui.painter();
-    let (bg, stroke) = if selected {
-        (theme::PRIMARY.linear_multiply(0.18), Stroke::new(1.5, theme::PRIMARY))
-    } else if resp.hovered() {
-        (theme::CARD_BG, Stroke::new(1.0, theme::PRIMARY))
-    } else {
-        (theme::CARD_BG, Stroke::new(1.0, theme::BORDER))
-    };
-    p.rect(rect, Rounding::same(theme::RADIUS), bg, stroke);
-    p.text(
-        rect.center(),
-        egui::Align2::CENTER_CENTER,
-        label,
-        egui::FontId::proportional(12.5),
-        if selected { theme::TEXT_MAIN } else { theme::TEXT_MUTED },
-    );
-    resp
-}
-
-fn swatch(ui: &mut egui::Ui, rgb: [u8; 3]) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::click());
-    ui.painter().rect(
-        rect,
-        Rounding::same(4.0),
-        Color32::from_rgb(rgb[0], rgb[1], rgb[2]),
-        Stroke::new(1.0, theme::BORDER),
-    );
-    resp
-}
-
-fn hint(ui: &mut egui::Ui, text: &str) {
-    ui.label(RichText::new(text).size(12.0).color(theme::TEXT_MUTED));
-    ui.add_space(10.0);
-}
-
-/// Margin helper kept here so shell.rs's content card stays generic.
-pub fn card_margin() -> Margin {
-    Margin::same(14.0)
-}

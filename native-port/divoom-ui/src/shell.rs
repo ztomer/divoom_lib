@@ -266,7 +266,7 @@ fn channels_tab(app: &mut DivoomApp, ui: &mut egui::Ui) {
         .fill(theme::CARD_BG)
         .rounding(Rounding::same(theme::RADIUS))
         .stroke(Stroke::new(1.0, theme::BORDER))
-        .inner_margin(crate::channels::card_margin())
+        .inner_margin(crate::channel_previews::card_margin())
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             crate::channels::panel(app, ui);

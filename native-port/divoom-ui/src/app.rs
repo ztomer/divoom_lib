@@ -126,7 +126,15 @@ impl DivoomApp {
             },
             brightness: 80,
             volume: 7,
-            devices: Vec::new(),
+            devices: std::env::var("DIVOOM_UI_FAKE_DEVICES")
+                .ok()
+                .map(|s| {
+                    s.split(',')
+                        .filter(|x| !x.is_empty())
+                        .map(|name| Device { name: name.to_string(), address: format!("mac-{name}") })
+                        .collect()
+                })
+                .unwrap_or_default(),
             selected_device: None,
             daemon_connected: false,
             status_detail: "connecting…".into(),

@@ -24,14 +24,8 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
             }
             return;
         }
-        // Slot list: each discovered device gets a slot index (its position).
-        for (i, d) in app.devices.iter().enumerate() {
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(format!("Slot {i}")).size(12.0).color(theme::TEXT_MUTED));
-                let name = if d.name.is_empty() { d.address.clone() } else { d.name.clone() };
-                ui.label(RichText::new(name).size(12.5).color(theme::TEXT_MAIN));
-            });
-        }
+        // Visual wall canvas: a row of device "screens" (bezels) forming the wall.
+        wall_canvas(app, ui);
         ui.add_space(12.0);
         if ui.button("Apply wall layout").clicked() {
             let slots: serde_json::Map<String, serde_json::Value> = app
@@ -51,6 +45,34 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
             );
         }
     });
+}
+
+/// Paint the discovered devices as a row of screen tiles (neutral bezel + label),
+/// the composite "wall" preview.
+fn wall_canvas(app: &DivoomApp, ui: &mut egui::Ui) {
+    let n = app.devices.len().max(1);
+    let tile = egui::Vec2::new(84.0, 84.0);
+    let gap = 12.0;
+    let total_w = n as f32 * tile.x + (n as f32 - 1.0) * gap;
+    let (rect, _) = ui.allocate_exact_size(egui::Vec2::new(ui.available_width(), tile.y + 28.0), egui::Sense::hover());
+    let p = ui.painter_at(rect);
+    let x0 = rect.left() + ((rect.width() - total_w) / 2.0).max(0.0);
+    for (i, d) in app.devices.iter().enumerate() {
+        let min = egui::pos2(x0 + i as f32 * (tile.x + gap), rect.top());
+        let tr = egui::Rect::from_min_size(min, tile);
+        // bezel + screen
+        p.rect(tr, egui::Rounding::same(8.0), theme::CARD_BG, egui::Stroke::new(1.0, theme::BORDER));
+        let screen = tr.shrink(8.0);
+        p.rect_filled(screen, egui::Rounding::same(3.0), theme::BG_BASE);
+        let sel = app.selected_device == Some(i);
+        if sel {
+            p.rect_stroke(screen, egui::Rounding::same(3.0), egui::Stroke::new(1.5, theme::PRIMARY));
+        }
+        let name = if d.name.is_empty() { d.address.clone() } else { d.name.clone() };
+        let short = name.split('-').next().unwrap_or(&name).to_string();
+        p.text(screen.center(), egui::Align2::CENTER_CENTER, short, egui::FontId::proportional(10.0), theme::TEXT_MUTED);
+        p.text(egui::pos2(tr.center().x, tr.bottom() + 12.0), egui::Align2::CENTER_CENTER, format!("Slot {i}"), egui::FontId::proportional(10.0), theme::TEXT_MUTED);
+    }
 }
 
 fn card(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {

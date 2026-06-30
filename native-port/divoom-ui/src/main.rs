@@ -8,6 +8,7 @@
 
 mod app;
 mod channels;
+mod channel_previews;
 mod daemon;
 mod device_settings;
 mod gallery;
