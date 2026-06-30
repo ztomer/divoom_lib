@@ -58,8 +58,9 @@ never deleted._
 - [ ] ✗ MCP server start/stop/status (subprocess)
 - [x] ✓ scan timeout (Settings -> Application; threaded into the scan command).
   `limit` is a GUI-side result filter (minor, deferred).
-- [ ] ✗ cloud login (`save_credentials`) — **DAEMON GAP** (only `get_credentials`
-  exists; no login/save command). Gallery can't auth without it.
+- [x] ✓ cloud login — DAEMON GAP CLOSED: added `save_credentials` command (writes
+  config.ini [divoom] 0600 + validates via get_credentials) + Settings login card
+  (email/masked password). Unblocks gallery auth.
 - [ ] ✗ export/import settings (`PresetsManagerMixin`)
 
 ## Live Widgets (data feeds) — the MediaSyncMixin
@@ -131,8 +132,8 @@ low-value or unverifiable without hardware.
 ## Daemon-gap closure run (2026-06-29, "close the gaps across daemon, menubar, app")
 - [x] ✓ **sync_time** — DateTimeCommand ported to divoomd `set_date_time` (0x18) +
   wire-byte test + UI button (chrono local time).
+- [x] ✓ cloud login (`save_credentials` daemon command + Settings login card)
 - [ ] ✗ test notification (`send_notification` daemon command)
-- [ ] ✗ cloud login (`save_credentials` daemon command + Divoom auth)
 - [ ] ✗ MCP server (Rust MCP in daemon — large)
 
 ## Progress log

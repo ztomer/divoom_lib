@@ -20,6 +20,8 @@ pub fn panel(app: &mut DivoomApp, ui: &mut egui::Ui) {
     egui::ScrollArea::vertical().show(ui, |ui| {
         notifications_card(app, ui);
         ui.add_space(12.0);
+        cloud_card(app, ui);
+        ui.add_space(12.0);
         lan_card(app, ui);
         ui.add_space(12.0);
         app_card(app, ui);
@@ -55,6 +57,42 @@ fn notifications_card(app: &mut DivoomApp, ui: &mut egui::Ui) {
                 app.raw("notification_status", json!({}), "notif_status");
             }
         });
+    });
+}
+
+/// Divoom cloud login — enables the gallery. The user's own account credentials
+/// go to the local daemon (`save_credentials`), which writes config.ini (0600) and
+/// authenticates. Password field is masked; we never log or display it.
+fn cloud_card(app: &mut DivoomApp, ui: &mut egui::Ui) {
+    card(ui, "Divoom Cloud (gallery login)", |ui| {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Email").size(12.0).color(theme::TEXT_MUTED));
+            ui.add(egui::TextEdit::singleline(&mut app.cloud_email).hint_text("you@example.com").desired_width(180.0));
+        });
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Password").size(12.0).color(theme::TEXT_MUTED));
+            ui.add(egui::TextEdit::singleline(&mut app.cloud_password).password(true).desired_width(180.0));
+            let can = !app.cloud_email.trim().is_empty() && !app.cloud_password.is_empty();
+            if ui.add_enabled(can, egui::Button::new("Log in")).clicked() {
+                app.raw(
+                    "save_credentials",
+                    json!({ "email": app.cloud_email.trim(), "password": app.cloud_password }),
+                    "cloud_login",
+                );
+                app.cloud_password.clear(); // don't keep it in memory after sending
+            }
+        });
+        if let Some(v) = app.replies.get("cloud_login") {
+            ui.add_space(6.0);
+            if v.get("success").and_then(|s| s.as_bool()) == Some(true) {
+                let email = v.get("email").and_then(|e| e.as_str()).unwrap_or("");
+                ui.colored_label(theme::ACCENT, format!("Logged in as {email}. Gallery is available."));
+            } else {
+                let err = v.get("error").and_then(|e| e.as_str()).unwrap_or("login failed");
+                ui.colored_label(theme::WARN, format!("Login failed: {err}"));
+            }
+        }
     });
 }
 

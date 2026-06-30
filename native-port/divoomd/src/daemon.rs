@@ -344,54 +344,9 @@ impl Daemon {
                 json!({"success": true})
             }
 
-            "fetch_gallery" => {
-                let classify = match req.args.get("classify").and_then(|v| v.as_i64()) {
-                    Some(c) => c,
-                    None => return err_reply("fetch_gallery requires 'classify'"),
-                };
-                let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
-                let file_sort = req.args.get("file_sort").and_then(|v| v.as_i64()).unwrap_or(1);
-                let file_size = req.args.get("file_size").and_then(|v| v.as_i64()).unwrap_or(127);
-
-                match crate::cloud::fetch_gallery(classify, limit, file_sort, file_size).await {
-                    Ok(res) => json!({
-                        "success": true,
-                        "result": res
-                    }),
-                    Err(e) => err_reply(&e),
-                }
-            }
-
-            "get_credentials" => {
-                let force = req.args.get("force_refresh").and_then(|v| v.as_bool()).unwrap_or(false);
-                match crate::cloud::get_credentials(force).await {
-                    Ok(creds) => json!({
-                        "success": true,
-                        "token": creds.token,
-                        "user_id": creds.user_id,
-                        "email": creds.email,
-                        "utc": creds.utc,
-                    }),
-                    Err(e) => err_reply(&e),
-                }
-            }
-
-            "get_cached_credentials" => {
-                match crate::cloud::get_cached_credentials() {
-                    Some(creds) => json!({
-                        "success": true,
-                        "credentials": {
-                            "token": creds.token,
-                            "user_id": creds.user_id,
-                            "email": creds.email,
-                            "utc": creds.utc,
-                        }
-                    }),
-                    None => json!({
-                        "success": true,
-                        "credentials": serde_json::Value::Null
-                    })
-                }
+            "fetch_gallery" | "save_credentials" | "get_credentials"
+            | "get_cached_credentials" => {
+                crate::cloud_cmds::handle(&req.command, &req).await
             }
 
             other => err_reply(&format!(

@@ -42,13 +42,7 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
     Some(PathBuf::from(home).join(".config").join("divoom-control"))
 }
 
-fn config_file_path() -> Option<PathBuf> {
-    Some(config_dir()?.join("config.ini"))
-}
-
-fn cache_file_path() -> Option<PathBuf> {
-    Some(config_dir()?.join("auth_token.json"))
-}
+use crate::cloud_store::{load_cache, load_config, save_cache};
 
 fn md5_hex(s: &str) -> String {
     let mut hasher = Md5::new();
@@ -64,97 +58,6 @@ fn hmac_md5_hex(message: &str) -> String {
     result.into_bytes().iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-fn load_config() -> (String, String) {
-    let path = match config_file_path() {
-        Some(p) => p,
-        None => return (String::new(), String::new()),
-    };
-    if !path.exists() {
-        return (String::new(), String::new());
-    }
-    let content = match std::fs::read_to_string(path) {
-        Ok(c) => c,
-        Err(_) => return (String::new(), String::new()),
-    };
-    let mut email = String::new();
-    let mut password = String::new();
-    let mut in_divoom_section = false;
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            let section = &trimmed[1..trimmed.len() - 1];
-            in_divoom_section = section.eq_ignore_ascii_case("divoom");
-        } else if in_divoom_section {
-            if let Some(pos) = trimmed.find('=') {
-                let key = trimmed[..pos].trim();
-                let val = trimmed[pos + 1..].trim();
-                if key.eq_ignore_ascii_case("email") {
-                    email = val.to_string();
-                } else if key.eq_ignore_ascii_case("password") {
-                    password = val.to_string();
-                }
-            }
-        }
-    }
-    (email, password)
-}
-
-fn save_cache(creds: &DivoomCredentials) -> Result<(), String> {
-    let path = cache_file_path().ok_or("cannot find cache directory")?;
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-    let val = json!({
-        "token": creds.token,
-        "user_id": creds.user_id,
-        "email": creds.email,
-        "utc": creds.utc,
-        "saved_at": now,
-    });
-    let data = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
-
-    // Atomic write (simulate write + rename + 0o600 mode)
-    let temp_path = path.with_extension("tmp");
-    std::fs::write(&temp_path, data).map_err(|e| e.to_string())?;
-    
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&temp_path, std::fs::Permissions::from_mode(0o600));
-    }
-    
-    std::fs::rename(temp_path, path).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-fn load_cache() -> Option<DivoomCredentials> {
-    let path = cache_file_path()?;
-    if !path.exists() {
-        return None;
-    }
-    let content = std::fs::read_to_string(path).ok()?;
-    let val: Value = serde_json::from_str(&content).ok()?;
-    let saved_at = val.get("saved_at")?.as_u64()?;
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-    
-    // Cache for 23 hours (23 * 3600 seconds)
-    if now > saved_at && now - saved_at > 23 * 3600 {
-        return None;
-    }
-
-    let creds = DivoomCredentials {
-        token: val.get("token")?.as_i64()?,
-        user_id: val.get("user_id")?.as_i64()?,
-        email: val.get("email").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        utc: val.get("utc").and_then(|v| v.as_i64()).unwrap_or(0),
-    };
-    if creds.is_valid() {
-        Some(creds)
-    } else {
-        None
-    }
-}
 
 async fn post_cloud(path: &str, body: &Value) -> Result<Value, String> {
     let client = reqwest::Client::new();

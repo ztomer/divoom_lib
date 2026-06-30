@@ -63,6 +63,8 @@ pub struct DivoomApp {
     pub lan_token: String,
     pub keep_alive: bool,
     pub scan_timeout: f64,
+    pub cloud_email: String,
+    pub cloud_password: String,
     // --- Schedule tab (alarm slots) ---
     pub alarms: Vec<Alarm>,
     // --- Pixel Art tab (16x16 editor) ---
@@ -163,6 +165,8 @@ impl DivoomApp {
             lan_token: String::new(),
             keep_alive: true,
             scan_timeout: 8.0,
+            cloud_email: String::new(),
+            cloud_password: String::new(),
             alarms: vec![Alarm::default(); 5],
             pixels: vec![[0, 0, 0]; 16 * 16],
             paint_color: [255, 90, 31],
