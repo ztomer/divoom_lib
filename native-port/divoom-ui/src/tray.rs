@@ -29,7 +29,7 @@ impl Tray {
     pub fn build() -> Option<Tray> {
         let icon = TrayIconBuilder::new()
             .with_tooltip("Divoom Control")
-            .with_icon(make_icon())
+            .with_icon(make_icon([0xff, 0x5a, 0x1f]))
             .build()
             .ok()?;
         let mut tray = Tray {
@@ -79,6 +79,11 @@ impl Tray {
         }
     }
 
+    /// Color-code the menubar glyph by status (parity with the pyobjc menubar).
+    pub fn set_status_color(&self, rgb: [u8; 3]) {
+        let _ = self.icon.set_icon(Some(make_icon(rgb)));
+    }
+
     /// Drain pending menu events; return the action if one of ours was clicked.
     pub fn poll(&self) -> Option<TrayAction> {
         let mut action = None;
@@ -97,8 +102,8 @@ impl Tray {
     }
 }
 
-/// A 16x16 orange rounded square — the Braun accent, until a real icon ships.
-fn make_icon() -> tray_icon::Icon {
+/// A 16x16 filled rounded square in `rgb` — the menubar glyph (status-colored).
+fn make_icon(rgb: [u8; 3]) -> tray_icon::Icon {
     const N: usize = 16;
     let mut rgba = vec![0u8; N * N * 4];
     for y in 0..N {
@@ -106,9 +111,9 @@ fn make_icon() -> tray_icon::Icon {
             let edge = x == 0 || y == 0 || x == N - 1 || y == N - 1;
             let i = (y * N + x) * 4;
             if !edge {
-                rgba[i] = 0xff;
-                rgba[i + 1] = 0x5a;
-                rgba[i + 2] = 0x1f;
+                rgba[i] = rgb[0];
+                rgba[i + 1] = rgb[1];
+                rgba[i + 2] = rgb[2];
                 rgba[i + 3] = 0xff;
             }
         }

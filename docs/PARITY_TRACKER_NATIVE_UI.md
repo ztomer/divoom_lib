@@ -98,7 +98,8 @@ never deleted._
 ## Tray menubar
 - [x] ✓ Show Dashboard / Notifications (label tracks state) / Quit
 - [x] ✓ dynamic device section (rebuilt on scan-list change; click → select+connect)
-- [ ] ✗ color-coded status glyph (minor polish; main window already shows it)
+- [x] ✓ color-coded status glyph (green=active, orange=idle, red=offline) — parity
+  with the pyobjc menubar; tray icon recolored on status change.
 
 ## PARITY STATUS — functional parity reached (2026-06-29)
 
@@ -137,7 +138,12 @@ low-value or unverifiable without hardware.
 - [x] ✓ cloud login (`save_credentials` daemon command + Settings login card)
 - [x] ✓ test notification — was NOT a daemon gap; device_call leaf existed, added
   the UI control (Settings notif card).
-- [ ] ✗ MCP server (Rust MCP in daemon — large; the one remaining real daemon gap)
+- [ ] ✗ MCP server (Rust MCP in daemon — large; **the one remaining real daemon
+  gap**). The Python MCP is a `python -m divoom_lib.cli mcp-server` subprocess; a
+  Python-free bundle needs a native MCP stdio JSON-RPC server in divoomd (~13 tools
+  → device_call). This is a standalone workstream (multi-hundred-line module) —
+  surfaced for an explicit go-ahead rather than ground out inside the loop.
+- [x] ✓ menubar status-color glyph (parity with pyobjc menubar)
 
 ## Progress log
 - 2026-06-29 gap-run: closed sync_time (daemon set_date_time 0x18 + UI), cloud

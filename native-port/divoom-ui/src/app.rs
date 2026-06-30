@@ -46,6 +46,7 @@ pub struct DivoomApp {
     tray: Option<crate::tray::Tray>,
     tray_inited: bool,
     tray_device_sig: String,
+    tray_color: [u8; 3],
     notif_running: bool,
     last_active: bool,
     // --- Device Settings tab ---
@@ -135,6 +136,7 @@ impl DivoomApp {
             tray: None,
             tray_inited: false,
             tray_device_sig: String::new(),
+            tray_color: [0xff, 0x5a, 0x1f],
             notif_running: false,
             last_active: false,
             clock_face: 0,
@@ -411,13 +413,28 @@ impl DivoomApp {
         let sig = devices.iter().map(|(_, a)| a.as_str()).collect::<Vec<_>>().join(",");
         let sig_changed = sig != self.tray_device_sig;
         let notif = self.notif_running;
+        // Status-colored menubar glyph: green=device active, orange=daemon up/idle,
+        // red=daemon offline (parity with the pyobjc menubar's color-coded status).
+        let color = if !self.daemon_connected {
+            crate::theme::ERROR.to_array()
+        } else if self.last_active {
+            crate::theme::ACCENT.to_array()
+        } else {
+            crate::theme::PRIMARY.to_array()
+        };
+        let color = [color[0], color[1], color[2]];
+        let color_changed = color != self.tray_color;
         if let Some(t) = self.tray.as_mut() {
             if sig_changed {
                 t.set_devices(&devices);
             }
             t.set_notifications_running(notif, &devices);
+            if color_changed {
+                t.set_status_color(color);
+            }
         }
         self.tray_device_sig = sig;
+        self.tray_color = color;
 
         let Some(action) = self.tray.as_ref().and_then(|t| t.poll()) else { return };
         match action {
