@@ -150,7 +150,9 @@ low-value or unverifiable without hardware.
 - [x] ✓ Channel previews (VJ/EQ webp via egui_extras image loader)
 - [x] ✓ Toggle switches (ui_widgets::toggle)
 - [x] ✓ Sidebar nav glyphs (Kare SVGs embedded, svg loader + tint — icons.rs)
-- [ ] ✗ Gallery thumbnails (https loader; needs cloud auth)
+- [x] ✓ Gallery thumbnails (daemon `get_animated_preview` decodes cloud files →
+  base64; UI lazy-loads per tile → texture; click-to-push via `sync_artwork`.
+  Needs cloud login for a non-empty list — login UI exists in Settings)
 - [x] ✓ Virtual-wall canvas (painted device-screen tiles + slot labels)
 - [x] ✓ Ambient color previews (painted per-mode)
 - [x] ✓ Live device-screen preview (sidebar — `get_device_activity` poll +
@@ -160,6 +162,16 @@ low-value or unverifiable without hardware.
 - [x] ✓ Custom fonts — Inter (body) + Inter Display (headings) bundled (fonts.rs)
 
 ## Progress log
+- 2026-06-29 visual6: gallery thumbnails (web parity for the lazy-loaded gallery).
+  New daemon command `get_animated_preview{file_id}` downloads the cloud file and
+  decodes it to a base64 data-url, reusing the proven `media::resolve_to_gif`
+  decoder (magic-43/9/18/26/0xAA) — offline-tested against cloud_fixtures. The UI
+  gallery (under Pixel Art) now renders `fetch_gallery`'s FileList as a grid: each
+  tile lazily requests its preview (once), decodes to a texture (preview.rs), shows
+  name + like count, and pushes to the device on click via `sync_artwork`. Verified
+  via a `DIVOOM_UI_FAKE_GALLERY` mock + screenshot. Live data needs Divoom cloud
+  login (Settings card already exists). Only remaining visual gap: audio visualizer
+  (needs local audio capture + hardware).
 - 2026-06-29 visual5: live device-screen preview in the sidebar (web parity for the
   "last pushed image"). New `preview.rs`: rgb->data-url PNG encode + data-url->egui
   texture decode (base64). App polls `get_device_activity` (~1.5s) and renders

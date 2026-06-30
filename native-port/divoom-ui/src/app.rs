@@ -105,6 +105,10 @@ pub struct DivoomApp {
     pub local_previews: std::collections::HashMap<String, String>,
     /// Decoded GPU texture cached by its source data-url (re-decoded only on change).
     pub preview_tex: Option<(String, egui::TextureHandle)>,
+    /// Gallery thumbnails: decoded textures + which file_ids we've already requested
+    /// a preview for (so the lazy per-tile fetch fires once, not every frame).
+    pub gallery_tex: std::collections::HashMap<String, egui::TextureHandle>,
+    pub gallery_requested: std::collections::HashSet<String>,
 }
 
 impl DivoomApp {
@@ -215,6 +219,8 @@ impl DivoomApp {
             last_activity_poll: None,
             local_previews: std::collections::HashMap::new(),
             preview_tex: None,
+            gallery_tex: std::collections::HashMap::new(),
+            gallery_requested: std::collections::HashSet::new(),
         };
         app.apply_debug_seed();
         app

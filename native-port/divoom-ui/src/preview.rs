@@ -12,6 +12,17 @@ use crate::app::DivoomApp;
 
 const PNG_DATA_URL_PREFIX: &str = "data:image/png;base64,";
 
+/// A 16x16 gradient test frame as a data-url (debug seeding only).
+fn test_pattern_data_url() -> Option<String> {
+    let px: Vec<[u8; 3]> = (0..16 * 16)
+        .map(|i| {
+            let (x, y) = (i % 16, i / 16);
+            [(x * 16) as u8, (y * 16) as u8, ((x + y) * 8) as u8]
+        })
+        .collect();
+    rgb_to_data_url(16, 16, &px)
+}
+
 impl DivoomApp {
     /// Debug harness: auto-select the first fake device, and (optionally) seed a
     /// synthetic last-pushed frame so the sidebar preview render path is testable
@@ -24,15 +35,25 @@ impl DivoomApp {
         if std::env::var("DIVOOM_UI_FAKE_PREVIEW").is_err() {
             return;
         }
-        if let Some(mac) = self.active_mac() {
-            let px: Vec<[u8; 3]> = (0..16 * 16)
+        let url = test_pattern_data_url();
+        if let (Some(mac), Some(u)) = (self.active_mac(), url.clone()) {
+            self.local_previews.insert(mac, u);
+        }
+        // Optionally mock a cloud gallery (list + per-tile decoded preview) so the
+        // gallery grid render path is testable headlessly.
+        if std::env::var("DIVOOM_UI_FAKE_GALLERY").is_ok() {
+            self.pixel_sub = crate::app::PixelSub::Gallery;
+            let items: Vec<_> = (0..6)
                 .map(|i| {
-                    let (x, y) = (i % 16, i / 16);
-                    [(x * 16) as u8, (y * 16) as u8, ((x + y) * 8) as u8]
+                    json!({ "FileId": format!("grp/M00/{i}"), "FileName": format!("Artwork {i}"), "LikeCnt": (i + 1) * 137 })
                 })
                 .collect();
-            if let Some(url) = rgb_to_data_url(16, 16, &px) {
-                self.local_previews.insert(mac, url);
+            self.replies
+                .insert("gallery".into(), json!({ "success": true, "result": { "FileList": items } }));
+            if let Some(u) = url {
+                for i in 0..6 {
+                    self.replies.insert(format!("gp:grp/M00/{i}"), json!({ "preview": u }));
+                }
             }
         }
     }
@@ -85,6 +106,27 @@ impl DivoomApp {
             .as_str()
             .filter(|s| s.starts_with("data:"))
             .map(|s| s.to_string())
+    }
+
+    /// Decode + cache a gallery thumbnail texture keyed by `file_id`. Decodes once
+    /// (the data-url is immutable per file_id); `None` if the payload won't decode.
+    pub fn gallery_texture(
+        &mut self,
+        ctx: &egui::Context,
+        file_id: &str,
+        data_url: &str,
+    ) -> Option<egui::TextureHandle> {
+        if let Some(t) = self.gallery_tex.get(file_id) {
+            return Some(t.clone());
+        }
+        let img = data_url_to_color_image(data_url)?;
+        let tex = ctx.load_texture(
+            format!("gallery:{file_id}"),
+            img,
+            egui::TextureOptions::NEAREST,
+        );
+        self.gallery_tex.insert(file_id.to_string(), tex.clone());
+        Some(tex)
     }
 
     /// Texture for the active device's preview, decoding (and caching) on change.

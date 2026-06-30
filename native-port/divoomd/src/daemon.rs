@@ -164,6 +164,8 @@ impl Daemon {
 
             "sync_artwork" => crate::sync_artwork::sync_artwork(self, &req.args).await,
 
+            "get_animated_preview" => crate::sync_artwork::get_animated_preview(&req.args).await,
+
             #[cfg(feature = "ble")]
             "scan" => self.cmd_scan(&req).await,
             "connect" => self.cmd_connect(&req).await,

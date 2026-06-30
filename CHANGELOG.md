@@ -4,6 +4,22 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+### Post-v0.20.2 — Native UI: cloud gallery thumbnails (2026-06-29)
+
+- **The cloud gallery (under Pixel Art) now shows decoded thumbnails** and pushes
+  to the device on click — web-UI parity for the lazy-loaded gallery grid.
+  - New daemon command `get_animated_preview {file_id}`: downloads the cloud file
+    and decodes it to a base64 `data:` URL, reusing the same proven
+    `media::resolve_to_gif` decoder `sync_artwork` uses (magic-43 / 9 / 18 / 26 /
+    0xAA). The raw binary is decoded daemon-side; only the small data-url crosses
+    the socket. Factored out a shared `download_cloud_file` helper. Offline-tested
+    against the existing `cloud_fixtures` (no cloud auth/network needed).
+  - The UI gallery renders `fetch_gallery`'s `FileList` as a grid; each tile lazily
+    requests its preview once, decodes it to a texture, shows the name + like count,
+    and calls `sync_artwork` on click to push it to the connected device.
+  - Needs a Divoom cloud login (the Settings card) for a non-empty list. Verified
+    via a `DIVOOM_UI_FAKE_GALLERY` debug mock + screenshot.
+
 ### Post-v0.20.2 — Native UI: live device-screen preview (2026-06-29)
 
 - **Sidebar now shows the device's last-pushed frame** (web-UI parity for the flat

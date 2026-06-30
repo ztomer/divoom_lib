@@ -28,6 +28,13 @@ Claude) should read this on entry and **update it at the end of every round**
     **Toolkit chosen: egui/eframe** (MIT/Apache; picked over iced for pragmatism).
     The current `web_ui/` is the **visual reference only** (read for layout/look),
     not shipped; stays archived in-tree.
+  - **Cloud gallery thumbnails DONE (2026-06-29):** new daemon command
+    `get_animated_preview{file_id}` downloads + decodes a cloud file to a base64
+    data-url (reuses `media::resolve_to_gif`; offline-tested vs cloud_fixtures).
+    The UI gallery (under Pixel Art) renders `fetch_gallery`'s FileList as a grid,
+    lazily fetches each tile's preview → texture, and pushes on click via
+    `sync_artwork`. Needs cloud login for live data (Settings card exists). Only
+    remaining visual-parity gap: the audio visualizer (needs local audio capture).
   - **Live device-screen preview DONE (2026-06-29):** the sidebar now renders the
     device's last-pushed frame (web parity). New `preview.rs` encodes RGB→data-url PNG
     and decodes data-url→egui texture (base64 + `image`); the app polls
