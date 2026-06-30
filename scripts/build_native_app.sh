@@ -59,6 +59,16 @@ cp "${DAEMON}" "${APP}/Contents/MacOS/divoomd"        # sibling: UI spawns it
 cp "${DYLIB}" "${APP}/Contents/MacOS/libdivoom_compact.dylib"  # sibling: encoder
 chmod +x "${APP}/Contents/MacOS/divoom-ui" "${APP}/Contents/MacOS/divoomd"
 
+# Channel-preview / icon assets (webp) — resolved by the UI as an exe-sibling
+# `assets/` dir (ui_widgets::assets_dir). Reused from the web UI; image-only, no
+# reverse-engineered references.
+ASSETS_SRC="divoom_gui/web_ui/assets"
+if [[ -d "${ASSETS_SRC}" ]]; then
+  mkdir -p "${APP}/Contents/MacOS/assets"
+  cp "${ASSETS_SRC}"/*.webp "${ASSETS_SRC}"/*.png "${APP}/Contents/MacOS/assets/" 2>/dev/null || true
+  echo "   bundled $(ls "${APP}/Contents/MacOS/assets" | wc -l | tr -d ' ') preview assets"
+fi
+
 cat > "${APP}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
