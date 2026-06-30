@@ -4,6 +4,26 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.1 — daemon-resolution fix + hardware mode test (2026-06-30)
+
+Patch on v0.21.0 (same shipped architecture: Python UI + bundled native Rust
+`divoomd` + `divoom-menubar`). Fixes + tooling since 0.21.0:
+
+- **fix(daemon):** `daemon_client.py` resolved the dev repo root one level too high
+  (`parents[2]` → `parents[1]`), so source runs silently used the Python daemon
+  instead of the Rust `divoomd`. The shipped `.app` was unaffected (it resolves
+  `divoomd` via `RESOURCEPATH`), so this is a dev-experience fix; `./run.sh` now
+  spawns the Rust daemon.
+- **run.sh:** kills any existing divoom processes (GUI / Python daemon / Rust
+  `divoomd` / menubar) and clears stale sockets before launching, so it always
+  starts from a clean slate. `build_native.sh`/`run_native.sh` renamed to
+  `build.sh`/`run.sh`.
+- **test:** new `scripts/hw_test_modes.py` — deterministic, socket-driven test of
+  every channel/mode + controls with read-back assertions (verified 24/24 on real
+  Pixoo-1 via the Rust daemon).
+- **ci:** reconciled `tests/test_no_emojis.py` with the authoritative Kare allowlist
+  (it had flagged the permitted ✓ ✗ ⚠); CI green on Python 3.14.
+
 ## v0.21.0 — Python UI + native Rust daemon & menubar (2026-06-30)
 
 Shipping architecture: the desktop **UI is the Python pywebview app**, the
