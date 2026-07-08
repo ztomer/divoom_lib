@@ -11,6 +11,7 @@ from divoom_gui.presets_manager import PresetsManagerMixin
 from divoom_gui.media_sync import MediaSyncMixin
 from divoom_gui.scanner_mixin import ScannerMixin
 from divoom_gui.debug_mixin import DebugMixin
+from divoom_gui.lifecycle_mixin import LifecycleSettingsMixin
 
 from divoom_gui.api import AsyncLoopThread
 from divoom_gui.api.connection import ConnectionApi
@@ -21,7 +22,8 @@ from divoom_gui.api.window import WindowApi
 
 logger = logging.getLogger("divoom_gui")
 
-class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin):
+class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin,
+                   LifecycleSettingsMixin):
     """The PyWebView JS api bridge orchestrator."""
     def __init__(self) -> None:
         self.loop_thread = AsyncLoopThread()
@@ -227,14 +229,8 @@ class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin
             return False
         return self.tools.factory_reset(confirm)
 
-    # ── R40 §9: daemon (menu bar) keep-alive lifecycle ────────────────────
-    def get_keep_daemon_alive(self) -> bool:
-        from divoom_lib.lifecycle_config import get_keep_daemon_alive
-        return get_keep_daemon_alive()
-
-    def set_keep_daemon_alive(self, value) -> bool:
-        from divoom_lib.lifecycle_config import set_keep_daemon_alive
-        return set_keep_daemon_alive(bool(value))
+    # Lifecycle-settings methods (keep_daemon_alive / quit_menubar_on_exit) live
+    # on LifecycleSettingsMixin so pywebview still exposes them as api.get_*().
 
     def live_job_start(self, mac: str, kind: str, params: dict) -> dict:
         client = self._client()

@@ -54,6 +54,40 @@ def test_decision_helpers(keep, expect):
     assert lc.should_stop_daemon_on_menubar_quit(keep) is expect
 
 
+# ── quit_menubar_on_exit flag + its decision helper ────────────────────────
+
+def test_quit_menubar_flag_defaults_true_and_roundtrips(tmp_path):
+    p = tmp_path / "config.ini"
+    assert lc.get_quit_menubar_on_exit(p) is True           # default
+    assert lc.set_quit_menubar_on_exit(False, p) is True
+    assert lc.get_quit_menubar_on_exit(p) is False
+    assert lc.set_quit_menubar_on_exit(True, p) is True
+    assert lc.get_quit_menubar_on_exit(p) is True
+
+
+def test_quit_menubar_read_tolerates_missing_and_garbage(tmp_path):
+    assert lc.get_quit_menubar_on_exit(tmp_path / "nope.ini") is True
+    bad = tmp_path / "bad.ini"
+    bad.write_text("[gui]\nquit_menubar_on_exit = not-a-bool\n")
+    assert lc.get_quit_menubar_on_exit(bad) is True
+    # the two lifecycle flags coexist in the same section without clobbering
+    both = tmp_path / "both.ini"
+    lc.set_keep_daemon_alive(True, both)
+    lc.set_quit_menubar_on_exit(False, both)
+    assert lc.get_keep_daemon_alive(both) is True
+    assert lc.get_quit_menubar_on_exit(both) is False
+
+
+@pytest.mark.parametrize("keep,quit_mb,expect", [
+    (False, True, True),    # shared lifecycle + opted in → terminate menu bar
+    (False, False, False),  # shared but user keeps the tray → leave it
+    (True, True, False),    # keep-alive (independent) → never terminate
+    (True, False, False),
+])
+def test_should_quit_menubar_on_exit(keep, quit_mb, expect):
+    assert lc.should_quit_menubar_on_exit(keep, quit_mb) is expect
+
+
 # ── daemon broadcasts a shutdown event before stopping ─────────────────────
 
 class _Monitor:

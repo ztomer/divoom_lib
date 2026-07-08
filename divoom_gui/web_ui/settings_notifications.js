@@ -219,6 +219,20 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Quit-menu-bar-on-exit toggle (Connectivity → Quit menu bar with dashboard).
+    const quitMenubarToggle = document.getElementById("quit-menubar-toggle");
+    if (quitMenubarToggle) {
+        api()?.get_quit_menubar_on_exit?.().then(v => { quitMenubarToggle.checked = !!v; });
+        quitMenubarToggle.addEventListener("change", () => {
+            api()?.set_quit_menubar_on_exit?.(quitMenubarToggle.checked).then(ok => {
+                window.showToast(ok ? (quitMenubarToggle.checked
+                    ? "Menu bar will quit with the dashboard"
+                    : "Menu bar will keep running (relaunch from tray)") : "Failed to save",
+                    ok ? "success" : "error");
+            });
+        });
+    }
+
     const mcpToggle = document.getElementById("mcp-toggle");
     const mcpStatusDetail = document.getElementById("mcp-status-detail");
     const mcpLog = document.getElementById("mcp-log");

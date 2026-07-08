@@ -276,11 +276,17 @@ def main():
         _shutdown_sent.set()
         try:
             from divoom_lib.lifecycle_config import (
-                get_keep_daemon_alive, should_stop_daemon_on_dashboard_quit)
-            if should_stop_daemon_on_dashboard_quit(get_keep_daemon_alive()):
+                get_keep_daemon_alive, get_quit_menubar_on_exit,
+                should_stop_daemon_on_dashboard_quit, should_quit_menubar_on_exit)
+            keep_alive = get_keep_daemon_alive()
+            if should_stop_daemon_on_dashboard_quit(keep_alive):
                 from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
                 logger.info(f"{reason}; stopping daemon (shared lifecycle).")
                 DaemonClient(DEFAULT_SOCKET_PATH, timeout=1.0).shutdown()
+            # The native menu bar doesn't follow the daemon's shutdown broadcast,
+            # so terminate it explicitly (unless the user opted to keep the tray).
+            if should_quit_menubar_on_exit(keep_alive, get_quit_menubar_on_exit()):
+                _terminate_menubar_agent()
         except Exception as e:
             logger.debug(f"daemon shutdown skipped: {e}")
 
@@ -385,6 +391,25 @@ def _spawn_menubar_agent() -> None:
         logger.info("Launched native Rust menu-bar agent (divoom-menubar).")
     except Exception as e:
         logger.warning(f"Could not launch menu-bar agent: {e}")
+
+
+def _terminate_menubar_agent() -> None:
+    """Terminate the native menu-bar agent (divoom-menubar) on a shared-lifecycle
+    quit. It's spawned detached and does NOT self-terminate on the daemon's
+    shutdown broadcast, so without this it orphans to launchd — a stale tray icon
+    that also survives a `brew upgrade`. Best-effort; macOS only; never raises.
+    Gated by :func:`lifecycle_config.should_quit_menubar_on_exit`."""
+    if sys.platform != "darwin":
+        return
+    try:
+        import subprocess
+        subprocess.run(["pkill", "-f", "divoom-menubar"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       check=False, timeout=3)
+        logger.info("Terminated menu-bar agent (shared-lifecycle quit).")
+    except Exception as e:
+        logger.debug(f"menu-bar terminate skipped: {e}")
+
 
 if __name__ == "__main__":
     main()

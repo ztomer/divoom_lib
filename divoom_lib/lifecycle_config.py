@@ -20,6 +20,13 @@ SECTION = "gui"
 KEY = "keep_daemon_alive"
 DEFAULT = False
 
+# Also terminate the native menu-bar agent when the dashboard quits (shared
+# lifecycle only). Default True — a plain quit is spotless. The native agent is
+# spawned detached and does NOT self-terminate on the daemon's shutdown
+# broadcast, so without this it orphans to launchd (a stale tray icon).
+KEY_QUIT_MENUBAR = "quit_menubar_on_exit"
+DEFAULT_QUIT_MENUBAR = True
+
 
 def get_keep_daemon_alive(path: Path = CONFIG_FILE) -> bool:
     """Read the flag (default False). Never raises."""
@@ -51,7 +58,45 @@ def set_keep_daemon_alive(value: bool, path: Path = CONFIG_FILE) -> bool:
         return False
 
 
+def get_quit_menubar_on_exit(path: Path = CONFIG_FILE) -> bool:
+    """Read the 'quit the menu-bar agent when the dashboard exits' flag
+    (default True). Never raises."""
+    try:
+        if path.exists():
+            cfg = configparser.ConfigParser()
+            cfg.read(path)
+            return cfg.getboolean(SECTION, KEY_QUIT_MENUBAR, fallback=DEFAULT_QUIT_MENUBAR)
+    except (configparser.Error, OSError, ValueError) as e:
+        logger.warning("quit_menubar_on_exit read failed (%s); default %s", e, DEFAULT_QUIT_MENUBAR)
+    return DEFAULT_QUIT_MENUBAR
+
+
+def set_quit_menubar_on_exit(value: bool, path: Path = CONFIG_FILE) -> bool:
+    """Persist the flag. Returns True on success."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cfg = configparser.ConfigParser()
+        if path.exists():
+            cfg.read(path)
+        if not cfg.has_section(SECTION):
+            cfg.add_section(SECTION)
+        cfg.set(SECTION, KEY_QUIT_MENUBAR, "true" if value else "false")
+        from divoom_lib.utils.atomic_io import atomic_write_config
+        atomic_write_config(path, cfg)
+        return True
+    except (configparser.Error, OSError) as e:
+        logger.warning("quit_menubar_on_exit write failed (%s)", e)
+        return False
+
+
 # ── pure decision helpers (no I/O — trivially testable) ──────────────────────
+
+def should_quit_menubar_on_exit(keep_alive: bool, quit_menubar: bool) -> bool:
+    """When the dashboard exits: terminate the native menu-bar agent? Only when
+    lifecycles are shared (keep-alive OFF) AND the user hasn't opted to keep the
+    tray icon. Keep-alive ON means independent lifecycles → never kill it."""
+    return (not keep_alive) and quit_menubar
+
 
 def should_follow_daemon_shutdown(keep_alive: bool) -> bool:
     """A subscriber that received the daemon's ``shutdown`` event: should it

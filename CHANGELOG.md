@@ -4,6 +4,25 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.5 — clean quit: terminate the menu-bar agent (2026-07-08)
+
+- **feat(gui):** quitting the dashboard now also terminates the native menu-bar
+  agent (`divoom-menubar`), so a plain quit is spotless. The agent is spawned
+  detached and does NOT follow the daemon's shutdown broadcast, so it used to
+  orphan to launchd — a stale tray icon that also survived a `brew upgrade`.
+- **feat(settings):** new global flag `quit_menubar_on_exit` (Settings →
+  Connectivity → "Quit menu bar with dashboard", default **on**). Off keeps the
+  tray agent running so you can relaunch the dashboard from it. Ignored when
+  "Background agent" (`keep_daemon_alive`) is on — then everything stays up.
+  Gated by `should_quit_menubar_on_exit(keep_alive, quit_menubar)`.
+- **refactor:** moved the four lifecycle-settings API methods to a dedicated
+  `LifecycleSettingsMixin` (`divoom_gui/lifecycle_mixin.py`) — keeps them
+  pywebview-exposed while trimming `gui_api.py` back under the size limit.
+- Complements the v0.21.4 Homebrew cask `uninstall` stanza (which kills processes
+  on brew-driven upgrades); this makes ordinary Cmd-Q / window-close clean too.
+- Teeth: `test_quit_menubar_flag_defaults_true_and_roundtrips`,
+  `test_should_quit_menubar_on_exit` (+ live terminator check).
+
 ## v0.21.4 — fix BLE scan crash: disclaim the native daemon (2026-06-30)
 
 - **fix(daemon):** the bundled app **detected no Bluetooth devices** — the native

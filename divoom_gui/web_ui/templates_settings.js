@@ -154,6 +154,16 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                             <p class="panel-hint" style="margin:0;">Keep the menu-bar agent (and the device daemon) running when you quit the dashboard. When off, quitting the dashboard also closes the menu bar, and choosing <em>Quit Divoom</em> from the menu bar also closes the dashboard.</p>
                         </div>
                     </div>
+                    <!-- Menu-bar cleanup on quit (only applies when Background agent is off). -->
+                    <div class="card glass-card">
+                        <div class="card-header flex-header">
+                            <h3>Quit menu bar with dashboard</h3>
+                            <label class="switch" title="Also quit the menu-bar agent when you close the dashboard" style="margin:0;"><input type="checkbox" id="quit-menubar-toggle"><span class="slider-round"></span></label>
+                        </div>
+                        <div class="card-body">
+                            <p class="panel-hint" style="margin:0;">On (default): closing the dashboard also quits the menu-bar agent for a fully clean shutdown (no leftover tray icon). Off: the menu bar keeps running so you can relaunch the dashboard from it. Ignored when <em>Background agent</em> is on.</p>
+                        </div>
+                    </div>
                     <!-- R15 §5: MCP server (Model Context Protocol) — exposes
                          12 device-control tools over stdio JSON-RPC. Connect
                          Claude Desktop, Cursor, Cline, or Continue to control

@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **CLEAN QUIT → v0.21.5 (2026-07-08): GUI terminates the menu-bar agent.** Root
+  cause of the orphan: the native `divoom-menubar` is spawned detached and does NOT
+  follow the daemon's `EVENT_SHUTDOWN` broadcast (the Python menubar did), so a
+  plain quit left it in the tray. Fix: on a shared-lifecycle quit the GUI now calls
+  `gui_main._terminate_menubar_agent()` (`pkill -f divoom-menubar`), gated by a new
+  global flag **`quit_menubar_on_exit`** (default True) via
+  `lifecycle_config.should_quit_menubar_on_exit(keep_alive, quit_menubar)` —
+  `(not keep_alive) and quit_menubar`. New UI toggle: Settings → Connectivity →
+  "Quit menu bar with dashboard". The 4 lifecycle API methods moved to
+  `divoom_gui/lifecycle_mixin.py` (`LifecycleSettingsMixin`) so they stay
+  pywebview-exposed while keeping `gui_api.py` under the 500-line limit (split, not
+  trimmed). **Verified end-to-end on the installed 0.21.5 DMG:** default → quit
+  kills app+daemon+menu bar (all clean); flag OFF → menu bar survives a quit.
+  Tests: `test_should_quit_menubar_on_exit` (+ flag roundtrip). Suite for the
+  touched area 49 green. NOTE: menu-bar **auto-spawn on launch** is intermittently
+  not firing (pre-existing, unrelated to this change) — worth a separate look.
+
 - **CLEAN HOMEBREW UPGRADE (2026-07-08): cask now stops all processes.** Verified
   the update UX: on `brew upgrade`, the app + `divoomd` + `divoom-menubar` were NOT
   being stopped — the cask had no `uninstall` stanza, and on quit the GUI shuts down
