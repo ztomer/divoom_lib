@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **CLEAN HOMEBREW UPGRADE (2026-07-08): cask now stops all processes.** Verified
+  the update UX: on `brew upgrade`, the app + `divoomd` + `divoom-menubar` were NOT
+  being stopped — the cask had no `uninstall` stanza, and on quit the GUI shuts down
+  `divoomd` (sends `shutdown`) but leaves `divoom-menubar` orphaned to launchd. Added
+  an `uninstall` stanza to `ztomer/homebrew-tap` Casks/divoom-control.rb:
+  `quit: "com.divoom.control"` (graceful GUI quit → daemon shutdown) + a `script:`
+  `pkill -f 'Divoom.app/Contents/Frameworks/bin/divoom'` (reaps the orphaned menubar
+  + any stubborn daemon); also fixed the stale `zap` socket path (`/tmp/divoom.sock`).
+  `brew style` clean. **Proven through brew:** `brew uninstall --cask` prints
+  "Quitting application … quit successfully" + "Running uninstall script" → zero
+  survivors; reinstall + relaunch scans 4 devices. **KEY GOTCHA (now in RELEASING.md
+  §5):** `brew upgrade` runs the *installed* version's uninstall stanza, so the
+  0.21.3→0.21.4 hop still swapped the bundle under live processes (0.21.3 had none);
+  0.21.4→later is clean. Never drop the stanza. Follow-up (not blocking): the GUI
+  could terminate `divoom-menubar` on full quit so non-brew quits are clean too —
+  left as-is since the tray agent is meant to persist a window-close (R24).
+
 - **BLE SCAN CRASH FIXED (2026-06-30): disclaim the native daemon.** The bundled
   app "detected no Bluetooth devices" — `divoomd` crashed with a TCC `SIGABRT`
   (`NSBluetoothAlwaysUsageDescription` missing) the moment it scanned. The daemon
