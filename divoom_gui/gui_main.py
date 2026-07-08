@@ -240,13 +240,15 @@ def main():
     # R24: spawn the daemon EAGERLY, BEFORE webview.start(), so it's ready when
     # the GUI first asks. The daemon's Bluetooth grant no longer depends on WHO
     # spawns it: `spawn_daemon` uses macOS TCC responsibility-disclaim so the
-    # daemon is always attributed to the granted `python3.14` binary, not
-    # pywebview's ungranted `Python.app` host (see daemon_bridge for the why).
+    # daemon is always its own responsible process — the native divoomd via its
+    # own embedded Info.plist (com.divoom.divoomd), the Python daemon via the
+    # granted `python3.14` binary — not pywebview's ungranted `Python.app` host or
+    # whatever app launched the bundle (see daemon_bridge for the why).
     if sys.platform == "darwin":
         try:
             from divoom_gui.daemon_bridge import ensure_daemon
             ensure_daemon(detach=True)
-            logger.info("Eagerly spawned daemon (TCC-disclaimed, granted python identity) before GUI host.")
+            logger.info("Eagerly spawned daemon (TCC-disclaimed) before GUI host.")
         except Exception as e:
             logger.warning(f"eager daemon spawn failed: {e}")
     _spawn_menubar_agent()

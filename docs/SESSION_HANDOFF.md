@@ -18,6 +18,29 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **BLE SCAN CRASH FIXED (2026-06-30): disclaim the native daemon.** The bundled
+  app "detected no Bluetooth devices" — `divoomd` crashed with a TCC `SIGABRT`
+  (`NSBluetoothAlwaysUsageDescription` missing) the moment it scanned. The daemon
+  itself was healthy: driven directly over `/tmp/divoom.sock` it returned both
+  devices (Ditoo-light-2, Pixoo-1). Root cause was in `spawn_daemon`
+  (`divoom_daemon/daemon_client.py`): it disclaimed TCC responsibility only for the
+  Python daemon, spawning native `divoomd` as a plain `Popen` child that
+  **inherited the launcher's responsible process**. When the `.app` was launched
+  under another app (crash report: `responsibleProc: "claude"`, no BT usage
+  description), CoreBluetooth SIGABRT'd it mid-scan → empty device list. From
+  Finder/Dock it worked (responsible = `Divoom.app`, granted) — hence intermittent.
+  **Fix:** disclaim the native daemon too (`use_rust or bundle_py is None`) so it's
+  its own responsible process using its embedded `com.divoom.divoomd` plist (the
+  `build.rs __TEXT,__info_plist` work, previously embedded but never the
+  responsibility basis); `_spawn_disclaimed_macos` now takes an explicit `env` so
+  `DIVOOMD_ENCODER_LIB` propagates. **Verified:** a `divoomd` spawned disclaimed
+  *from a shell* (the prior SIGABRT context) scans cleanly and finds both devices,
+  no crash. Teeth: `test_rust_daemon_is_tcc_disclaimed`. **Verified end-to-end
+  through the shipped v0.21.4 DMG:** built → killed all entities → installed from
+  `dist/Divoom-v0.21.4.dmg` → launched → the app's daemon scanned **4 devices**
+  (Ditoo-light-2, Timoo-light-4, Pixoo-1, Tivoo-Max-light-3) and **connected to
+  Pixoo-1** (`get_brightness` → 60 over live BLE), no crash. Shipped v0.21.4.
+
 - **BLANK-GUI FIXED → v0.21.2 (2026-06-30):** the py2app `.app` opened a blank
   dashboard — pywebview's WKWebView won't load the `file://` UI inside a py2app
   bundle (renders fine as loose Python, so `./run.sh` always worked). Root-caused by

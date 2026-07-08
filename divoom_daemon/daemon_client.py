@@ -65,17 +65,23 @@ def daemon_alive(socket_path: str = DEFAULT_SOCKET_PATH, timeout: float = 0.5) -
     return _client_alive(DaemonClient(socket_path, timeout=timeout))
 
 
-def _spawn_disclaimed_macos(cmd: list[str], log_path: str) -> int:
+def _spawn_disclaimed_macos(cmd: list[str], log_path: str,
+                            env: dict[str, str] | None = None) -> int:
     """Spawn ``cmd`` with macOS TCC responsibility DISCLAIMED, returning the pid.
 
     This is the crux of making BLE work from the GUI without user intervention.
     A normal child inherits the parent's "responsible process" for TCC — for the
     GUI that's pywebview's `Python.app` (which has no Bluetooth grant), so every
     scan comes back empty/denied. Disclaiming makes the daemon its OWN responsible
-    process, attributed to the python binary itself — which the user has already
-    granted Bluetooth (it shows as `python3.14` in Privacy > Bluetooth). Verified:
-    `CBCentralManager.authorization()` == 3 (allowed) and scans find devices,
-    regardless of whether the parent is the GUI, a terminal, or Finder.
+    process: a Python daemon is attributed to the granted python binary
+    (`python3.14` in Privacy > Bluetooth), the native ``divoomd`` to its OWN
+    embedded Info.plist (`com.divoom.divoomd`, build.rs `__TEXT,__info_plist`).
+    Either way the grant no longer depends on whoever launched the .app — an
+    *inherited* responsibility with no usage description (Terminal, Claude
+    Desktop) SIGABRTs the daemon the instant CoreBluetooth starts.
+
+    ``env`` overrides the spawned process environment (defaults to ``os.environ``);
+    the native daemon needs ``DIVOOMD_ENCODER_LIB`` propagated this way.
 
     Uses posix_spawn (libc) with `responsibility_spawnattrs_setdisclaim` +
     POSIX_SPAWN_SETSID, redirecting stdout/stderr to ``log_path``.
@@ -119,8 +125,9 @@ def _spawn_disclaimed_macos(cmd: list[str], log_path: str) -> int:
             libc.posix_spawn_file_actions_adddup2(ctypes.byref(fa), 1, 2)
 
             argv = (ctypes.c_char_p * (len(cmd) + 1))(*[a.encode() for a in cmd], None)
-            env = [f"{k}={v}" for k, v in os.environ.items()]
-            envp = (ctypes.c_char_p * (len(env) + 1))(*[e.encode() for e in env], None)
+            env_items = (env if env is not None else os.environ)
+            env_pairs = [f"{k}={v}" for k, v in env_items.items()]
+            envp = (ctypes.c_char_p * (len(env_pairs) + 1))(*[e.encode() for e in env_pairs], None)
             pid = ctypes.c_int()
             rc = libc.posix_spawn(ctypes.byref(pid), cmd[0].encode(),
                                   ctypes.byref(fa), ctypes.byref(attr), argv, envp)
@@ -223,13 +230,19 @@ def spawn_daemon(
     except OSError:
         pass
 
-    # TCC disclaim is a Python-daemon device: it re-attributes the spawned python to
-    # the granted python identity. The native divoomd is a distinct binary — don't
-    # disclaim it; spawn it directly so a bundle child inherits the .app's BT grant.
-    if sys.platform == "darwin" and bundle_py is None and not use_rust:
+    # macOS TCC: an undisclaimed child inherits its launcher's responsible
+    # process; if that launcher lacks a Bluetooth usage description (e.g. the .app
+    # was started under Terminal / Claude Desktop), CoreBluetooth SIGABRTs the
+    # daemon the instant it scans. Disclaim so the daemon is its OWN responsible
+    # process — native divoomd via its embedded com.divoom.divoomd Info.plist
+    # (build.rs __TEXT,__info_plist), the dev Python daemon via the granted python
+    # identity. Skip only a py2app bundle's Python daemon (bundle_py set), where
+    # the .app is itself the declared BT-responsible process.
+    if sys.platform == "darwin" and (use_rust or bundle_py is None):
         try:
-            pid = _spawn_disclaimed_macos(cmd, log_path)
-            logger.info("Spawned daemon (TCC-disclaimed, granted python identity) pid=%s", pid)
+            disclaim_env = {**os.environ, **rust_env_extra}
+            pid = _spawn_disclaimed_macos(cmd, log_path, env=disclaim_env)
+            logger.info("Spawned daemon (TCC-disclaimed, rust=%s) pid=%s", use_rust, pid)
             return pid
         except Exception as e:
             logger.warning("Disclaimed spawn failed (%s); falling back to Popen.", e)

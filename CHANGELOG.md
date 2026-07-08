@@ -4,6 +4,31 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.4 — fix BLE scan crash: disclaim the native daemon (2026-06-30)
+
+- **fix(daemon):** the bundled app **detected no Bluetooth devices** — the native
+  `divoomd` crashed with a TCC `SIGABRT` ("must contain an
+  `NSBluetoothAlwaysUsageDescription` key") the instant it touched CoreBluetooth.
+  Root cause: `spawn_daemon` disclaimed TCC responsibility only for the *Python*
+  daemon (`bundle_py is None and not use_rust`); the native `divoomd` was spawned
+  as a plain `Popen` child, so it **inherited its launcher's responsible process**.
+  When the `.app` was started under another app (the crash report shows
+  `responsibleProc: "claude"`) — or any process with no Bluetooth usage
+  description — CoreBluetooth killed the daemon mid-scan and the app showed zero
+  devices. Launching straight from Finder/Dock happened to work (responsible =
+  `Divoom.app`, which has the grant), which is why it was intermittent.
+  - **Fix:** disclaim the native daemon too (`use_rust or bundle_py is None`) so
+    `divoomd` becomes its OWN responsible process and TCC attributes the grant to
+    its embedded `com.divoom.divoomd` Info.plist (the `build.rs`
+    `__TEXT,__info_plist` work — previously embedded but never used as the
+    responsibility basis), independent of who launched the `.app`.
+    `_spawn_disclaimed_macos` now takes an explicit `env` so `DIVOOMD_ENCODER_LIB`
+    propagates through `posix_spawn`.
+  - **Verified:** a `divoomd` spawned disclaimed from a *shell* (the most hostile
+    responsibility context — exactly the prior SIGABRT case) scans cleanly and
+    finds both devices (Ditoo-light-2, Pixoo-1) with no crash report.
+  - Teeth: `test_rust_daemon_is_tcc_disclaimed` (fails against the old guard).
+
 ## v0.21.3 — fix gallery filter JS error (2026-06-30)
 
 - **fix(web_ui):** the gallery startup called `window.loadGalleryFilter()`, but

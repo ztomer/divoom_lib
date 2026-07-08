@@ -426,6 +426,42 @@ def test_ensure_daemon_spawns_then_connects(live_daemon, monkeypatch):
     assert calls["n"] == 1
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS TCC disclaim path")
+def test_rust_daemon_is_tcc_disclaimed(monkeypatch, tmp_path):
+    """The native divoomd MUST be spawned TCC-disclaimed so it's its OWN responsible
+    process (using its embedded com.divoom.divoomd Info.plist) — not an undisclaimed
+    Popen child that inherits the launcher's responsibility. When the .app is started
+    under another app (e.g. Claude Desktop) with no Bluetooth usage description, an
+    inherited responsibility SIGABRTs the daemon mid-scan. Regression guard for that.
+    """
+    rust = tmp_path / "divoomd"
+    rust.write_text("")
+    rust.chmod(0o755)
+    monkeypatch.setenv("DIVOOM_RUST_BINARY", str(rust))
+    monkeypatch.setenv("DIVOOM_USE_RUST_DAEMON", "1")
+    # Not a py2app bundle.
+    monkeypatch.setattr(daemon_bridge, "bundle_python", lambda: None)
+
+    seen = {}
+
+    def fake_disclaim(cmd, log_path, env=None):
+        seen["cmd"] = cmd
+        seen["env"] = env
+        return 4242
+
+    def boom_popen(*a, **k):  # the Rust daemon must NOT take the Popen path
+        raise AssertionError("rust daemon spawned undisclaimed via Popen")
+
+    monkeypatch.setattr(daemon_bridge, "_spawn_disclaimed_macos", fake_disclaim)
+    monkeypatch.setattr(daemon_bridge.subprocess, "Popen", boom_popen)
+
+    pid = daemon_bridge.spawn_daemon(f"/tmp/divoom_disc_{os.getpid()}.sock")
+    assert pid == 4242
+    assert seen["cmd"][0] == str(rust)
+    # env is passed explicitly (so DIVOOMD_ENCODER_LIB propagates through posix_spawn).
+    assert seen["env"] is not None
+
+
 def test_bundle_python_none_from_source():
     """Release: bundle_python() is None when running from source (not a .app)."""
     assert daemon_bridge.bundle_python() is None
