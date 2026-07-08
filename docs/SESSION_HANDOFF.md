@@ -18,6 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **MENU BAR MISSING ON NORMAL LAUNCH → FIXED v0.21.6 (2026-07-08).** A clean-room
+  install-from-DMG + single `open` launch caught it: the menu-bar agent never
+  spawned when the app was started the normal way (Finder/Dock/`open`/cask) — no
+  tray icon. `_spawn_menubar_agent`'s dupe-guard used `pgrep -f divoom-menubar`;
+  `-f` is a loose substring match over every process's full command line, and under
+  LaunchServices a coalition process transiently carries "divoom-menubar" in its
+  args, so the guard false-matched → "already running" → skipped the spawn. (Direct
+  `Contents/MacOS/Divoom` launches had no such process → looked intermittent.)
+  Proven with a decoy: `pgrep -f divoom-menubar` matched `helper
+  divoom-menubar-relaunch`; `pgrep -x divoom-menubar` (exact name) did not. Fix:
+  use `pgrep -x`. Teeth: `test_menubar_dupe_guard_uses_exact_match`. **Verified
+  end-to-end on the 0.21.6 DMG:** fresh install → `open` → menu bar spawns; scan
+  finds 4 devices; connect Pixoo-1 (get_brightness → 60). Shipped v0.21.6.
+
 - **CLEAN QUIT → v0.21.5 (2026-07-08): GUI terminates the menu-bar agent.** Root
   cause of the orphan: the native `divoom-menubar` is spawned detached and does NOT
   follow the daemon's `EVENT_SHUTDOWN` broadcast (the Python menubar did), so a

@@ -4,6 +4,19 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.6 — fix: menu bar never appeared on a normal launch (2026-07-08)
+
+- **fix(gui):** the menu-bar agent failed to spawn when the app was launched the
+  normal way (Finder / Dock / `open` / a Homebrew cask launch) — no tray icon.
+  The dupe-guard used `pgrep -f divoom-menubar`, whose `-f` does a loose substring
+  match over every process's full command line; under LaunchServices a coalition
+  process transiently carries "divoom-menubar" in its args, so the guard
+  false-matched and concluded "already running" → skipped the spawn. (Direct
+  `Contents/MacOS/Divoom` launches happened to have no such process, which is why
+  it looked intermittent.) Fix: match the exact process name with `pgrep -x
+  divoom-menubar`. Found by a clean-room install-from-DMG + single-launch check.
+- Teeth: `test_menubar_dupe_guard_uses_exact_match`.
+
 ## v0.21.5 — clean quit: terminate the menu-bar agent (2026-07-08)
 
 - **feat(gui):** quitting the dashboard now also terminates the native menu-bar

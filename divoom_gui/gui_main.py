@@ -358,9 +358,14 @@ def _spawn_menubar_agent() -> None:
         return
     try:
         import subprocess
-        # Don't spawn a second status item if one is already running.
+        # Don't spawn a second status item if one is already running. Match the
+        # EXACT process name (-x), not a loose command-line substring (-f): under
+        # LaunchServices (`open` / Finder / Dock) some coalition process
+        # transiently carries "divoom-menubar" in its args, so `-f` false-matched
+        # and the agent never launched (no tray icon on a normal launch). `-x`
+        # matches only a real `divoom-menubar` process, path-independent.
         existing = subprocess.run(
-            ["pgrep", "-f", "divoom-menubar"],
+            ["pgrep", "-x", "divoom-menubar"],
             capture_output=True, text=True,
         )
         if existing.returncode == 0 and existing.stdout.strip():

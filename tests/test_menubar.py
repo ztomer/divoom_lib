@@ -94,3 +94,39 @@ def test_menu_thumbnail_rejects_non_png_and_garbage():
     assert _menu_thumbnail("") is None
     assert _menu_thumbnail("data:image/svg+xml;utf8,<svg/>") is None        # no base64
     assert _menu_thumbnail("data:image/png;base64,not-real-bytes") is None  # invalid
+
+
+def test_menubar_dupe_guard_uses_exact_match(monkeypatch):
+    """The 'already running?' check must use `pgrep -x` (exact process name), not
+    `-f` (loose command-line substring). Under LaunchServices (Finder/Dock/`open`)
+    a coalition process transiently carries "divoom-menubar" in its args, so `-f`
+    false-matched and the agent never launched — no tray icon on a normal launch.
+    """
+    import subprocess
+    from divoom_gui import gui_main
+
+    monkeypatch.setattr(gui_main.sys, "platform", "darwin")
+    monkeypatch.setattr(gui_main, "_resolve_menubar_binary", lambda: "/fake/divoom-menubar")
+
+    seen = {}
+
+    class _NoMatch:
+        returncode = 1
+        stdout = ""
+
+    def fake_run(args, **kw):
+        seen["pgrep"] = args
+        return _NoMatch()
+
+    def fake_popen(args, **kw):
+        seen["spawn"] = args
+        return object()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
+    gui_main._spawn_menubar_agent()
+
+    assert seen.get("pgrep") == ["pgrep", "-x", "divoom-menubar"], seen.get("pgrep")
+    # with no match, the agent must actually spawn
+    assert seen.get("spawn") == ["/fake/divoom-menubar"]
