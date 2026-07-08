@@ -4,6 +4,19 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.7 — fix: settings toggles didn't reflect saved state on open (2026-07-08)
+
+- **fix(web_ui):** the Connectivity settings toggles ("Background agent",
+  "Quit menu bar with dashboard") didn't show their persisted value when Settings
+  opened — a saved-`true` flag rendered as **off**. The init read
+  (`api().get_*()`) ran at `DOMContentLoaded`, before pywebview injects
+  `window.pywebview.api`, so it was silently skipped and the toggle kept its
+  unchecked HTML default. (Invisible on `keep_daemon_alive`, whose default is
+  false; exposed by `quit_menubar_on_exit`, whose default is true.) Fix: defer the
+  value reads to the `pywebviewready` event (the same guard `restoreScanSettings`
+  already uses). Writing was always fine. Found by driving the real dashboard UI
+  on-screen: the toggle showed off while the config held true.
+
 ## v0.21.6 — fix: menu bar never appeared on a normal launch (2026-07-08)
 
 - **fix(gui):** the menu-bar agent failed to spawn when the app was launched the

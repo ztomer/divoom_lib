@@ -208,7 +208,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // R40 §9: keep-daemon-alive toggle (Connectivity → Background agent).
     const keepDaemonToggle = document.getElementById("keep-daemon-toggle");
     if (keepDaemonToggle) {
-        api()?.get_keep_daemon_alive?.().then(v => { keepDaemonToggle.checked = !!v; });
         keepDaemonToggle.addEventListener("change", () => {
             api()?.set_keep_daemon_alive?.(keepDaemonToggle.checked).then(ok => {
                 window.showToast(ok ? (keepDaemonToggle.checked
@@ -222,7 +221,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // Quit-menu-bar-on-exit toggle (Connectivity → Quit menu bar with dashboard).
     const quitMenubarToggle = document.getElementById("quit-menubar-toggle");
     if (quitMenubarToggle) {
-        api()?.get_quit_menubar_on_exit?.().then(v => { quitMenubarToggle.checked = !!v; });
         quitMenubarToggle.addEventListener("change", () => {
             api()?.set_quit_menubar_on_exit?.(quitMenubarToggle.checked).then(ok => {
                 window.showToast(ok ? (quitMenubarToggle.checked
@@ -232,6 +230,20 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     }
+
+    // Reflect the PERSISTED lifecycle-flag values into the toggles. This must wait
+    // for the pywebview API to exist: at DOMContentLoaded `window.pywebview` is
+    // often not injected yet, so a bare api() read was silently skipped and a
+    // true-valued flag (e.g. quit_menubar_on_exit's default) showed as off — the
+    // toggle kept its unchecked HTML default. Same guard as restoreScanSettings.
+    function syncLifecycleToggles() {
+        if (keepDaemonToggle)
+            api()?.get_keep_daemon_alive?.().then(v => { keepDaemonToggle.checked = !!v; });
+        if (quitMenubarToggle)
+            api()?.get_quit_menubar_on_exit?.().then(v => { quitMenubarToggle.checked = !!v; });
+    }
+    if (window.pywebview) syncLifecycleToggles();
+    else window.addEventListener("pywebviewready", syncLifecycleToggles);
 
     const mcpToggle = document.getElementById("mcp-toggle");
     const mcpStatusDetail = document.getElementById("mcp-status-detail");

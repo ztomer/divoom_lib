@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **SETTINGS TOGGLES IGNORED SAVED STATE → FIXED v0.21.7 (2026-07-08).** Caught by
+  driving the real dashboard on-screen (computer-use): the Connectivity toggles
+  didn't reflect their persisted value when Settings opened — `quit_menubar_on_exit`
+  was `true` in config but the toggle rendered OFF. Root cause: the init read
+  `api().get_*()` ran at `DOMContentLoaded`, before pywebview injects
+  `window.pywebview.api`, so it was silently skipped and the toggle kept its
+  unchecked HTML default. (Invisible on `keep_daemon_alive` — default false; exposed
+  by `quit_menubar_on_exit` — default true.) Writing was always fine (verified by
+  clicking → config flipped). Fix (`settings_notifications.js`): defer the value
+  reads to the `pywebviewready` event, the same guard `restoreScanSettings` uses.
+  **Verified on-screen on the 0.21.7 DMG:** toggle now shows ON (orange) reflecting
+  the true default; Background agent shows off. Also re-confirmed on 0.21.7: dash
+  renders, menu bar spawns, clean-quit terminates it, scan finds 4 devices + connect
+  Pixoo-1 (brightness 60). NOTE: the MCP Server card shows a Python traceback in the
+  UI (mcp_server run_stdio connect_read_pipe) — pre-existing, unrelated, worth a
+  separate look. Shipped v0.21.7.
+
 - **MENU BAR MISSING ON NORMAL LAUNCH → FIXED v0.21.6 (2026-07-08).** A clean-room
   install-from-DMG + single `open` launch caught it: the menu-bar agent never
   spawned when the app was started the normal way (Finder/Dock/`open`/cask) — no
