@@ -33,6 +33,14 @@ const NOTIFY_UUID: Uuid = Uuid::from_u128(0x49535343_1e4d_4bd9_ba61_23c647249616
 
 const DEVICE_NAME_HINTS: &[&str] = &["Pixoo", "Divoom", "Tivoo", "Timoo", "Ditoo", "Timebox"];
 
+/// Upper bound on a single BLE write. A write to a peripheral that vanished
+/// (device powered off, out of range, or Bluetooth toggled mid-operation) can
+/// otherwise hang forever — and since the write runs while the caller holds the
+/// daemon's `device` lock, that wedges ALL device ops (and the device_status
+/// liveness probe, which then falsely reports the daemon down). Bounding it lets
+/// the op fail, release the lock, and the daemon self-recover.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+
 pub use crate::transport::BleResult;
 
 /// A device discovered during a scan.
@@ -233,7 +241,15 @@ impl BleTransport {
         } else {
             wtype
         };
-        self.peripheral.write(&self.write_char, &frame, wtype).await?;
+        match tokio::time::timeout(
+            WRITE_TIMEOUT,
+            self.peripheral.write(&self.write_char, &frame, wtype),
+        )
+        .await
+        {
+            Ok(res) => res?, // write finished (Ok, or a real BLE error to propagate)
+            Err(_) => return Err("BLE write timed out (device unreachable)".into()),
+        }
         Ok(())
     }
 

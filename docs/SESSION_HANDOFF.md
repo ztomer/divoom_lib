@@ -18,6 +18,22 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **FALSE "SERVICE NOT RUNNING" BANNER + DEVICE-LOCK WEDGE → FIXED v0.21.17
+  (2026-07-09).** User hit the daemon-down banner while the daemon WAS running.
+  Root-caused live: `device_status`/`device_call` hung 6s+ while
+  `get_status`/`get_device_activity` were instant → the daemon's `device` mutex
+  was stuck, held by an unbounded BLE write that never returned (write to a
+  peripheral that vanished when Bluetooth was toggled mid-op). The liveness probe
+  (`daemon_alive`/`_client_alive`) used `device_status` (needs that mutex) → hung
+  → false "dead" → banner. Fixes: (1) `ble.rs` bounds the write with `WRITE_TIMEOUT`
+  (5s) so a hung write releases the lock and the daemon self-recovers; (2)
+  `daemon_client.py` probe switched device_status → **get_status** (cheap,
+  LOCK-FREE); (3) `notification_service._state` uses `getattr(mon,"is_running",…)`
+  (get_status is now the probe, must not raise on an incomplete monitor — also fixed
+  2 daemon_bridge tests). Rust + Python compile/tests green. NOTE: any daemon
+  running BEFORE this build (incl. the user's current v0.21.16) can still be
+  wedged — needs a daemon restart (quit+reopen app) to pick up the fix.
+
 - **BLE SCAN CoreBluetooth-THROTTLE HARDENING → v0.21.16 (2026-07-09).** The wedge
   that dogged this session (rapid daemon restarts → CoreBluetooth scan-frequency
   throttle → scans return 0 until BT toggle) is now guarded in `native-port/divoomd`:

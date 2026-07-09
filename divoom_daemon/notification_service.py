@@ -51,7 +51,10 @@ class NotificationService:
         if self._health_error():
             return STATE_ERROR
         mon = self._monitor
-        return STATE_ACTIVE if (mon is not None and mon.is_running) else STATE_IDLE
+        # getattr (not direct .is_running) to match _counters/_health_error and
+        # keep get_status — now the daemon liveness probe — from raising on an
+        # incomplete monitor.
+        return STATE_ACTIVE if getattr(mon, "is_running", False) else STATE_IDLE
 
     def _counters(self) -> dict:
         mon = self._monitor

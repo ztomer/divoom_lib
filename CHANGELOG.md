@@ -4,6 +4,27 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.17 — fix: false "background service isn't running" banner + device-lock wedge (2026-07-09)
+
+- **fix(rust-daemon):** an unbounded BLE write could hang forever and **wedge the
+  daemon's `device` mutex**. A write to a peripheral that vanished (device off /
+  out of range / Bluetooth toggled mid-operation) never returned, and because the
+  write runs while the caller holds the `device` lock, EVERY subsequent device op
+  (`device_status`, `device_call`) blocked permanently. Bounded the write with a
+  5s `WRITE_TIMEOUT` (`ble.rs`) so it fails, releases the lock, and the daemon
+  self-recovers instead of needing a restart.
+- **fix(daemon-client):** the liveness probe (`daemon_alive` / `_client_alive`)
+  used `device_status`, which needs that same device mutex — so a live daemon that
+  was merely busy with a device op (or wedged as above) looked **dead**, wrongly
+  showing the GUI's "Background service isn't running" banner (and risking
+  spurious respawns). Switched the probe to `get_status`, which is cheap and
+  **lock-free** on both daemons. Liveness now means "the process answers,"
+  independent of device state.
+- Together: the banner reflects true daemon liveness, and a hung device write can
+  no longer take the daemon's device path down. Root-caused from a live repro
+  (toggling Bluetooth mid-op left `device_status`/`device_call` hanging 6s+ while
+  `get_status`/`get_device_activity` stayed instant).
+
 ## v0.21.16 — harden: native daemon BLE scan against CoreBluetooth throttle (2026-07-09)
 
 - **harden(rust-daemon):** made the daemon resistant to wedging the Mac's
