@@ -4,6 +4,25 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.14 — fix: native daemon BLE scan concurrency guard (2026-07-09)
+
+- **fix(rust-daemon):** the native `divoomd` had no guard against concurrent BLE
+  scans. `cmd_scan` drove the one shared adapter's `start_scan`/`stop_scan` with
+  no lock, so two overlapping scans clobbered each other — one's `stop_scan` cut
+  the other short, truncating its device list. This was the actual cause of the
+  GUI intermittently finding 2 of 3 devices (an overlapping scan — e.g. a probe or
+  a retry — landing during the GUI's scan). Added a `scanning` flag; a concurrent
+  scan is now rejected with "scan already in progress" (RAII `ScanGuard` resets it
+  on any return, incl. errors), mirroring the Python daemon's single-scan model.
+- Also caps an over-long user scan timeout at 90s in `ble::scan` (mirrors the
+  Python `_SCAN_RESULT_TIMEOUT`) so a stray large value can't run the adapter for
+  minutes. The scan itself keeps the proven single-window-then-`peripherals()`
+  snapshot: an earlier attempt to make it incremental / early-exit-at-limit was
+  reverted because querying peripheral properties *during* an active scan blocks
+  on macOS CoreBluetooth and wedged the scan.
+- Teeth: `daemon_connect::scan_guard_tests` (reject-concurrent + reset-on-drop).
+  `ble::scan` needs a device — verified over the socket on the built app.
+
 ## v0.21.13 — refactor: hot-channel "Last checked" is now daemon-owned (2026-07-08)
 
 - **refactor(hot):** moved the per-device last-checked stamp (v0.21.12) from the

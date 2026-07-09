@@ -39,6 +39,12 @@ pub struct Daemon {
     // lifetime (dropping it stops notification delivery).
     #[cfg(feature = "ble")]
     central: Mutex<Option<Adapter>>,
+    /// True while a scan is running. A scan drives the one shared adapter's
+    /// start/stop; two overlapping scans would clobber each other (one's
+    /// stop_scan ends the other early → truncated results), so cmd_scan rejects
+    /// a concurrent scan. Mirrors the Python daemon's single-scan model.
+    #[cfg(feature = "ble")]
+    pub(crate) scanning: std::sync::atomic::AtomicBool,
     // C image encoder (libdivoom_compact FFI); loaded once, cached for lifetime.
     encoder: OnceLock<Option<NativeEncoder>>,
     pub(crate) tx: tokio::sync::broadcast::Sender<Value>,
@@ -75,6 +81,8 @@ impl Daemon {
             device_id: Mutex::new(default_mac),
             #[cfg(feature = "ble")]
             central: Mutex::new(None),
+            #[cfg(feature = "ble")]
+            scanning: std::sync::atomic::AtomicBool::new(false),
             encoder: OnceLock::new(),
             tx,
             live_jobs: Arc::new(crate::live_jobs::LiveJobCoordinator::new()),

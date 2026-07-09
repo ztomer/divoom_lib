@@ -29,10 +29,37 @@ pub(crate) async fn probe_lan(daemon: &Daemon) -> Value {
     }
 }
 
+/// Resets the daemon's `scanning` flag on drop, so a scan that returns via ANY
+/// path (incl. an early error) can't wedge the guard.
+#[cfg(feature = "ble")]
+struct ScanGuard<'a>(&'a std::sync::atomic::AtomicBool);
+#[cfg(feature = "ble")]
+impl Drop for ScanGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 /// Handle `scan` command (BLE only).
 #[cfg(feature = "ble")]
 pub(crate) async fn cmd_scan(daemon: &Daemon, req: &Request) -> Value {
+    use std::sync::atomic::Ordering;
+    // Reject a concurrent scan: two scans share the one adapter and would corrupt
+    // each other (one's stop_scan cuts the other short → a truncated device list,
+    // which is exactly how an overlapping probe made the GUI miss a device).
+    if daemon
+        .scanning
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return err_reply("scan already in progress");
+    }
+    let _guard = ScanGuard(&daemon.scanning);
+
     let timeout = req.args.get("timeout").and_then(|v| v.as_f64()).unwrap_or(8.0);
+    // `limit` is accepted but intentionally NOT used to truncate results: capping
+    // could hide a real device (the "found 2 of 3" class of bug). ble::scan caps
+    // an over-long timeout internally so a stray large value can't wedge things.
     let central = match daemon.central().await {
         Ok(c) => c,
         Err(e) => return err_reply(&format!("scan failed: {e}")),
@@ -123,4 +150,34 @@ pub(crate) async fn cmd_disconnect(daemon: &Daemon) -> Value {
     *daemon.device_id.lock().await = None;
     let _ = daemon.tx.send(json!({"type":"status","state":"idle","counters":{}}));
     json!({"success": true})
+}
+
+#[cfg(all(test, feature = "ble"))]
+mod scan_guard_tests {
+    use super::ScanGuard;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    // The scan guard is what stops two overlapping scans from clobbering the one
+    // adapter (the corruption that truncated the GUI's device list). Pin its
+    // claim / reject-while-held / reset-on-drop behavior without needing BLE.
+    #[test]
+    fn rejects_concurrent_then_resets_on_drop() {
+        let flag = AtomicBool::new(false);
+        // First scan claims the guard.
+        assert!(flag
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok());
+        {
+            let _g = ScanGuard(&flag);
+            // A concurrent scan is rejected while the first holds it.
+            assert!(flag
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_err());
+        }
+        // Guard dropped (scan finished) → flag cleared → a new scan can claim it.
+        assert!(!flag.load(Ordering::SeqCst));
+        assert!(flag
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok());
+    }
 }

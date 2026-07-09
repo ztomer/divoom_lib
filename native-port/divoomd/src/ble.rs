@@ -48,8 +48,21 @@ pub async fn make_central() -> BleResult<Adapter> {
     manager.adapters().await?.into_iter().next().ok_or_else(|| "no BLE adapter".into())
 }
 
+/// Backstop cap for a scan window (mirrors the Python daemon's
+/// `_SCAN_RESULT_TIMEOUT`): a long user-configured timeout must not run the
+/// adapter for minutes.
+const SCAN_TIMEOUT_CAP: Duration = Duration::from_secs(90);
+
 /// Scan for Divoom devices for `timeout`, returning name + id pairs.
+///
+/// Deliberately a single scan window, then one `peripherals()` enumeration
+/// AFTER `stop_scan`: on macOS/CoreBluetooth, querying peripheral `properties()`
+/// while a scan is still active blocks and wedges the scan, so it must be read
+/// only once the scan has stopped. A long user-configured timeout is capped at
+/// `SCAN_TIMEOUT_CAP` (mirrors the Python daemon's `_SCAN_RESULT_TIMEOUT`) so a
+/// stray large value can't run the adapter for minutes.
 pub async fn scan(central: &Adapter, timeout: Duration) -> BleResult<Vec<Discovered>> {
+    let timeout = timeout.min(SCAN_TIMEOUT_CAP);
     central.start_scan(ScanFilter::default()).await?;
     tokio::time::sleep(timeout).await;
     central.stop_scan().await?;

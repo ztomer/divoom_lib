@@ -18,6 +18,28 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **NATIVE DAEMON BLE SCAN CONCURRENCY GUARD → v0.21.14 (2026-07-09).** User: app
+  found 2 of 3. Drove the daemon socket: it RELIABLY finds all 3 in isolated scans
+  (6/15/60/120s) — BLE/daemon healthy. Root cause: **no scan concurrency guard** —
+  overlapping scans share the one adapter and clobber each other (my own probes
+  overlapping the GUI scan truncated it). Fix: `Daemon.scanning` flag + `ScanGuard`
+  RAII in cmd_scan; concurrent scan rejected. Plus a 90s timeout cap in ble::scan.
+  Teeth: `scan_guard_tests`; both feature sets compile.
+  **IMPORTANT LESSONS / CAVEATS:**
+  (a) I first tried to also make ble::scan incremental (event stream) + early-exit
+  at limit — BOTH hung: querying peripheral `properties()` DURING an active scan
+  blocks on macOS CoreBluetooth. Reverted to the proven single-window snapshot
+  (query only AFTER stop_scan). Do NOT reintroduce during-scan property reads.
+  (b) My many rapid daemon kill/restart cycles during testing WEDGED the Mac's
+  CoreBluetooth — scans started returning 0 devices (cache went empty). This is
+  environmental (not the code); needs a Bluetooth reset / settle to clear. Verify
+  on a clean BLE stack. (c) Testing done by hot-swapping the release divoomd into
+  the installed .app + re-signing (faster than a full DMG rebuild). The COMMITTED
+  DMG still needs a rebuild with the final (reverted) code. (d) connect also scans
+  (BleTransport::connect) and isn't under the guard yet — scan-vs-connect is a
+  follow-up.
+
+
 - **DMG BUILD + INSTALL + RUNTIME TEST → PASSED v0.21.13 (2026-07-09).** Built
   `dist/Divoom-v0.21.13.dmg` (38M, adhoc-signed) via `scripts/build_release.sh`
   (had to create `.buildvenv` first). Installed from the mounted DMG to
