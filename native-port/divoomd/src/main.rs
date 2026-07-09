@@ -170,6 +170,11 @@ async fn main() {
             }
         }
     }
+    // Stop any in-flight BLE scan cleanly before exit so we don't leak a scan
+    // session to bluetoothd (leaked sessions across restarts trip the OS
+    // scan-frequency throttle → empty scans).
+    #[cfg(feature = "ble")]
+    daemon.stop_scan_cleanup().await;
     let _ = std::fs::remove_file(&socket_path);
 }
 

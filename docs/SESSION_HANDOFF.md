@@ -18,6 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **BLE SCAN CoreBluetooth-THROTTLE HARDENING → v0.21.16 (2026-07-09).** The wedge
+  that dogged this session (rapid daemon restarts → CoreBluetooth scan-frequency
+  throttle → scans return 0 until BT toggle) is now guarded in `native-port/divoomd`:
+  (1) `Daemon::stop_scan_cleanup()` called on shutdown in `main.rs` — stops the
+  scan on the cached central so a normal quit doesn't leak a scan session to
+  bluetoothd; (2) `cmd_scan` caches last result+time (`Daemon.last_scan`) and a
+  scan within `MIN_RESCAN_INTERVAL` (3s) returns the cached list (`"cached":true`)
+  instead of hitting the radio. Teeth: `rapid_rescan_returns_cached_without_touching_radio`.
+  Both feature sets compile. NOTE: `kill -9` still leaks (SIGKILL uncatchable) —
+  tests should SIGTERM. Recovery for a wedged stack: BT toggle / `sudo pkill
+  bluetoothd`. Functional scan (finds 3) was verified earlier post-BT-reset; this
+  round is compile+unit-tested only (user's BT still wedged from prior testing).
+
 - **SCAN TIMEOUT DEFAULT 60→20s → v0.21.15 (2026-07-09).** After the v0.21.14 scan
   guard fix, scans still ran ~80s because they run the full window when device
   count < limit and the default/persisted timeout was long. Lowered the default to

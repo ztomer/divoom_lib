@@ -45,6 +45,12 @@ pub struct Daemon {
     /// a concurrent scan. Mirrors the Python daemon's single-scan model.
     #[cfg(feature = "ble")]
     pub(crate) scanning: std::sync::atomic::AtomicBool,
+    /// Last scan's completion time + result. A scan within `MIN_RESCAN_INTERVAL`
+    /// of the last returns this cached list instead of hitting the radio —
+    /// back-to-back scans trip CoreBluetooth's scan-frequency throttle (which
+    /// silently returns 0 devices until it resets).
+    #[cfg(feature = "ble")]
+    pub(crate) last_scan: Mutex<Option<(Instant, Vec<Value>)>>,
     // C image encoder (libdivoom_compact FFI); loaded once, cached for lifetime.
     encoder: OnceLock<Option<NativeEncoder>>,
     pub(crate) tx: tokio::sync::broadcast::Sender<Value>,
@@ -83,6 +89,8 @@ impl Daemon {
             central: Mutex::new(None),
             #[cfg(feature = "ble")]
             scanning: std::sync::atomic::AtomicBool::new(false),
+            #[cfg(feature = "ble")]
+            last_scan: Mutex::new(None),
             encoder: OnceLock::new(),
             tx,
             live_jobs: Arc::new(crate::live_jobs::LiveJobCoordinator::new()),
@@ -109,6 +117,18 @@ impl Daemon {
             *g = Some(ble::make_central().await.map_err(|e| e.to_string())?);
         }
         Ok(g.as_ref().unwrap().clone())
+    }
+
+    /// On shutdown, stop any BLE scan still running on the cached central so we
+    /// don't leave a leaked scan session with bluetoothd. Left uncleaned across
+    /// rapid restarts, those stale sessions trip the OS scan-frequency throttle
+    /// (scans then silently return 0 devices until Bluetooth is toggled).
+    #[cfg(feature = "ble")]
+    pub async fn stop_scan_cleanup(&self) {
+        use btleplug::api::Central;
+        if let Some(adapter) = self.central.lock().await.as_ref() {
+            let _ = adapter.stop_scan().await;
+        }
     }
 
     pub fn initialize_self_weak(&self, weak: Weak<Daemon>) {

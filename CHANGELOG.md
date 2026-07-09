@@ -4,6 +4,28 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.16 — harden: native daemon BLE scan against CoreBluetooth throttle (2026-07-09)
+
+- **harden(rust-daemon):** made the daemon resistant to wedging the Mac's
+  CoreBluetooth stack — the failure mode where rapid scan cycles make discovery
+  silently return 0 devices until Bluetooth is toggled. Two changes:
+  - **Clean scan teardown on shutdown.** On SIGINT/SIGTERM/shutdown the daemon now
+    calls `stop_scan()` on the cached central before exit (`Daemon::stop_scan_cleanup`,
+    wired in `main.rs`), so a normal quit never leaks a scan session to
+    `bluetoothd`. Leaked sessions accumulated across restarts trip the OS
+    scan-frequency throttle.
+  - **Rapid re-scan short-circuit.** `cmd_scan` caches the last scan's result +
+    time; a scan arriving within `MIN_RESCAN_INTERVAL` (3s) returns the cached
+    list (`"cached": true`) instead of hitting the radio, so a retry / script /
+    test can't hammer the adapter into the throttle.
+- Why: mostly an edge case (normal use doesn't restart/rescan rapidly), but it
+  repeatedly broke this session's own testing. The operational mitigations remain
+  "keep the background agent alive" (avoid respawns) and, to recover a wedged
+  stack, toggle Bluetooth.
+- Teeth: `scan_guard_tests::rapid_rescan_returns_cached_without_touching_radio`
+  (cache hit returns before `central()`, guard released). Both feature sets
+  compile (`--no-default-features` CI gate green).
+
 ## v0.21.15 — change: default BLE scan timeout 60s → 20s (2026-07-09)
 
 - **change(scan):** the default device-scan timeout is now **20s** (was 60s in the
