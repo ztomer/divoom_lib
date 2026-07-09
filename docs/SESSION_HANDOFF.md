@@ -18,6 +18,30 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **ROCK-SOLID BLE CONNECTION → v0.21.19/20 + hardware test loop (2026-07-09).**
+  User: "can't connect, very flaky." Live repro found the BLE **connect path had
+  unbounded awaits** — `peripheral.connect()`/`discover_services()`/`subscribe()`
+  (CoreBluetooth `connect()` waits forever for an unresponsive device, and it runs
+  while holding the `device` lock → whole device path hung, connect never returned
+  in 40s+). Fixed v0.21.19: each bounded at 20s (`CONNECT_TIMEOUT` in `ble.rs`).
+  Then ran an adverse hardware test loop over the socket (daemon has TCC): connect/
+  reconnect 0.2–1.7s, device-switch Timoo↔Pixoo 0.3–0.7s, channel-switch (0x45)
+  with read-back confirming the mode changed, brightness writes, scan-while-
+  connected, rapid connect/disconnect ×3, and 2 full quit/relaunch restart cycles
+  — ALL pass. GUI **auto-connects to the last device + auto-scans on startup**
+  (app_init.js); those two contend on the one adapter — noted, but the timeouts +
+  self-heal make it recover cleanly. Also shipped v0.21.20: **version indicator in
+  the Settings footer** (`get_app_version` in lifecycle_mixin reads
+  pyproject/Info.plist). Final v0.21.20 DMG built + installed + confirmed on
+  hardware. Test methodology: SIGTERM (not -9) between restarts; pace BLE ops.
+
+- **STILL OPEN (pre-loop request): cut a release tag + update Homebrew.** Was
+  investigating when interrupted: git remote is `github.com/ztomer/divoom_lib`
+  (note: mismatched repo name vs `divoom-control`), NO Homebrew cask/formula in the
+  tree, tags go v0.21.3..v0.21.7 (stale — none for the 8–20 work). Branch
+  `claude/hopeful-hertz-eddb6b` is 20+ commits ahead of main. Needs: decide
+  tag/merge strategy + find/create the cask (likely a separate tap) + DMG sha256.
+
 - **BLE CENTRAL SELF-HEAL → FIXED v0.21.18 (2026-07-09).** User: "can't connect to
   screens, very flaky." Live repro: with a dead cached central, BOTH `scan` and
   `connect` returned `"Channel closed"` in ~0.0s — the CoreBluetooth session died
