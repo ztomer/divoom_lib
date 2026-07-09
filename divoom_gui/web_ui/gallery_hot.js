@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const list = document.getElementById("hot-preview-list");
         if (!list) return;
         list.innerHTML = '<div class="hot-preview-empty">Loading hot channel manifest...</div>';
+        loadLastChecked();  // R53: show when this device was last checked
 
         window.pywebview?.api?.hot_update_preview?.().then(json => {
             let r;
@@ -38,6 +39,46 @@ document.addEventListener("DOMContentLoaded", () => {
             renderHotPreview(r.items);
         });
     }
+
+    // ── R53: per-device "last checked" stamp ──────────────────────────────
+    // The active device's address (the app's canonical device key). Empty when
+    // no device is connected, in which case we simply show no stamp.
+    function hotDeviceAddress() {
+        return (document.getElementById("banner-device-mac")?.textContent || "").trim();
+    }
+
+    function formatChecked(seconds) {
+        const then = seconds * 1000;
+        const diff = Date.now() - then;
+        const day = 86400000;
+        if (diff < 60000) return "just now";
+        if (diff < 3600000) { const m = Math.round(diff / 60000); return `${m} min${m > 1 ? "s" : ""} ago`; }
+        if (diff < day) { const h = Math.round(diff / 3600000); return `${h} hour${h > 1 ? "s" : ""} ago`; }
+        if (diff < 30 * day) { const d = Math.round(diff / day); return `${d} day${d > 1 ? "s" : ""} ago`; }
+        return new Date(then).toLocaleDateString();
+    }
+
+    function renderLastChecked(entry) {
+        const el = document.getElementById("hot-last-checked");
+        if (!el) return;
+        if (!entry || !entry.checked_at) { el.textContent = ""; el.title = ""; el.classList.remove("stale"); return; }
+        el.textContent = `Last checked ${formatChecked(entry.checked_at)}`;
+        // >2 weeks old → flag it, so an undated "up to date" can't mislead.
+        const stale = (Date.now() - entry.checked_at * 1000) > 14 * 86400000;
+        el.classList.toggle("stale", stale);
+        el.title = new Date(entry.checked_at * 1000).toLocaleString()
+            + ` — manifest ${entry.manifest}, downloaded ${entry.downloaded}, pushed ${entry.served}`;
+    }
+
+    function loadLastChecked() {
+        const addr = hotDeviceAddress();
+        if (!addr || !window.pywebview?.api?.hot_get_check) { renderLastChecked(null); return; }
+        window.pywebview.api.hot_get_check(addr).then(json => {
+            let e; try { e = JSON.parse(json); } catch { e = null; }
+            renderLastChecked(e);
+        });
+    }
+    window.loadLastChecked = loadLastChecked;
     // R42 §4: the pixel-art sub-tab handler (settings_features.js) calls
     // window.loadHotPreview — without this exposure the hot panel stayed on
     // "Loading hot channel manifest..." forever when the sub-tab was clicked.
@@ -174,6 +215,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 fill.style.background = "linear-gradient(90deg, #166534, #22c55e)";
                 btn.classList.add("progress-ok");
                 window.showToast("Hot channel already up to date", "success", " BLE");
+            }
+            // R53: stamp this device's last-checked time + outcome, then refresh
+            // the label from the stored entry (single source of truth).
+            const addr = hotDeviceAddress();
+            if (addr && window.pywebview?.api?.hot_record_check) {
+                window.pywebview.api.hot_record_check(addr, JSON.stringify(result)).then(json => {
+                    let e; try { e = JSON.parse(json); } catch { e = null; }
+                    renderLastChecked(e);
+                });
             }
         } else {
             fill.style.width = "100%";

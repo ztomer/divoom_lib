@@ -58,6 +58,22 @@ class GalleryHotApiMixin:
             return json.dumps({"phase": "error", "error": "no daemon"})
         return json.dumps(client.hot_update_progress())
 
+    def hot_record_check(self, address: str, result_json: str) -> str:
+        """R53: persist the last hot-channel check outcome for a device so the
+        card can show a dated "Last checked <when>" instead of a blind verdict.
+        Called by the UI when an update finishes. Returns the stored entry."""
+        from divoom_lib import hot_update_state
+        try:
+            result = json.loads(result_json) if result_json else {}
+        except (TypeError, ValueError):
+            result = {}
+        return json.dumps(hot_update_state.record_check(address or "", result))
+
+    def hot_get_check(self, address: str) -> str:
+        """R53: the persisted last hot-channel check for a device (or ``{}``)."""
+        from divoom_lib import hot_update_state
+        return json.dumps(hot_update_state.get_check(address or ""))
+
     def hot_update_preview(self) -> str:
         """Fetch the hot channel manifest from Divoom's cloud and cross-reference
         with the cached gallery to show what would be pushed."""

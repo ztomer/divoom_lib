@@ -426,6 +426,36 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertFalse(res["daemon"])
         self.assertIsNone(self.api._daemon_client)
 
+    # ── R53: hot-channel per-device last-checked stamp (API delegation) ──
+    # The persistence itself is covered in test_hot_update_state.py; here we pin
+    # that the JS-API layer parses the result JSON and forwards to the store.
+
+    def test_hot_record_check_delegates(self):
+        with patch("divoom_lib.hot_update_state.record_check",
+                   return_value={"checked_at": 5.0, "served": 1, "manifest": 9,
+                                 "downloaded": 9, "confirmed": 0}) as rec:
+            out = json.loads(self.api.hot_record_check(
+                "AA:BB", json.dumps({"served": [{"file_id": "x"}],
+                                     "manifest": 9, "downloaded": 9})))
+        assert out["served"] == 1 and out["manifest"] == 9
+        args, _ = rec.call_args
+        assert args[0] == "AA:BB"
+        assert args[1]["manifest"] == 9  # parsed result dict forwarded
+
+    def test_hot_record_check_bad_json_forwards_empty(self):
+        with patch("divoom_lib.hot_update_state.record_check", return_value={}) as rec:
+            json.loads(self.api.hot_record_check("dev1", "not json"))
+        args, _ = rec.call_args
+        assert args[0] == "dev1"
+        assert args[1] == {}  # unparseable payload coerced to {}, never raises
+
+    def test_hot_get_check_delegates(self):
+        with patch("divoom_lib.hot_update_state.get_check",
+                   return_value={"checked_at": 3.0}) as g:
+            out = json.loads(self.api.hot_get_check("dev1"))
+        assert out == {"checked_at": 3.0}
+        g.assert_called_once_with("dev1")
+
     def test_scan_devices(self):
         """R17 P5: scanning is owned by the daemon; the GUI proxies via scan()."""
         fake = MagicMock()

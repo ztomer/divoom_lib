@@ -4,6 +4,22 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.12 — feat: hot channel shows a per-device "Last checked" stamp (2026-07-08)
+
+- **feat(hot):** the hot-channel card now shows **"Last checked <when>"** per
+  device under the Update button, so the verdict is dated instead of blind (the
+  user hit an undated "up to date" they couldn't trust). New store
+  `divoom_lib/hot_update_state.py` persists `{address: {checked_at, served,
+  manifest, downloaded, confirmed}}` at `~/.config/divoom-control/hot_update_state.json`
+  (separate from the Monthly Best config). New GUI-API methods `hot_record_check`
+  / `hot_get_check` (`gallery_hot_api.py`); `gallery_hot.js` stamps the time when
+  an update finishes and shows it on tab open, keyed by the active device address.
+  A stamp older than **2 weeks** turns amber. Relative time ("3 hours ago",
+  "15 days ago") with an absolute-time + counts tooltip.
+- Teeth: `test_hot_update_state.py` (8 cases — roundtrip, per-device keying,
+  int/list `served`, corrupt file, blank address) + 3 API-delegation tests in
+  `test_gui_api.py`. Stamp render + stale-amber styling verified in the preview.
+
 ## v0.21.11 — fix: hot channel false "up to date" + redundant per-device downloads (2026-07-08)
 
 - **fix(hot):** two device HOT-channel update bugs.

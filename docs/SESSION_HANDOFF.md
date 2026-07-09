@@ -18,6 +18,14 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HOT CHANNEL "LAST CHECKED" STAMP → ADDED v0.21.12 (2026-07-08).** Per-device
+  dated verdict so "up to date" isn't blind (user's follow-up ask). New store
+  `divoom_lib/hot_update_state.py` (`hot_update_state.json`, keyed by device
+  address; separate from Monthly Best's hotchannel.json). GUI API
+  `hot_record_check`/`hot_get_check` (`gallery_hot_api.py`); `gallery_hot.js`
+  stamps on finish + shows on tab open; `>2wk` turns amber. Teeth: 8 store tests
+  + 3 API tests. Stamp/stale styling verified in preview. **Not verified on DMG.**
+
 - **MCP CARD STALE TRACEBACK → FIXED v0.21.8 (2026-07-08).** The Settings →
   Connectivity → "MCP Server" card showed a Python traceback even with the toggle
   OFF (the v0.21.7 note flagged it as an open follow-up). Root cause 1: the GUI
