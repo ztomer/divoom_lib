@@ -18,13 +18,19 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **HOT CHANNEL "LAST CHECKED" STAMP → ADDED v0.21.12 (2026-07-08).** Per-device
-  dated verdict so "up to date" isn't blind (user's follow-up ask). New store
-  `divoom_lib/hot_update_state.py` (`hot_update_state.json`, keyed by device
-  address; separate from Monthly Best's hotchannel.json). GUI API
-  `hot_record_check`/`hot_get_check` (`gallery_hot_api.py`); `gallery_hot.js`
-  stamps on finish + shows on tab open; `>2wk` turns amber. Teeth: 8 store tests
-  + 3 API tests. Stamp/stale styling verified in preview. **Not verified on DMG.**
+- **HOT CHANNEL "LAST CHECKED" STAMP → ADDED v0.21.12, MADE DAEMON-OWNED v0.21.13
+  (2026-07-08).** Per-device dated verdict so "up to date" isn't blind (user's
+  follow-up ask). v0.21.12 recorded it GUI-side; v0.21.13 moved the WRITE into the
+  daemon (correct owner — it runs the update; daemon is native Rust now). The
+  daemon stamps `hot_update_state.json` on completion in BOTH impls
+  (`native-port/divoomd/src/hot_state.rs`; Python `owner_art.py` via
+  `divoom_lib/hot_update_state.py`); the GUI passes the active device address on
+  the write and only READS via `hot_get_check` (resolves the same active-device
+  key). `hot_record_check` removed. Store keyed by device address (MAC/`LAN:ip`/
+  `MatrixWall`); `>2wk` turns amber. Teeth: 3 Rust + 3 GUI-API + store tests.
+  `cargo check` clean; Python suite green; preview re-verified. **Not on DMG.**
+  Rationale on record: an undated "up to date" was untrustworthy; now dated +
+  daemon-authoritative, captures non-GUI triggers too.
 
 - **MCP CARD STALE TRACEBACK → FIXED v0.21.8 (2026-07-08).** The Settings →
   Connectivity → "MCP Server" card showed a Python traceback even with the toggle

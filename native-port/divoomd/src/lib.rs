@@ -29,6 +29,7 @@ pub mod wall;
 pub mod art_codec;
 pub mod art_hot;
 pub mod art;
+pub mod hot_state;
 #[cfg(target_os = "macos")]
 pub mod macos_notifications;
 pub mod transport;

@@ -4,6 +4,25 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.13 — refactor: hot-channel "Last checked" is now daemon-owned (2026-07-08)
+
+- **refactor(hot):** moved the per-device last-checked stamp (v0.21.12) from the
+  GUI/Python layer into the **daemon**, which is the correct owner — it runs the
+  update and knows the outcome + target device firsthand, and the daemon is now
+  native **Rust** (`divoomd`, with the Python daemon as fallback). The GUI-side
+  write (`hot_record_check`) was removed; the daemon stamps
+  `hot_update_state.json` on completion in **both** implementations
+  (`native-port/divoomd/src/hot_state.rs` and, via `divoom_lib/hot_update_state.py`,
+  `divoom_daemon/owner_art.py`), and the GUI only **reads** it (`hot_get_check`).
+- Why it matters: the stamp now captures hot updates triggered by **any** client
+  (menubar, CLI, a future scheduled sync), not just this GUI, and lives with the
+  single source of truth. The GUI passes the active device address to the daemon
+  so the write key matches the GUI's read key exactly.
+- Teeth: 3 Rust unit tests (`hot_state`, cargo), 3 GUI-API tests (address
+  forwarded on write, active-device resolved on read), `hot_update_state.py`
+  store tests retained. `cargo check` clean; full Python suite green; JS render +
+  no-op safety re-verified in the preview.
+
 ## v0.21.12 — feat: hot channel shows a per-device "Last checked" stamp (2026-07-08)
 
 - **feat(hot):** the hot-channel card now shows **"Last checked <when>"** per

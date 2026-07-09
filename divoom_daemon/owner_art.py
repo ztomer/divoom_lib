@@ -213,6 +213,16 @@ class OwnerArtMixin:
                 result = await device.hot_update.update(
                     device_size=device_size,
                     progress_cb=lambda p: self._set_hot_progress(p))
+                # R53: the daemon owns the last-checked stamp — it did the work
+                # and knows the outcome. Key by the address the GUI passed (so its
+                # read hits the same key). Mirrors the native Rust daemon.
+                addr = args.get("address") or ""
+                if addr and result.get("success"):
+                    try:
+                        from divoom_lib import hot_update_state
+                        hot_update_state.record_check(addr, result)
+                    except Exception as e:
+                        logger.debug(f"hot_update: record_check failed: {e}")
                 if result.get("success") and show:
                     await device.hot_update.show_hot_channel()
                 self._set_hot_progress({"phase": "done", "result": result})

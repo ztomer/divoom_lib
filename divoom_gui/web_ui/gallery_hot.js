@@ -41,12 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ── R53: per-device "last checked" stamp ──────────────────────────────
-    // The active device's address (the app's canonical device key). Empty when
-    // no device is connected, in which case we simply show no stamp.
-    function hotDeviceAddress() {
-        return (document.getElementById("banner-device-mac")?.textContent || "").trim();
-    }
-
+    // The daemon writes the stamp (it owns the update); we only READ it, keyed
+    // by the active device — the backend resolves that key, matching what
+    // hot_channel_update passed for the write.
     function formatChecked(seconds) {
         const then = seconds * 1000;
         const diff = Date.now() - then;
@@ -71,9 +68,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function loadLastChecked() {
-        const addr = hotDeviceAddress();
-        if (!addr || !window.pywebview?.api?.hot_get_check) { renderLastChecked(null); return; }
-        window.pywebview.api.hot_get_check(addr).then(json => {
+        if (!window.pywebview?.api?.hot_get_check) { renderLastChecked(null); return; }
+        // No address arg — the backend resolves the active device (same key the
+        // write used), so read and write can't drift.
+        window.pywebview.api.hot_get_check().then(json => {
             let e; try { e = JSON.parse(json); } catch { e = null; }
             renderLastChecked(e);
         });
@@ -216,15 +214,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 btn.classList.add("progress-ok");
                 window.showToast("Hot channel already up to date", "success", " BLE");
             }
-            // R53: stamp this device's last-checked time + outcome, then refresh
-            // the label from the stored entry (single source of truth).
-            const addr = hotDeviceAddress();
-            if (addr && window.pywebview?.api?.hot_record_check) {
-                window.pywebview.api.hot_record_check(addr, JSON.stringify(result)).then(json => {
-                    let e; try { e = JSON.parse(json); } catch { e = null; }
-                    renderLastChecked(e);
-                });
-            }
+            // R53: the DAEMON stamped the last-checked state on completion; just
+            // re-read it so the label reflects the daemon-owned source of truth.
+            loadLastChecked();
         } else {
             fill.style.width = "100%";
             text.textContent = p.error ? `Failed: ${p.error}` : "Update failed";

@@ -426,35 +426,42 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertFalse(res["daemon"])
         self.assertIsNone(self.api._daemon_client)
 
-    # ── R53: hot-channel per-device last-checked stamp (API delegation) ──
-    # The persistence itself is covered in test_hot_update_state.py; here we pin
-    # that the JS-API layer parses the result JSON and forwards to the store.
+    # ── R53: hot-channel last-checked (daemon-owned; GUI writes via daemon,
+    #        reads the shared state file) ──────────────────────────────────
 
-    def test_hot_record_check_delegates(self):
-        with patch("divoom_lib.hot_update_state.record_check",
-                   return_value={"checked_at": 5.0, "served": 1, "manifest": 9,
-                                 "downloaded": 9, "confirmed": 0}) as rec:
-            out = json.loads(self.api.hot_record_check(
-                "AA:BB", json.dumps({"served": [{"file_id": "x"}],
-                                     "manifest": 9, "downloaded": 9})))
-        assert out["served"] == 1 and out["manifest"] == 9
-        args, _ = rec.call_args
-        assert args[0] == "AA:BB"
-        assert args[1]["manifest"] == 9  # parsed result dict forwarded
+    def test_hot_channel_update_passes_active_address_to_daemon(self):
+        """The GUI hands the daemon the device address so the daemon stamps the
+        last-checked state under the SAME key the GUI reads by."""
+        fake = MagicMock()
+        fake.hot_update.return_value = {"success": True, "started": True}
+        self.api._daemon_client = fake
+        # _active_device_size is cached in the instance __dict__ by
+        # _wire_collaborators, so patch at the instance level (a class patch is
+        # shadowed); _active_device_mac patches fine either way.
+        with patch.object(self.api, "_active_device_mac",
+                          return_value="AA:BB:CC:DD:EE:FF"), \
+             patch.object(self.api, "_active_device_size", return_value=64):
+            json.loads(self.api.hot_channel_update())
+        fake.hot_update.assert_called_once()
+        assert fake.hot_update.call_args.kwargs.get("address") == "AA:BB:CC:DD:EE:FF"
+        assert fake.hot_update.call_args.kwargs.get("device_size") == 64
 
-    def test_hot_record_check_bad_json_forwards_empty(self):
-        with patch("divoom_lib.hot_update_state.record_check", return_value={}) as rec:
-            json.loads(self.api.hot_record_check("dev1", "not json"))
-        args, _ = rec.call_args
-        assert args[0] == "dev1"
-        assert args[1] == {}  # unparseable payload coerced to {}, never raises
-
-    def test_hot_get_check_delegates(self):
-        with patch("divoom_lib.hot_update_state.get_check",
+    def test_hot_get_check_resolves_active_device(self):
+        """With no explicit address, hot_get_check reads the store for the active
+        device (the same key the write used)."""
+        with patch.object(self.api, "_active_device_mac",
+                          return_value="AA:BB:CC:DD:EE:FF"), \
+             patch("divoom_lib.hot_update_state.get_check",
                    return_value={"checked_at": 3.0}) as g:
-            out = json.loads(self.api.hot_get_check("dev1"))
+            out = json.loads(self.api.hot_get_check())
         assert out == {"checked_at": 3.0}
-        g.assert_called_once_with("dev1")
+        g.assert_called_once_with("AA:BB:CC:DD:EE:FF")
+
+    def test_hot_get_check_explicit_address_wins(self):
+        with patch.object(self.api, "_active_device_mac", return_value="other"), \
+             patch("divoom_lib.hot_update_state.get_check", return_value={}) as g:
+            self.api.hot_get_check("LAN:192.168.1.5")
+        g.assert_called_once_with("LAN:192.168.1.5")
 
     def test_scan_devices(self):
         """R17 P5: scanning is owned by the daemon; the GUI proxies via scan()."""
