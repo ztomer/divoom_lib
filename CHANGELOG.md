@@ -4,6 +4,31 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.9 — fix: daemon-down was silent and unrecoverable on restart (2026-07-08)
+
+- **fix(gui):** restarting the app left it **unusable with no indication and no
+  way to recover**. The daemon (sole device owner) is deliberately killed on quit
+  (`keep_daemon_alive` defaults off), so a restart must respawn it. The eager
+  launch spawn (`gui_main.py`) **discarded its client and never surfaced or
+  retried a failure** — `api._daemon_client` stayed `None` until some later user
+  action lazily re-ran `ensure_daemon()`, which is why it "eventually reconnected"
+  silently. There was also **no daemon-down UI at all**, and the backend couldn't
+  distinguish "daemon down" from "no device" (`get_connection_state` collapsed
+  both to `disconnected`).
+- **fix:** (1) the eager spawn now **assigns** the live client to the API so the
+  GUI is ready immediately; (2) new backend `daemon_health()` (fast liveness
+  probe, no spawn — distinguishes daemon-down from device-disconnected) and
+  `reconnect_daemon()` (drops the stale client + re-ensures/spawns); (3) a
+  frontend daemon-health heartbeat (every 4s + on dashboard open, **not** gated
+  behind an active device) that **auto-reconnects silently once**, and only then
+  shows a persistent **Reconnect banner** if that fails. This directly fixes the
+  "must be checked when the dashboard/app launches" and "no way to reconnect"
+  gaps.
+- Teeth: `test_daemon_health_reports_up/down`, `test_daemon_health_probe_error_is_down`,
+  `test_daemon_health_remote_assumed_up`, `test_reconnect_daemon_success_resets_and_reensures`,
+  `test_reconnect_daemon_failure_reports_down`, `test_reconnect_daemon_swallows_spawn_error`.
+  Banner render + hidden-default verified in the static web_ui preview.
+
 ## v0.21.8 — fix: MCP Server card showed a stale Python traceback (2026-07-08)
 
 - **fix(mcp):** the Settings → Connectivity → "MCP Server" card displayed a

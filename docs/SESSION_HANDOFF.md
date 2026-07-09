@@ -36,13 +36,20 @@ Claude) should read this on entry and **update it at the end of every round**
   verified on a DMG** (native pywebview app; TCC/BLE harness limit) — confirmed by
   unit tests + direct reproduction of the guard turning the crash into a clean line.
 
-- **OPEN THREADS from live 0.21.7 use (2026-07-08), being worked THIS round:**
-  (1) **Daemon not relaunched on app restart** — quit kills the daemon
-  (`keep_daemon_alive` default false), but launch spawn (`gui_main.py:250`)
-  **discards its client and never retries/surfaces failure**; no daemon-down UI,
-  and `get_connection_state` can't distinguish daemon-down from no-device
-  (`scanner_mixin.py:79-88`); "eventually reconnected" = lazy `ensure_daemon()` on
-  the next user action. (2) **Hot channel false "up to date"** — no local
+- **DAEMON-DOWN SILENT + UNRECOVERABLE → FIXED v0.21.9 (2026-07-08).** Restart
+  left the app unusable with no indication / no reconnect. Root causes: eager
+  launch spawn (`gui_main.py`) discarded its client + never surfaced/retried
+  failure; no daemon-down UI; `get_connection_state` couldn't tell daemon-down
+  from no-device. Fix: eager spawn now assigns `api._daemon_client`; new backend
+  `daemon_health()` (no-spawn liveness probe) + `reconnect_daemon()` (reset stale
+  client + re-ensure); frontend daemon heartbeat (4s + on open, ungated) that
+  auto-reconnects once then shows a **Reconnect banner** (`#daemon-banner` in
+  index.html, styled in widgets_extra.css, wired in app_globals.js/app_init.js).
+  Teeth: 7 tests in `test_gui_api.py` (52 pass). Banner render verified in the
+  static web_ui preview. **Not yet verified on a DMG** (TCC/BLE harness limit).
+
+- **OPEN THREADS from live 0.21.7 use (2026-07-08) — remaining THIS round:**
+  (2) **Hot channel false "up to date"** — no local
   version/timestamp compare; UI verdict is just `served.length===0`
   (`gallery_hot.js:147`), which is empty on device-silence/CDN-fail too
   (`hot_update.py:249-252`). (3) **Hot channel redundant per-device download** —

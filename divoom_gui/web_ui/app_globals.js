@@ -308,6 +308,68 @@ window.startConnectionHeartbeat = function() {
     window._ownedHeartbeat = setInterval(window.refreshOwnedDevices, 4000);
 };
 
+// ── R53: daemon-down detection + reconnect ────────────────────────────────
+// The background service (daemon) owns the device over the socket and is killed
+// on quit (keep-alive off), so it MUST respawn on the next launch. If it's ever
+// unreachable, NOTHING works — unlike the device dot, this is app-wide. Unlike
+// refreshConnectionState it is NOT gated behind appConnected, so a down daemon
+// is caught even with no device connected. Policy: auto-reconnect silently once,
+// then surface a persistent banner with a manual Reconnect only if that fails.
+window._daemonReconnecting = false;
+
+window.setDaemonBanner = function(show) {
+    const banner = document.getElementById("daemon-banner");
+    if (!banner) return;
+    banner.hidden = !show;
+};
+
+window.refreshDaemonHealth = async function() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.daemon_health) return;
+    let health;
+    try { health = JSON.parse(await api.daemon_health()); }
+    catch (e) { return; }  // pywebview not ready / transient — try next tick
+    if (health && health.daemon) { window.setDaemonBanner(false); return; }
+    // Daemon is down. Attempt one silent auto-reconnect before nagging the user.
+    if (!window._daemonReconnecting && api.reconnect_daemon) {
+        window._daemonReconnecting = true;
+        try {
+            const r = JSON.parse(await api.reconnect_daemon());
+            if (r && r.daemon) {
+                window.setDaemonBanner(false);
+                window.showToast("Reconnected to the background service.", "success");
+                return;
+            }
+        } catch (e) { /* fall through to the banner */ }
+        finally { window._daemonReconnecting = false; }
+    }
+    window.setDaemonBanner(true);
+};
+
+// Manual reconnect (the banner button). Gives immediate feedback and re-probes.
+window.reconnectDaemonManual = async function() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.reconnect_daemon) return;
+    const btn = document.getElementById("daemon-reconnect-btn");
+    if (btn) { btn.disabled = true; btn.textContent = "Reconnecting..."; }
+    let ok = false;
+    try { ok = !!(JSON.parse(await api.reconnect_daemon()) || {}).daemon; }
+    catch (e) { ok = false; }
+    if (btn) { btn.disabled = false; btn.textContent = "Reconnect"; }
+    if (ok) {
+        window.setDaemonBanner(false);
+        window.showToast("Reconnected to the background service.", "success");
+    } else {
+        window.showToast("Still can't reach the background service.", "error");
+    }
+};
+
+window.startDaemonHeartbeat = function() {
+    if (window._daemonHeartbeat) return;
+    window.refreshDaemonHealth();  // probe immediately on dashboard open
+    window._daemonHeartbeat = setInterval(window.refreshDaemonHealth, 4000);
+};
+
 window.updateDeviceSelectorDropdown = function() {
     const sel = document.getElementById("sidebar-device-select");
     if (!sel) return;
