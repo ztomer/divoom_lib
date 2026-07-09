@@ -144,15 +144,37 @@ document.addEventListener("DOMContentLoaded", () => {
         if (p.phase === "done") {
             fill.style.width = "100%";
             const result = p.result || {};
-            const n = (result.served || []).length;
-            text.textContent = n ? `${n} file${n > 1 ? "s" : ""} updated` : "Up to date";
-            fill.style.background = "linear-gradient(90deg, #166534, #22c55e)";
+            const served = (result.served || []).length;
+            const manifest = result.manifest || 0;
+            // downloaded may be absent on older daemons — assume complete then.
+            const downloaded = (result.downloaded != null) ? result.downloaded : manifest;
+            // Some curated files couldn't be fetched from the CDN, so the device
+            // was never offered them. Reporting "Up to date" here is the false
+            // positive the user hit — be honest instead.
+            const incomplete = manifest > 0 && downloaded < manifest;
+
             btn.classList.remove("progress-active");
-            btn.classList.add("progress-ok");
-            window.showToast(
-                n ? `Hot channel updated (${n} file${n > 1 ? "s" : ""})`
-                   : "Hot channel already up to date",
-                "success", " BLE");
+            if (served) {
+                text.textContent = `${served} file${served > 1 ? "s" : ""} updated`;
+                fill.style.background = "linear-gradient(90deg, #166534, #22c55e)";
+                btn.classList.add("progress-ok");
+                window.showToast(
+                    `Hot channel updated (${served} file${served > 1 ? "s" : ""})`,
+                    "success", " BLE");
+            } else if (incomplete) {
+                const missing = manifest - downloaded;
+                text.textContent = `Checked ${downloaded}/${manifest}`;
+                fill.style.background = "linear-gradient(90deg, #78350f, #f59e0b)";
+                btn.classList.add("progress-ok");
+                window.showToast(
+                    `Hot channel: ${missing} file${missing > 1 ? "s" : ""} couldn't be fetched — not fully checked`,
+                    "error");
+            } else {
+                text.textContent = "Up to date";
+                fill.style.background = "linear-gradient(90deg, #166534, #22c55e)";
+                btn.classList.add("progress-ok");
+                window.showToast("Hot channel already up to date", "success", " BLE");
+            }
         } else {
             fill.style.width = "100%";
             text.textContent = p.error ? `Failed: ${p.error}` : "Update failed";

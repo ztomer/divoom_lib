@@ -55,17 +55,19 @@ Claude) should read this on entry and **update it at the end of every round**
   `build_release.sh` regenerates before packaging; `setup_app.py` gains `iconfile`
   for parity. **Not yet verified on a DMG.**
 
-- **OPEN THREADS from live 0.21.7 use (2026-07-08) — remaining THIS round:**
-  (2) **Hot channel false "up to date"** — no local
-  version/timestamp compare; UI verdict is just `served.length===0`
-  (`gallery_hot.js:147`), which is empty on device-silence/CDN-fail too
-  (`hot_update.py:249-252`). (3) **Hot channel redundant per-device download** —
-  manifest+bodies fetched inside per-device `update()` (`owner_art.py:213`,
-  `hot_update.py:213,219-230`), no `device_type` cache. (4) **Missing app icon** —
-  `divoom.spec:80` `icon=None`, no `.icns` in repo (only a 1024px JPEG mis-named
-  `app_icon.png`). Plan: auto-reconnect + banner-on-failure for the daemon; icns
-  from the source image; `device_type`-keyed hot cache; persist a real freshness
-  marker.
+- **HOT CHANNEL false "up to date" + redundant downloads → FIXED v0.21.11
+  (2026-07-08).** (a) UI verdict was `served.length===0` → "up to date"; a partial
+  CDN download (files dropped from the advertised manifest) reported a clean
+  "up to date" it never verified. Fix: `gallery_hot.js` now uses the engine's
+  `manifest`/`downloaded` counts — `downloaded < manifest` → "Checked D/M" +
+  amber + warning toast, not "Up to date". (b) manifest+bodies were fetched per
+  device inside `update()`; added `_load_hot_files` device_type-keyed cache (5-min
+  TTL) in `hot_update.py` so same-size devices reuse one fetch+download. Teeth: 2
+  cache tests + guard updated (26 hot tests pass; full suite green). NOTE: did NOT
+  add a persisted freshness timestamp — the "up to date" signal is protocol-honest
+  once partial-download is surfaced; a dated last-checked marker is a possible
+  future nicety (would need a new store; hotchannel.json is the *Monthly Best*
+  config, a different subsystem). **Not verified on a DMG.**
 
 - **SETTINGS TOGGLES IGNORED SAVED STATE → FIXED v0.21.7 (2026-07-08).** Caught by
   driving the real dashboard on-screen (computer-use): the Connectivity toggles

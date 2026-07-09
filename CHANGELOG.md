@@ -4,6 +4,29 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.11 — fix: hot channel false "up to date" + redundant per-device downloads (2026-07-08)
+
+- **fix(hot):** two device HOT-channel update bugs.
+  - **False "up to date".** The UI declared "up to date" purely from
+    `served.length === 0` (`gallery_hot.js`), so a run where some curated files
+    **couldn't be fetched from the CDN** (silently dropped from the advertised
+    manifest, so the device was never offered them) reported a clean "up to date"
+    it hadn't actually verified. The engine already returns `manifest` +
+    `downloaded` counts; the card now uses them — when `downloaded < manifest` it
+    shows "Checked D/M" with an amber bar and a "N file(s) couldn't be fetched —
+    not fully checked" toast instead of a false "Up to date". Genuine
+    up-to-date (all files downloaded, device requested none) still reads clean.
+  - **Redundant per-device downloads.** The manifest + every file body were
+    fetched inside `update()`, which the daemon calls once per device, so N
+    same-size devices each re-hit the CDN. Added a `device_type`-keyed cache
+    (`_load_hot_files`, 5-min TTL) so same-size devices reuse one fetch+download;
+    bodies are read-only during streaming and hot updates are serialized
+    daemon-wide, so sharing is safe.
+- Teeth: `test_load_hot_files_caches_per_device_type`,
+  `test_clear_hot_manifest_cache_forces_refetch`; the preview/send manifest-source
+  guard updated for the new `_load_hot_files` seam. UI verdict logic verified for
+  all branches (updated / partial / up-to-date / old-daemon).
+
 ## v0.21.10 — fix: macOS app had no icon (2026-07-08)
 
 - **fix(build):** the shipped `Divoom.app` used the generic blank Dock/Finder
