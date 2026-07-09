@@ -35,12 +35,18 @@ Claude) should read this on entry and **update it at the end of every round**
   pyproject/Info.plist). Final v0.21.20 DMG built + installed + confirmed on
   hardware. Test methodology: SIGTERM (not -9) between restarts; pace BLE ops.
 
-- **STILL OPEN (pre-loop request): cut a release tag + update Homebrew.** Was
-  investigating when interrupted: git remote is `github.com/ztomer/divoom_lib`
-  (note: mismatched repo name vs `divoom-control`), NO Homebrew cask/formula in the
-  tree, tags go v0.21.3..v0.21.7 (stale — none for the 8–20 work). Branch
-  `claude/hopeful-hertz-eddb6b` is 20+ commits ahead of main. Needs: decide
-  tag/merge strategy + find/create the cask (likely a separate tap) + DMG sha256.
+- **RELEASE v0.21.20 CUT + HOMEBREW UPDATED (2026-07-09).** New one-shot
+  `scripts/release.sh` (reads pyproject version → build DMG [skippable] → annotated
+  tag + push → GitHub release on `ztomer/divoom_lib` with the DMG → bump
+  `Casks/divoom-control.rb` version+sha256 in `ztomer/homebrew-tap` via gh API;
+  idempotent). Ran it: tag v0.21.20 pushed, GitHub release created (notes span all
+  of v0.21.8→20 since the last release was v0.21.7), DMG asset uploaded (URL 200),
+  cask at 0.21.20 + sha 160f522e. `brew upgrade --cask ztomer/tap/divoom-control`
+  now serves it. CAVEATS: (a) tag was cut from branch `claude/hopeful-hertz-eddb6b`
+  (not main) — commits reach origin via the tag but NO origin branch points at
+  them; merge the branch to main for branch history. (b) code repo is named
+  `divoom_lib` (known, user won't rename). Next release: just bump pyproject + run
+  `scripts/release.sh`.
 
 - **BLE CENTRAL SELF-HEAL → FIXED v0.21.18 (2026-07-09).** User: "can't connect to
   screens, very flaky." Live repro: with a dead cached central, BOTH `scan` and
