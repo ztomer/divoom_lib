@@ -48,6 +48,13 @@ Claude) should read this on entry and **update it at the end of every round**
   Teeth: 7 tests in `test_gui_api.py` (52 pass). Banner render verified in the
   static web_ui preview. **Not yet verified on a DMG** (TCC/BLE harness limit).
 
+- **MISSING APP ICON → FIXED v0.21.10 (2026-07-08).** Shipped `Divoom.app` had
+  the generic blank icon: `divoom.spec` had `icon=None` and no `.icns` existed
+  (only a 1024px JPEG mis-named `app_icon.png`). Fix: `scripts/make_icns.sh`
+  builds `packaging/Divoom.icns`; `divoom.spec` points `icon=` at it;
+  `build_release.sh` regenerates before packaging; `setup_app.py` gains `iconfile`
+  for parity. **Not yet verified on a DMG.**
+
 - **OPEN THREADS from live 0.21.7 use (2026-07-08) — remaining THIS round:**
   (2) **Hot channel false "up to date"** — no local
   version/timestamp compare; UI verdict is just `served.length===0`

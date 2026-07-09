@@ -56,7 +56,11 @@ echo "→ building native rust daemon (divoomd)"
 echo "→ building native rust menubar (divoom-menubar)"
 ( cd native-port/divoom-menubar && cargo build --release )
 
-# 2. PyInstaller build → dist/Divoom.app.
+# 2. App icon → packaging/Divoom.icns (regenerate so it always matches source).
+echo "→ generating app icon (.icns)"
+"$(dirname "$0")/make_icns.sh"
+
+# 3. PyInstaller build → dist/Divoom.app.
 echo "→ pyinstaller build"
 rm -rf build dist
 "${PYBUILD}" -m PyInstaller --noconfirm --distpath dist --workpath build divoom.spec

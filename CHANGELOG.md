@@ -4,6 +4,19 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.10 — fix: macOS app had no icon (2026-07-08)
+
+- **fix(build):** the shipped `Divoom.app` used the generic blank Dock/Finder
+  icon. The shipping PyInstaller spec had `icon=None` (`divoom.spec`) and there
+  was no `.icns` in the repo at all — the only source was
+  `divoom_gui/web_ui/assets/app_icon.png`, which is actually a 1024px JPEG. Fix:
+  `scripts/make_icns.sh` generates `packaging/Divoom.icns` (full Retina iconset via
+  `sips`+`iconutil`) from that source; `divoom.spec` now points `icon=` at it (so
+  PyInstaller copies it in and sets `CFBundleIconFile`); `scripts/build_release.sh`
+  regenerates it before packaging so it always tracks the source art; and
+  `setup_app.py` gains `iconfile` for parity on the legacy py2app path. (The
+  menubar tray icon draws itself programmatically and was never affected.)
+
 ## v0.21.9 — fix: daemon-down was silent and unrecoverable on restart (2026-07-08)
 
 - **fix(gui):** restarting the app left it **unusable with no indication and no
