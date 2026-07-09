@@ -4,6 +4,27 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.8 — fix: MCP Server card showed a stale Python traceback (2026-07-08)
+
+- **fix(mcp):** the Settings → Connectivity → "MCP Server" card displayed a
+  Python traceback (`run_stdio` → `connect_write_pipe` →
+  `ValueError: Pipe transport is only for pipes, sockets and character devices`)
+  even with the toggle **off**. Two root causes: (1) the GUI spawns
+  `divoom-control mcp-server` with **stdout redirected to a log file**, but an MCP
+  *stdio* server needs real pipes owned by an MCP client — asyncio's write-pipe
+  transport rejects a regular file and crashed on startup, spewing a traceback
+  into `~/.config/divoom-control/mcp-server.log`; (2) the card **tailed that log
+  unconditionally**, so a crash from a previous session surfaced forever. Fix:
+  `run_stdio()` now guards with `_stdio_is_pipe_like()` and exits with a single
+  clean diagnostic when stdin/stdout aren't client-owned pipes (real clients —
+  Claude Desktop, Cursor — are unaffected; see `docs/MCP_SERVER.md`); and
+  `MCPController` only surfaces the log for a server started **this** session and
+  truncates the log on each start, so a fresh launch never shows an archaeological
+  traceback. Benign for the feature — the CLI/MCP-client path always worked.
+- Teeth: `test_stdio_is_pipe_like_classifies_streams`,
+  `test_run_stdio_on_regular_file_exits_clean_no_traceback`,
+  `test_mcp_controller_hides_stale_log_on_fresh_launch`.
+
 ## v0.21.7 — fix: settings toggles didn't reflect saved state on open (2026-07-08)
 
 - **fix(web_ui):** the Connectivity settings toggles ("Background agent",

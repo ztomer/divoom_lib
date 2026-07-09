@@ -509,3 +509,95 @@ def test_cmd_mcp_server_routes_through_daemon(monkeypatch) -> None:
     assert rc == 0
     assert ensure_calls["socket_path"] == "/tmp/divoom.sock"
     assert len(captured["tools"]) >= 12
+
+
+# ── 9. stdio transport guard (no-pipe) ──────────────────────────────
+#
+# The GUI spawns the server with stdout redirected to a log file. asyncio's
+# write-pipe transport rejects regular files, which used to crash run_stdio()
+# with a multi-frame ValueError traceback that the GUI card surfaced. The guard
+# must turn that into a clean, single-line diagnostic and return.
+
+
+def test_stdio_is_pipe_like_classifies_streams(tmp_path) -> None:
+    import os
+    from divoom_lib.mcp_server import _stdio_is_pipe_like
+
+    # Regular file -> not pipe-like (this is the GUI log-file case).
+    f = open(tmp_path / "out.log", "w")
+    try:
+        assert _stdio_is_pipe_like(f) is False
+    finally:
+        f.close()
+
+    # OS pipe ends -> pipe-like (what a real MCP client provides).
+    r, w = os.pipe()
+
+    class _F:
+        def __init__(self, fd): self._fd = fd
+        def fileno(self): return self._fd
+
+    try:
+        assert _stdio_is_pipe_like(_F(r)) is True
+        assert _stdio_is_pipe_like(_F(w)) is True
+    finally:
+        os.close(r)
+        os.close(w)
+
+    # A stream with no real fd -> not pipe-like, no exception.
+    assert _stdio_is_pipe_like(object()) is False
+
+
+def test_run_stdio_on_regular_file_exits_clean_no_traceback(tmp_path, monkeypatch) -> None:
+    """run_stdio() must not raise (or emit a traceback) when stdout is a regular
+    file — it should write one clean diagnostic line and return."""
+    import asyncio
+    import io
+    import sys
+
+    server = MCPServer(server_info={"name": "x", "version": "1"})
+
+    fake_stdin = open(tmp_path / "in.log", "w+")   # regular file (not a pipe)
+    fake_stdout = open(tmp_path / "out.log", "w+")  # regular file (the GUI case)
+    fake_stderr = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", fake_stdin)
+    monkeypatch.setattr(sys, "stdout", fake_stdout)
+    monkeypatch.setattr(sys, "stderr", fake_stderr)
+    try:
+        # Must complete without raising.
+        asyncio.run(server.run_stdio())
+    finally:
+        fake_stdin.close()
+        fake_stdout.close()
+
+    err = fake_stderr.getvalue()
+    assert "Traceback" not in err
+    assert "not connected to an MCP client" in err
+    # No JSON-RPC was written to stdout.
+    fake_stdout_content = (tmp_path / "out.log").read_text()
+    assert fake_stdout_content == ""
+
+
+# ── 10. GUI MCP controller: stale-log gating ────────────────────────
+#
+# The card must not surface a log left over from a previous session (the
+# "traceback shown when the toggle is off" bug). status() only tails the log
+# for a server started this session.
+
+
+def test_mcp_controller_hides_stale_log_on_fresh_launch(tmp_path) -> None:
+    from divoom_gui.mcp_control import MCPController, status_to_dict
+
+    log_path = tmp_path / "mcp-server.log"
+    log_path.write_text(
+        "Traceback (most recent call last):\n"
+        "  File \"mcp_server.py\", line 292, in run_stdio\n"
+        "ValueError: Pipe transport is only for pipes, sockets and character devices\n"
+    )
+
+    ctl = MCPController(log_path=log_path)  # nothing started this session
+    status = status_to_dict(ctl.status())
+
+    assert status["running"] is False
+    # The stale traceback must NOT be surfaced to the card.
+    assert status["last_log_lines"] == []

@@ -18,6 +18,41 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **MCP CARD STALE TRACEBACK → FIXED v0.21.8 (2026-07-08).** The Settings →
+  Connectivity → "MCP Server" card showed a Python traceback even with the toggle
+  OFF (the v0.21.7 note flagged it as an open follow-up). Root cause 1: the GUI
+  spawns `divoom-control mcp-server` with stdout redirected to a **log file**, but
+  an MCP *stdio* server needs client-owned **pipes** — asyncio's write-pipe
+  transport rejects a regular file (`ValueError: Pipe transport is only for pipes,
+  sockets and character devices`) and crashed at startup, writing a traceback to
+  `~/.config/divoom-control/mcp-server.log`. Root cause 2: the card **tailed that
+  log unconditionally** (even stopped / never-started), so a crash from a prior
+  session persisted. Fix: `run_stdio()` guards non-pipe stdio via
+  `_stdio_is_pipe_like()` and exits with one clean diagnostic line
+  (`mcp_server.py`); `MCPController` only surfaces the log for a server started
+  THIS session and truncates on start (`mcp_control.py`). Real MCP-client launches
+  (Claude Desktop/Cursor) were always fine — only the GUI "Start" toggle was
+  doomed. Teeth: 3 new tests in `test_mcp_server.py` (33 pass total). **Not yet
+  verified on a DMG** (native pywebview app; TCC/BLE harness limit) — confirmed by
+  unit tests + direct reproduction of the guard turning the crash into a clean line.
+
+- **OPEN THREADS from live 0.21.7 use (2026-07-08), being worked THIS round:**
+  (1) **Daemon not relaunched on app restart** — quit kills the daemon
+  (`keep_daemon_alive` default false), but launch spawn (`gui_main.py:250`)
+  **discards its client and never retries/surfaces failure**; no daemon-down UI,
+  and `get_connection_state` can't distinguish daemon-down from no-device
+  (`scanner_mixin.py:79-88`); "eventually reconnected" = lazy `ensure_daemon()` on
+  the next user action. (2) **Hot channel false "up to date"** — no local
+  version/timestamp compare; UI verdict is just `served.length===0`
+  (`gallery_hot.js:147`), which is empty on device-silence/CDN-fail too
+  (`hot_update.py:249-252`). (3) **Hot channel redundant per-device download** —
+  manifest+bodies fetched inside per-device `update()` (`owner_art.py:213`,
+  `hot_update.py:213,219-230`), no `device_type` cache. (4) **Missing app icon** —
+  `divoom.spec:80` `icon=None`, no `.icns` in repo (only a 1024px JPEG mis-named
+  `app_icon.png`). Plan: auto-reconnect + banner-on-failure for the daemon; icns
+  from the source image; `device_type`-keyed hot cache; persist a real freshness
+  marker.
+
 - **SETTINGS TOGGLES IGNORED SAVED STATE → FIXED v0.21.7 (2026-07-08).** Caught by
   driving the real dashboard on-screen (computer-use): the Connectivity toggles
   didn't reflect their persisted value when Settings opened — `quit_menubar_on_exit`
