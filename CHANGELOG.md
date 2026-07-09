@@ -4,6 +4,17 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.15 — change: default BLE scan timeout 60s → 20s (2026-07-09)
+
+- **change(scan):** the default device-scan timeout is now **20s** (was 60s in the
+  GUI, 15s in the daemon). Divoom devices advertise within a few seconds, so a
+  scan that runs the full window (which it does whenever fewer devices than the
+  `limit` are present) no longer makes the user wait ~1–2 minutes. Aligned across
+  `scanner_mixin.get_scan_settings`, `presets_manager.load_config`,
+  `daemon_config.DEFAULT_SCAN_TIMEOUT`, and the Settings → Devices input default +
+  JS fallbacks. The 90s cap from v0.21.14 remains a backstop for a hand-set large
+  value. Teeth: updated `test_r42_fixes` default assertions (60 → 20).
+
 ## v0.21.14 — fix: native daemon BLE scan concurrency guard (2026-07-09)
 
 - **fix(rust-daemon):** the native `divoomd` had no guard against concurrent BLE

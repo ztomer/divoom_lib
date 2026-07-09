@@ -18,6 +18,17 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **SCAN TIMEOUT DEFAULT 60→20s → v0.21.15 (2026-07-09).** After the v0.21.14 scan
+  guard fix, scans still ran ~80s because they run the full window when device
+  count < limit and the default/persisted timeout was long. Lowered the default to
+  20s across `scanner_mixin.get_scan_settings`, `presets_manager.load_config`,
+  `daemon_config.DEFAULT_SCAN_TIMEOUT`, the Settings input default + JS fallbacks.
+  Also reset THIS user's persisted config.ini `[gui] timeout` 120→20. Verified on
+  the installed build: scan finds all 3 devices (Pixoo-1, Timoo-light-4,
+  Tivoo-Max-light-3) fast. v0.21.14 guard confirmed working end-to-end (after a
+  Bluetooth reset — my rapid daemon restarts during testing had wedged
+  CoreBluetooth; see the v0.21.14 caveats below).
+
 - **NATIVE DAEMON BLE SCAN CONCURRENCY GUARD → v0.21.14 (2026-07-09).** User: app
   found 2 of 3. Drove the daemon socket: it RELIABLY finds all 3 in isolated scans
   (6/15/60/120s) — BLE/daemon healthy. Root cause: **no scan concurrency guard** —

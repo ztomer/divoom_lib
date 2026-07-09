@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener("change", () => {
-                const t = parseInt(document.getElementById("scan-timeout")?.value) || 60;
+                const t = parseInt(document.getElementById("scan-timeout")?.value) || window.SCAN_TIMEOUT_DEFAULT;
                 const l = parseInt(document.getElementById("scan-limit")?.value);
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.save_scan_settings) {
                     window.pywebview.api.save_scan_settings(t, isNaN(l) ? 0 : l);
@@ -136,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.runBleScan = function() {
-        const timeout = parseInt(document.getElementById("scan-timeout")?.value) || 60;
+        const timeout = parseInt(document.getElementById("scan-timeout")?.value) || window.SCAN_TIMEOUT_DEFAULT;
         const limit = parseInt(document.getElementById("scan-limit")?.value) || 0;
 
         if (scanSpinner) scanSpinner.style.display = "inline-block";
