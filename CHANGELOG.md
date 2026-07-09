@@ -4,6 +4,14 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.20 — feat: version indicator in Settings (2026-07-09)
+
+- **feat(settings):** the Settings panel now shows the app version in a small
+  footer ("Divoom Control v0.21.20"). New lock-free `get_app_version` JS-API
+  (`lifecycle_mixin`) reads the version from pyproject.toml (dev tree) or the
+  bundle's `Info.plist` CFBundleShortVersionString (packaged .app); the footer
+  (`templates_settings.js`) is populated on load (`settings_hardware.js`).
+
 ## v0.21.19 — fix: bound the BLE connect path (no more connect hangs) (2026-07-09)
 
 - **fix(rust-daemon):** the BLE connect path had unbounded awaits —

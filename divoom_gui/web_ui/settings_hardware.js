@@ -121,6 +121,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.pywebview) restoreScanSettings();
     else window.addEventListener("pywebviewready", restoreScanSettings);
 
+    // Settings footer version indicator (backend get_app_version → pyproject/plist).
+    function loadAppVersion() {
+        const el = document.getElementById("app-version");
+        if (!el || !window.pywebview?.api?.get_app_version) return;
+        Promise.resolve(window.pywebview.api.get_app_version())
+            .then(v => { if (v) el.textContent = "v" + v; })
+            .catch(() => {});
+    }
+    if (window.pywebview) loadAppVersion();
+    else window.addEventListener("pywebviewready", loadAppVersion);
+
     // Persist scan timeout / limit values on change
     ["scan-timeout", "scan-limit"].forEach(id => {
         const el = document.getElementById(id);

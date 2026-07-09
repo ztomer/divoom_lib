@@ -33,3 +33,29 @@ class LifecycleSettingsMixin:
     def set_quit_menubar_on_exit(self, value) -> bool:
         from divoom_lib.lifecycle_config import set_quit_menubar_on_exit
         return set_quit_menubar_on_exit(bool(value))
+
+    def get_app_version(self) -> str:
+        """The app version, for the Settings footer. Dev tree: read pyproject.toml.
+        Packaged .app: the bundle's Info.plist CFBundleShortVersionString (set from
+        the same pyproject version at build time)."""
+        import sys
+        from pathlib import Path
+        try:
+            import tomllib
+            pp = Path(__file__).resolve().parents[1] / "pyproject.toml"
+            if pp.is_file():
+                with pp.open("rb") as f:
+                    return str(tomllib.load(f)["project"]["version"])
+        except Exception:
+            pass
+        try:
+            import plistlib
+            mei = getattr(sys, "_MEIPASS", None)  # PyInstaller: Contents/Frameworks
+            if mei:
+                plist = Path(mei).parent / "Info.plist"
+                if plist.is_file():
+                    with plist.open("rb") as f:
+                        return str(plistlib.load(f).get("CFBundleShortVersionString", "?"))
+        except Exception:
+            pass
+        return "?"

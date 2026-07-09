@@ -247,5 +247,6 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                             </div>
                         </div>
                     </div>
+                    <div class="settings-version panel-hint" style="text-align:center; margin-top:14px; opacity:0.6; font-size:11px;">Divoom Control <span id="app-version">v...</span></div>
                 </div>
     `;
