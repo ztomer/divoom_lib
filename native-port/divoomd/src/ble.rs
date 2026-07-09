@@ -41,6 +41,13 @@ const DEVICE_NAME_HINTS: &[&str] = &["Pixoo", "Divoom", "Tivoo", "Timoo", "Ditoo
 /// the op fail, release the lock, and the daemon self-recover.
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Upper bound on each GATT setup step (connect / discover / subscribe).
+/// CoreBluetooth's `connect()` waits INDEFINITELY for an unresponsive device
+/// (off, out of range, or already connected elsewhere) — and the connect runs
+/// while the daemon holds the `device` lock, so an unbounded hang wedges the
+/// whole device path. Bounded so a bad connect fails and the caller can retry.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+
 pub use crate::transport::BleResult;
 
 /// A device discovered during a scan.
@@ -131,13 +138,22 @@ impl BleTransport {
         // BLE connect reliable on Linux needs forcing the LE transport / pairing /
         // disabling BR/EDR — tracked in scripts/linux_remote/README.md. Scan works
         // on Linux today; connect does not.
-        peripheral.connect().await?;
-        peripheral.discover_services().await?;
+        match tokio::time::timeout(CONNECT_TIMEOUT, peripheral.connect()).await {
+            Ok(r) => r?,
+            Err(_) => return Err("BLE connect timed out".into()),
+        }
+        match tokio::time::timeout(CONNECT_TIMEOUT, peripheral.discover_services()).await {
+            Ok(r) => r?,
+            Err(_) => return Err("BLE discover_services timed out".into()),
+        }
         let chars = peripheral.characteristics();
         let write_char = chars.iter().find(|c| c.uuid == WRITE_UUID).ok_or("no write characteristic")?.clone();
         let notify_char = chars.iter().find(|c| c.uuid == NOTIFY_UUID).ok_or("no notify characteristic")?.clone();
 
-        peripheral.subscribe(&notify_char).await?;
+        match tokio::time::timeout(CONNECT_TIMEOUT, peripheral.subscribe(&notify_char)).await {
+            Ok(r) => r?,
+            Err(_) => return Err("BLE subscribe timed out".into()),
+        }
         let mut notifications = peripheral.notifications().await?;
         let (tx, rx) = mpsc::channel::<Frame>(256);
 

@@ -4,6 +4,19 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.19 — fix: bound the BLE connect path (no more connect hangs) (2026-07-09)
+
+- **fix(rust-daemon):** the BLE connect path had unbounded awaits —
+  `peripheral.connect()`, `discover_services()`, and `subscribe()` (`ble.rs`).
+  CoreBluetooth's `connect()` waits INDEFINITELY for an unresponsive device (off,
+  out of range, already connected elsewhere), and the connect runs while the
+  daemon holds the `device` lock — so a bad connect hung the whole device path
+  (observed: connect never returned in 40s+). Each step is now bounded by a 20s
+  `CONNECT_TIMEOUT`, so a bad connect fails cleanly and the caller can retry.
+- Verified on real hardware: connect/reconnect 0.3–1.7s, device switching
+  (Timoo↔Pixoo) 0.3–0.7s, channel switching (0x45) with read-back confirming the
+  mode changed, brightness writes — all solid across disconnect/reconnect cycles.
+
 ## v0.21.18 — fix: BLE central self-heals a dead CoreBluetooth session (2026-07-09)
 
 - **fix(rust-daemon):** flaky "can't connect to the screens" — once the daemon's
