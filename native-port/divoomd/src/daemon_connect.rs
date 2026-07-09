@@ -14,7 +14,29 @@ const MIN_RESCAN_INTERVAL: Duration = Duration::from_secs(3);
 use crate::daemon::{Daemon, DeviceTransport};
 use crate::protocol::{err_reply, Request};
 #[cfg(feature = "ble")]
-use crate::ble::{self, BleTransport};
+use crate::ble::{self, BleTransport, Discovered};
+
+/// btleplug surfaces a dead CoreBluetooth central (its session ended after a
+/// device disconnect or a Bluetooth toggle) as "Channel closed". The cached
+/// Adapter can't recover, so we drop it and retry once with a fresh one.
+#[cfg(feature = "ble")]
+fn is_dead_central(err: &str) -> bool {
+    err.contains("Channel closed")
+}
+
+/// Get the (cached) central and run one scan; error as a String for retry logic.
+#[cfg(feature = "ble")]
+async fn run_scan(daemon: &Daemon, dur: Duration) -> Result<Vec<Discovered>, String> {
+    let central = daemon.central().await?;
+    ble::scan(&central, dur).await.map_err(|e| e.to_string())
+}
+
+/// Get the (cached) central and run one connect; error as a String for retry.
+#[cfg(feature = "ble")]
+async fn run_connect(daemon: &Daemon, id: &str) -> Result<BleTransport, String> {
+    let central = daemon.central().await?;
+    BleTransport::connect(&central, id).await.map_err(|e| e.to_string())
+}
 
 /// Handle `probe_lan` — check whether the connected device is reachable over its
 /// LAN HTTP API (Python-daemon parity). BLE/SPP devices report "no LAN configured".
@@ -79,11 +101,13 @@ pub(crate) async fn cmd_scan(daemon: &Daemon, req: &Request) -> Value {
     // `limit` is accepted but intentionally NOT used to truncate results: capping
     // could hide a real device (the "found 2 of 3" class of bug). ble::scan caps
     // an over-long timeout internally so a stray large value can't wedge things.
-    let central = match daemon.central().await {
-        Ok(c) => c,
-        Err(e) => return err_reply(&format!("scan failed: {e}")),
-    };
-    match ble::scan(&central, Duration::from_secs_f64(timeout)).await {
+    let dur = Duration::from_secs_f64(timeout);
+    let mut result = run_scan(daemon, dur).await;
+    if matches!(&result, Err(e) if is_dead_central(e)) {
+        daemon.reset_central().await; // stale CoreBluetooth session — rebuild + retry
+        result = run_scan(daemon, dur).await;
+    }
+    match result {
         Ok(devs) => {
             let devices: Vec<Value> = devs
                 .iter()
@@ -139,11 +163,12 @@ pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
             }
         }
 
-        let central = match daemon.central().await {
-            Ok(c) => c,
-            Err(e) => return err_reply(&format!("connect failed: {e}")),
-        };
-        match BleTransport::connect(&central, &id).await {
+        let mut result = run_connect(daemon, &id).await;
+        if matches!(&result, Err(e) if is_dead_central(e)) {
+            daemon.reset_central().await; // stale CoreBluetooth session — rebuild + retry
+            result = run_connect(daemon, &id).await;
+        }
+        match result {
             Ok(t) => {
                 *daemon.device.lock().await = Some(Arc::new(DeviceTransport::Ble(t)));
                 *daemon.device_id.lock().await = Some(id.clone());
@@ -175,7 +200,7 @@ pub(crate) async fn cmd_disconnect(daemon: &Daemon) -> Value {
 
 #[cfg(all(test, feature = "ble"))]
 mod scan_guard_tests {
-    use super::{cmd_scan, ScanGuard};
+    use super::{cmd_scan, is_dead_central, ScanGuard};
     use crate::daemon::Daemon;
     use crate::protocol::make_request;
     use serde_json::json;
@@ -186,6 +211,16 @@ mod scan_guard_tests {
     // result WITHOUT touching the radio (the check short-circuits before
     // daemon.central()), so this is unit-testable with no BLE device. Guards the
     // anti-throttle behavior that stops rapid re-scans wedging CoreBluetooth.
+    #[test]
+    fn detects_dead_central_error() {
+        // "Channel closed" (from either scan or connect) → recreate the central.
+        assert!(is_dead_central("connect failed: Channel closed"));
+        assert!(is_dead_central("scan failed: Channel closed"));
+        // Ordinary failures must NOT trigger a central rebuild.
+        assert!(!is_dead_central("device not found in scan"));
+        assert!(!is_dead_central("no BLE adapter"));
+    }
+
     #[tokio::test]
     async fn rapid_rescan_returns_cached_without_touching_radio() {
         let daemon = Daemon::new();

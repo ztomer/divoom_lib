@@ -4,6 +4,20 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.18 — fix: BLE central self-heals a dead CoreBluetooth session (2026-07-09)
+
+- **fix(rust-daemon):** flaky "can't connect to the screens" — once the daemon's
+  cached BLE central (CoreBluetooth session) died, EVERY scan and connect failed
+  instantly with `"Channel closed"` and only a daemon restart recovered it. The
+  session ends after a device disconnect or a Bluetooth toggle, and the daemon
+  cached the `Adapter` for its whole lifetime and never rebuilt it. Now: a scan or
+  connect that fails with a dead-central error drops the cached central
+  (`Daemon::reset_central`) and **retries once with a fresh one** — the daemon
+  self-heals without a restart. Root-caused live: with a dead central, `scan` and
+  `connect` both returned `"Channel closed"` in ~0.0s.
+- Teeth: `scan_guard_tests::detects_dead_central_error`. Both feature sets compile;
+  31 lib tests pass.
+
 ## v0.21.17 — fix: false "background service isn't running" banner + device-lock wedge (2026-07-09)
 
 - **fix(rust-daemon):** an unbounded BLE write could hang forever and **wedge the

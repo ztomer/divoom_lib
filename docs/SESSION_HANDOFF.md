@@ -18,6 +18,18 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **BLE CENTRAL SELF-HEAL → FIXED v0.21.18 (2026-07-09).** User: "can't connect to
+  screens, very flaky." Live repro: with a dead cached central, BOTH `scan` and
+  `connect` returned `"Channel closed"` in ~0.0s — the CoreBluetooth session died
+  (device disconnect / BT toggle) and the daemon cached the Adapter forever, never
+  rebuilding it, so only a restart recovered. Fix (`daemon_connect.rs`): on a
+  dead-central error (`is_dead_central` → contains "Channel closed"), call
+  `Daemon::reset_central()` and retry the scan/connect ONCE with a fresh central.
+  `run_scan`/`run_connect` helpers factor it. Teeth: `detects_dead_central_error`.
+  NOTE: could not exercise the RECOVERY path on hardware (can't kill the central on
+  demand without also restarting the daemon → fresh central); detector unit-tested,
+  and a fresh central after install recovers the user immediately.
+
 - **FALSE "SERVICE NOT RUNNING" BANNER + DEVICE-LOCK WEDGE → FIXED v0.21.17
   (2026-07-09).** User hit the daemon-down banner while the daemon WAS running.
   Root-caused live: `device_status`/`device_call` hung 6s+ while
