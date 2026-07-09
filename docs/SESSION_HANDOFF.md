@@ -18,6 +18,29 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **DMG BUILD + INSTALL + RUNTIME TEST → PASSED v0.21.13 (2026-07-09).** Built
+  `dist/Divoom-v0.21.13.dmg` (38M, adhoc-signed) via `scripts/build_release.sh`
+  (had to create `.buildvenv` first). Installed from the mounted DMG to
+  `/Applications` (replaced 0.21.7). VERIFIED on the real build:
+  (1) **App icon** — `Contents/Resources/Divoom.icns` present, all 10 iconset
+  sizes incl @2x, `CFBundleIconFile=Divoom.icns`. (2) **Bundle** ships all web_ui
+  changes (daemon-banner, hot-last-checked, loadLastChecked, refreshDaemonHealth)
+  and the Rust `hot_state` (strings probe: `hot_update_state.json` + fields +
+  `[ Wrn ] hot_state record_check failed:`). (3) **Launch** — dashboard renders;
+  native Rust `divoomd` + `divoom-menubar` both spawn; BLE works (4 devices found,
+  Timoo-light-4 connected); NO daemon-down banner (healthy). (4) **Daemon
+  reliability (v0.21.9)** — `kill -9` the daemon → app STAYED running and a fresh
+  daemon respawned within ~1s, device still connected, no banner. LIMITATION:
+  couldn't drive the pywebview UI via computer-use — the user's tiling WM
+  (`com.zaidenstein.ZoneTilerWM`, not allowlistable) overlays the window and eats
+  clicks. So the MCP-card / hot-channel-stamp / banner VISUALS weren't clicked
+  through on the DMG (all verified earlier via unit tests + the static web_ui
+  preview). Note: stale `~/.config/divoom-control/mcp-server.log` (Jun 10) is
+  still on disk — confirms the MCP fix relies on session-gating to not surface it.
+  Full test suite can't run clean in this shell (BLE tests SIGSEGV mid-run;
+  see [[divoom-pytest-shutdown-segfault]]) — changed-area files all green.
+
+
 - **HOT CHANNEL "LAST CHECKED" STAMP → ADDED v0.21.12, MADE DAEMON-OWNED v0.21.13
   (2026-07-08).** Per-device dated verdict so "up to date" isn't blind (user's
   follow-up ask). v0.21.12 recorded it GUI-side; v0.21.13 moved the WRITE into the
