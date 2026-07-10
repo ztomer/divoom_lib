@@ -18,6 +18,33 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HOT-CHANNEL UPLOADS WERE BROKEN → FIXED + HARDWARE-CONFIRMED, v0.21.22
+  (2026-07-09).** User: "unsure the hot-channel downloads are uploaded to the
+  device." They were right — uploads served 0 files for EVERY device class. Root
+  cause (found via a `DIVOOMD_BLE_DEBUG` BLE wire trace): the hot API returns each
+  file's `Version` as a JSON **string** (`"1112"`) but `VendorId` as a number;
+  `fetch_hot_manifest` (`art_hot.rs`) parsed `Version` with serde `as_u64()` →
+  `None` for strings → every `HotFile.version = 0`. So the `0x9B` manifest
+  advertised `newestVersion=0` and `pick_file` never matched the device's request
+  (`0xF7` for v1103) → `pick_file NONE -> break`, served 0. Fix: `json_u32()`
+  accepts number OR string (Python parity `int(f["Version"])`), applied to Version
+  + VendorId; pure `parse_hot_manifest()` split out with a regression test (string
+  Version, numeric VendorId; proven red before green). HARDWARE CONFIRM: re-ran
+  over the socket → manifest `...58040000` (newestVersion=1112), 10 files MATCH +
+  streamed (**1907 0x9E packets**), served=10 confirmed=10, then v1113 request →
+  clean break. Also this round: the earlier `show_after` switch fix (device now
+  switches to the HOT channel after a push) is confirmed too. Committed (927cd92 +
+  d9e8898). Kept gated BLE TX + `[hot]` session logging (DIVOOMD_BLE_DEBUG) that
+  made this findable. Release v0.21.22 NOT cut yet.
+  - KNOWN LATENT (not fixed): `run_hot_session` runs with the device lock dropped
+    (`art_hot.rs:132`); a concurrent `device_call` calls `send_command_and_wait`
+    which DRAINS the notify channel (`ble.rs:290`) and could steal an in-flight
+    upload's frames. Rare (progress UI polls a lock-free endpoint) but real —
+    candidate: hold the device lock for the whole session.
+  - Process note: `git checkout -- <file>` on an UNCOMMITTED file wipes all working
+    changes — it cost a re-apply of this fix mid-round. Commit before "break to
+    prove the test fails" experiments.
+
 - **HOT-CHANNEL SWITCH FIX → v0.21.22, AWAITING HARDWARE CONFIRM (2026-07-09).**
   User: "selecting the hot channel should switch the device to the hot channel;
   this doesn't happen now." Root cause: the native daemon dropped the `show` flag.
