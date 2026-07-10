@@ -8,8 +8,10 @@
 //!
 //! Shape (keyed by the GUI's device address — MAC, `LAN:<ip>`, or `MatrixWall`):
 //!
-//!     { "AA:BB:CC:DD:EE:FF": { "checked_at": 1720000000, "served": 0,
-//!                              "manifest": 12, "downloaded": 12, "confirmed": 0 } }
+//! ```text
+//! { "AA:BB:CC:DD:EE:FF": { "checked_at": 1720000000, "served": 0,
+//!                          "manifest": 12, "downloaded": 12, "confirmed": 0 } }
+//! ```
 
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
