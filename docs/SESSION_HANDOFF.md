@@ -18,6 +18,22 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **CI GREEN → v0.21.21 (2026-07-09).** The v0.21.20 tag push was the first CI run
+  since v0.21.7, and it went red: `rust-core` + `rust-ble` both failed on a
+  **rustdoc doctest** — `hot_state.rs` had an indented JSON example in its module
+  doc (`//!`), which rustdoc compiles as a runnable Rust doctest
+  (`test src/hot_state.rs - hot_state (line 11) ... FAILED`). Local `cargo test
+  --lib` never caught it because `--lib` EXCLUDES doctests; they only run under
+  `cargo test --doc`. Fix: wrapped the block in a `text` fence (renders, not
+  compiled). Shipped as v0.21.21 (fresh DMG + tag + release + cask — user chose a
+  follow-up patch over rewriting the published v0.21.20 tag). CI on v0.21.21:
+  `rust-core`/`rust-ble`/`rust-ble-linux`/`test`/`no-emoji` all GREEN; overall run
+  conclusion **success**. NOTE: `rust-ble-windows` fails on BOTH v0.21.20 AND
+  v0.21.21 (`unresolved import tokio::net::UnixListener/UnixStream`) — the daemon
+  is Unix-socket-only, can't compile on Windows; it's a pre-existing, inherent,
+  NON-BLOCKING job (continue-on-error). Candidate cleanup: drop the Windows job
+  since this is a macOS-only app.
+
 - **ROCK-SOLID BLE CONNECTION → v0.21.19/20 + hardware test loop (2026-07-09).**
   User: "can't connect, very flaky." Live repro found the BLE **connect path had
   unbounded awaits** — `peripheral.connect()`/`discover_services()`/`subscribe()`
