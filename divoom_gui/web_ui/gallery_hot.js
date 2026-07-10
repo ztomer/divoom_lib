@@ -224,6 +224,11 @@ document.addEventListener("DOMContentLoaded", () => {
             // R53: the DAEMON stamped the last-checked state on completion; just
             // re-read it so the label reflects the daemon-owned source of truth.
             loadLastChecked();
+            // The manifest can rotate while the app sits on this tab, so the grid
+            // goes stale (it only re-fetches on tab activation). Re-fetch now so
+            // the tiles reflect the set the device was just synced against — the
+            // newest file was missing from the preview until this refresh.
+            loadHotPreview();
         } else {
             fill.style.width = "100%";
             text.textContent = p.error ? `Failed: ${p.error}` : "Update failed";

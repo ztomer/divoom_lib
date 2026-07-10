@@ -18,11 +18,18 @@ shipped milestone (per the project planning docs).
   a bare "Downloading N/M" / "Uploading N/M"; it now reads "1/2 Downloading from
   Divoom N/M" then "2/2 Uploading to device N/M" (and "1/2 Using cached files" when
   the download was served from cache), so the step is legible at a glance.
+- **fix(gui): hot preview showed a stale / arbitrarily-ordered set.** The grid only
+  re-fetched on tab activation, so after the manifest rotated (or after an update)
+  the newest file wasn't shown where expected. Two fixes: (1) re-fetch the manifest
+  after an update completes (`gallery_hot.js`), and (2) sort the preview
+  newest-first in `hot_update_preview` (`gallery_hot_api.py`) — the hot API's list
+  order isn't a stable contract, so the newest art now pins to tile 0 regardless.
 - **verified:** the hot-channel PREVIEW is a faithful decode of the exact bytes
   streamed to the device — the tile and the upload both pull
   `fin.divoom-gz.com/{file_id}`, and the local decoder renders those bytes to
-  coherent animated art (confirmed against real 0xAA hot files). The preview grid
-  shows the full curated manifest; a given device only receives the subset it lacks.
+  coherent animated art (confirmed against real 0xAA hot files; the on-disk decode
+  cache is correct, not stale). The preview grid shows the full curated manifest;
+  a given device only receives the subset it lacks.
 
 ## v0.21.22 — fix: hot-channel upload + channel switch (2026-07-09)
 

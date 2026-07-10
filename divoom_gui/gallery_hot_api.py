@@ -113,6 +113,13 @@ class GalleryHotApiMixin:
                     "has_cache": f.file_id in name_map,
                 })
 
+            # Show newest-first deterministically. The hot API's list order is
+            # not a stable contract (it can reorder its "featured" set between
+            # requests), which made the newest file land at an arbitrary tile —
+            # so the just-added art wasn't where the user looked for it. Sorting by
+            # version here pins the newest to tile 0 regardless of API order.
+            items.sort(key=lambda it: it.get("version", 0), reverse=True)
+
             return json.dumps({"success": True, "items": items, "count": len(items)})
         except Exception as e:
             logger.warning(f"hot_update_preview failed: {e}")
