@@ -4,6 +4,17 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.22 — fix: Update Hot Channel now switches the device to it (2026-07-09)
+
+- **fix(rust-daemon):** "Update Hot Channel" pushed the curated files but left the
+  screen on whatever channel it was on — the device never switched to the HOT/cloud
+  channel. The GUI passes `show=True` and `art.rs` forwards it as `show_after`, but
+  `run_hot_update` (`art_hot.rs`) took the flag as `_show_after` and dropped it on
+  the floor. Now, after a successful push, it issues `0x45 [0x02]` (the HOT-channel
+  switch) when `show_after` is set — matching the Python daemon
+  (`owner_art.show_hot_channel`). Fires even when the device was already up to date
+  (0 files served), so the button reliably brings the screen to the hot channel.
+
 ## v0.21.21 — fix: green CI (rustdoc doctest) (2026-07-09)
 
 - **fix(ci):** the `hot_state.rs` module doc comment carried an indented JSON

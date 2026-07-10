@@ -100,7 +100,7 @@ fn pick_file<'a>(files: &'a [HotFile], vendor_id: u32, version: u32) -> Option<&
 pub(crate) async fn run_hot_update(
     daemon: Arc<Daemon>,
     device_size: u32,
-    _show_after: bool,
+    show_after: bool,
     progress: Arc<HotProgress>,
 ) -> Result<Value, String> {
     let client = reqwest::Client::builder()
@@ -131,7 +131,17 @@ pub(crate) async fn run_hot_update(
         let dev = match guard.as_ref() { Some(d) => d.clone(), None => return Err("no device connected".into()) };
         drop(guard);
         if matches!(&*dev, crate::daemon::DeviceTransport::Ble(_) | crate::daemon::DeviceTransport::Spp(_)) {
-            return run_hot_session(&*dev, &files, ok_dl, progress).await;
+            let result = run_hot_session(&*dev, &files, ok_dl, progress).await?;
+            // Parity with the Python daemon (owner_art.show_hot_channel): after a
+            // successful push, switch the device to the HOT/cloud channel so it
+            // actually shows what we just uploaded. Without this the files land in
+            // the rotation but the screen stays on whatever channel it was on.
+            if show_after {
+                if let Err(e) = dev.send_command(0x45, &[0x02], true).await {
+                    return Err(format!("hot channel switch (0x45 [0x02]) failed: {e}"));
+                }
+            }
+            return Ok(result);
         }
     }
     Err("hot_update requires BLE/SPP transport".into())
