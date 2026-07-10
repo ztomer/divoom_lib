@@ -4,13 +4,16 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
-## v0.21.20 — feat: version indicator in Settings (2026-07-09)
+## v0.21.21 — fix: green CI (rustdoc doctest) (2026-07-09)
 
 - **fix(ci):** the `hot_state.rs` module doc comment carried an indented JSON
   example, which `rustdoc` compiles as a doctest — it failed the `rust-ble` and
   `rust-core` jobs on the v0.21.20 tag push. Wrapped it in a `text` fence so it
   is rendered, not compiled. (Local `cargo test --lib` masked this; doctests
   only run under `cargo test --doc`.)
+
+## v0.21.20 — feat: version indicator in Settings (2026-07-09)
+
 - **feat(settings):** the Settings panel now shows the app version in a small
   footer ("Divoom Control v0.21.20"). New lock-free `get_app_version` JS-API
   (`lifecycle_mixin`) reads the version from pyproject.toml (dev tree) or the
