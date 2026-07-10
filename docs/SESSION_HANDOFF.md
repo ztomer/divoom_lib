@@ -36,11 +36,16 @@ Claude) should read this on entry and **update it at the end of every round**
   switches to the HOT channel after a push) is confirmed too. Committed (927cd92 +
   d9e8898). Kept gated BLE TX + `[hot]` session logging (DIVOOMD_BLE_DEBUG) that
   made this findable. Release v0.21.22 NOT cut yet.
-  - KNOWN LATENT (not fixed): `run_hot_session` runs with the device lock dropped
-    (`art_hot.rs:132`); a concurrent `device_call` calls `send_command_and_wait`
-    which DRAINS the notify channel (`ble.rs:290`) and could steal an in-flight
-    upload's frames. Rare (progress UI polls a lock-free endpoint) but real —
-    candidate: hold the device lock for the whole session.
+  - CONCURRENCY FIX (done, 8dcab81): `run_hot_session` now holds the device lock
+    for the whole BLE exchange, so a concurrent `device_call` (which drains the
+    notify channel via `send_command_and_wait`) waits instead of truncating an
+    in-flight upload. Download stays lock-free; `get_status`/`hot_update_progress`
+    lock-free so the progress UI is unaffected. Hardware-verified: 11-file /
+    1907-packet upload completed cleanly with the lock held.
+  - RELEASED v0.21.22 (tag + GitHub release + DMG + cask). CI GREEN (rust-ble,
+    rust-core, rust-ble-linux, test, no-emoji all pass; rust-ble-windows is the
+    known non-blocking Unix-socket-on-Windows failure being removed on branch
+    claude/beautiful-kare-94c4d2).
   - Process note: `git checkout -- <file>` on an UNCOMMITTED file wipes all working
     changes — it cost a re-apply of this fix mid-round. Commit before "break to
     prove the test fails" experiments.
