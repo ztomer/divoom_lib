@@ -4,6 +4,26 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.23 — hot-channel: cache downloads + clearer two-phase progress (2026-07-10)
+
+- **perf(rust-daemon): cache hot-file downloads per device size.** The manifest +
+  all 25 file bodies depend only on `device_type` (pixel class), but the native
+  daemon re-fetched them from the CDN on every update — so syncing four devices
+  re-downloaded the same set four times. Ported the Python daemon's
+  `_load_hot_files`/`_MANIFEST_CACHE_TTL` (300s): the fully-downloaded set is
+  cached per device_type and shared (bodies are read-only during the BLE session),
+  so a second same-size device reuses it instantly. New `load_hot_files` + a
+  cache-hit unit test.
+- **ux(gui): hot-channel progress now names both phases.** The button progress read
+  a bare "Downloading N/M" / "Uploading N/M"; it now reads "1/2 Downloading from
+  Divoom N/M" then "2/2 Uploading to device N/M" (and "1/2 Using cached files" when
+  the download was served from cache), so the step is legible at a glance.
+- **verified:** the hot-channel PREVIEW is a faithful decode of the exact bytes
+  streamed to the device — the tile and the upload both pull
+  `fin.divoom-gz.com/{file_id}`, and the local decoder renders those bytes to
+  coherent animated art (confirmed against real 0xAA hot files). The preview grid
+  shows the full curated manifest; a given device only receives the subset it lacks.
+
 ## v0.21.22 — fix: hot-channel upload + channel switch (2026-07-09)
 
 - **fix(rust-daemon): hot-channel uploads never reached the device.** The hot API

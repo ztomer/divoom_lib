@@ -153,6 +153,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let pct = 0;
         let msg = "Starting\u2026";
 
+        // Two phases, made explicit so the step is legible: first we pull the
+        // curated files FROM Divoom's cloud, then we stream them TO the device.
         switch (p.phase) {
             case "starting":
                 pct = 0;
@@ -160,15 +162,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 break;
             case "fetching_manifest":
                 pct = 2;
-                msg = "Fetching list\u2026";
+                msg = "1/2 Fetching hot list\u2026";
                 break;
             case "downloading":
                 pct = 5 + (p.current / p.total) * 45;
-                msg = `Downloading ${p.current}/${p.total}`;
+                // Cached: bodies were already downloaded for this device size, so
+                // we skip straight to the upload \u2014 say so rather than flashing a
+                // misleading "downloading".
+                msg = p.cached
+                    ? "1/2 Using cached files"
+                    : `1/2 Downloading from Divoom ${p.current}/${p.total}`;
                 break;
             case "uploading":
                 pct = 50 + (p.current / p.total) * 48;
-                msg = `Uploading ${p.current}/${p.total}`;
+                msg = `2/2 Uploading to device ${p.current}/${p.total}`;
                 break;
         }
 

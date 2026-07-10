@@ -118,6 +118,70 @@ fn pick_file<'a>(files: &'a [HotFile], vendor_id: u32, version: u32) -> Option<&
     candidates.iter().filter(|f| f.version >= version).min_by_key(|f| f.version).copied()
 }
 
+// ── Manifest + body cache, keyed by device_type (pixel class) ──────────────
+// The manifest and every file body depend ONLY on device_type, so syncing N
+// same-size devices would otherwise re-hit the CDN N times (fetch the manifest +
+// download all 25 bodies per device). Cache the fully-downloaded set per
+// device_type for a short TTL and share it — bodies are read-only during the BLE
+// session, so sharing across devices is safe. Ports `_load_hot_files` /
+// `_MANIFEST_CACHE_TTL` from `divoom_lib/tools/hot_update.py`.
+const MANIFEST_CACHE_TTL_SECS: u64 = 300;
+type HotCache = std::sync::Mutex<
+    std::collections::HashMap<u32, (std::time::Instant, Arc<Vec<HotFile>>)>,
+>;
+static MANIFEST_CACHE: std::sync::OnceLock<HotCache> = std::sync::OnceLock::new();
+fn manifest_cache() -> &'static HotCache {
+    MANIFEST_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Drop all cached manifests (test hook / force-refresh).
+#[cfg(test)]
+fn clear_manifest_cache() { manifest_cache().lock().unwrap().clear(); }
+
+/// Return `(files, downloaded_count, from_cache)` for `device_type`, reusing a
+/// recent cached download for the same device class so N same-size devices don't
+/// each re-fetch from the CDN. On a miss, fetch the manifest + download every
+/// body, then cache the fully-downloaded set.
+async fn load_hot_files(
+    client: &reqwest::Client,
+    device_type: u32,
+    progress: &HotProgress,
+) -> Result<(Arc<Vec<HotFile>>, usize, bool), String> {
+    // Cache hit → reuse. The lock is held only for the sync lookup + clone,
+    // never across an await (that would serialize concurrent updates / risk a
+    // hang), so drop the guard before any network I/O.
+    {
+        let cache = manifest_cache().lock().unwrap();
+        if let Some((t, files)) = cache.get(&device_type) {
+            if t.elapsed().as_secs() < MANIFEST_CACHE_TTL_SECS {
+                let dl = files.iter().filter(|f| !f.body.is_empty()).count();
+                if dl > 0 {
+                    return Ok((files.clone(), dl, true));
+                }
+            }
+        }
+    }
+
+    // Miss → fetch the manifest + download every body.
+    let mut files = fetch_hot_manifest(client, device_type).await?;
+    if files.is_empty() { return Err("empty hot manifest".into()); }
+    let total = files.len();
+    progress.set(json!({"phase": "downloading", "current": 0, "total": total}));
+    let mut ok_dl = 0usize;
+    for (i, f) in files.iter_mut().enumerate() {
+        if download_hot_file(client, f).await { ok_dl += 1; }
+        progress.set(json!({"phase":"downloading","current":i+1,"total":total,"file_id":&f.file_id}));
+    }
+    if ok_dl == 0 { return Err("no hot files downloadable".into()); }
+
+    let arc = Arc::new(files);
+    manifest_cache()
+        .lock()
+        .unwrap()
+        .insert(device_type, (std::time::Instant::now(), arc.clone()));
+    Ok((arc, ok_dl, false))
+}
+
 pub(crate) async fn run_hot_update(
     daemon: Arc<Daemon>,
     device_size: u32,
@@ -129,21 +193,18 @@ pub(crate) async fn run_hot_update(
         .user_agent("okhttp/4.12.0")
         .build().map_err(|e| e.to_string())?;
 
-    // 1. Fetch manifest
+    // 1+2. Manifest + bodies, cached per device_type so N same-size devices
+    // don't each re-hit the CDN (load_hot_files emits the "downloading" progress
+    // on a miss; a hit returns instantly).
     progress.set(json!({"phase": "fetching_manifest"}));
     let device_type = device_type_for_size(device_size);
-    let mut files = fetch_hot_manifest(&client, device_type).await?;
-    if files.is_empty() { return Err("empty hot manifest".into()); }
-
-    // 2. Download files
-    let total_files = files.len();
-    progress.set(json!({"phase": "downloading", "current": 0, "total": total_files}));
-    let mut ok_dl = 0usize;
-    for (i, f) in files.iter_mut().enumerate() {
-        if download_hot_file(&client, f).await { ok_dl += 1; }
-        progress.set(json!({"phase":"downloading","current":i+1,"total":total_files,"file_id":&f.file_id}));
+    let (files, ok_dl, from_cache) = load_hot_files(&client, device_type, &progress).await?;
+    if from_cache {
+        // Nothing was re-fetched — jump the download bar to full so the UI moves
+        // straight to the upload phase instead of sitting at "fetching".
+        let n = files.len();
+        progress.set(json!({"phase": "downloading", "current": n, "total": n, "cached": true}));
     }
-    if ok_dl == 0 { return Err("no hot files downloadable".into()); }
 
     // 3. BLE session
     #[cfg(feature = "ble")]
@@ -333,5 +394,31 @@ mod tests {
         let picked = pick_file(&with_bodies, 40005454, 1103);
         assert!(picked.is_some(), "pick_file must match a held version");
         assert_eq!(picked.unwrap().version, 1103);
+    }
+
+    // A cache hit must reuse the downloaded set (from_cache=true) and NOT touch
+    // the network — this is what stops N same-size devices re-downloading.
+    #[tokio::test]
+    async fn load_hot_files_returns_cached_without_refetch() {
+        clear_manifest_cache();
+        let dt = 99u32; // synthetic device_type — no real CDN entry
+        let cached = Arc::new(vec![HotFile {
+            vendor_id: 1, file_id: "x.bin".into(), version: 5,
+            sha1: String::new(), body: vec![1, 2, 3, 4],
+        }]);
+        manifest_cache().lock().unwrap()
+            .insert(dt, (std::time::Instant::now(), cached.clone()));
+
+        // reqwest::Client is unused on a hit; if the cache missed this would hit
+        // the network for device_type 99 and return an error/empty instead.
+        let (got, dl, from_cache) =
+            load_hot_files(&reqwest::Client::new(), dt, &HotProgress::default())
+                .await
+                .expect("cache hit must succeed without network");
+        assert!(from_cache, "should report a cache hit");
+        assert_eq!(dl, 1);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].file_id, "x.bin");
+        clear_manifest_cache();
     }
 }
