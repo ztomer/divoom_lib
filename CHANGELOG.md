@@ -4,8 +4,18 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
-## v0.21.22 — fix: Update Hot Channel now switches the device to it (2026-07-09)
+## v0.21.22 — fix: hot-channel upload + channel switch (2026-07-09)
 
+- **fix(rust-daemon): hot-channel uploads never reached the device.** The hot API
+  returns each file's `Version` as a JSON **string** (`"1112"`) but `VendorId` as a
+  number; `fetch_hot_manifest` (`art_hot.rs`) read `Version` with serde's
+  `as_u64()`, which yields `None` for strings, so **every file's version parsed as
+  0**. The `0x9B` manifest then advertised `newestVersion=0`, and `pick_file` never
+  matched the device's request (it asks for e.g. v1103) → the session served 0
+  files every time. Confirmed on hardware via a BLE wire trace: device sent `0xF7`
+  requests, we replied nothing. Fixed with a `json_u32` helper that accepts number
+  or string (parity with Python's `int(f["Version"])`); split out a pure
+  `parse_hot_manifest` with a regression test against the real response shape.
 - **fix(rust-daemon):** "Update Hot Channel" pushed the curated files but left the
   screen on whatever channel it was on — the device never switched to the HOT/cloud
   channel. The GUI passes `show=True` and `art.rs` forwards it as `show_after`, but

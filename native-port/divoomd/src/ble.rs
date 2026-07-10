@@ -237,6 +237,12 @@ impl BleTransport {
 
     /// Encode `[command_id, args...]` in the active framing and write it.
     pub async fn send_command(&self, command_id: u8, args: &[u8], write_with_response: bool) -> BleResult<()> {
+        if std::env::var("DIVOOMD_BLE_DEBUG").is_ok() {
+            let n = args.len().min(12);
+            let hx: String = args[..n].iter().map(|b| format!("{b:02x}")).collect();
+            eprintln!("[ble] tx cmd=0x{command_id:02x} ({} args){}", args.len(),
+                      if n > 0 { format!(" {hx}{}", if args.len() > n { ".." } else { "" }) } else { String::new() });
+        }
         let mut payload = Vec::with_capacity(1 + args.len());
         payload.push(command_id);
         payload.extend_from_slice(args);
