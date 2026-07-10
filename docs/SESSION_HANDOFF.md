@@ -18,6 +18,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HOT-CHANNEL SWITCH FIX → v0.21.22, AWAITING HARDWARE CONFIRM (2026-07-09).**
+  User: "selecting the hot channel should switch the device to the hot channel;
+  this doesn't happen now." Root cause: the native daemon dropped the `show` flag.
+  GUI "Update Hot Channel" sends `hot_update{show:True}`; `art.rs cmd_hot_update`
+  reads it as `show_after` (default true) and passes it down, but
+  `art_hot.rs run_hot_update` took it as `_show_after` and never used it — so files
+  were pushed but the screen never switched. The Python daemon DID switch
+  (`owner_art.show_hot_channel` → `0x45 [0x02]`), so the two daemons disagreed. Fix
+  (`art_hot.rs`): after a successful `run_hot_session`, if `show_after`, send
+  `0x45 [0x02]` (HOT/cloud channel). Fires even when 0 files served (already up to
+  date), so the button reliably lands the screen on the hot channel. Committed +
+  version bumped to 0.21.22; release NOT cut yet — needs user-POV hardware confirm
+  (OS-facing). Both target/release + target/debug divoomd rebuilt with the fix.
+  Verify: `./run.sh` → connect a device → set it to Clock → click "Update Hot
+  Channel" → screen should switch to the hot/cloud channel. (A/B driver in the
+  scratchpad: `hw_test_hot_channel.py`.) After confirm: `scripts/release.sh`.
+
 - **CI GREEN → v0.21.21 (2026-07-09).** The v0.21.20 tag push was the first CI run
   since v0.21.7, and it went red: `rust-core` + `rust-ble` both failed on a
   **rustdoc doctest** — `hot_state.rs` had an indented JSON example in its module
