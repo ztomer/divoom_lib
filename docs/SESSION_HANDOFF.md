@@ -18,6 +18,30 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HOT-CHANNEL PREVIEW investigation → v0.21.23 (2026-07-10).** User: the newest
+  hot file (a penguin, v1112) isn't visible in the preview grid; suspected a stale
+  cache. Verified with data + a live look at the packaged app (computer-use):
+  (a) the DECODE/CACHE is correct — the tile decodes the exact bytes streamed to
+  the device (`fin.divoom-gz.com/{file_id}`), and `get_animated_preview` returns
+  the right penguin; the on-disk `cache_gallery` is fine. (b) `fetch_hot_manifest`
+  is deterministic (penguin at index 0, newest-first) but the packaged app's grid
+  showed a non-penguin at tile 0 and shifted between renders. (c) Code audit: only
+  `renderHotPreview` writes the grid, no shuffle/sort, renders in manifest order,
+  async swap is race-safe; `gallery_hot_api.py` unchanged since v0.21.22 → same
+  logic. Conclusion: no reproducible code bug; the ordering weirdness is most
+  likely the hot API returning a non-stable "featured" order over time (or my own
+  misreads of the animated grid — flagged honestly). FIXES (defensive, committed
+  67fd449): re-fetch preview after an update (`gallery_hot.js` finishProgress) +
+  sort preview newest-first in `hot_update_preview` (pins newest to tile 0
+  regardless of API order). NOT independently reproduced/confirmed fixed — needs
+  verification in a fresh v0.21.23 build (packaged app is still v0.21.22). Also
+  note: a few tiles render near-black; their 0xAA first-frame color counts are low
+  (2–12 vs the penguin's 58) — likely genuinely-dark animations, NOT confirmed
+  decoder garbage (would need a device-vs-tile comparison to call it a bug).
+  LESSON: applied [[trace-the-boundary]] — caught myself twice labeling
+  low-res/animated thumbnails as "garbage"/"penguin appeared" without verifying.
+
+
 - **HOT-CHANNEL UPLOADS WERE BROKEN → FIXED + HARDWARE-CONFIRMED, v0.21.22
   (2026-07-09).** User: "unsure the hot-channel downloads are uploaded to the
   device." They were right — uploads served 0 files for EVERY device class. Root
