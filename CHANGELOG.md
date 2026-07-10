@@ -16,6 +16,14 @@ shipped milestone (per the project planning docs).
   requests, we replied nothing. Fixed with a `json_u32` helper that accepts number
   or string (parity with Python's `int(f["Version"])`); split out a pure
   `parse_hot_manifest` with a regression test against the real response shape.
+- **fix(rust-daemon): hold the device lock for the whole hot-upload session.** The
+  session is device-driven and reads the shared notify channel; it previously ran
+  with the lock dropped, so a concurrent `device_call` (which calls
+  `send_command_and_wait` → drains that channel) could steal an in-flight upload's
+  ack/request frames and truncate the transfer. Now the lock is held across the
+  BLE exchange (download stays lock-free; `get_status`/`hot_update_progress` remain
+  lock-free, so the progress UI is unaffected). Verified on hardware: a full
+  11-file / 1907-packet upload completed cleanly with the lock held.
 - **fix(rust-daemon):** "Update Hot Channel" pushed the curated files but left the
   screen on whatever channel it was on — the device never switched to the HOT/cloud
   channel. The GUI passes `show=True` and `art.rs` forwards it as `show_after`, but

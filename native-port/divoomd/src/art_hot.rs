@@ -148,9 +148,16 @@ pub(crate) async fn run_hot_update(
     // 3. BLE session
     #[cfg(feature = "ble")]
     {
+        // Hold the device lock for the WHOLE session: it is device-driven (0xF7/
+        // 0x9D/0x9E) and reads the shared notify channel. A concurrent `device_call`
+        // grabs this same lock and calls `send_command_and_wait`, which DRAINS that
+        // channel (ble.rs) — that would silently steal an in-flight upload's ack/
+        // request frames and truncate the transfer. Serializing here makes any
+        // concurrent device command wait instead. (Download above ran lock-free —
+        // it is pure HTTP; only the BLE exchange needs exclusivity. get_status /
+        // hot_update_progress are lock-free so the progress UI is unaffected.)
         let guard = daemon.device.lock().await;
         let dev = match guard.as_ref() { Some(d) => d.clone(), None => return Err("no device connected".into()) };
-        drop(guard);
         if matches!(&*dev, crate::daemon::DeviceTransport::Ble(_) | crate::daemon::DeviceTransport::Spp(_)) {
             let result = run_hot_session(&*dev, &files, ok_dl, progress).await?;
             // Parity with the Python daemon (owner_art.show_hot_channel): after a
