@@ -49,7 +49,8 @@ shipped milestone (per the project planning docs).
 - **status:** code fix complete + green (38 Rust lib tests, 37 python
   protocol/wedge/JS tests, 18 mock-device e2e). Real-device `--run-hardware`
   scan→connect→device_call→disconnect→reconnect loop pending free device.
-  Ready to cut v0.22.1 (build + sign + Homebrew cask bump).
+  **RELEASED as v0.22.1** (tag pushed; GitHub release w/ DMG; Homebrew cask
+  bumped, sha `3f9fb34e69f63483fc409a445b9ce4b757f71a473fc941e9415383615de0a18e`).
 
 ## v0.22.0 — feat: persist known devices so undetected ones still show (R50)
 

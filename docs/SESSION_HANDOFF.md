@@ -33,27 +33,30 @@ Claude) should read this on entry and **update it at the end of every round**
   commit is NOT an ancestor of `main`, `main` has diverged and must be merged first.
    The `claude/hopeful-hertz-eddb6b` branch may still hold unmerged work; check it.
 
-- **R57 (2026-07-12): daemon connect hardening — root-caused + fixed (NOT yet released).**
-  The v0.22.0 "connect to all devices fails" regression is ROOT-CAUSED: Rust
-  `BleTransport::connect` / `ble::scan` called `central.start_scan()` /
+- **R57 (2026-07-12): daemon connect hardening — ROOT-CAUSED, FIXED, RELEASED as
+  v0.22.1.** The v0.22.0 "connect to all devices fails" regression is ROOT-CAUSED:
+  Rust `BleTransport::connect` / `ble::scan` called `central.start_scan()` /
   `central.peripherals()` with **no timeout guard**, so a dead CoreBluetooth
   session hangs forever → `run_connect`/`run_scan` never error → `reset_central`
   self-heal never fires → daemon unusable for ALL devices. FIXED via a new
-  `BleCentral` abstraction (`native-port/divoomd/src/central.rs`) whose
-  `connect` bounds every BLE call in `tokio::time::timeout`; added a concurrent
-  connect guard (`ConnectGuard`/`connecting: AtomicBool`), widened
-  `is_dead_central` to match `timed out`/`stale`/`central`, made GUI connect
-  re-ensure the daemon (`scanner_mixin.connect_single_device` → `reconnect_daemon`),
-  added a JS connect watchdog (`app_globals.connectDevice`, 35s), and bumped
-  `connect_timeout` 20→30s. DETERMINISTIC COVERAGE added: 4 Rust `central.rs`
-  wedge tests (`BleCentral::Faulty`) + 5 Python `tests/test_daemon_client_wedge.py`
-  tests (silent/never-terminated/immediate-close/absent/garbage daemon). All green:
-  38 Rust lib tests, 37 python protocol/wedge/JS tests, 18 mock-device e2e. Real
-  BLE connect verified unchanged (0.7s on Pixoo-1). **NEXT: run `--run-hardware`
-  scan→connect→device_call→disconnect→reconnect loop if a device is free, then
-  CUT v0.22.1** (rebuild DMG + sign + Homebrew cask sha bump, honoring the
-  `merge-base --is-ancestor <tag> HEAD` pre-release check). Plan:
-  `docs/PLANNING_ROUND57.md`.
+  `BleCentral` abstraction (`native-port/divoomd/src/central.rs`) whose `connect`
+  bounds every BLE call in `tokio::time::timeout`; added a concurrent connect
+  guard (`ConnectGuard`/`connecting: AtomicBool`), widened `is_dead_central` to
+  match `timed out`/`stale`/`central`, made GUI connect re-ensure the daemon
+  (`scanner_mixin.connect_single_device` → `reconnect_daemon`), added a JS connect
+  watchdog (`app_globals.connectDevice`, 35s), and bumped `connect_timeout` 20→30s.
+  DETERMINISTIC COVERAGE: 4 Rust `central.rs` wedge tests (`BleCentral::Faulty`) +
+  5 Python `tests/test_daemon_client_wedge.py` tests. Ble-lifecycle split into
+  `daemon_ble.rs` for the 500-LOC rule (daemon.rs now 467 lines). All green: 38
+  Rust lib tests, 55 python protocol/wedge/JS/mock-e2e tests. Real BLE connect
+  verified unchanged (0.7s on Pixoo-1). **RELEASED v0.22.1**: tag pushed, GitHub
+  release w/ DMG at `dist/Divoom-v0.22.1.dmg`, Homebrew cask bumped to 0.22.1
+  (sha `3f9fb34e69f63483fc409a445b9ce4b757f71a473fc941e9415383615de0a18e`),
+  `brew audit` clean. Pre-release `merge-base --is-ancestor v0.22.0 HEAD` passed.
+  **NEXT: e2e edge-case blitz** — mid-flight disconnect, scan/connect overlap,
+  reconnect loop, offline-MAC connect, connect-already-connected, daemon-restart-
+  mid-op — both against the mock-device harness and `--run-hardware` if a device
+  is free. Plan: `docs/PLANNING_ROUND57.md`.
 
 
 - **HOT-CHANNEL PREVIEW investigation → v0.21.23 (2026-07-10).** User: the newest
