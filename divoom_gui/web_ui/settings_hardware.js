@@ -121,12 +121,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.pywebview) restoreScanSettings();
     else window.addEventListener("pywebviewready", restoreScanSettings);
 
+    // Settings footer version indicator (backend get_app_version → pyproject/plist).
+    function loadAppVersion() {
+        const el = document.getElementById("app-version");
+        if (!el || !window.pywebview?.api?.get_app_version) return;
+        Promise.resolve(window.pywebview.api.get_app_version())
+            .then(v => { if (v) el.textContent = "v" + v; })
+            .catch(() => {});
+    }
+    if (window.pywebview) loadAppVersion();
+    else window.addEventListener("pywebviewready", loadAppVersion);
+
     // Persist scan timeout / limit values on change
     ["scan-timeout", "scan-limit"].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener("change", () => {
-                const t = parseInt(document.getElementById("scan-timeout")?.value) || 60;
+                const t = parseInt(document.getElementById("scan-timeout")?.value) || window.SCAN_TIMEOUT_DEFAULT;
                 const l = parseInt(document.getElementById("scan-limit")?.value);
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.save_scan_settings) {
                     window.pywebview.api.save_scan_settings(t, isNaN(l) ? 0 : l);
@@ -136,7 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     window.runBleScan = function() {
-        const timeout = parseInt(document.getElementById("scan-timeout")?.value) || 60;
+        const timeout = parseInt(document.getElementById("scan-timeout")?.value) || window.SCAN_TIMEOUT_DEFAULT;
         const limit = parseInt(document.getElementById("scan-limit")?.value) || 0;
 
         if (scanSpinner) scanSpinner.style.display = "inline-block";

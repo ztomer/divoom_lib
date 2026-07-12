@@ -64,10 +64,18 @@ def test_preview_device_type_tracks_size(monkeypatch, tmp_path):
 def test_preview_and_send_share_one_manifest_source():
     """Guard: both the preview and the send resolve device_type through the same
     DEVICE_TYPE_BY_SIZE map + fetch_hot_manifest — if someone forks one path,
-    this is the seam that breaks. (Static reference, not a runtime call.)"""
+    this is the seam that breaks. (Static reference, not a runtime call.) The
+    send now funnels the fetch through _load_hot_files (device_type-keyed cache),
+    so pin that indirection too rather than weakening the invariant."""
     import inspect
     preview_src = inspect.getsource(GalleryHotApiMixin.hot_update_preview)
     update_src = inspect.getsource(hot.HotUpdate.update)
-    for src in (preview_src, update_src):
-        assert "DEVICE_TYPE_BY_SIZE" in src
-        assert "fetch_hot_manifest" in src
+    loader_src = inspect.getsource(hot._load_hot_files)
+    # Both paths key off pixel size via the same map.
+    assert "DEVICE_TYPE_BY_SIZE" in preview_src
+    assert "DEVICE_TYPE_BY_SIZE" in update_src
+    # Preview fetches the manifest directly; the send funnels through
+    # _load_hot_files, the one place that calls fetch_hot_manifest.
+    assert "fetch_hot_manifest" in preview_src
+    assert "_load_hot_files" in update_src
+    assert "fetch_hot_manifest" in loader_src

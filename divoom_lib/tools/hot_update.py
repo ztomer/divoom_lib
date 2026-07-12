@@ -33,6 +33,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
 import urllib.request
 
 from divoom_lib.models import COMMANDS
@@ -111,6 +112,53 @@ def download_hot_file(f: HotFile) -> bool:
         return False
     f.body = body
     return True
+
+
+# ── manifest + body cache, keyed by device_type ───────────────────────────
+# The manifest and every file body depend ONLY on device_type (pixel class), so
+# syncing N same-size devices used to re-hit the CDN N times (fetch manifest +
+# download every body per device). Cache the fully-downloaded HotFile set per
+# device_type for a short TTL and reuse it. Bodies are read-only during
+# streaming, so sharing them across devices is safe. A daemon-wide guard
+# (_try_begin_hot_update) serializes hot updates, so no lock is needed.
+_MANIFEST_CACHE_TTL = 300.0  # seconds
+_manifest_cache: dict[int, tuple[float, list[HotFile]]] = {}
+
+
+def clear_hot_manifest_cache() -> None:
+    """Drop all cached manifests (force-refresh / test hook)."""
+    _manifest_cache.clear()
+
+
+async def _load_hot_files(device_type: int, progress_cb=None) -> tuple[list[HotFile], int, bool]:
+    """Return ``(files, downloaded_count, from_cache)`` for ``device_type``,
+    reusing a recent cached download for the same device class so N same-size
+    devices don't each re-fetch from the CDN."""
+    now = time.monotonic()
+    cached = _manifest_cache.get(device_type)
+    if cached and (now - cached[0]) < _MANIFEST_CACHE_TTL:
+        files = cached[1]
+        dl = sum(1 for f in files if f.body is not None)
+        if dl:
+            return files, dl, True
+
+    files = await asyncio.to_thread(fetch_hot_manifest, device_type)
+    if not files:
+        return [], 0, False
+    if progress_cb:
+        progress_cb({"phase": "downloading", "current": 0, "total": len(files)})
+    ok_dl = 0
+    for i, f in enumerate(files):
+        try:
+            ok_dl += 1 if await asyncio.to_thread(download_hot_file, f) else 0
+        except Exception as e:
+            logger.warning(f"hot file {f.file_id}: download failed: {e}")
+        if progress_cb:
+            progress_cb({"phase": "downloading", "current": i + 1,
+                         "total": len(files), "file_id": f.file_id})
+    if ok_dl:
+        _manifest_cache[device_type] = (now, files)
+    return files, ok_dl, False
 
 
 class HotUpdate:
@@ -210,24 +258,19 @@ class HotUpdate:
             progress_cb({"phase": "fetching_manifest"})
 
         device_type = DEVICE_TYPE_BY_SIZE.get(int(device_size), 1)
-        files = await asyncio.to_thread(fetch_hot_manifest, device_type)
+        # Fetch manifest + download bodies once per device_type; reuse across
+        # same-size devices (see _load_hot_files) instead of re-hitting the CDN.
+        files, ok_dl, from_cache = await _load_hot_files(device_type, progress_cb)
         if not files:
             return {"success": False, "error": "empty hot manifest"}
-
-        if progress_cb:
-            progress_cb({"phase": "downloading", "current": 0, "total": len(files)})
-        ok_dl = 0
-        for i, f in enumerate(files):
-            try:
-                ok_dl += 1 if await asyncio.to_thread(download_hot_file, f) else 0
-            except Exception as e:
-                logger.warning(f"hot file {f.file_id}: download failed: {e}")
-            if progress_cb:
-                progress_cb({"phase": "downloading", "current": i + 1,
-                             "total": len(files), "file_id": f.file_id})
         if ok_dl == 0:
             return {"success": False, "error": "no hot files downloadable"}
-        self.logger.info(f"hot: manifest {len(files)} files, {ok_dl} downloaded")
+        if from_cache and progress_cb:
+            # Jump the download bar — nothing was re-fetched.
+            progress_cb({"phase": "downloading", "current": len(files),
+                         "total": len(files)})
+        self.logger.info(f"hot: manifest {len(files)} files, {ok_dl} downloaded"
+                         f"{' (cached)' if from_cache else ''}")
 
         listen = getattr(comm, "_listen_commands", None)
         if isinstance(listen, set):

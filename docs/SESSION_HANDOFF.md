@@ -18,6 +18,287 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **HOT-CHANNEL PREVIEW investigation → v0.21.23 (2026-07-10).** User: the newest
+  hot file (a penguin, v1112) isn't visible in the preview grid; suspected a stale
+  cache. Verified with data + a live look at the packaged app (computer-use):
+  (a) the DECODE/CACHE is correct — the tile decodes the exact bytes streamed to
+  the device (`fin.divoom-gz.com/{file_id}`), and `get_animated_preview` returns
+  the right penguin; the on-disk `cache_gallery` is fine. (b) `fetch_hot_manifest`
+  is deterministic (penguin at index 0, newest-first) but the packaged app's grid
+  showed a non-penguin at tile 0 and shifted between renders. (c) Code audit: only
+  `renderHotPreview` writes the grid, no shuffle/sort, renders in manifest order,
+  async swap is race-safe; `gallery_hot_api.py` unchanged since v0.21.22 → same
+  logic. Conclusion: no reproducible code bug; the ordering weirdness is most
+  likely the hot API returning a non-stable "featured" order over time (or my own
+  misreads of the animated grid — flagged honestly). FIXES (defensive, committed
+  67fd449): re-fetch preview after an update (`gallery_hot.js` finishProgress) +
+  sort preview newest-first in `hot_update_preview` (pins newest to tile 0
+  regardless of API order). NOT independently reproduced/confirmed fixed — needs
+  verification in a fresh v0.21.23 build (packaged app is still v0.21.22). Also
+  note: a few tiles render near-black; their 0xAA first-frame color counts are low
+  (2–12 vs the penguin's 58) — likely genuinely-dark animations, NOT confirmed
+  decoder garbage (would need a device-vs-tile comparison to call it a bug).
+  LESSON: applied [[trace-the-boundary]] — caught myself twice labeling
+  low-res/animated thumbnails as "garbage"/"penguin appeared" without verifying.
+
+
+- **HOT-CHANNEL UPLOADS WERE BROKEN → FIXED + HARDWARE-CONFIRMED, v0.21.22
+  (2026-07-09).** User: "unsure the hot-channel downloads are uploaded to the
+  device." They were right — uploads served 0 files for EVERY device class. Root
+  cause (found via a `DIVOOMD_BLE_DEBUG` BLE wire trace): the hot API returns each
+  file's `Version` as a JSON **string** (`"1112"`) but `VendorId` as a number;
+  `fetch_hot_manifest` (`art_hot.rs`) parsed `Version` with serde `as_u64()` →
+  `None` for strings → every `HotFile.version = 0`. So the `0x9B` manifest
+  advertised `newestVersion=0` and `pick_file` never matched the device's request
+  (`0xF7` for v1103) → `pick_file NONE -> break`, served 0. Fix: `json_u32()`
+  accepts number OR string (Python parity `int(f["Version"])`), applied to Version
+  + VendorId; pure `parse_hot_manifest()` split out with a regression test (string
+  Version, numeric VendorId; proven red before green). HARDWARE CONFIRM: re-ran
+  over the socket → manifest `...58040000` (newestVersion=1112), 10 files MATCH +
+  streamed (**1907 0x9E packets**), served=10 confirmed=10, then v1113 request →
+  clean break. Also this round: the earlier `show_after` switch fix (device now
+  switches to the HOT channel after a push) is confirmed too. Committed (927cd92 +
+  d9e8898). Kept gated BLE TX + `[hot]` session logging (DIVOOMD_BLE_DEBUG) that
+  made this findable. Release v0.21.22 NOT cut yet.
+  - CONCURRENCY FIX (done, 8dcab81): `run_hot_session` now holds the device lock
+    for the whole BLE exchange, so a concurrent `device_call` (which drains the
+    notify channel via `send_command_and_wait`) waits instead of truncating an
+    in-flight upload. Download stays lock-free; `get_status`/`hot_update_progress`
+    lock-free so the progress UI is unaffected. Hardware-verified: 11-file /
+    1907-packet upload completed cleanly with the lock held.
+  - RELEASED v0.21.22 (tag + GitHub release + DMG + cask). CI GREEN (rust-ble,
+    rust-core, rust-ble-linux, test, no-emoji all pass; rust-ble-windows is the
+    known non-blocking Unix-socket-on-Windows failure being removed on branch
+    claude/beautiful-kare-94c4d2).
+  - Process note: `git checkout -- <file>` on an UNCOMMITTED file wipes all working
+    changes — it cost a re-apply of this fix mid-round. Commit before "break to
+    prove the test fails" experiments.
+
+- **HOT-CHANNEL SWITCH FIX → v0.21.22, AWAITING HARDWARE CONFIRM (2026-07-09).**
+  User: "selecting the hot channel should switch the device to the hot channel;
+  this doesn't happen now." Root cause: the native daemon dropped the `show` flag.
+  GUI "Update Hot Channel" sends `hot_update{show:True}`; `art.rs cmd_hot_update`
+  reads it as `show_after` (default true) and passes it down, but
+  `art_hot.rs run_hot_update` took it as `_show_after` and never used it — so files
+  were pushed but the screen never switched. The Python daemon DID switch
+  (`owner_art.show_hot_channel` → `0x45 [0x02]`), so the two daemons disagreed. Fix
+  (`art_hot.rs`): after a successful `run_hot_session`, if `show_after`, send
+  `0x45 [0x02]` (HOT/cloud channel). Fires even when 0 files served (already up to
+  date), so the button reliably lands the screen on the hot channel. Committed +
+  version bumped to 0.21.22; release NOT cut yet — needs user-POV hardware confirm
+  (OS-facing). Both target/release + target/debug divoomd rebuilt with the fix.
+  Verify: `./run.sh` → connect a device → set it to Clock → click "Update Hot
+  Channel" → screen should switch to the hot/cloud channel. (A/B driver in the
+  scratchpad: `hw_test_hot_channel.py`.) After confirm: `scripts/release.sh`.
+
+- **CI GREEN → v0.21.21 (2026-07-09).** The v0.21.20 tag push was the first CI run
+  since v0.21.7, and it went red: `rust-core` + `rust-ble` both failed on a
+  **rustdoc doctest** — `hot_state.rs` had an indented JSON example in its module
+  doc (`//!`), which rustdoc compiles as a runnable Rust doctest
+  (`test src/hot_state.rs - hot_state (line 11) ... FAILED`). Local `cargo test
+  --lib` never caught it because `--lib` EXCLUDES doctests; they only run under
+  `cargo test --doc`. Fix: wrapped the block in a `text` fence (renders, not
+  compiled). Shipped as v0.21.21 (fresh DMG + tag + release + cask — user chose a
+  follow-up patch over rewriting the published v0.21.20 tag). CI on v0.21.21:
+  `rust-core`/`rust-ble`/`rust-ble-linux`/`test`/`no-emoji` all GREEN; overall run
+  conclusion **success**. NOTE: `rust-ble-windows` fails on BOTH v0.21.20 AND
+  v0.21.21 (`unresolved import tokio::net::UnixListener/UnixStream`) — the daemon
+  is Unix-socket-only, can't compile on Windows; it's a pre-existing, inherent,
+  NON-BLOCKING job (continue-on-error). Candidate cleanup: drop the Windows job
+  since this is a macOS-only app.
+
+- **ROCK-SOLID BLE CONNECTION → v0.21.19/20 + hardware test loop (2026-07-09).**
+  User: "can't connect, very flaky." Live repro found the BLE **connect path had
+  unbounded awaits** — `peripheral.connect()`/`discover_services()`/`subscribe()`
+  (CoreBluetooth `connect()` waits forever for an unresponsive device, and it runs
+  while holding the `device` lock → whole device path hung, connect never returned
+  in 40s+). Fixed v0.21.19: each bounded at 20s (`CONNECT_TIMEOUT` in `ble.rs`).
+  Then ran an adverse hardware test loop over the socket (daemon has TCC): connect/
+  reconnect 0.2–1.7s, device-switch Timoo↔Pixoo 0.3–0.7s, channel-switch (0x45)
+  with read-back confirming the mode changed, brightness writes, scan-while-
+  connected, rapid connect/disconnect ×3, and 2 full quit/relaunch restart cycles
+  — ALL pass. GUI **auto-connects to the last device + auto-scans on startup**
+  (app_init.js); those two contend on the one adapter — noted, but the timeouts +
+  self-heal make it recover cleanly. Also shipped v0.21.20: **version indicator in
+  the Settings footer** (`get_app_version` in lifecycle_mixin reads
+  pyproject/Info.plist). Final v0.21.20 DMG built + installed + confirmed on
+  hardware. Test methodology: SIGTERM (not -9) between restarts; pace BLE ops.
+
+- **RELEASE v0.21.20 CUT + HOMEBREW UPDATED (2026-07-09).** New one-shot
+  `scripts/release.sh` (reads pyproject version → build DMG [skippable] → annotated
+  tag + push → GitHub release on `ztomer/divoom_lib` with the DMG → bump
+  `Casks/divoom-control.rb` version+sha256 in `ztomer/homebrew-tap` via gh API;
+  idempotent). Ran it: tag v0.21.20 pushed, GitHub release created (notes span all
+  of v0.21.8→20 since the last release was v0.21.7), DMG asset uploaded (URL 200),
+  cask at 0.21.20 + sha 160f522e. `brew upgrade --cask ztomer/tap/divoom-control`
+  now serves it. CAVEATS: (a) tag was cut from branch `claude/hopeful-hertz-eddb6b`
+  (not main) — commits reach origin via the tag but NO origin branch points at
+  them; merge the branch to main for branch history. (b) code repo is named
+  `divoom_lib` (known, user won't rename). Next release: just bump pyproject + run
+  `scripts/release.sh`.
+
+- **BLE CENTRAL SELF-HEAL → FIXED v0.21.18 (2026-07-09).** User: "can't connect to
+  screens, very flaky." Live repro: with a dead cached central, BOTH `scan` and
+  `connect` returned `"Channel closed"` in ~0.0s — the CoreBluetooth session died
+  (device disconnect / BT toggle) and the daemon cached the Adapter forever, never
+  rebuilding it, so only a restart recovered. Fix (`daemon_connect.rs`): on a
+  dead-central error (`is_dead_central` → contains "Channel closed"), call
+  `Daemon::reset_central()` and retry the scan/connect ONCE with a fresh central.
+  `run_scan`/`run_connect` helpers factor it. Teeth: `detects_dead_central_error`.
+  NOTE: could not exercise the RECOVERY path on hardware (can't kill the central on
+  demand without also restarting the daemon → fresh central); detector unit-tested,
+  and a fresh central after install recovers the user immediately.
+
+- **FALSE "SERVICE NOT RUNNING" BANNER + DEVICE-LOCK WEDGE → FIXED v0.21.17
+  (2026-07-09).** User hit the daemon-down banner while the daemon WAS running.
+  Root-caused live: `device_status`/`device_call` hung 6s+ while
+  `get_status`/`get_device_activity` were instant → the daemon's `device` mutex
+  was stuck, held by an unbounded BLE write that never returned (write to a
+  peripheral that vanished when Bluetooth was toggled mid-op). The liveness probe
+  (`daemon_alive`/`_client_alive`) used `device_status` (needs that mutex) → hung
+  → false "dead" → banner. Fixes: (1) `ble.rs` bounds the write with `WRITE_TIMEOUT`
+  (5s) so a hung write releases the lock and the daemon self-recovers; (2)
+  `daemon_client.py` probe switched device_status → **get_status** (cheap,
+  LOCK-FREE); (3) `notification_service._state` uses `getattr(mon,"is_running",…)`
+  (get_status is now the probe, must not raise on an incomplete monitor — also fixed
+  2 daemon_bridge tests). Rust + Python compile/tests green. NOTE: any daemon
+  running BEFORE this build (incl. the user's current v0.21.16) can still be
+  wedged — needs a daemon restart (quit+reopen app) to pick up the fix.
+
+- **BLE SCAN CoreBluetooth-THROTTLE HARDENING → v0.21.16 (2026-07-09).** The wedge
+  that dogged this session (rapid daemon restarts → CoreBluetooth scan-frequency
+  throttle → scans return 0 until BT toggle) is now guarded in `native-port/divoomd`:
+  (1) `Daemon::stop_scan_cleanup()` called on shutdown in `main.rs` — stops the
+  scan on the cached central so a normal quit doesn't leak a scan session to
+  bluetoothd; (2) `cmd_scan` caches last result+time (`Daemon.last_scan`) and a
+  scan within `MIN_RESCAN_INTERVAL` (3s) returns the cached list (`"cached":true`)
+  instead of hitting the radio. Teeth: `rapid_rescan_returns_cached_without_touching_radio`.
+  Both feature sets compile. NOTE: `kill -9` still leaks (SIGKILL uncatchable) —
+  tests should SIGTERM. Recovery for a wedged stack: BT toggle / `sudo pkill
+  bluetoothd`. Functional scan (finds 3) was verified earlier post-BT-reset; this
+  round is compile+unit-tested only (user's BT still wedged from prior testing).
+
+- **SCAN TIMEOUT DEFAULT 60→20s → v0.21.15 (2026-07-09).** After the v0.21.14 scan
+  guard fix, scans still ran ~80s because they run the full window when device
+  count < limit and the default/persisted timeout was long. Lowered the default to
+  20s across `scanner_mixin.get_scan_settings`, `presets_manager.load_config`,
+  `daemon_config.DEFAULT_SCAN_TIMEOUT`, the Settings input default + JS fallbacks.
+  Also reset THIS user's persisted config.ini `[gui] timeout` 120→20. Verified on
+  the installed build: scan finds all 3 devices (Pixoo-1, Timoo-light-4,
+  Tivoo-Max-light-3) fast. v0.21.14 guard confirmed working end-to-end (after a
+  Bluetooth reset — my rapid daemon restarts during testing had wedged
+  CoreBluetooth; see the v0.21.14 caveats below).
+
+- **NATIVE DAEMON BLE SCAN CONCURRENCY GUARD → v0.21.14 (2026-07-09).** User: app
+  found 2 of 3. Drove the daemon socket: it RELIABLY finds all 3 in isolated scans
+  (6/15/60/120s) — BLE/daemon healthy. Root cause: **no scan concurrency guard** —
+  overlapping scans share the one adapter and clobber each other (my own probes
+  overlapping the GUI scan truncated it). Fix: `Daemon.scanning` flag + `ScanGuard`
+  RAII in cmd_scan; concurrent scan rejected. Plus a 90s timeout cap in ble::scan.
+  Teeth: `scan_guard_tests`; both feature sets compile.
+  **IMPORTANT LESSONS / CAVEATS:**
+  (a) I first tried to also make ble::scan incremental (event stream) + early-exit
+  at limit — BOTH hung: querying peripheral `properties()` DURING an active scan
+  blocks on macOS CoreBluetooth. Reverted to the proven single-window snapshot
+  (query only AFTER stop_scan). Do NOT reintroduce during-scan property reads.
+  (b) My many rapid daemon kill/restart cycles during testing WEDGED the Mac's
+  CoreBluetooth — scans started returning 0 devices (cache went empty). This is
+  environmental (not the code); needs a Bluetooth reset / settle to clear. Verify
+  on a clean BLE stack. (c) Testing done by hot-swapping the release divoomd into
+  the installed .app + re-signing (faster than a full DMG rebuild). The COMMITTED
+  DMG still needs a rebuild with the final (reverted) code. (d) connect also scans
+  (BleTransport::connect) and isn't under the guard yet — scan-vs-connect is a
+  follow-up.
+
+
+- **DMG BUILD + INSTALL + RUNTIME TEST → PASSED v0.21.13 (2026-07-09).** Built
+  `dist/Divoom-v0.21.13.dmg` (38M, adhoc-signed) via `scripts/build_release.sh`
+  (had to create `.buildvenv` first). Installed from the mounted DMG to
+  `/Applications` (replaced 0.21.7). VERIFIED on the real build:
+  (1) **App icon** — `Contents/Resources/Divoom.icns` present, all 10 iconset
+  sizes incl @2x, `CFBundleIconFile=Divoom.icns`. (2) **Bundle** ships all web_ui
+  changes (daemon-banner, hot-last-checked, loadLastChecked, refreshDaemonHealth)
+  and the Rust `hot_state` (strings probe: `hot_update_state.json` + fields +
+  `[ Wrn ] hot_state record_check failed:`). (3) **Launch** — dashboard renders;
+  native Rust `divoomd` + `divoom-menubar` both spawn; BLE works (4 devices found,
+  Timoo-light-4 connected); NO daemon-down banner (healthy). (4) **Daemon
+  reliability (v0.21.9)** — `kill -9` the daemon → app STAYED running and a fresh
+  daemon respawned within ~1s, device still connected, no banner. LIMITATION:
+  couldn't drive the pywebview UI via computer-use — the user's tiling WM
+  (`com.zaidenstein.ZoneTilerWM`, not allowlistable) overlays the window and eats
+  clicks. So the MCP-card / hot-channel-stamp / banner VISUALS weren't clicked
+  through on the DMG (all verified earlier via unit tests + the static web_ui
+  preview). Note: stale `~/.config/divoom-control/mcp-server.log` (Jun 10) is
+  still on disk — confirms the MCP fix relies on session-gating to not surface it.
+  Full test suite can't run clean in this shell (BLE tests SIGSEGV mid-run;
+  see [[divoom-pytest-shutdown-segfault]]) — changed-area files all green.
+
+
+- **HOT CHANNEL "LAST CHECKED" STAMP → ADDED v0.21.12, MADE DAEMON-OWNED v0.21.13
+  (2026-07-08).** Per-device dated verdict so "up to date" isn't blind (user's
+  follow-up ask). v0.21.12 recorded it GUI-side; v0.21.13 moved the WRITE into the
+  daemon (correct owner — it runs the update; daemon is native Rust now). The
+  daemon stamps `hot_update_state.json` on completion in BOTH impls
+  (`native-port/divoomd/src/hot_state.rs`; Python `owner_art.py` via
+  `divoom_lib/hot_update_state.py`); the GUI passes the active device address on
+  the write and only READS via `hot_get_check` (resolves the same active-device
+  key). `hot_record_check` removed. Store keyed by device address (MAC/`LAN:ip`/
+  `MatrixWall`); `>2wk` turns amber. Teeth: 3 Rust + 3 GUI-API + store tests.
+  `cargo check` clean; Python suite green; preview re-verified. **Not on DMG.**
+  Rationale on record: an undated "up to date" was untrustworthy; now dated +
+  daemon-authoritative, captures non-GUI triggers too.
+
+- **MCP CARD STALE TRACEBACK → FIXED v0.21.8 (2026-07-08).** The Settings →
+  Connectivity → "MCP Server" card showed a Python traceback even with the toggle
+  OFF (the v0.21.7 note flagged it as an open follow-up). Root cause 1: the GUI
+  spawns `divoom-control mcp-server` with stdout redirected to a **log file**, but
+  an MCP *stdio* server needs client-owned **pipes** — asyncio's write-pipe
+  transport rejects a regular file (`ValueError: Pipe transport is only for pipes,
+  sockets and character devices`) and crashed at startup, writing a traceback to
+  `~/.config/divoom-control/mcp-server.log`. Root cause 2: the card **tailed that
+  log unconditionally** (even stopped / never-started), so a crash from a prior
+  session persisted. Fix: `run_stdio()` guards non-pipe stdio via
+  `_stdio_is_pipe_like()` and exits with one clean diagnostic line
+  (`mcp_server.py`); `MCPController` only surfaces the log for a server started
+  THIS session and truncates on start (`mcp_control.py`). Real MCP-client launches
+  (Claude Desktop/Cursor) were always fine — only the GUI "Start" toggle was
+  doomed. Teeth: 3 new tests in `test_mcp_server.py` (33 pass total). **Not yet
+  verified on a DMG** (native pywebview app; TCC/BLE harness limit) — confirmed by
+  unit tests + direct reproduction of the guard turning the crash into a clean line.
+
+- **DAEMON-DOWN SILENT + UNRECOVERABLE → FIXED v0.21.9 (2026-07-08).** Restart
+  left the app unusable with no indication / no reconnect. Root causes: eager
+  launch spawn (`gui_main.py`) discarded its client + never surfaced/retried
+  failure; no daemon-down UI; `get_connection_state` couldn't tell daemon-down
+  from no-device. Fix: eager spawn now assigns `api._daemon_client`; new backend
+  `daemon_health()` (no-spawn liveness probe) + `reconnect_daemon()` (reset stale
+  client + re-ensure); frontend daemon heartbeat (4s + on open, ungated) that
+  auto-reconnects once then shows a **Reconnect banner** (`#daemon-banner` in
+  index.html, styled in widgets_extra.css, wired in app_globals.js/app_init.js).
+  Teeth: 7 tests in `test_gui_api.py` (52 pass). Banner render verified in the
+  static web_ui preview. **Not yet verified on a DMG** (TCC/BLE harness limit).
+
+- **MISSING APP ICON → FIXED v0.21.10 (2026-07-08).** Shipped `Divoom.app` had
+  the generic blank icon: `divoom.spec` had `icon=None` and no `.icns` existed
+  (only a 1024px JPEG mis-named `app_icon.png`). Fix: `scripts/make_icns.sh`
+  builds `packaging/Divoom.icns`; `divoom.spec` points `icon=` at it;
+  `build_release.sh` regenerates before packaging; `setup_app.py` gains `iconfile`
+  for parity. **Not yet verified on a DMG.**
+
+- **HOT CHANNEL false "up to date" + redundant downloads → FIXED v0.21.11
+  (2026-07-08).** (a) UI verdict was `served.length===0` → "up to date"; a partial
+  CDN download (files dropped from the advertised manifest) reported a clean
+  "up to date" it never verified. Fix: `gallery_hot.js` now uses the engine's
+  `manifest`/`downloaded` counts — `downloaded < manifest` → "Checked D/M" +
+  amber + warning toast, not "Up to date". (b) manifest+bodies were fetched per
+  device inside `update()`; added `_load_hot_files` device_type-keyed cache (5-min
+  TTL) in `hot_update.py` so same-size devices reuse one fetch+download. Teeth: 2
+  cache tests + guard updated (26 hot tests pass; full suite green). NOTE: did NOT
+  add a persisted freshness timestamp — the "up to date" signal is protocol-honest
+  once partial-download is surfaced; a dated last-checked marker is a possible
+  future nicety (would need a new store; hotchannel.json is the *Monthly Best*
+  config, a different subsystem). **Not verified on a DMG.**
+
 - **SETTINGS TOGGLES IGNORED SAVED STATE → FIXED v0.21.7 (2026-07-08).** Caught by
   driving the real dashboard on-screen (computer-use): the Connectivity toggles
   didn't reflect their persisted value when Settings opened — `quit_menubar_on_exit`

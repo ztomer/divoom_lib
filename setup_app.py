@@ -69,8 +69,13 @@ _RES_FILES = [
 ]
 DATA_FILES = [("", _RES_FILES)] if _RES_FILES else []
 
+_ICON = str(Path(__file__).resolve().parent / "packaging" / "Divoom.icns")
+
 OPTIONS = {
     "argv_emulation": False,
+    # App icon (py2app sets CFBundleIconFile from this). PyInstaller is the
+    # shipping packager (divoom.spec), but keep parity in case this path revives.
+    **({"iconfile": _ICON} if os.path.exists(_ICON) else {}),
     # Listing the runtime packages as `packages` copies each as a real directory
     # tree (not byte-compiled into the zip), so web_ui/, fonts/ and the native
     # dylib travel with their package and resolve via Path(__file__).parent.

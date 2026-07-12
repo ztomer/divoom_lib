@@ -87,12 +87,54 @@ class ScannerMixin:
             logger.debug(f"get_connection_state failed: {e}")
             return json.dumps({"connected": False, "state": "disconnected"})
 
+    # ── Daemon health / reconnect (R53) ───────────────────────────────
+    #
+    # The daemon is the sole device owner and is deliberately killed on quit
+    # (keep_daemon_alive defaults False), so a restart MUST respawn it. The eager
+    # launch spawn can fail silently; if it does nothing works and the user had
+    # no indication and no way to recover. These two methods back the frontend's
+    # daemon-down banner: a fast liveness probe (no spawn — so it can tell
+    # "daemon down" from "no device connected", which get_connection_state above
+    # conflates) and an explicit reconnect that resets the cached client.
+
+    def daemon_health(self) -> str:
+        """Fast, honest daemon liveness for the frontend heartbeat. Probes the
+        socket WITHOUT spawning so "daemon down" is distinguishable from "device
+        disconnected". Returns JSON ``{"daemon": bool}``. A configured remote
+        daemon (DIVOOM_DAEMON_HOST) is never spawned locally — report it healthy
+        and let real calls surface any transport error."""
+        if os.environ.get("DIVOOM_DAEMON_HOST"):
+            return json.dumps({"daemon": True})
+        try:
+            from divoom_gui.daemon_bridge import daemon_alive
+            return json.dumps({"daemon": bool(daemon_alive())})
+        except Exception as e:
+            logger.debug(f"daemon_health failed: {e}")
+            return json.dumps({"daemon": False})
+
+    def reconnect_daemon(self) -> str:
+        """Drop the cached client and (re)ensure a live daemon, spawning one if
+        needed. Backs the banner's Reconnect button and the frontend's silent
+        auto-reconnect. Returns JSON ``{"daemon": bool}``."""
+        from divoom_gui.daemon_bridge import ensure_daemon
+        self._daemon_client = None
+        try:
+            client = ensure_daemon()
+        except Exception as e:
+            logger.warning(f"reconnect_daemon: ensure_daemon failed: {e}")
+            client = None
+        self._daemon_client = client
+        if client is not None:
+            logger.info("Daemon reconnected (client re-ensured).")
+        return json.dumps({"daemon": client is not None})
+
     def get_scan_settings(self) -> str:
         """R42 §1: the persisted scan timeout/limit (config.ini [gui]) so the
         Settings inputs restore between sessions — save_scan_settings wrote them
         on every scan but nothing ever read them back."""
         import configparser
-        timeout, limit = 60, 4
+        from divoom_daemon.daemon_config import DEFAULT_SCAN_TIMEOUT, DEFAULT_SCAN_LIMIT
+        timeout, limit = int(DEFAULT_SCAN_TIMEOUT), DEFAULT_SCAN_LIMIT
         try:
             config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
             if config_file.exists():

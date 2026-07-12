@@ -53,15 +53,15 @@ def bundle_python() -> str | None:
 
 
 def _client_alive(client: DaemonClient) -> bool:
-    # Liveness probe: fast-fail (connect_retries=0) so ensure_daemon's readiness
-    # poll and daemon_alive() don't each sit through the device-traffic retry
-    # budget when no daemon is up.
-    reply = client.send_command("device_status", connect_retries=0)
-    return bool(reply.get("success", False)) or ("connected" in reply)
+    # Liveness probe: fast-fail (connect_retries=0). Probe get_status (cheap,
+    # LOCK-FREE) NOT device_status, which needs the device mutex — a device op
+    # holding it makes a live daemon look dead (false "not running" banner).
+    reply = client.send_command("get_status", connect_retries=0)
+    return bool(reply.get("success", False))
 
 
 def daemon_alive(socket_path: str = DEFAULT_SOCKET_PATH, timeout: float = 0.5) -> bool:
-    """True if a daemon answers ``device_status`` on ``socket_path``."""
+    """True if a daemon answers ``get_status`` on ``socket_path``."""
     return _client_alive(DaemonClient(socket_path, timeout=timeout))
 
 

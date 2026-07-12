@@ -47,7 +47,10 @@ class GalleryHotApiMixin:
         if client is None:
             return json.dumps({"success": False, "error": "no daemon available"})
         size = self._active_device_size() if hasattr(self, "_active_device_size") else 16
-        r = client.hot_update(device_size=int(size), show=True)
+        # R53: pass the active device address so the DAEMON stamps the
+        # last-checked state under the same key the GUI reads by (hot_get_check).
+        addr = self._active_device_mac() if hasattr(self, "_active_device_mac") else None
+        r = client.hot_update(device_size=int(size), show=True, address=addr or "")
         return json.dumps(r)
 
     def hot_update_status(self) -> str:
@@ -57,6 +60,17 @@ class GalleryHotApiMixin:
         if client is None:
             return json.dumps({"phase": "error", "error": "no daemon"})
         return json.dumps(client.hot_update_progress())
+
+    def hot_get_check(self, address: str = "") -> str:
+        """R53: the daemon-recorded last hot-channel check for a device (or
+        ``{}``). Reads the shared ``hot_update_state.json`` the daemon writes.
+        With no ``address`` it resolves the active device — the same key
+        ``hot_channel_update`` passes for the write, so read and write always
+        agree."""
+        from divoom_lib import hot_update_state
+        addr = address or (self._active_device_mac()
+                           if hasattr(self, "_active_device_mac") else "")
+        return json.dumps(hot_update_state.get_check(addr or ""))
 
     def hot_update_preview(self) -> str:
         """Fetch the hot channel manifest from Divoom's cloud and cross-reference
@@ -98,6 +112,13 @@ class GalleryHotApiMixin:
                     "preview_url": meta.get("preview_url", ""),
                     "has_cache": f.file_id in name_map,
                 })
+
+            # Show newest-first deterministically. The hot API's list order is
+            # not a stable contract (it can reorder its "featured" set between
+            # requests), which made the newest file land at an arbitrary tile —
+            # so the just-added art wasn't where the user looked for it. Sorting by
+            # version here pins the newest to tile 0 regardless of API order.
+            items.sort(key=lambda it: it.get("version", 0), reverse=True)
 
             return json.dumps({"success": True, "items": items, "count": len(items)})
         except Exception as e:

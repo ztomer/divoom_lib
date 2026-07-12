@@ -5,6 +5,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // dot reflects a mid-session drop / DEGRADED link, not a stale "connected".
     if (window.startConnectionHeartbeat) window.startConnectionHeartbeat();
 
+    // R53: check the background service (daemon) is up on open and every 4s. It's
+    // killed on quit, so a restart must respawn it; if that failed the app is
+    // unusable with no indication. The heartbeat auto-reconnects, then surfaces a
+    // Reconnect banner. Wire the banner button to a manual reconnect.
+    if (window.startDaemonHeartbeat) window.startDaemonHeartbeat();
+    const daemonReconnectBtn = document.getElementById("daemon-reconnect-btn");
+    if (daemonReconnectBtn)
+        daemonReconnectBtn.addEventListener("click", () => window.reconnectDaemonManual());
+
     // ── 0. FRAMELESS WINDOW DRAG (appbar) ──
     // The window drag is handled by pywebview's built-in drag-region
     // mechanism: <header class="integrated-appbar pywebview-drag-region">

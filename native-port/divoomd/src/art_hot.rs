@@ -29,22 +29,43 @@ impl HotFile {
     fn packet_count(&self) -> usize { (self.body.len() + CHUNK_SIZE - 1) / CHUNK_SIZE }
 }
 
+/// Read a u32 from a JSON value that may be a NUMBER or a quoted STRING. The hot
+/// API returns `VendorId` as a number but `Version` as a string ("1112"), and
+/// serde's `as_u64()` yields None for the string form — which silently zeroed
+/// every file's version, so the 0x9B manifest advertised newestVersion=0 and the
+/// device never matched an offered file (uploads served 0). Mirrors Python's
+/// `int(f["Version"])`, which accepts both.
+fn json_u32(v: Option<&Value>) -> u32 {
+    match v {
+        Some(Value::Number(n)) => n.as_u64().unwrap_or(0) as u32,
+        Some(Value::String(s)) => s.trim().parse::<u32>().unwrap_or(0),
+        _ => 0,
+    }
+}
+
+/// Pure parse of the hot-API response body into HotFile entries (no bodies yet).
+/// Split from the HTTP call so it can be unit-tested against the real response
+/// shape (string `Version`, numeric `VendorId`).
+fn parse_hot_manifest(data: &Value) -> Vec<HotFile> {
+    let mut files = Vec::new();
+    for vendor in data.get("VendorList").and_then(|v| v.as_array()).unwrap_or(&vec![]) {
+        let vid = json_u32(vendor.get("VendorId"));
+        for f in vendor.get("FileList").and_then(|v| v.as_array()).unwrap_or(&vec![]) {
+            let file_id = f.get("FileId").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let version = json_u32(f.get("Version"));
+            let sha1 = f.get("Sha1").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            files.push(HotFile { vendor_id: vid, file_id, version, sha1, body: Vec::new() });
+        }
+    }
+    files
+}
+
 async fn fetch_hot_manifest(client: &reqwest::Client, device_type: u32) -> Result<Vec<HotFile>, String> {
     let body = serde_json::json!({"DeviceType": device_type, "IsTest": false});
     let resp = client.post(HOT_API).json(&body).send().await
         .map_err(|e| e.to_string())?;
     let data: Value = resp.json().await.map_err(|e| e.to_string())?;
-    let mut files = Vec::new();
-    for vendor in data.get("VendorList").and_then(|v| v.as_array()).unwrap_or(&vec![]) {
-        let vid = vendor.get("VendorId").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-        for f in vendor.get("FileList").and_then(|v| v.as_array()).unwrap_or(&vec![]) {
-            let file_id = f.get("FileId").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let version = f.get("Version").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-            let sha1 = f.get("Sha1").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            files.push(HotFile { vendor_id: vid, file_id, version, sha1, body: Vec::new() });
-        }
-    }
-    Ok(files)
+    Ok(parse_hot_manifest(&data))
 }
 
 async fn download_hot_file(client: &reqwest::Client, f: &mut HotFile) -> bool {
@@ -97,10 +118,74 @@ fn pick_file<'a>(files: &'a [HotFile], vendor_id: u32, version: u32) -> Option<&
     candidates.iter().filter(|f| f.version >= version).min_by_key(|f| f.version).copied()
 }
 
+// ── Manifest + body cache, keyed by device_type (pixel class) ──────────────
+// The manifest and every file body depend ONLY on device_type, so syncing N
+// same-size devices would otherwise re-hit the CDN N times (fetch the manifest +
+// download all 25 bodies per device). Cache the fully-downloaded set per
+// device_type for a short TTL and share it — bodies are read-only during the BLE
+// session, so sharing across devices is safe. Ports `_load_hot_files` /
+// `_MANIFEST_CACHE_TTL` from `divoom_lib/tools/hot_update.py`.
+const MANIFEST_CACHE_TTL_SECS: u64 = 300;
+type HotCache = std::sync::Mutex<
+    std::collections::HashMap<u32, (std::time::Instant, Arc<Vec<HotFile>>)>,
+>;
+static MANIFEST_CACHE: std::sync::OnceLock<HotCache> = std::sync::OnceLock::new();
+fn manifest_cache() -> &'static HotCache {
+    MANIFEST_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Drop all cached manifests (test hook / force-refresh).
+#[cfg(test)]
+fn clear_manifest_cache() { manifest_cache().lock().unwrap().clear(); }
+
+/// Return `(files, downloaded_count, from_cache)` for `device_type`, reusing a
+/// recent cached download for the same device class so N same-size devices don't
+/// each re-fetch from the CDN. On a miss, fetch the manifest + download every
+/// body, then cache the fully-downloaded set.
+async fn load_hot_files(
+    client: &reqwest::Client,
+    device_type: u32,
+    progress: &HotProgress,
+) -> Result<(Arc<Vec<HotFile>>, usize, bool), String> {
+    // Cache hit → reuse. The lock is held only for the sync lookup + clone,
+    // never across an await (that would serialize concurrent updates / risk a
+    // hang), so drop the guard before any network I/O.
+    {
+        let cache = manifest_cache().lock().unwrap();
+        if let Some((t, files)) = cache.get(&device_type) {
+            if t.elapsed().as_secs() < MANIFEST_CACHE_TTL_SECS {
+                let dl = files.iter().filter(|f| !f.body.is_empty()).count();
+                if dl > 0 {
+                    return Ok((files.clone(), dl, true));
+                }
+            }
+        }
+    }
+
+    // Miss → fetch the manifest + download every body.
+    let mut files = fetch_hot_manifest(client, device_type).await?;
+    if files.is_empty() { return Err("empty hot manifest".into()); }
+    let total = files.len();
+    progress.set(json!({"phase": "downloading", "current": 0, "total": total}));
+    let mut ok_dl = 0usize;
+    for (i, f) in files.iter_mut().enumerate() {
+        if download_hot_file(client, f).await { ok_dl += 1; }
+        progress.set(json!({"phase":"downloading","current":i+1,"total":total,"file_id":&f.file_id}));
+    }
+    if ok_dl == 0 { return Err("no hot files downloadable".into()); }
+
+    let arc = Arc::new(files);
+    manifest_cache()
+        .lock()
+        .unwrap()
+        .insert(device_type, (std::time::Instant::now(), arc.clone()));
+    Ok((arc, ok_dl, false))
+}
+
 pub(crate) async fn run_hot_update(
     daemon: Arc<Daemon>,
     device_size: u32,
-    _show_after: bool,
+    show_after: bool,
     progress: Arc<HotProgress>,
 ) -> Result<Value, String> {
     let client = reqwest::Client::builder()
@@ -108,30 +193,44 @@ pub(crate) async fn run_hot_update(
         .user_agent("okhttp/4.12.0")
         .build().map_err(|e| e.to_string())?;
 
-    // 1. Fetch manifest
+    // 1+2. Manifest + bodies, cached per device_type so N same-size devices
+    // don't each re-hit the CDN (load_hot_files emits the "downloading" progress
+    // on a miss; a hit returns instantly).
     progress.set(json!({"phase": "fetching_manifest"}));
     let device_type = device_type_for_size(device_size);
-    let mut files = fetch_hot_manifest(&client, device_type).await?;
-    if files.is_empty() { return Err("empty hot manifest".into()); }
-
-    // 2. Download files
-    let total_files = files.len();
-    progress.set(json!({"phase": "downloading", "current": 0, "total": total_files}));
-    let mut ok_dl = 0usize;
-    for (i, f) in files.iter_mut().enumerate() {
-        if download_hot_file(&client, f).await { ok_dl += 1; }
-        progress.set(json!({"phase":"downloading","current":i+1,"total":total_files,"file_id":&f.file_id}));
+    let (files, ok_dl, from_cache) = load_hot_files(&client, device_type, &progress).await?;
+    if from_cache {
+        // Nothing was re-fetched — jump the download bar to full so the UI moves
+        // straight to the upload phase instead of sitting at "fetching".
+        let n = files.len();
+        progress.set(json!({"phase": "downloading", "current": n, "total": n, "cached": true}));
     }
-    if ok_dl == 0 { return Err("no hot files downloadable".into()); }
 
     // 3. BLE session
     #[cfg(feature = "ble")]
     {
+        // Hold the device lock for the WHOLE session: it is device-driven (0xF7/
+        // 0x9D/0x9E) and reads the shared notify channel. A concurrent `device_call`
+        // grabs this same lock and calls `send_command_and_wait`, which DRAINS that
+        // channel (ble.rs) — that would silently steal an in-flight upload's ack/
+        // request frames and truncate the transfer. Serializing here makes any
+        // concurrent device command wait instead. (Download above ran lock-free —
+        // it is pure HTTP; only the BLE exchange needs exclusivity. get_status /
+        // hot_update_progress are lock-free so the progress UI is unaffected.)
         let guard = daemon.device.lock().await;
         let dev = match guard.as_ref() { Some(d) => d.clone(), None => return Err("no device connected".into()) };
-        drop(guard);
         if matches!(&*dev, crate::daemon::DeviceTransport::Ble(_) | crate::daemon::DeviceTransport::Spp(_)) {
-            return run_hot_session(&*dev, &files, ok_dl, progress).await;
+            let result = run_hot_session(&*dev, &files, ok_dl, progress).await?;
+            // Parity with the Python daemon (owner_art.show_hot_channel): after a
+            // successful push, switch the device to the HOT/cloud channel so it
+            // actually shows what we just uploaded. Without this the files land in
+            // the rotation but the screen stays on whatever channel it was on.
+            if show_after {
+                if let Err(e) = dev.send_command(0x45, &[0x02], true).await {
+                    return Err(format!("hot channel switch (0x45 [0x02]) failed: {e}"));
+                }
+            }
+            return Ok(result);
         }
     }
     Err("hot_update requires BLE/SPP transport".into())
@@ -165,6 +264,10 @@ async fn run_hot_session(
     let idle_to = Duration::from_secs_f64(IDLE_DONE_TIMEOUT_SECS);
     let mut served: Vec<Value> = Vec::new();
     let mut pending_request: Option<Vec<u8>> = None;
+    let dbg = std::env::var("DIVOOMD_BLE_DEBUG").is_ok();
+    if dbg {
+        eprintln!("[hot] sent 0x9B manifest: {} vendor(s), {} files downloaded", vendors.len(), ok_dl);
+    }
 
     loop {
         let (cmd, payload) = if let Some(p) = pending_request.take() {
@@ -172,16 +275,16 @@ async fn run_hot_session(
         } else {
             match ble.wait_for_any_response(&[cmd_f7, cmd_9f], idle_to).await {
                 Some((c, p)) => (c, p),
-                None => break, // device quiet — up to date
+                None => { if dbg { eprintln!("[hot] wait([f7,9f]) TIMED OUT after {IDLE_DONE_TIMEOUT_SECS}s -> ending (device quiet)"); } break; } // device quiet — up to date
             }
         };
-        if cmd == cmd_9f { break; }
-        if payload.len() < 8 { continue; }
+        if cmd == cmd_9f { if dbg { eprintln!("[hot] got 0x9F (pause) -> break"); } break; }
+        if payload.len() < 8 { if dbg { eprintln!("[hot] got 0x{cmd:02x} short payload len={} -> skip", payload.len()); } continue; }
         let vendor_id = u32::from_le_bytes(payload[0..4].try_into().unwrap_or([0;4]));
         let version = u32::from_le_bytes(payload[4..8].try_into().unwrap_or([0;4]));
         let f = match pick_file(files, vendor_id, version) {
-            Some(f) => f,
-            None => break,
+            Some(f) => { if dbg { eprintln!("[hot] request vendor={vendor_id} v{version} -> pick_file MATCH {} v{}", f.file_id, f.version); } f },
+            None => { if dbg { eprintln!("[hot] request vendor={vendor_id} v{version} -> pick_file NONE -> break (nothing to serve)"); } break; }
         };
         // Send 0x9D file info
         let mut info = Vec::new();
@@ -195,12 +298,13 @@ async fn run_hot_session(
         // Wait for 0x9D ack
         let ack = match ble.wait_for_any_response(&[cmd_9d, cmd_f7], idle_to).await {
             Some(a) => a,
-            None => break,
+            None => { if dbg { eprintln!("[hot] no 0x9D ack (timeout) -> break"); } break; },
         };
-        if ack.0 == cmd_f7 { pending_request = Some(ack.1); continue; }
+        if ack.0 == cmd_f7 { if dbg { eprintln!("[hot] 0x9D ack was another 0xF7 -> re-loop"); } pending_request = Some(ack.1); continue; }
         let p2 = &ack.1;
-        if p2.is_empty() || p2[0] != 0 { continue; }
+        if p2.is_empty() || p2[0] != 0 { if dbg { eprintln!("[hot] 0x9D ack declined (payload {:02x?}) -> skip file", p2); } continue; }
         let start_pkt = if p2.len() >= 3 { u16::from_le_bytes([p2[1], p2[2]]) as usize } else { 0 };
+        if dbg { eprintln!("[hot] 0x9D accepted, streaming from packet {start_pkt} of {}", f.packet_count()); }
 
         // Stream file packets
         let total = f.packet_count();
@@ -248,4 +352,73 @@ async fn run_hot_session(
         "downloaded": ok_dl,
         "confirmed": confirmed_count,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_u32_accepts_number_and_string() {
+        assert_eq!(json_u32(Some(&json!(1112))), 1112); // numeric (VendorId shape)
+        assert_eq!(json_u32(Some(&json!("1112"))), 1112); // quoted string (Version shape)
+        assert_eq!(json_u32(Some(&json!(" 1103 "))), 1103); // padded string
+        assert_eq!(json_u32(Some(&json!("nope"))), 0);
+        assert_eq!(json_u32(None), 0);
+    }
+
+    // Regression: the hot API returns `Version` as a STRING ("1112") and
+    // `VendorId` as a NUMBER. Parsing Version with as_u64() zeroed every version,
+    // so the 0x9B manifest advertised newestVersion=0 and pick_file never matched
+    // the device's request — uploads served 0 files. This asserts versions parse.
+    #[test]
+    fn parse_manifest_reads_string_versions() {
+        let data = json!({
+            "VendorList": [{
+                "VendorId": 40005454,
+                "FileList": [
+                    {"FileId": "a.bin", "Version": "1103", "Sha1": "aa"},
+                    {"FileId": "b.bin", "Version": "1112", "Sha1": "bb"},
+                ],
+            }],
+        });
+        let files = parse_hot_manifest(&data);
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0].vendor_id, 40005454);
+        assert_eq!(files[0].version, 1103, "string Version must parse, not zero");
+        assert_eq!(files[1].version, 1112);
+
+        // With bodies present, the device's request for v1103 must resolve.
+        let mut with_bodies = files;
+        for f in &mut with_bodies { f.body = vec![0u8; 4]; }
+        let picked = pick_file(&with_bodies, 40005454, 1103);
+        assert!(picked.is_some(), "pick_file must match a held version");
+        assert_eq!(picked.unwrap().version, 1103);
+    }
+
+    // A cache hit must reuse the downloaded set (from_cache=true) and NOT touch
+    // the network — this is what stops N same-size devices re-downloading.
+    #[tokio::test]
+    async fn load_hot_files_returns_cached_without_refetch() {
+        clear_manifest_cache();
+        let dt = 99u32; // synthetic device_type — no real CDN entry
+        let cached = Arc::new(vec![HotFile {
+            vendor_id: 1, file_id: "x.bin".into(), version: 5,
+            sha1: String::new(), body: vec![1, 2, 3, 4],
+        }]);
+        manifest_cache().lock().unwrap()
+            .insert(dt, (std::time::Instant::now(), cached.clone()));
+
+        // reqwest::Client is unused on a hit; if the cache missed this would hit
+        // the network for device_type 99 and return an error/empty instead.
+        let (got, dl, from_cache) =
+            load_hot_files(&reqwest::Client::new(), dt, &HotProgress::default())
+                .await
+                .expect("cache hit must succeed without network");
+        assert!(from_cache, "should report a cache hit");
+        assert_eq!(dl, 1);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].file_id, "x.bin");
+        clear_manifest_cache();
+    }
 }

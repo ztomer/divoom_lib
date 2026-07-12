@@ -304,6 +304,9 @@ pub async fn cmd_hot_update(
 ) -> Value {
     let device_size = args.get("device_size").and_then(|v| v.as_u64()).unwrap_or(16) as u32;
     let show_after = args.get("show").and_then(|v| v.as_bool()).unwrap_or(true);
+    // R53: the GUI passes the device address it displays; we stamp the outcome
+    // under it so "Last checked <when>" is dated and daemon-owned.
+    let address = args.get("address").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
     if !progress.try_begin() {
         return json!({"success": false, "error": "hot update already in progress"});
@@ -314,8 +317,14 @@ pub async fn cmd_hot_update(
     tokio::spawn(async move {
         let result = crate::art_hot::run_hot_update(daemon_arc.clone(), device_size, show_after, progress_arc.clone()).await;
         match result {
-            Ok(summary) => progress_arc.set(json!({"phase": "done", "result": summary})),
-            Err(e)       => progress_arc.set(json!({"phase": "error", "error": e})),
+            Ok(summary) => {
+                // Stamp the per-device last-checked state before publishing done.
+                if let Err(e) = crate::hot_state::record_check(&address, &summary) {
+                    eprintln!("[ Wrn ] hot_state record_check failed: {}", e);
+                }
+                progress_arc.set(json!({"phase": "done", "result": summary}));
+            }
+            Err(e) => progress_arc.set(json!({"phase": "error", "error": e})),
         }
     });
 

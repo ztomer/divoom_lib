@@ -373,6 +373,96 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertIn("daemon", result["error"])
         self.assertEqual(result["rules"], [["whatsapp", 6]])
 
+    # ── R53: daemon health + reconnect (daemon-down banner backend) ────
+
+    def test_daemon_health_reports_up(self):
+        with patch("divoom_gui.daemon_bridge.daemon_alive", return_value=True):
+            res = json.loads(self.api.daemon_health())
+        self.assertTrue(res["daemon"])
+
+    def test_daemon_health_reports_down(self):
+        with patch("divoom_gui.daemon_bridge.daemon_alive", return_value=False):
+            res = json.loads(self.api.daemon_health())
+        self.assertFalse(res["daemon"])
+
+    def test_daemon_health_probe_error_is_down(self):
+        """A probe that raises reads as down, never propagates."""
+        with patch("divoom_gui.daemon_bridge.daemon_alive", side_effect=OSError("boom")):
+            res = json.loads(self.api.daemon_health())
+        self.assertFalse(res["daemon"])
+
+    def test_daemon_health_remote_assumed_up(self):
+        """A configured remote daemon is never spawned/probed locally — report
+        healthy and let real calls surface any transport error."""
+        import os
+        with patch.dict(os.environ, {"DIVOOM_DAEMON_HOST": "192.168.1.50"}), \
+             patch("divoom_gui.daemon_bridge.daemon_alive", return_value=False):
+            res = json.loads(self.api.daemon_health())
+        self.assertTrue(res["daemon"])  # remote short-circuits the local probe
+
+    def test_reconnect_daemon_success_resets_and_reensures(self):
+        """reconnect_daemon drops the (possibly dead) cached client and hands the
+        freshly ensured one back — the fix for the never-reset stale client."""
+        self.api._daemon_client = "stale-dead-client"
+        fake = MagicMock()
+        with patch("divoom_gui.daemon_bridge.ensure_daemon", return_value=fake) as ens:
+            res = json.loads(self.api.reconnect_daemon())
+        self.assertTrue(res["daemon"])
+        self.assertIs(self.api._daemon_client, fake)
+        ens.assert_called_once()
+
+    def test_reconnect_daemon_failure_reports_down(self):
+        self.api._daemon_client = "stale"
+        with patch("divoom_gui.daemon_bridge.ensure_daemon", return_value=None):
+            res = json.loads(self.api.reconnect_daemon())
+        self.assertFalse(res["daemon"])
+        self.assertIsNone(self.api._daemon_client)
+
+    def test_reconnect_daemon_swallows_spawn_error(self):
+        self.api._daemon_client = "stale"
+        with patch("divoom_gui.daemon_bridge.ensure_daemon",
+                   side_effect=RuntimeError("spawn boom")):
+            res = json.loads(self.api.reconnect_daemon())
+        self.assertFalse(res["daemon"])
+        self.assertIsNone(self.api._daemon_client)
+
+    # ── R53: hot-channel last-checked (daemon-owned; GUI writes via daemon,
+    #        reads the shared state file) ──────────────────────────────────
+
+    def test_hot_channel_update_passes_active_address_to_daemon(self):
+        """The GUI hands the daemon the device address so the daemon stamps the
+        last-checked state under the SAME key the GUI reads by."""
+        fake = MagicMock()
+        fake.hot_update.return_value = {"success": True, "started": True}
+        self.api._daemon_client = fake
+        # _active_device_size is cached in the instance __dict__ by
+        # _wire_collaborators, so patch at the instance level (a class patch is
+        # shadowed); _active_device_mac patches fine either way.
+        with patch.object(self.api, "_active_device_mac",
+                          return_value="AA:BB:CC:DD:EE:FF"), \
+             patch.object(self.api, "_active_device_size", return_value=64):
+            json.loads(self.api.hot_channel_update())
+        fake.hot_update.assert_called_once()
+        assert fake.hot_update.call_args.kwargs.get("address") == "AA:BB:CC:DD:EE:FF"
+        assert fake.hot_update.call_args.kwargs.get("device_size") == 64
+
+    def test_hot_get_check_resolves_active_device(self):
+        """With no explicit address, hot_get_check reads the store for the active
+        device (the same key the write used)."""
+        with patch.object(self.api, "_active_device_mac",
+                          return_value="AA:BB:CC:DD:EE:FF"), \
+             patch("divoom_lib.hot_update_state.get_check",
+                   return_value={"checked_at": 3.0}) as g:
+            out = json.loads(self.api.hot_get_check())
+        assert out == {"checked_at": 3.0}
+        g.assert_called_once_with("AA:BB:CC:DD:EE:FF")
+
+    def test_hot_get_check_explicit_address_wins(self):
+        with patch.object(self.api, "_active_device_mac", return_value="other"), \
+             patch("divoom_lib.hot_update_state.get_check", return_value={}) as g:
+            self.api.hot_get_check("LAN:192.168.1.5")
+        g.assert_called_once_with("LAN:192.168.1.5")
+
     def test_scan_devices(self):
         """R17 P5: scanning is owned by the daemon; the GUI proxies via scan()."""
         fake = MagicMock()

@@ -403,11 +403,15 @@ class DaemonClient:
             "custom_art_query_page", {"page": page},
             read_timeout=load_daemon_config().sync_read_timeout)
 
-    def hot_update(self, *, device_size: int = 16, show: bool = True) -> dict:
+    def hot_update(self, *, device_size: int = 16, show: bool = True,
+                   address: str = "") -> dict:
         """Start a HOT channel update in the background on the daemon (returns
-        immediately). Call ``hot_update_progress()`` to poll progress."""
+        immediately). Call ``hot_update_progress()`` to poll progress. ``address``
+        is the caller's device key; the daemon stamps the last-checked state
+        under it (R53)."""
         return self.send_command(
-            "hot_update", {"device_size": device_size, "show": show},
+            "hot_update",
+            {"device_size": device_size, "show": show, "address": address},
             read_timeout=30)
 
     def hot_update_progress(self) -> dict:

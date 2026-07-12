@@ -247,8 +247,19 @@ def main():
     if sys.platform == "darwin":
         try:
             from divoom_gui.daemon_bridge import ensure_daemon
-            ensure_daemon(detach=True)
-            logger.info("Eagerly spawned daemon (TCC-disclaimed) before GUI host.")
+            # R53: assign the client. Previously the return value was discarded,
+            # so api._daemon_client stayed None until the first user action
+            # lazily re-ran ensure_daemon — and a failed/slow spawn surfaced
+            # nothing. Handing the live client over means the GUI is ready
+            # immediately; if it's None (spawn failed/timed out), the frontend's
+            # daemon-health heartbeat auto-reconnects and, failing that, shows a
+            # Reconnect banner instead of leaving the app silently unusable.
+            api._daemon_client = ensure_daemon(detach=True)
+            if api._daemon_client is not None:
+                logger.info("Eagerly spawned daemon (TCC-disclaimed) before GUI host.")
+            else:
+                logger.warning("Eager daemon spawn did not become ready; "
+                               "UI will auto-reconnect / offer a Reconnect banner.")
         except Exception as e:
             logger.warning(f"eager daemon spawn failed: {e}")
     _spawn_menubar_agent()

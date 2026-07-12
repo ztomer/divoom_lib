@@ -14,7 +14,18 @@ import pytest
 sys.path.append(str(Path(__file__).parent.parent))
 
 from divoom_lib.models import COMMANDS
-from divoom_lib.tools.hot_update import HotFile, HotUpdate
+from divoom_lib.tools.hot_update import HotFile, HotUpdate, clear_hot_manifest_cache
+
+
+@pytest.fixture(autouse=True)
+def _clear_hot_cache():
+    """The device_type-keyed manifest cache is module-level; clear it around each
+    test so a cached download from one test never masks another's monkeypatched
+    fetch_hot_manifest / download_hot_file."""
+    clear_hot_manifest_cache()
+    yield
+    clear_hot_manifest_cache()
+
 
 CMD_LIST = COMMANDS["send hot file list"]
 CMD_INFO = COMMANDS["hot update file info"]
@@ -166,3 +177,65 @@ async def test_silent_device_file_marked_unconfirmed(monkeypatch):
     assert result["success"] is True
     assert result["served"] == [{"file_id": f.file_id, "version": 1099, "confirmed": False}]
     assert result["confirmed"] == 0  # streamed but NOT device-confirmed
+
+
+# ── device_type-keyed download cache (no redundant per-device fetch) ───────
+
+@pytest.mark.asyncio
+async def test_load_hot_files_caches_per_device_type(monkeypatch):
+    """Two syncs of the same device class reuse one CDN fetch+download instead of
+    re-downloading per device; a different class fetches separately."""
+    from divoom_lib.tools import hot_update as hu_mod
+
+    fetch_calls, dl_calls = [], []
+
+    def fake_fetch(dt):
+        fetch_calls.append(dt)
+        f = _file(version=1099 + dt)
+        f.body = None          # force the download path to populate it
+        return [f]
+
+    def fake_dl(f):
+        dl_calls.append(f.file_id)
+        f.body = b"\x02" * 300
+        return True
+
+    monkeypatch.setattr(hu_mod, "fetch_hot_manifest", fake_fetch)
+    monkeypatch.setattr(hu_mod, "download_hot_file", fake_dl)
+
+    files1, dl1, cached1 = await hu_mod._load_hot_files(1)
+    assert dl1 == 1 and cached1 is False
+    assert fetch_calls == [1] and len(dl_calls) == 1
+
+    # Same device_type → served from cache: no new fetch, no new download.
+    files2, dl2, cached2 = await hu_mod._load_hot_files(1)
+    assert cached2 is True and dl2 == 1
+    assert files2 is files1
+    assert fetch_calls == [1] and len(dl_calls) == 1  # unchanged
+
+    # Different device_type → its own fetch+download.
+    _f3, _dl3, cached3 = await hu_mod._load_hot_files(0)
+    assert cached3 is False
+    assert fetch_calls == [1, 0] and len(dl_calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_clear_hot_manifest_cache_forces_refetch(monkeypatch):
+    from divoom_lib.tools import hot_update as hu_mod
+
+    fetch_calls = []
+
+    def fake_fetch(dt):
+        fetch_calls.append(dt)
+        f = _file()
+        f.body = None
+        return [f]
+
+    monkeypatch.setattr(hu_mod, "fetch_hot_manifest", fake_fetch)
+    monkeypatch.setattr(hu_mod, "download_hot_file",
+                        lambda f: (setattr(f, "body", b"\x03" * 300), True)[1])
+
+    await hu_mod._load_hot_files(1)
+    hu_mod.clear_hot_manifest_cache()
+    await hu_mod._load_hot_files(1)
+    assert fetch_calls == [1, 1]  # cleared → re-fetched, not served from cache

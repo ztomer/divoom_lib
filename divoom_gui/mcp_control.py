@@ -81,6 +81,11 @@ class MCPController:
         self._proc: Optional[subprocess.Popen] = None
         self._started_at: Optional[float] = None
         self._mac: Optional[str] = None
+        # True once we've spawned a server in *this* GUI session. Gates whether
+        # ``status()`` surfaces the log file: on a fresh launch (toggle never
+        # touched) we must NOT tail a log left over from a previous session, or
+        # the card shows an archaeological traceback the user can't act on.
+        self._started_this_session: bool = False
 
     # ── Subprocess spawn / stop ────────────────────────────────────
 
@@ -114,7 +119,10 @@ class MCPController:
         if mac:
             cmd += ["--mac", mac]
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_fp = open(self._log_path, "ab", buffering=0)
+        # Truncate ("wb"), not append: each start gets a self-contained log so
+        # the GUI card never mixes a fresh run with a stale crash from a prior
+        # session. Combined with ``_started_this_session`` gating in status().
+        log_fp = open(self._log_path, "wb", buffering=0)
         env = dict(os.environ)
         env.setdefault("PYTHONUNBUFFERED", "1")
         try:
@@ -133,6 +141,7 @@ class MCPController:
             return MCPStatus(running=False, error=f"failed to spawn MCP server: {exc}")
         self._started_at = time.time()
         self._mac = mac
+        self._started_this_session = True
         logger.info("MCP server started: pid=%s mac=%s", self._proc.pid, mac)
         # Reap the log file handle — the subprocess owns the FD now.
         try:
@@ -167,6 +176,7 @@ class MCPController:
         self._proc = None
         self._started_at = None
         self._mac = None
+        self._started_this_session = False
         return self.status()
 
     # ── Status ─────────────────────────────────────────────────────
@@ -174,8 +184,14 @@ class MCPController:
     def status(self) -> MCPStatus:
         running = self.is_running()
         last_lines: list[str] = []
+        # Only surface the log for a server we started this session. On a fresh
+        # GUI launch (toggle never touched) the log on disk is from an older run
+        # and must not be shown — that was the "traceback shown when the toggle
+        # is off" bug. ``is_running()`` may have flipped the flag's companion
+        # process reference to None after a crash-exit, but we keep showing the
+        # (now clean) log until the user explicitly stops via stop().
         try:
-            if self._log_path.exists():
+            if self._started_this_session and self._log_path.exists():
                 with open(self._log_path, "rb") as f:
                     f.seek(0, os.SEEK_END)
                     size = f.tell()

@@ -25,7 +25,7 @@ CONFIG_FILE = CONFIG_DIR / "daemon.ini"
 SECTION = "daemon"
 
 # ── named defaults (no magic numbers at the call sites) ──────────────────────
-DEFAULT_SCAN_TIMEOUT = 15.0          # seconds to scan when the GUI sends no timeout
+DEFAULT_SCAN_TIMEOUT = 20.0          # seconds to scan when the GUI sends no timeout
 DEFAULT_SCAN_LIMIT = 4               # stop after N devices (0 = no limit)
 DEFAULT_SCAN_READ_SLACK = 10.0       # client waits scan_timeout + this for the reply
 DEFAULT_CLIENT_TIMEOUT = 2.0         # socket read timeout for quick, non-scan commands

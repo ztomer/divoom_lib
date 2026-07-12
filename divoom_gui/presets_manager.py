@@ -67,11 +67,13 @@ class PresetsManagerMixin:
     def load_config(self) -> str:
         logger.info("GUI Action: Loading configurations...")
         try:
+            from divoom_daemon.daemon_config import DEFAULT_SCAN_TIMEOUT, DEFAULT_SCAN_LIMIT
+            default_timeout, default_limit = int(DEFAULT_SCAN_TIMEOUT), DEFAULT_SCAN_LIMIT
             config_file = Path.home() / ".config" / "divoom-control" / "config.ini"
             cfg = configparser.ConfigParser()
             email = ""
-            timeout = 60
-            limit = 4
+            timeout = default_timeout
+            limit = default_limit
             lan_ip = ""
             lan_token = 0
             
@@ -91,8 +93,8 @@ class PresetsManagerMixin:
             if config_file.exists():
                 cfg.read(config_file)
                 email = cfg.get("divoom", "email", fallback="")
-                timeout = _safe_int(cfg.get("gui", "timeout", fallback="60"), 60)
-                limit = _safe_int(cfg.get("gui", "limit", fallback="4"), 4)
+                timeout = _safe_int(cfg.get("gui", "timeout", fallback=str(default_timeout)), default_timeout)
+                limit = _safe_int(cfg.get("gui", "limit", fallback=str(default_limit)), default_limit)
                 last_connected_device = cfg.get("gui", "last_connected_device", fallback="")
                 last_detected_count = _safe_int(cfg.get("gui", "last_detected_count", fallback="0"), 0)
                 lan_ip = cfg.get("lan", "device_ip", fallback="")

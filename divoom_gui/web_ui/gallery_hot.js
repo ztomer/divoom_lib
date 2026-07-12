@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const list = document.getElementById("hot-preview-list");
         if (!list) return;
         list.innerHTML = '<div class="hot-preview-empty">Loading hot channel manifest...</div>';
+        loadLastChecked();  // R53: show when this device was last checked
 
         window.pywebview?.api?.hot_update_preview?.().then(json => {
             let r;
@@ -38,6 +39,44 @@ document.addEventListener("DOMContentLoaded", () => {
             renderHotPreview(r.items);
         });
     }
+
+    // ── R53: per-device "last checked" stamp ──────────────────────────────
+    // The daemon writes the stamp (it owns the update); we only READ it, keyed
+    // by the active device — the backend resolves that key, matching what
+    // hot_channel_update passed for the write.
+    function formatChecked(seconds) {
+        const then = seconds * 1000;
+        const diff = Date.now() - then;
+        const day = 86400000;
+        if (diff < 60000) return "just now";
+        if (diff < 3600000) { const m = Math.round(diff / 60000); return `${m} min${m > 1 ? "s" : ""} ago`; }
+        if (diff < day) { const h = Math.round(diff / 3600000); return `${h} hour${h > 1 ? "s" : ""} ago`; }
+        if (diff < 30 * day) { const d = Math.round(diff / day); return `${d} day${d > 1 ? "s" : ""} ago`; }
+        return new Date(then).toLocaleDateString();
+    }
+
+    function renderLastChecked(entry) {
+        const el = document.getElementById("hot-last-checked");
+        if (!el) return;
+        if (!entry || !entry.checked_at) { el.textContent = ""; el.title = ""; el.classList.remove("stale"); return; }
+        el.textContent = `Last checked ${formatChecked(entry.checked_at)}`;
+        // >2 weeks old → flag it, so an undated "up to date" can't mislead.
+        const stale = (Date.now() - entry.checked_at * 1000) > 14 * 86400000;
+        el.classList.toggle("stale", stale);
+        el.title = new Date(entry.checked_at * 1000).toLocaleString()
+            + ` — manifest ${entry.manifest}, downloaded ${entry.downloaded}, pushed ${entry.served}`;
+    }
+
+    function loadLastChecked() {
+        if (!window.pywebview?.api?.hot_get_check) { renderLastChecked(null); return; }
+        // No address arg — the backend resolves the active device (same key the
+        // write used), so read and write can't drift.
+        window.pywebview.api.hot_get_check().then(json => {
+            let e; try { e = JSON.parse(json); } catch { e = null; }
+            renderLastChecked(e);
+        });
+    }
+    window.loadLastChecked = loadLastChecked;
     // R42 §4: the pixel-art sub-tab handler (settings_features.js) calls
     // window.loadHotPreview — without this exposure the hot panel stayed on
     // "Loading hot channel manifest..." forever when the sub-tab was clicked.
@@ -114,6 +153,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let pct = 0;
         let msg = "Starting\u2026";
 
+        // Two phases, made explicit so the step is legible: first we pull the
+        // curated files FROM Divoom's cloud, then we stream them TO the device.
         switch (p.phase) {
             case "starting":
                 pct = 0;
@@ -121,15 +162,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 break;
             case "fetching_manifest":
                 pct = 2;
-                msg = "Fetching list\u2026";
+                msg = "1/2 Fetching hot list\u2026";
                 break;
             case "downloading":
                 pct = 5 + (p.current / p.total) * 45;
-                msg = `Downloading ${p.current}/${p.total}`;
+                // Cached: bodies were already downloaded for this device size, so
+                // we skip straight to the upload \u2014 say so rather than flashing a
+                // misleading "downloading".
+                msg = p.cached
+                    ? "1/2 Using cached files"
+                    : `1/2 Downloading from Divoom ${p.current}/${p.total}`;
                 break;
             case "uploading":
                 pct = 50 + (p.current / p.total) * 48;
-                msg = `Uploading ${p.current}/${p.total}`;
+                msg = `2/2 Uploading to device ${p.current}/${p.total}`;
                 break;
         }
 
@@ -144,15 +190,45 @@ document.addEventListener("DOMContentLoaded", () => {
         if (p.phase === "done") {
             fill.style.width = "100%";
             const result = p.result || {};
-            const n = (result.served || []).length;
-            text.textContent = n ? `${n} file${n > 1 ? "s" : ""} updated` : "Up to date";
-            fill.style.background = "linear-gradient(90deg, #166534, #22c55e)";
+            const served = (result.served || []).length;
+            const manifest = result.manifest || 0;
+            // downloaded may be absent on older daemons — assume complete then.
+            const downloaded = (result.downloaded != null) ? result.downloaded : manifest;
+            // Some curated files couldn't be fetched from the CDN, so the device
+            // was never offered them. Reporting "Up to date" here is the false
+            // positive the user hit — be honest instead.
+            const incomplete = manifest > 0 && downloaded < manifest;
+
             btn.classList.remove("progress-active");
-            btn.classList.add("progress-ok");
-            window.showToast(
-                n ? `Hot channel updated (${n} file${n > 1 ? "s" : ""})`
-                   : "Hot channel already up to date",
-                "success", " BLE");
+            if (served) {
+                text.textContent = `${served} file${served > 1 ? "s" : ""} updated`;
+                fill.style.background = "linear-gradient(90deg, #166534, #22c55e)";
+                btn.classList.add("progress-ok");
+                window.showToast(
+                    `Hot channel updated (${served} file${served > 1 ? "s" : ""})`,
+                    "success", " BLE");
+            } else if (incomplete) {
+                const missing = manifest - downloaded;
+                text.textContent = `Checked ${downloaded}/${manifest}`;
+                fill.style.background = "linear-gradient(90deg, #78350f, #f59e0b)";
+                btn.classList.add("progress-ok");
+                window.showToast(
+                    `Hot channel: ${missing} file${missing > 1 ? "s" : ""} couldn't be fetched — not fully checked`,
+                    "error");
+            } else {
+                text.textContent = "Up to date";
+                fill.style.background = "linear-gradient(90deg, #166534, #22c55e)";
+                btn.classList.add("progress-ok");
+                window.showToast("Hot channel already up to date", "success", " BLE");
+            }
+            // R53: the DAEMON stamped the last-checked state on completion; just
+            // re-read it so the label reflects the daemon-owned source of truth.
+            loadLastChecked();
+            // The manifest can rotate while the app sits on this tab, so the grid
+            // goes stale (it only re-fetches on tab activation). Re-fetch now so
+            // the tiles reflect the set the device was just synced against — the
+            // newest file was missing from the preview until this refresh.
+            loadHotPreview();
         } else {
             fill.style.width = "100%";
             text.textContent = p.error ? `Failed: ${p.error}` : "Update failed";

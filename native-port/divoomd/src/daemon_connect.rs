@@ -2,13 +2,41 @@
 //! Split from daemon.rs to keep that file under the 500-LOC ground rule.
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use serde_json::{json, Value};
+
+/// Minimum gap between BLE scans; a scan arriving sooner reuses the last result
+/// instead of hitting the radio, so nothing (a retry, a script, a test) can
+/// hammer the adapter into CoreBluetooth's scan-frequency throttle.
+#[cfg(feature = "ble")]
+const MIN_RESCAN_INTERVAL: Duration = Duration::from_secs(3);
 
 use crate::daemon::{Daemon, DeviceTransport};
 use crate::protocol::{err_reply, Request};
 #[cfg(feature = "ble")]
-use crate::ble::{self, BleTransport};
+use crate::ble::{self, BleTransport, Discovered};
+
+/// btleplug surfaces a dead CoreBluetooth central (its session ended after a
+/// device disconnect or a Bluetooth toggle) as "Channel closed". The cached
+/// Adapter can't recover, so we drop it and retry once with a fresh one.
+#[cfg(feature = "ble")]
+fn is_dead_central(err: &str) -> bool {
+    err.contains("Channel closed")
+}
+
+/// Get the (cached) central and run one scan; error as a String for retry logic.
+#[cfg(feature = "ble")]
+async fn run_scan(daemon: &Daemon, dur: Duration) -> Result<Vec<Discovered>, String> {
+    let central = daemon.central().await?;
+    ble::scan(&central, dur).await.map_err(|e| e.to_string())
+}
+
+/// Get the (cached) central and run one connect; error as a String for retry.
+#[cfg(feature = "ble")]
+async fn run_connect(daemon: &Daemon, id: &str) -> Result<BleTransport, String> {
+    let central = daemon.central().await?;
+    BleTransport::connect(&central, id).await.map_err(|e| e.to_string())
+}
 
 /// Handle `probe_lan` — check whether the connected device is reachable over its
 /// LAN HTTP API (Python-daemon parity). BLE/SPP devices report "no LAN configured".
@@ -29,21 +57,65 @@ pub(crate) async fn probe_lan(daemon: &Daemon) -> Value {
     }
 }
 
+/// Resets the daemon's `scanning` flag on drop, so a scan that returns via ANY
+/// path (incl. an early error) can't wedge the guard.
+#[cfg(feature = "ble")]
+struct ScanGuard<'a>(&'a std::sync::atomic::AtomicBool);
+#[cfg(feature = "ble")]
+impl Drop for ScanGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 /// Handle `scan` command (BLE only).
 #[cfg(feature = "ble")]
 pub(crate) async fn cmd_scan(daemon: &Daemon, req: &Request) -> Value {
+    use std::sync::atomic::Ordering;
+    // Reject a concurrent scan: two scans share the one adapter and would corrupt
+    // each other (one's stop_scan cuts the other short → a truncated device list,
+    // which is exactly how an overlapping probe made the GUI miss a device).
+    if daemon
+        .scanning
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return err_reply("scan already in progress");
+    }
+    let _guard = ScanGuard(&daemon.scanning);
+
+    // Rapid re-scan short-circuit: a scan within MIN_RESCAN_INTERVAL of the last
+    // returns the cached result instead of hitting the radio. Back-to-back scans
+    // trip CoreBluetooth's scan-frequency throttle (which then returns 0 devices
+    // until Bluetooth is toggled) — the failure mode that dogged this feature.
+    {
+        let last = daemon.last_scan.lock().await;
+        if let Some((at, devices)) = last.as_ref() {
+            if at.elapsed() < MIN_RESCAN_INTERVAL {
+                return json!({"success": true, "devices": devices.clone(), "cached": true});
+            }
+        }
+    }
+
     let timeout = req.args.get("timeout").and_then(|v| v.as_f64()).unwrap_or(8.0);
-    let central = match daemon.central().await {
-        Ok(c) => c,
-        Err(e) => return err_reply(&format!("scan failed: {e}")),
-    };
-    match ble::scan(&central, Duration::from_secs_f64(timeout)).await {
-        Ok(devs) => json!({
-            "success": true,
-            "devices": devs.iter()
+    // `limit` is accepted but intentionally NOT used to truncate results: capping
+    // could hide a real device (the "found 2 of 3" class of bug). ble::scan caps
+    // an over-long timeout internally so a stray large value can't wedge things.
+    let dur = Duration::from_secs_f64(timeout);
+    let mut result = run_scan(daemon, dur).await;
+    if matches!(&result, Err(e) if is_dead_central(e)) {
+        daemon.reset_central().await; // stale CoreBluetooth session — rebuild + retry
+        result = run_scan(daemon, dur).await;
+    }
+    match result {
+        Ok(devs) => {
+            let devices: Vec<Value> = devs
+                .iter()
                 .map(|d| json!({"name": d.name, "address": d.id}))
-                .collect::<Vec<_>>(),
-        }),
+                .collect();
+            *daemon.last_scan.lock().await = Some((Instant::now(), devices.clone()));
+            json!({"success": true, "devices": devices})
+        }
         Err(e) => err_reply(&format!("scan failed: {e}")),
     }
 }
@@ -91,11 +163,12 @@ pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
             }
         }
 
-        let central = match daemon.central().await {
-            Ok(c) => c,
-            Err(e) => return err_reply(&format!("connect failed: {e}")),
-        };
-        match BleTransport::connect(&central, &id).await {
+        let mut result = run_connect(daemon, &id).await;
+        if matches!(&result, Err(e) if is_dead_central(e)) {
+            daemon.reset_central().await; // stale CoreBluetooth session — rebuild + retry
+            result = run_connect(daemon, &id).await;
+        }
+        match result {
             Ok(t) => {
                 *daemon.device.lock().await = Some(Arc::new(DeviceTransport::Ble(t)));
                 *daemon.device_id.lock().await = Some(id.clone());
@@ -123,4 +196,65 @@ pub(crate) async fn cmd_disconnect(daemon: &Daemon) -> Value {
     *daemon.device_id.lock().await = None;
     let _ = daemon.tx.send(json!({"type":"status","state":"idle","counters":{}}));
     json!({"success": true})
+}
+
+#[cfg(all(test, feature = "ble"))]
+mod scan_guard_tests {
+    use super::{cmd_scan, is_dead_central, ScanGuard};
+    use crate::daemon::Daemon;
+    use crate::protocol::make_request;
+    use serde_json::json;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Instant;
+
+    // A scan arriving within MIN_RESCAN_INTERVAL of the last returns the cached
+    // result WITHOUT touching the radio (the check short-circuits before
+    // daemon.central()), so this is unit-testable with no BLE device. Guards the
+    // anti-throttle behavior that stops rapid re-scans wedging CoreBluetooth.
+    #[test]
+    fn detects_dead_central_error() {
+        // "Channel closed" (from either scan or connect) → recreate the central.
+        assert!(is_dead_central("connect failed: Channel closed"));
+        assert!(is_dead_central("scan failed: Channel closed"));
+        // Ordinary failures must NOT trigger a central rebuild.
+        assert!(!is_dead_central("device not found in scan"));
+        assert!(!is_dead_central("no BLE adapter"));
+    }
+
+    #[tokio::test]
+    async fn rapid_rescan_returns_cached_without_touching_radio() {
+        let daemon = Daemon::new();
+        let cached = vec![json!({"name": "Pixoo-1", "address": "AA:BB"})];
+        *daemon.last_scan.lock().await = Some((Instant::now(), cached.clone()));
+
+        let resp = cmd_scan(&daemon, &make_request("scan", None, None)).await;
+        assert_eq!(resp["cached"], json!(true));
+        assert_eq!(resp["devices"], json!(cached));
+        // The guard must be released again after a cached return.
+        assert!(!daemon.scanning.load(Ordering::SeqCst));
+    }
+
+    // The scan guard is what stops two overlapping scans from clobbering the one
+    // adapter (the corruption that truncated the GUI's device list). Pin its
+    // claim / reject-while-held / reset-on-drop behavior without needing BLE.
+    #[test]
+    fn rejects_concurrent_then_resets_on_drop() {
+        let flag = AtomicBool::new(false);
+        // First scan claims the guard.
+        assert!(flag
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok());
+        {
+            let _g = ScanGuard(&flag);
+            // A concurrent scan is rejected while the first holds it.
+            assert!(flag
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_err());
+        }
+        // Guard dropped (scan finished) → flag cleared → a new scan can claim it.
+        assert!(!flag.load(Ordering::SeqCst));
+        assert!(flag
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok());
+    }
 }

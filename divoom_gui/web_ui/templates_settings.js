@@ -1,5 +1,9 @@
 /* templates_settings.js — Settings panel template */
 window.DivoomTemplates = window.DivoomTemplates || {};
+// Single JS-side default for the scan timeout (seconds). Bootstrap fallback only:
+// the daemon's DEFAULT_SCAN_TIMEOUT is the authority and is loaded into the input
+// via get_scan_settings on open (restoreScanSettings). Keep in sync with it.
+window.SCAN_TIMEOUT_DEFAULT = 20;
 window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome is now .tabs-row + .tab-btn
                      (defined in tabs.css) — same active state as Channels and
                      Tools. The glass-card wrapper unifies appearance with
@@ -27,7 +31,7 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                 <div style="display:flex; gap:10px; margin-bottom:15px;">
                                     <div style="flex:1;">
                                         <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Timeout (s)</label>
-                                        <input type="number" id="scan-timeout" min="3" max="120" value="60" class="text-input">
+                                        <input type="number" id="scan-timeout" min="3" max="120" value="${window.SCAN_TIMEOUT_DEFAULT}" class="text-input">
                                     </div>
                                     <div style="flex:1;">
                                         <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Devices</label>
@@ -243,5 +247,6 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                             </div>
                         </div>
                     </div>
+                    <div class="settings-version panel-hint" style="text-align:center; margin-top:14px; opacity:0.6; font-size:11px;">Divoom Control <span id="app-version">v...</span></div>
                 </div>
     `;

@@ -30,7 +30,7 @@ def test_get_scan_settings_defaults_when_missing(tmp_path, monkeypatch):
     from divoom_gui.scanner_mixin import ScannerMixin
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     s = json.loads(ScannerMixin().get_scan_settings())
-    assert s == {"timeout": 60, "limit": 4}
+    assert s == {"timeout": 20, "limit": 4}
 
 
 # ── §2 macOS 26 NC DB discovery ────────────────────────────────────────────
@@ -136,6 +136,6 @@ def test_load_config_corrupt_int_field_does_not_wipe_whole_config(tmp_path, monk
 
     data = json.loads(Host().load_config())
     assert data["email"] == "user@example.com"  # whole config survives
-    assert data["timeout"] == 60                # corrupt -> default
+    assert data["timeout"] == 20                # corrupt -> default
     assert data["limit"] == 7                   # valid   -> parsed
     assert data["lan_token"] == 0               # corrupt -> default

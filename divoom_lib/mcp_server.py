@@ -57,11 +57,34 @@ import asyncio
 import dataclasses
 import json
 import logging
+import os
+import stat
 import sys
 from typing import Any, Awaitable, Callable, Optional
 
 
 logger = logging.getLogger(__name__)
+
+
+def _stdio_is_pipe_like(stream: Any) -> bool:
+    """True if ``stream``'s fd is a pipe, socket, or character device — the
+    only kinds asyncio's ``connect_read_pipe`` / ``connect_write_pipe`` accept.
+
+    A regular file (e.g. stdout redirected to a log file, or ``> out.txt``)
+    returns False: asyncio's ``_UnixWritePipeTransport`` raises
+    ``ValueError("Pipe transport is only for pipes, sockets and character
+    devices")`` for those, which is exactly the crash the GUI's "Start MCP
+    server" toggle produced (it spawns us with stdout pointed at a log file).
+    A missing / detached fd also returns False."""
+    try:
+        fd = stream.fileno()
+    except (AttributeError, OSError, ValueError):
+        return False
+    try:
+        mode = os.fstat(fd).st_mode
+    except OSError:
+        return False
+    return stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode) or stat.S_ISCHR(mode)
 
 
 # ── JSON-RPC error codes (standard) ──────────────────────────────────
@@ -280,6 +303,23 @@ class MCPServer:
         one response. The loop exits cleanly on EOF (stdin closed —
         what the parent process does when it wants to stop us)."""
         loop = asyncio.get_running_loop()
+        # An MCP stdio server only works when stdin *and* stdout are pipes owned
+        # by the MCP client that launched us (Claude Desktop, Cursor, ...). If
+        # stdout is a regular file — the GUI spawns us with stdout redirected to
+        # a log file, or a user runs `divoom-control mcp-server > out.txt` — then
+        # `connect_write_pipe` below raises a multi-frame ValueError traceback
+        # ("Pipe transport is only for pipes, sockets and character devices").
+        # Detect that up front and exit with a single clean diagnostic instead
+        # of spewing a traceback into the log the GUI card surfaces.
+        if not _stdio_is_pipe_like(sys.stdin) or not _stdio_is_pipe_like(sys.stdout):
+            sys.stderr.write(
+                "MCP server: stdin/stdout are not connected to an MCP client. "
+                "The stdio transport needs pipes owned by the client, so launch "
+                "this from your MCP client's config (Claude Desktop, Cursor, ...), "
+                "not standalone or from the GUI. See docs/MCP_SERVER.md.\n"
+            )
+            sys.stderr.flush()
+            return
         # No `loop=` kwarg: StreamReader binds to the running loop on its own
         # (the explicit param has been deprecated since 3.8). Verified no
         # DeprecationWarning on 3.14. See REVIEW_2026-06 §0.1 (1.8).

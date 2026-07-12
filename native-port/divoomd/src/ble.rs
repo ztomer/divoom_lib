@@ -33,6 +33,21 @@ const NOTIFY_UUID: Uuid = Uuid::from_u128(0x49535343_1e4d_4bd9_ba61_23c647249616
 
 const DEVICE_NAME_HINTS: &[&str] = &["Pixoo", "Divoom", "Tivoo", "Timoo", "Ditoo", "Timebox"];
 
+/// Upper bound on a single BLE write. A write to a peripheral that vanished
+/// (device powered off, out of range, or Bluetooth toggled mid-operation) can
+/// otherwise hang forever — and since the write runs while the caller holds the
+/// daemon's `device` lock, that wedges ALL device ops (and the device_status
+/// liveness probe, which then falsely reports the daemon down). Bounding it lets
+/// the op fail, release the lock, and the daemon self-recover.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Upper bound on each GATT setup step (connect / discover / subscribe).
+/// CoreBluetooth's `connect()` waits INDEFINITELY for an unresponsive device
+/// (off, out of range, or already connected elsewhere) — and the connect runs
+/// while the daemon holds the `device` lock, so an unbounded hang wedges the
+/// whole device path. Bounded so a bad connect fails and the caller can retry.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+
 pub use crate::transport::BleResult;
 
 /// A device discovered during a scan.
@@ -48,8 +63,21 @@ pub async fn make_central() -> BleResult<Adapter> {
     manager.adapters().await?.into_iter().next().ok_or_else(|| "no BLE adapter".into())
 }
 
+/// Backstop cap for a scan window (mirrors the Python daemon's
+/// `_SCAN_RESULT_TIMEOUT`): a long user-configured timeout must not run the
+/// adapter for minutes.
+const SCAN_TIMEOUT_CAP: Duration = Duration::from_secs(90);
+
 /// Scan for Divoom devices for `timeout`, returning name + id pairs.
+///
+/// Deliberately a single scan window, then one `peripherals()` enumeration
+/// AFTER `stop_scan`: on macOS/CoreBluetooth, querying peripheral `properties()`
+/// while a scan is still active blocks and wedges the scan, so it must be read
+/// only once the scan has stopped. A long user-configured timeout is capped at
+/// `SCAN_TIMEOUT_CAP` (mirrors the Python daemon's `_SCAN_RESULT_TIMEOUT`) so a
+/// stray large value can't run the adapter for minutes.
 pub async fn scan(central: &Adapter, timeout: Duration) -> BleResult<Vec<Discovered>> {
+    let timeout = timeout.min(SCAN_TIMEOUT_CAP);
     central.start_scan(ScanFilter::default()).await?;
     tokio::time::sleep(timeout).await;
     central.stop_scan().await?;
@@ -110,13 +138,22 @@ impl BleTransport {
         // BLE connect reliable on Linux needs forcing the LE transport / pairing /
         // disabling BR/EDR — tracked in scripts/linux_remote/README.md. Scan works
         // on Linux today; connect does not.
-        peripheral.connect().await?;
-        peripheral.discover_services().await?;
+        match tokio::time::timeout(CONNECT_TIMEOUT, peripheral.connect()).await {
+            Ok(r) => r?,
+            Err(_) => return Err("BLE connect timed out".into()),
+        }
+        match tokio::time::timeout(CONNECT_TIMEOUT, peripheral.discover_services()).await {
+            Ok(r) => r?,
+            Err(_) => return Err("BLE discover_services timed out".into()),
+        }
         let chars = peripheral.characteristics();
         let write_char = chars.iter().find(|c| c.uuid == WRITE_UUID).ok_or("no write characteristic")?.clone();
         let notify_char = chars.iter().find(|c| c.uuid == NOTIFY_UUID).ok_or("no notify characteristic")?.clone();
 
-        peripheral.subscribe(&notify_char).await?;
+        match tokio::time::timeout(CONNECT_TIMEOUT, peripheral.subscribe(&notify_char)).await {
+            Ok(r) => r?,
+            Err(_) => return Err("BLE subscribe timed out".into()),
+        }
         let mut notifications = peripheral.notifications().await?;
         let (tx, rx) = mpsc::channel::<Frame>(256);
 
@@ -200,6 +237,12 @@ impl BleTransport {
 
     /// Encode `[command_id, args...]` in the active framing and write it.
     pub async fn send_command(&self, command_id: u8, args: &[u8], write_with_response: bool) -> BleResult<()> {
+        if std::env::var("DIVOOMD_BLE_DEBUG").is_ok() {
+            let n = args.len().min(12);
+            let hx: String = args[..n].iter().map(|b| format!("{b:02x}")).collect();
+            eprintln!("[ble] tx cmd=0x{command_id:02x} ({} args){}", args.len(),
+                      if n > 0 { format!(" {hx}{}", if args.len() > n { ".." } else { "" }) } else { String::new() });
+        }
         let mut payload = Vec::with_capacity(1 + args.len());
         payload.push(command_id);
         payload.extend_from_slice(args);
@@ -220,7 +263,15 @@ impl BleTransport {
         } else {
             wtype
         };
-        self.peripheral.write(&self.write_char, &frame, wtype).await?;
+        match tokio::time::timeout(
+            WRITE_TIMEOUT,
+            self.peripheral.write(&self.write_char, &frame, wtype),
+        )
+        .await
+        {
+            Ok(res) => res?, // write finished (Ok, or a real BLE error to propagate)
+            Err(_) => return Err("BLE write timed out (device unreachable)".into()),
+        }
         Ok(())
     }
 

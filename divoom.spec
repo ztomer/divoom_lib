@@ -74,10 +74,14 @@ exe = EXE(
 )
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="Divoom")
 
+# App icon: PyInstaller copies this into Contents/Resources/ and sets
+# CFBundleIconFile automatically. Regenerate from source via scripts/make_icns.sh.
+_ICON = _ex("packaging/Divoom.icns")
+
 app = BUNDLE(
     coll,
     name="Divoom.app",
-    icon=None,
+    icon=_ICON if os.path.exists(_ICON) else None,
     bundle_identifier="com.divoom.control",
     version=VERSION,
     info_plist={

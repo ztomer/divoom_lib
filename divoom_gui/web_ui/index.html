@@ -543,6 +543,16 @@
     <span id="global-status-dot" class="transport-dot inactive"
           title="Disconnected" role="img" aria-label="Connection status"></span>
 
+    <!-- R53: daemon-down banner. The background service owns the device over the
+         socket and is killed on quit (keep-alive off), so it must respawn on the
+         next launch. If it's ever unreachable the app can do NOTHING, so surface
+         it: the health heartbeat auto-reconnects silently first, and only shows
+         this banner (with a manual Reconnect) when that fails. -->
+    <div id="daemon-banner" class="daemon-banner" role="alert" hidden>
+        <span class="daemon-banner-msg">Background service isn't running &mdash; the app can't reach your devices.</span>
+        <button id="daemon-reconnect-btn" class="daemon-banner-btn" type="button">Reconnect</button>
+    </div>
+
     <!-- Notification Overlay -->
     <div id="toast" class="toast"></div>
     

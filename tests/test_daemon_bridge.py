@@ -363,10 +363,10 @@ def test_hot_update_rpc(live_daemon):
     _, _, sp = live_daemon
     client = DaemonClient(sp)
     client.send_command = MagicMock(return_value={"success": True})
-    reply = client.hot_update(device_size=32, show=True)
+    reply = client.hot_update(device_size=32, show=True, address="AA:BB")
     assert reply == {"success": True}
     client.send_command.assert_called_once_with("hot_update", {
-        "device_size": 32, "show": True,
+        "device_size": 32, "show": True, "address": "AA:BB",
     }, read_timeout=ANY)
 
 
@@ -377,7 +377,7 @@ def test_hot_update_defaults(live_daemon):
     client.send_command = MagicMock(return_value={"success": True})
     client.hot_update()
     client.send_command.assert_called_once_with("hot_update", {
-        "device_size": 16, "show": True,
+        "device_size": 16, "show": True, "address": "",
     }, read_timeout=ANY)
 
 
