@@ -160,6 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.showToast(`Discovered ${devices.length} screens!`, "success");
                     window.renderArrangerCanvas();
                     if (window.renderDeviceDots) window.renderDeviceDots();
+                    if (window.refreshKnownDevices) window.refreshKnownDevices();
                 })
                 .catch(err => {
                     // The scan runs in the daemon, which can die mid-scan (e.g. a

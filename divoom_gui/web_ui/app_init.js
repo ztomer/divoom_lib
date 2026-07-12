@@ -369,6 +369,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         setTimeout(() => window.connectDevice(name, addr), 500);
                     }
 
+                    if (window.refreshKnownDevices) window.refreshKnownDevices();
+
                     if (window.runBleScan) {
                         setTimeout(() => {
                             window.showToast("Startup: Auto-scanning screens...", "success");

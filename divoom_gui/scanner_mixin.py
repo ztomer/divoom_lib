@@ -104,6 +104,42 @@ class ScannerMixin:
             logger.warning(f"get_scan_settings failed: {e}")
         return json.dumps({"timeout": timeout, "limit": limit})
 
+    def get_known_devices(self) -> str:
+        """Return all known devices with a ``detected`` flag indicating whether
+        each was seen in the most recent scan. Used by the frontend to render
+        known-but-undetected chips."""
+        try:
+            cache_file = Path.home() / ".config" / "divoom-control" / "discovered_devices.json"
+            if not cache_file.exists():
+                return json.dumps([])
+            known = json.loads(cache_file.read_text(encoding="utf-8"))
+            if not isinstance(known, list):
+                return json.dumps([])
+            detected = set()
+            for d in (getattr(self, "discovered_list", None) or []):
+                addr = d.get("address") or d.get("ip")
+                if addr:
+                    detected.add(addr)
+            # Annotate and filter: only include devices not in the scan (the
+            # scan results are already in discoveredDevices). Include at most
+            # one entry per address (if an undetected known device somehow
+            # shares an address with a detected one, the detected wins).
+            out = []
+            seen = set(detected)
+            for d in known:
+                addr = d.get("address") or d.get("ip")
+                if not addr or addr in detected:
+                    continue
+                if addr in seen:
+                    continue
+                seen.add(addr)
+                out.append({"address": addr, "name": d.get("name", addr),
+                            "detected": False})
+            return json.dumps(out)
+        except Exception as e:
+            logger.warning(f"get_known_devices failed: {e}")
+            return json.dumps([])
+
     def scan_devices(self, timeout: int | None = None, limit: int | None = None) -> str:
         # Fall back to the shared daemon config (daemon.ini) when the UI sends
         # nothing, so the scan defaults live in ONE place. The UI normally passes
@@ -138,8 +174,30 @@ class ScannerMixin:
         try:
             cfg_dir = Path.home() / ".config" / "divoom-control"
             cfg_dir.mkdir(parents=True, exist_ok=True)
-            atomic_write_text(cfg_dir / "discovered_devices.json",
-                              json.dumps(results, indent=2))
+            cache_file = cfg_dir / "discovered_devices.json"
+            # Merge: preserve existing known devices, update with fresh scan
+            known = {}
+            if cache_file.exists():
+                try:
+                    existing = json.loads(cache_file.read_text(encoding="utf-8"))
+                    if isinstance(existing, list):
+                        for d in existing:
+                            addr = d.get("address") or d.get("ip")
+                            if addr:
+                                known[addr] = d
+                except Exception:
+                    known = {}
+            now = __import__("time").time()
+            for d in results:
+                addr = d.get("address") or d.get("ip")
+                if addr:
+                    prev = known.get(addr, {})
+                    prev.update(d)
+                    prev["first_seen"] = prev.get("first_seen", now)
+                    prev["last_seen"] = now
+                    known[addr] = prev
+            merged = list(known.values())
+            atomic_write_text(cache_file, json.dumps(merged, indent=2))
             import configparser
             config_file = cfg_dir / "config.ini"
             cfg = configparser.ConfigParser()
@@ -148,7 +206,7 @@ class ScannerMixin:
             if "gui" not in cfg:
                 cfg["gui"] = {}
             cfg["gui"]["last_detected_count"] = str(len(results))
-            atomic_write_config(config_file, cfg, mode=0o600)  # holds creds
+            atomic_write_config(config_file, cfg, mode=0o600)
         except Exception as ce:
             logger.warning(f"Failed to cache discovered devices/count: {ce}")
 

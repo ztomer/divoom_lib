@@ -85,6 +85,17 @@ window.renderDeviceDots = function() {
     (window.DivoomState.registeredLanDevices || []).forEach(d => {
         if (d.ip) entries.push({ value: `LAN:${d.ip}`, name: `Wi-Fi: ${d.ip}` });
     });
+    // Merge known-but-undetected devices from the persistent cache
+    const knownPending = window.__knownUndetectedDevices;
+    if (knownPending && knownPending.length) {
+        const existing = new Set(entries.map(e => e.value));
+        knownPending.forEach(d => {
+            if (!existing.has(d.address)) {
+                entries.push({ value: d.address, name: d.name, known: true });
+                existing.add(d.address);
+            }
+        });
+    }
     host.innerHTML = "";
     entries.forEach(e => {
         const isActive = e.value === activeMac;
@@ -94,6 +105,7 @@ window.renderDeviceDots = function() {
         // R47: streaming = daemon owns it (live widget); degraded = link struggling.
         if (e.streaming && !isActive) chip.classList.add("chip-streaming");
         if (e.degraded) chip.classList.add("chip-degraded");
+        if (e.known && !isActive) chip.classList.add("chip-known");
         // data-value: R34 §2 — connectDevice pulses this element while connecting.
         chip.dataset.value = e.value;
         chip.title = e.degraded ? `${e.name} — ${e.kind} (reconnecting)`
@@ -175,4 +187,19 @@ window.renderWallButton = function() {
 window.setScanning = function(on) {
     const el = document.getElementById("scan-indicator");
     if (el) el.hidden = !on;
+};
+
+// Load known devices from persistent cache and merge in undetected ones
+window.refreshKnownDevices = function() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.get_known_devices) return;
+    api.get_known_devices().then(json => {
+        try {
+            const known = JSON.parse(json) || [];
+            window.__knownUndetectedDevices = known;
+            window.renderDeviceDots();
+        } catch (e) {
+            window.__knownUndetectedDevices = [];
+        }
+    });
 };

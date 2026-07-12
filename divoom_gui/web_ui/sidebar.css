@@ -368,6 +368,23 @@
 }
 .device-chip.chip-degraded .device-chip-state { color: #ffc864; opacity: 1; }
 
+/* Known-but-undetected: a device seen in a previous scan/session that the
+   current scan didn't find. Faded to distinguish it from reachable devices
+   while keeping it selectable (maybe it's just asleep / out of range). */
+.device-chip.chip-known {
+    border-color: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    opacity: 0.55;
+}
+.device-chip.chip-known .device-chip-dot {
+    opacity: 0.35;
+    box-shadow: none;
+}
+.device-chip.chip-known:hover {
+    opacity: 0.85;
+    background: rgba(255, 255, 255, 0.04);
+}
+
 /* Virtual Wall — same chip vocabulary as devices but dashed border to mark it
    as a composite (not a single screen). "Joined panels" glyph (bounding rect +
    vertical divider) is deliberately distinct from the 2×2 filled-rects of the

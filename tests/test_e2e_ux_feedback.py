@@ -309,3 +309,51 @@ async def test_wall_button_communicates_screen_count():
             assert shown["hasGlyph"] is True
         finally:
             await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_known_but_undetected_device_shows_distinct_state():
+    """A device seen in a previous session but missed by the current scan must
+    still appear in the sidebar as a distinct 'known' chip — not vanish. Closing
+    the "known device that wasn't detected" gap (R50)."""
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            # Render the current scan result synchronously...
+            await page.evaluate("""() => {
+                window.DivoomState.discoveredDevices = [
+                    {address:'AA', name:'Ditoo'}, {address:'BB', name:'Pixoo'}];
+                window.renderDeviceDots();
+            }""")
+            # ...then trigger the async known-devices fetch.
+            await page.evaluate("""() => {
+                window.__api.get_known_devices = () =>
+                    JSON.stringify([{address:'CC', name:'Tivoo', detected:false}]);
+                window.refreshKnownDevices();
+            }""")
+            # Wait for the async fetch + re-render to land the CC chip.
+            await page.wait_for_function(
+                "() => !!document.querySelector('#device-dots .device-chip[data-value=\"CC\"]')",
+                timeout=4000)
+            res = await page.evaluate("""() => {
+                const chips = [...document.querySelectorAll('#device-dots .device-chip')];
+                const cc = chips.find(c => c.dataset.value === 'CC');
+                const aa = chips.find(c => c.dataset.value === 'AA');
+                return {
+                    count: chips.length,
+                    ccExists: !!cc,
+                    ccKnown: cc ? cc.classList.contains('chip-known') : false,
+                    ccText: cc ? cc.textContent.trim() : '',
+                    aaKnown: aa ? aa.classList.contains('chip-known') : null,
+                };
+            }""")
+            assert res["count"] == 3              # AA + BB + CC (not dropped)
+            assert res["ccExists"] is True
+            assert res["ccKnown"] is True         # distinct 'known' state
+            assert "Tivoo" in res["ccText"]
+            assert res["aaKnown"] is False         # a detected device is NOT known
+        finally:
+            await browser.close()
