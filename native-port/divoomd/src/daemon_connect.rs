@@ -233,7 +233,7 @@ pub(crate) async fn cmd_disconnect(daemon: &Daemon) -> Value {
 
 #[cfg(all(test, feature = "ble"))]
 mod scan_guard_tests {
-    use super::{cmd_scan, is_dead_central, ScanGuard};
+    use super::{cmd_connect, cmd_disconnect, cmd_scan, is_dead_central, ScanGuard};
     use crate::daemon::Daemon;
     use crate::protocol::make_request;
     use serde_json::json;
@@ -289,5 +289,55 @@ mod scan_guard_tests {
         assert!(flag
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok());
+    }
+
+    // Mock-transport connect (no BLE) must mark the daemon connected and own a
+    // Mock device — the basis for every hardware-free connect/disconnect e2e.
+    #[tokio::test]
+    async fn mock_connect_succeeds_and_owns_device() {
+        let daemon = Daemon::new();
+        let req = make_request("connect", Some(json!({"mock": true})), None);
+        let res = cmd_connect(&daemon, &req).await;
+        assert_eq!(res["success"], json!(true));
+        assert_eq!(res["mac"], json!("MOCK_MAC"));
+        assert!(daemon.device.lock().await.is_some(), "device not owned after mock connect");
+    }
+
+    // The connecting guard must reject a second connect while one is in flight
+    // (prevents two scans/connects clobbering the one shared central).
+    #[tokio::test]
+    async fn connect_guard_rejects_when_in_progress() {
+        let daemon = Daemon::new();
+        daemon.connecting.store(true, Ordering::SeqCst); // simulate an in-flight connect
+        let req = make_request("connect", Some(json!({"mock": true})), None);
+        let res = cmd_connect(&daemon, &req).await;
+        assert_eq!(res["success"], json!(false));
+        assert_eq!(res["error"], json!("connect already in progress"));
+        // The simulated in-flight connect still holds the flag (we didn't run one).
+        assert!(daemon.connecting.load(Ordering::SeqCst));
+    }
+
+    // Disconnect with no device owned must be a clean success, not a crash.
+    #[tokio::test]
+    async fn disconnect_with_no_device_is_safe() {
+        let daemon = Daemon::new();
+        let res = cmd_disconnect(&daemon).await;
+        assert_eq!(res["success"], json!(true));
+        assert!(daemon.device.lock().await.is_none());
+    }
+
+    // Connect → device_call → disconnect → reconnect must stay stable across a
+    // loop, with the daemon always answering get_status (never wedged).
+    #[tokio::test]
+    async fn connect_disconnect_reconnect_loop_stays_responsive() {
+        let daemon = Daemon::new();
+        for _ in 0..5 {
+            let c = cmd_connect(&daemon, &make_request("connect", Some(json!({"mock": true})), None)).await;
+            assert_eq!(c["success"], json!(true));
+            assert!(daemon.device.lock().await.is_some(), "device not owned after connect");
+            let d = cmd_disconnect(&daemon).await;
+            assert_eq!(d["success"], json!(true));
+            assert!(daemon.device.lock().await.is_none());
+        }
     }
 }

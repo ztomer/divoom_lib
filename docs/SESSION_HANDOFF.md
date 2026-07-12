@@ -58,6 +58,17 @@ Claude) should read this on entry and **update it at the end of every round**
   mid-op — both against the mock-device harness and `--run-hardware` if a device
   is free. Plan: `docs/PLANNING_ROUND57.md`.
 
+  **E2E EDGE-CASE BLITZ DONE (still same commit wave as the release):** 8 tests in
+  `tests/test_daemon_connect_edge_e2e.py` drive a REAL divoomd over a Unix socket
+  via its `mock` transport (no Bluetooth) + an unreachable LAN IP for the
+  "device is off" case — mid-flight disconnect, 5× reconnect loop, connect-while-
+  already-connected idempotency, connect-to-offline-device-then-recover, device-op
+  after disconnect, scan-during-connect. All 8 pass. Plus 4 Rust
+  `daemon_connect.rs` connect-lifecycle unit tests (mock-connect, concurrent
+  connect-guard rejection, disconnect-with-no-device, reconnect loop). Full green:
+  42 Rust lib + 39 python. The only remaining gap is a real-device `--run-hardware`
+  scan→connect→device_call→disconnect→reconnect loop (needs a free Pixoo).
+
 
 - **HOT-CHANNEL PREVIEW investigation → v0.21.23 (2026-07-10).** User: the newest
   hot file (a penguin, v1112) isn't visible in the preview grid; suspected a stale

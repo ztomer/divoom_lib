@@ -101,3 +101,25 @@ never resolve. This lets us exercise the wedge + self-heal in CI without hardwar
 3. Python hanging-socket client test.
 4. `connect_single_device` re-ensure + UI connect watchdog.
 5. Reconcile timeouts; run full suite; update CHANGELOG + SESSION_HANDOFF; cut v0.22.1 if shipped code changed.
+
+## Outcome / what shipped
+
+- **Root cause confirmed + fixed.** Rust `BleTransport::connect`/`ble::scan` had no
+  timeout around `central.start_scan()`/`central.peripherals()`; a dead
+  CoreBluetooth session hung forever → self-heal never fired → daemon unusable
+  for all devices. New `BleCentral` abstraction bounds every BLE call in
+  `tokio::time::timeout`; `connect` guard added; `is_dead_central` widened.
+- **Files shipped:** `central.rs` (NEW) + `daemon_ble.rs` (NEW, split for 500-LOC
+  rule); edits to `ble.rs`, `daemon.rs`, `daemon_connect.rs`, `lib.rs`,
+  `scanner_mixin.py`, `app_globals.js`, `daemon_config.py`.
+- **Tests shipped (deterministic, no hardware):** 4 Rust wedge tests (`central.rs`
+  `BleCentral::Faulty`), 4 Rust connect-lifecycle unit tests (`daemon_connect.rs`),
+  5 Python hanging-socket client tests (`test_daemon_client_wedge.py`), 8 Python
+  daemon connect/disconnect edge-case e2e (`test_daemon_connect_edge_e2e.py`, real
+  divoomd over a socket via its `mock` transport). All green: 42 Rust lib + 39 python.
+- **Released v0.22.1** (tag, GitHub release w/ DMG, Homebrew cask bumped, sha
+  `3f9fb34e69f63483fc409a445b9ce4b757f71a473fc941e9415383615de0a18e`). Real BLE
+  connect verified unchanged on Pixoo-1 (0.7s).
+- **Remaining gap:** real-device `--run-hardware` scan→connect→device_call→
+  disconnect→reconnect loop needs a free Pixoo; the mock/LAN e2e covers the
+  orchestration logic without radio.

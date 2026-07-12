@@ -40,15 +40,23 @@ shipped milestone (per the project planning docs).
 - **test(rust):** `central.rs` adds 4 deterministic wedge tests against
   `BleCentral::Faulty` (scan/connect return within bounds; `is_dead_central`
   matches wedge + channel-closed but rejects absent-device / no-adapter). No
-  hardware; proves the daemon can't hang on a wedged central.
+  hardware; proves the daemon can't hang on a wedged central. `daemon_connect.rs`
+  adds 4 connect-lifecycle unit tests: mock connect owns a device, the concurrent
+  connect guard rejects a second connect, disconnect-with-no-device is safe, and a
+  5× connect→disconnect→reconnect loop stays responsive. (42 Rust lib tests.)
 - **test(python):** `tests/test_daemon_client_wedge.py` (5 tests) proves
   `DaemonClient.send_command` returns an error dict within `read_timeout` (no
   hang, no raise) against a silent / never-terminated / immediate-close /
-  absent daemon, and skips a malformed frame cleanly. Mirrors the Rust wedge
-  matrix on the client side.
-- **status:** code fix complete + green (38 Rust lib tests, 37 python
-  protocol/wedge/JS tests, 18 mock-device e2e). Real-device `--run-hardware`
-  scan→connect→device_call→disconnect→reconnect loop pending free device.
+  absent daemon, and skips a malformed frame cleanly. `tests/
+  test_daemon_connect_edge_e2e.py` (8 tests) drives a REAL divoomd over a Unix
+  socket using its `mock` transport (no Bluetooth) to prove the connect/
+  disconnect state machine survives the nasty sequences: mid-flight disconnect,
+  reconnect loop, connect-while-already-connected, connect to an offline device
+  (unreachable LAN IP) then recover, and a device op after disconnect. (39 python
+  protocol/wedge/JS/mock/edge-e2e tests.)
+- **status:** code fix complete + green (42 Rust lib tests, 39 python
+  protocol/wedge/JS/mock/edge-e2e tests). Real-device `--run-hardware`
+  scan→connect→device_call→disconnect→reconnect loop still pending a free device.
   **RELEASED as v0.22.1** (tag pushed; GitHub release w/ DMG; Homebrew cask
   bumped, sha `3f9fb34e69f63483fc409a445b9ce4b757f71a473fc941e9415383615de0a18e`).
 
