@@ -18,6 +18,21 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **RELEASE v0.22.0 CUT + HOMEBREW UPDATED (2026-07-12).** Known-devices persistence
+  (R50, my earlier commit 5bd42b5) shipped on top of the full v0.21.8–v0.21.23
+  line. **CRITICAL cross-session catch:** the other session cut v0.21.8–v0.21.23
+  from branch `claude/hopeful-hertz-eddb6b` but never merged to `main`; `main` had
+  regressed to v0.21.7 + only the local known-devices feature, so a naive
+  `v0.22.0` built from `main` would have DROPPED 29 commits of real fixes. Fixed
+  by merging `e5388a6` (v0.21.23) into `main` (merge commit 1928f82), then
+  rebuilding + releasing from the merged tree. Tests: 1747 pass / 90 skip / 1
+  pre-existing Rust-BLE failure. DMG sha `92765206…`; Homebrew cask bumped to
+  0.22.0 (sha `9276520600f549ef679fea7fe25faf7a051987b26537776cc808b0a184108351`),
+  `brew audit` clean. **Lesson / standing rule:** before cutting a release, verify
+  `git merge-base --is-ancestor <latest_release_tag> HEAD` — if the latest release
+  commit is NOT an ancestor of `main`, `main` has diverged and must be merged first.
+  The `claude/hopeful-hertz-eddb6b` branch may still hold unmerged work; check it.
+
 - **HOT-CHANNEL PREVIEW investigation → v0.21.23 (2026-07-10).** User: the newest
   hot file (a penguin, v1112) isn't visible in the preview grid; suspected a stale
   cache. Verified with data + a live look at the packaged app (computer-use):
