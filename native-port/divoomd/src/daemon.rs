@@ -22,7 +22,7 @@ use crate::protocol::{err_reply, Request};
 use crate::socket_server::Handler;
 
 #[cfg(feature = "ble")]
-use crate::ble::{self, Adapter};
+use crate::central::BleCentral;
 use tokio::sync::Mutex;
 
 const EXCLUSIVE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -38,13 +38,18 @@ pub struct Daemon {
     // the CoreBluetooth central, created once and kept alive for the daemon's
     // lifetime (dropping it stops notification delivery).
     #[cfg(feature = "ble")]
-    central: Mutex<Option<Adapter>>,
+    pub(crate) central: Mutex<Option<BleCentral>>,
     /// True while a scan is running. A scan drives the one shared adapter's
     /// start/stop; two overlapping scans would clobber each other (one's
     /// stop_scan ends the other early → truncated results), so cmd_scan rejects
     /// a concurrent scan. Mirrors the Python daemon's single-scan model.
     #[cfg(feature = "ble")]
     pub(crate) scanning: std::sync::atomic::AtomicBool,
+    /// True while a connect is running. Two concurrent connects would clobber the
+    /// one shared central + overwrite the owned device, so `cmd_connect` rejects a
+    /// second with a clear error (mirrors the `scanning` guard for scans).
+    #[cfg(feature = "ble")]
+    pub(crate) connecting: std::sync::atomic::AtomicBool,
     /// Last scan's completion time + result. A scan within `MIN_RESCAN_INTERVAL`
     /// of the last returns this cached list instead of hitting the radio —
     /// back-to-back scans trip CoreBluetooth's scan-frequency throttle (which
@@ -90,6 +95,8 @@ impl Daemon {
             #[cfg(feature = "ble")]
             scanning: std::sync::atomic::AtomicBool::new(false),
             #[cfg(feature = "ble")]
+            connecting: std::sync::atomic::AtomicBool::new(false),
+            #[cfg(feature = "ble")]
             last_scan: Mutex::new(None),
             encoder: OnceLock::new(),
             tx,
@@ -107,38 +114,6 @@ impl Daemon {
         self.encoder.get_or_init(|| {
             crate::native_encode::find_encoder_lib().and_then(|p| NativeEncoder::load(p).ok())
         }).as_ref()
-    }
-
-    /// Get (creating + caching once) the shared CoreBluetooth central.
-    #[cfg(feature = "ble")]
-    pub(crate) async fn central(&self) -> Result<Adapter, String> {
-        let mut g = self.central.lock().await;
-        if g.is_none() {
-            *g = Some(ble::make_central().await.map_err(|e| e.to_string())?);
-        }
-        Ok(g.as_ref().unwrap().clone())
-    }
-
-    /// Drop the cached central so the next `central()` recreates it. btleplug
-    /// reports a dead CoreBluetooth session as "Channel closed" (the session ends
-    /// after a device disconnect or a Bluetooth toggle); the stale Adapter can't
-    /// recover, so every scan/connect fails until it's rebuilt. This lets the
-    /// daemon self-heal without a restart.
-    #[cfg(feature = "ble")]
-    pub(crate) async fn reset_central(&self) {
-        *self.central.lock().await = None;
-    }
-
-    /// On shutdown, stop any BLE scan still running on the cached central so we
-    /// don't leave a leaked scan session with bluetoothd. Left uncleaned across
-    /// rapid restarts, those stale sessions trip the OS scan-frequency throttle
-    /// (scans then silently return 0 devices until Bluetooth is toggled).
-    #[cfg(feature = "ble")]
-    pub async fn stop_scan_cleanup(&self) {
-        use btleplug::api::Central;
-        if let Some(adapter) = self.central.lock().await.as_ref() {
-            let _ = adapter.stop_scan().await;
-        }
     }
 
     pub fn initialize_self_weak(&self, weak: Weak<Daemon>) {

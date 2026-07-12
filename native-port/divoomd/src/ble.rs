@@ -9,9 +9,11 @@
 use std::time::{Duration, Instant};
 
 use btleplug::api::{
-    Central, CharPropFlags, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
+    CharPropFlags, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
 };
 use btleplug::platform::{Manager, Peripheral};
+
+use crate::central::BleCentral;
 
 /// The platform BLE adapter. On macOS the CoreBluetooth central manager it wraps
 /// MUST stay alive for the duration of a connection — dropping it silently stops
@@ -58,9 +60,15 @@ pub struct Discovered {
 }
 
 /// Create the platform adapter. The caller must keep it alive (see [`Adapter`]).
-pub async fn make_central() -> BleResult<Adapter> {
+pub async fn make_central() -> BleResult<BleCentral> {
     let manager = Manager::new().await?;
-    manager.adapters().await?.into_iter().next().ok_or_else(|| "no BLE adapter".into())
+    let adapter = manager
+        .adapters()
+        .await?
+        .into_iter()
+        .next()
+        .ok_or_else(|| -> Box<dyn std::error::Error + Send + Sync> { "no BLE adapter".into() })?;
+    Ok(BleCentral::Real(adapter))
 }
 
 /// Backstop cap for a scan window (mirrors the Python daemon's
@@ -76,25 +84,37 @@ const SCAN_TIMEOUT_CAP: Duration = Duration::from_secs(90);
 /// only once the scan has stopped. A long user-configured timeout is capped at
 /// `SCAN_TIMEOUT_CAP` (mirrors the Python daemon's `_SCAN_RESULT_TIMEOUT`) so a
 /// stray large value can't run the adapter for minutes.
-pub async fn scan(central: &Adapter, timeout: Duration) -> BleResult<Vec<Discovered>> {
-    let timeout = timeout.min(SCAN_TIMEOUT_CAP);
-    central.start_scan(ScanFilter::default()).await?;
-    tokio::time::sleep(timeout).await;
-    central.stop_scan().await?;
-    let mut out = Vec::new();
-    for p in central.peripherals().await? {
-        let name = p.properties().await?.and_then(|pr| pr.local_name).unwrap_or_default();
-        if DEVICE_NAME_HINTS.iter().any(|h| name.contains(h)) {
-            out.push(Discovered { name, id: p.id().to_string() });
+pub async fn scan(central: &BleCentral, timeout: Duration) -> BleResult<Vec<Discovered>> {
+    let dur = timeout.min(SCAN_TIMEOUT_CAP);
+    // Guard the whole scan in a timeout. A dead CoreBluetooth session (after a
+    // disconnect / Bluetooth toggle) makes `start_scan`/`peripherals` hang
+    // forever with no error — which would wedge the scan command and defeat the
+    // caller's `reset_central` self-heal (it only fires on an `Err`). The timeout
+    // turns the hang into an `Err` matching `is_dead_central` so the daemon
+    // rebuilds the central and retries.
+    let work = async {
+        central.start_scan(ScanFilter::default()).await?;
+        tokio::time::sleep(dur).await;
+        central.stop_scan().await?;
+        let mut out = Vec::new();
+        for p in central.peripherals().await? {
+            let name = p.properties().await?.and_then(|pr| pr.local_name).unwrap_or_default();
+            if DEVICE_NAME_HINTS.iter().any(|h| name.contains(h)) {
+                out.push(Discovered { name, id: p.id().to_string() });
+            }
         }
+        Ok(out)
+    };
+    match tokio::time::timeout(dur + Duration::from_secs(10), work).await {
+        Ok(r) => r,
+        Err(_) => Err("scan timed out: central may be stale (Channel closed)".into()),
     }
-    Ok(out)
 }
 
 /// An owned connection to one device: serialized writes + a parsed-frame channel.
 pub struct BleTransport {
     // keep the central alive for the connection's lifetime (notifications need it)
-    _central: Adapter,
+    _central: BleCentral,
     peripheral: Peripheral,
     write_char: Characteristic,
     protocol: Protocol,
@@ -106,29 +126,53 @@ impl BleTransport {
     /// Connect to the device whose `id` matches a prior `scan()` result. Discovers
     /// services, subscribes to notifications, spawns the frame-parsing task, and
     /// runs the autoprobe to pick the framing.
-    pub async fn connect(central: &Adapter, id: &str) -> BleResult<Self> {
+    pub async fn connect(central: &BleCentral, id: &str) -> BleResult<Self> {
         // Ensure the peripheral is known to the adapter. A single fixed scan window
         // intermittently misses a device on macOS (its next advertisement may not
         // land inside the window) — most visibly on RECONNECT after a disconnect.
         // Poll the discovered set until the target appears or a deadline passes,
         // mirroring the Python daemon's reconnect-scan retries.
-        central.start_scan(ScanFilter::default()).await?;
-        let deadline = Instant::now() + Duration::from_secs(10);
+        let _dbg = std::env::var("DIVOOMD_BLE_DEBUG").is_ok();
+        if _dbg { eprintln!("[ble][connect] start_scan"); }
+        // EVERY central await below is bounded by a timeout. On a dead
+        // CoreBluetooth session `start_scan`/`peripherals`/`stop_scan` hang forever
+        // with no error, which would wedge `connect` and defeat the caller's
+        // `reset_central` self-heal (it only fires on an `Err`). Each timeout turns
+        // the hang into an `Err` matching `is_dead_central`, so the daemon rebuilds
+        // the central + retries instead of hanging.
+        match tokio::time::timeout(Duration::from_secs(5), central.start_scan(ScanFilter::default())).await {
+            Ok(r) => r?,
+            Err(_) => {
+                return Err(
+                    "BLE scan start timed out: central may be stale (Channel closed)".into(),
+                )
+            }
+        }
+        let deadline = Instant::now() + Duration::from_secs(8);
         let mut found = None;
         while Instant::now() < deadline {
-            if let Some(p) = central
-                .peripherals()
-                .await?
-                .into_iter()
-                .find(|p| p.id().to_string() == id)
-            {
-                found = Some(p);
-                break;
+            match tokio::time::timeout(Duration::from_secs(2), central.peripherals()).await {
+                Ok(peripherals) => {
+                    if let Some(p) = peripherals?
+                        .into_iter()
+                        .find(|p| p.id().to_string() == id)
+                    {
+                        found = Some(p);
+                        break;
+                    }
+                }
+                Err(_) => {
+                    let _ = tokio::time::timeout(Duration::from_secs(3), central.stop_scan()).await;
+                    return Err(
+                        "BLE discovery timed out: central may be stale (Channel closed)".into(),
+                    );
+                }
             }
             tokio::time::sleep(Duration::from_millis(400)).await;
         }
-        central.stop_scan().await?;
-        let peripheral = found.ok_or("device not found in scan")?;
+        let _ = tokio::time::timeout(Duration::from_secs(3), central.stop_scan()).await;
+        let peripheral = found.ok_or_else(|| "device not found in scan".to_string())?;
+        if _dbg { eprintln!("[ble][connect] found peripheral, connecting"); }
 
         // NOTE (Linux/BlueZ): these dual-mode Divoom devices also advertise the
         // classic SPP profile (UUID 0x1101), and BlueZ routes connect() to BR/EDR —
@@ -139,9 +183,10 @@ impl BleTransport {
         // disabling BR/EDR — tracked in scripts/linux_remote/README.md. Scan works
         // on Linux today; connect does not.
         match tokio::time::timeout(CONNECT_TIMEOUT, peripheral.connect()).await {
-            Ok(r) => r?,
+            Ok(r) => { if _dbg { eprintln!("[ble][connect] connect returned"); } r?; }
             Err(_) => return Err("BLE connect timed out".into()),
         }
+        if _dbg { eprintln!("[ble][connect] discover_services"); }
         match tokio::time::timeout(CONNECT_TIMEOUT, peripheral.discover_services()).await {
             Ok(r) => r?,
             Err(_) => return Err("BLE discover_services timed out".into()),

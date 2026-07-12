@@ -204,7 +204,21 @@ window.connectDevice = function(name, address) {
     }
 
     if (window.pywebview && window.pywebview.api) {
+        // R57 watchdog: if the daemon never answers the connect (dead/!wedged
+        // central that the Rust BleCentral timeout + client read_timeout failed
+        // to catch — defense in depth), don't leave the UI stuck on "connecting".
+        // The client read_timeout is ~30s; fire the watchdog a beat after.
+        let connectWatchdog = null;
+        connectWatchdog = setTimeout(() => {
+            window.DivoomState.appConnected = false;
+            window.showToast(`Background service not responding for ${name}. Try Reconnect.`, "error");
+            if (statusDot) { statusDot.className = "transport-dot inactive"; statusDot.removeAttribute("style"); }
+            if (window.renderDeviceDots) window.renderDeviceDots();
+            document.getElementById("banner-device-name").textContent = "None";
+            document.getElementById("banner-device-mac").textContent = "None";
+        }, 35000);
         window.pywebview.api.connect_single_device(address).then(res => {
+            clearTimeout(connectWatchdog);
             if (res) {
                 window.DivoomState.appConnected = true;
                 const type = address === "MatrixWall" ? "wall" : (address.startsWith("LAN:") ? "lan" : "ble");
@@ -282,20 +296,22 @@ window.refreshConnectionState = function() {
             // Reports connected but a write/drop just failed — show amber, keep
             // appConnected (the daemon's live-job self-heal may revive it).
             dot.className = "transport-dot active degraded";
-            dot.removeAttribute("style");
             dot.title = "Link degraded — reconnecting";
-        } else if (s && s.connected) {
-            const type = window._activeTransportType();
-            dot.className = `transport-dot active ${type}`;
-            dot.removeAttribute("style");
-            dot.title = "";
-        } else {
-            // Genuinely dropped while we thought we were connected.
+        } else if (state === "disconnected" || !s || !s.connected) {
+            // Genuinely dropped — or the daemon explicitly reports disconnected
+            // while a stale connected:true lingered. Flip the dot + the global
+            // flag so the UI stops claiming a live link; a disconnected state
+            // must NOT be masked by a stale connected flag.
             window.DivoomState.appConnected = false;
             dot.className = "transport-dot inactive";
-            dot.removeAttribute("style");
             dot.title = "Disconnected";
+        } else {
+            // Honest connected (ble/lan/wall) — colour the dot by transport type.
+            const type = window._activeTransportType();
+            dot.className = `transport-dot active ${type}`;
+            dot.title = "";
         }
+        dot.removeAttribute("style");
     }).catch(() => {});
 };
 

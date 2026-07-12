@@ -4,6 +4,53 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.1 — fix: daemon connect can no longer wedge on a dead CoreBluetooth (R57)
+
+- **root cause (v0.22.0 regression):** `BleTransport::connect` /
+  `ble::scan` called `central.start_scan()` / `central.peripherals()` with
+  **no timeout guard**. When CoreBluetooth's central is dead (killed daemon,
+  Bluetooth toggled, TCC wedged), those calls hang **forever** — so
+  `run_connect` / `run_scan` never returned `Err`, the `reset_central`
+  self-heal never fired, and the daemon became unusable for **every** device
+  ("connect to all devices fails"). Reproduced live: a connect returned only
+  after the client's own 90s timeout, and even then `success=false`.
+- **fix(rust-daemon):** new `BleCentral` abstraction (`central.rs`) wrapping
+  the real `Adapter` with a `#[cfg(test)] Faulty` variant whose
+  `start_scan`/`peripherals`/`stop_scan` never resolve. `connect` now bounds
+  every BLE call in `tokio::time::timeout` and returns an error that
+  `is_dead_central` matches, so the self-heal path runs and the daemon stays
+  responsive. Real BLE connect verified unchanged (0.7s on Pixoo-1).
+- **fix(rust-daemon): concurrent-connect guard.** A second `connect` while one
+  is in flight is now rejected with `err_reply("connect already in progress")`
+  instead of stacking scans on the shared central. `connecting: AtomicBool`
+  scoped to the original caller (not a global lock) via `ConnectGuard`.
+- **fix(rust-daemon):** `is_dead_central` now also matches `timed out` /
+  `stale` / `central` (previously only `Channel closed`); it deliberately does
+  NOT match `device not found in scan` / `no BLE adapter` so a legit
+  absent device doesn't trip a central reset.
+- **fix(gui): connect re-ensures the daemon.** `connect_single_device`
+  (`scanner_mixin.py`) now calls `reconnect_daemon()` before connecting — a
+  cheap no-op when a daemon is live, a respawn when the process died — so a
+  connect click never targets a stale/dead socket.
+- **fix(gui): connect watchdog.** `connectDevice` (`app_globals.js`) flips the
+  status dot to inactive + "Background service not responding" if the daemon
+  doesn't answer within 35s, so the UI can't get stuck on "connecting".
+- **fix(config):** `connect_timeout` 20s → 30s so the client doesn't give up
+  mid-BLE-handshake before the daemon's (now bounded) connect returns.
+- **test(rust):** `central.rs` adds 4 deterministic wedge tests against
+  `BleCentral::Faulty` (scan/connect return within bounds; `is_dead_central`
+  matches wedge + channel-closed but rejects absent-device / no-adapter). No
+  hardware; proves the daemon can't hang on a wedged central.
+- **test(python):** `tests/test_daemon_client_wedge.py` (5 tests) proves
+  `DaemonClient.send_command` returns an error dict within `read_timeout` (no
+  hang, no raise) against a silent / never-terminated / immediate-close /
+  absent daemon, and skips a malformed frame cleanly. Mirrors the Rust wedge
+  matrix on the client side.
+- **status:** code fix complete + green (38 Rust lib tests, 37 python
+  protocol/wedge/JS tests, 18 mock-device e2e). Real-device `--run-hardware`
+  scan→connect→device_call→disconnect→reconnect loop pending free device.
+  Ready to cut v0.22.1 (build + sign + Homebrew cask bump).
+
 ## v0.22.0 — feat: persist known devices so undetected ones still show (R50)
 
 - **feat(web_ui):** a device seen in a previous scan/session but missed by the

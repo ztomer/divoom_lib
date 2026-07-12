@@ -73,16 +73,23 @@ class ScannerMixin:
         """BLE Hardening P6: the daemon's honest connection_state for the active
         device, for the appbar heartbeat. Returns JSON
         ``{"connected": bool, "state": "connected"|"degraded"|"disconnected"}``;
-        a missing/unreachable daemon reads as disconnected."""
+        a missing/unreachable daemon reads as disconnected.
+
+        The honest ``state`` wins over a stale ``connected`` flag: a device
+        reporting ``state: "disconnected"`` is forced to ``connected: False`` so
+        the UI never shows a green "connected" dot for a link that's down
+        (defense-in-depth — the frontend's ``refreshConnectionState`` enforces
+        the same, but the data source itself must be honest)."""
         try:
             client = self._client()
             if client is None:
                 return json.dumps({"connected": False, "state": "disconnected"})
             status = client.device_status() or {}
-            return json.dumps({
-                "connected": bool(status.get("connected")),
-                "state": status.get("connection_state", "disconnected"),
-            })
+            state = status.get("connection_state", "disconnected")
+            connected = bool(status.get("connected"))
+            if state == "disconnected":
+                connected = False
+            return json.dumps({"connected": connected, "state": state})
         except Exception as e:
             logger.debug(f"get_connection_state failed: {e}")
             return json.dumps({"connected": False, "state": "disconnected"})
@@ -262,9 +269,16 @@ class ScannerMixin:
                 return True
 
             self.current_target_mode = "single"
+
+            # R57: a connect click must never target a stale/dead daemon socket.
+            # reconnect_daemon() is a cheap no-op when a daemon is already live
+            # (it only probes get_status), and respawns one if the process died.
+            # The Rust daemon's BleCentral timeout (native-port/divoomd/src/
+            # central.rs) covers the remaining wedge case (dead CoreBluetooth).
+            self.reconnect_daemon()
             client = self._client()
             if client is None:
-                logger.error("Connect failed: no daemon available")
+                logger.error("Connect failed: daemon could not be (re)started")
                 return False
 
             # Drop any prior daemon-owned device first.

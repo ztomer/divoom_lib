@@ -20,8 +20,15 @@ use crate::ble::{self, BleTransport, Discovered};
 /// device disconnect or a Bluetooth toggle) as "Channel closed". The cached
 /// Adapter can't recover, so we drop it and retry once with a fresh one.
 #[cfg(feature = "ble")]
-fn is_dead_central(err: &str) -> bool {
+pub(crate) fn is_dead_central(err: &str) -> bool {
+    // A dead CoreBluetooth session surfaces as "Channel closed", but can also
+    // hang `start_scan`/`peripherals` until our timeout guard turns it into a
+    // "...timed out: central may be stale..." error. Match both so the daemon
+    // rebuilds the central and retries either way.
     err.contains("Channel closed")
+        || err.contains("timed out")
+        || err.contains("stale")
+        || err.contains("central")
 }
 
 /// Get the (cached) central and run one scan; error as a String for retry logic.
@@ -63,6 +70,18 @@ pub(crate) async fn probe_lan(daemon: &Daemon) -> Value {
 struct ScanGuard<'a>(&'a std::sync::atomic::AtomicBool);
 #[cfg(feature = "ble")]
 impl Drop for ScanGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// Resets the daemon's `connecting` flag on drop, so a connect that returns via
+/// ANY path (incl. an early error or a timeout) can't wedge the guard.
+#[cfg(feature = "ble")]
+struct ConnectGuard<'a>(&'a std::sync::atomic::AtomicBool);
+
+#[cfg(feature = "ble")]
+impl Drop for ConnectGuard<'_> {
     fn drop(&mut self) {
         self.0.store(false, std::sync::atomic::Ordering::SeqCst);
     }
@@ -122,6 +141,20 @@ pub(crate) async fn cmd_scan(daemon: &Daemon, req: &Request) -> Value {
 
 /// Handle `connect_device` command (BLE or LAN).
 pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
+    // Reject a concurrent connect: two would clobber the one shared central and
+    // overwrite the owned device. Held for the whole command via Drop-on-return.
+    #[cfg(feature = "ble")]
+    {
+        if daemon
+            .connecting
+            .compare_exchange(false, true, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst)
+            .is_err()
+        {
+            return err_reply("connect already in progress");
+        }
+    }
+    #[cfg(feature = "ble")]
+    let _guard = ConnectGuard(&daemon.connecting);
     let mock = req.args.get("mock").and_then(|v| v.as_bool()).unwrap_or(false);
     if mock {
         let mock_transport = crate::mock_transport::MockTransport::new();

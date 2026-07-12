@@ -12,9 +12,13 @@ pub mod autoprobe;
 pub mod image_proc;
 #[cfg(feature = "ble")]
 pub mod ble;
+#[cfg(feature = "ble")]
+pub mod central;
 pub mod command_queue;
 pub mod commands;
 pub mod daemon;
+#[cfg(feature = "ble")]
+pub mod daemon_ble;
 pub mod framing;
 pub mod lan;
 pub mod models;

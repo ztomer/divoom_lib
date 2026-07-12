@@ -30,7 +30,7 @@ DEFAULT_SCAN_LIMIT = 4               # stop after N devices (0 = no limit)
 DEFAULT_SCAN_READ_SLACK = 10.0       # client waits scan_timeout + this for the reply
 DEFAULT_CLIENT_TIMEOUT = 2.0         # socket read timeout for quick, non-scan commands
 DEFAULT_RECONNECT_SCAN_TIMEOUT = 3.0  # short scan used during auto-reconnect
-DEFAULT_CONNECT_TIMEOUT = 20.0       # client read timeout for connect/disconnect (BLE is slow)
+DEFAULT_CONNECT_TIMEOUT = 30.0       # client read timeout for connect/disconnect (BLE is slow)
 DEFAULT_SYNC_READ_TIMEOUT = 120.0    # client read timeout for sync_artwork (download + BLE stream)
 DEFAULT_HOT_UPDATE_TIMEOUT = 600.0   # client read timeout for hot_update (manifest of ~30 files)
 
