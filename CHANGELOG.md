@@ -4,6 +4,26 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.21.8 — feat: persist known devices so undetected ones still show (R50)
+
+- **feat(web_ui):** a device seen in a previous scan/session but missed by the
+  current scan no longer vanishes from the sidebar. Previously `_cache_discovered`
+  overwrote the persistent cache with only the latest scan results, so a device
+  that didn't advertise in a given scan silently dropped out of the UI. Now scan
+  results **merge** into the cache by MAC address (with `first_seen`/`last_seen`
+  timestamps), and a new `get_known_devices()` API returns the devices NOT seen
+  in the latest scan. The sidebar renders those as a distinct, faded
+  `chip-known` state (faint border, 55% opacity, dimmed dot) so they stay
+  selectable even when out of range / asleep.
+  - `scanner_mixin.py`: `_cache_discovered` merges (not replaces); new
+    `get_known_devices()`.
+  - `device_selector.js`: `renderDeviceDots` merges known-undetected chips; new
+    `refreshKnownDevices()`.
+  - `settings_hardware.js` + `app_init.js`: call `refreshKnownDevices` on scan +
+    load.
+  - `sidebar.css`: `.device-chip.chip-known` styling.
+  - `tests/test_e2e_ux_feedback.py`: added `test_known_but_undetected_device_shows_distinct_state`.
+
 ## v0.21.7 — fix: settings toggles didn't reflect saved state on open (2026-07-08)
 
 - **fix(web_ui):** the Connectivity settings toggles ("Background agent",
