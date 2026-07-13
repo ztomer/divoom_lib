@@ -47,11 +47,23 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
 
 ## 1. Coverage >= 95%
 
-- [ ] Baseline `coverage run -m pytest && coverage report` (source =
-      `divoom_lib`, `divoom_gui`, `divoom_daemon`) — record the real TOTAL, including the
-      4 new test files.
-- [ ] Close gaps with real unit tests (cloud client, auth, device_call facade, BLE
-      read-retry/cache, GUI API mixins, daemon parity) — not padding.
+- [x] Baseline: 69% (13831 stmts, 3941 missed) — but a full-suite `pytest --cov` run
+      couldn't even complete before this round: `tests/test_spp_integration.py` let a
+      real `BleakClient.connect()` reach CoreBluetooth, SIGABRTing the interpreter.
+      Fixed (commit `e26fc6d`) by mocking at the correct call-time import site
+      (`divoom_lib.divoom.BleakClient`, not the `ble_transport` module-level name —
+      BLETransport re-imports it locally at call time).
+- [x] Wave 1 (commit `a15a628`): 6 parallel agents closed the 6 biggest gaps —
+      cli_commands.py, monthly_best_daemon.py, presets_manager.py, media_sync.py,
+      gallery_hot_api.py, gallery_sync.py — all 20-61% -> 98-100%. TOTAL 69% -> **76%**
+      (3941 -> 3043 missed). Full suite: 2184 passed, 0 failed, 91 skipped.
+- [ ] Wave 2 in flight: scanner_mixin.py, utils/media_source.py, bt_spp_rfcomm.py +
+      bt_spp_transport.py, api/tools.py + api/lighting.py, media/music.py,
+      device_owner.py, gui_main.py + audio_visualizer.py (the last pair explicitly
+      instructed to draw an honest testable/untestable line with documented
+      `# pragma: no cover` only on the genuine mainloop/hardware-capture lines, not
+      as a blanket exclusion).
+- [ ] Further waves as needed on the next-biggest remaining gaps until >= 95%.
 - [ ] Add defensible `[tool.coverage.report] exclude_lines` / `[tool.coverage.run] omit`
       only for genuinely untestable surface (CLI entrypoints, `__main__` blocks,
       platform-only branches, `web_ui/*.js`, hardware-gated paths) — list what's omitted
