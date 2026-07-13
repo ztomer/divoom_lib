@@ -4,14 +4,26 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
-## Unreleased — chore: relocate the Rust daemon to the repo root
+## v0.22.3 — event-handler fix + doc accuracy (R60)
+
+- **fix(ui): `onDaemonEvent` now honors an explicit `disconnected` state.** A daemon
+  reporting `connected:true, state:"disconnected"` (the P6 honest-state regression
+  case) was shown as connected. The event handler now flips the dot + `appConnected`
+  to false. Caught by rewriting the device-status e2e tests to drive the live event
+  handlers instead of the dead 4s polling heartbeats.
+- **docs(round60):** verified each open thread against the code — cloud image-decode
+  parity and the Phase-5 Rust-default flip were already shipped (stale handoff
+  corrected). Stripped false "not ported" docstrings in `sync_artwork.rs`,
+  `art_codec.rs`, `monthly_best.rs`. Plan: `docs/PLANNING_ROUND60.md`.
+
+## v0.22.2 — harden + event-driven UI (R58/R59) + rename
 
 - **rename:** the Rust daemon (`divoomd`) is no longer a "port"; it moved from
   `native-port/divoomd` to `divoomd/` (repo root) per the user's decree. `git mv`
   plus all path references updated and verified: `cargo build --release` green,
   42 Rust lib tests + `native_encode_parity` green; Python daemon wedge/edge-e2e
   + 10 parity tests green (3 hw/cloud skips). Pure path change — no behavior
-  change, so no version bump.
+  change; shipped in v0.22.2.
 - **fix(depth):** dropped the binary's repo-root parent-walk `5→4` in
   `divoomd/src/native_encode.rs` and `divoomd/src/spp.rs`, and the
   `divoomd/src/live_jobs/render.rs` `include_bytes` `../../../../`→`../../../`,
@@ -22,8 +34,6 @@ shipped milestone (per the project planning docs).
   `scripts/linux_remote/test_host.sh`, `divoom_daemon/daemon_client.py`,
   `tests/test_rust_daemon_parity.py`, and the `native-port/gen_*.py` codegen
   output paths repointed to the root `divoomd/`.
-
-## v0.22.2 — harden + event-driven UI (R58/R59)
 
 - **fix(rust-daemon): socket idle timeout + bounded concurrency.** `socket_server.rs`
   previously capped only incoming *frame* size; a client that connected and held the
