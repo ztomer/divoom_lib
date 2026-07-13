@@ -138,7 +138,7 @@ pub async fn get_category_file_list(classify: i64, limit: i64) -> Result<Value, 
 
 /// Search weather cities (Weather/SearchCity) by keyword. Returns the city list.
 pub async fn search_weather_city(keyword: &str) -> Result<Value, String> {
-    let creds = get_credentials(false).await?;
+    let mut creds = get_credentials(false).await?;
     let (device_id, device_pw, _, _) = load_virtual_device();
 
     let client = reqwest::Client::builder()
@@ -147,24 +147,40 @@ pub async fn search_weather_city(keyword: &str) -> Result<Value, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    let mut body = json!({
-        "Command": "Weather/SearchCity",
-        "Token": creds.token,
-        "UserId": creds.user_id,
-        "DeviceId": device_id,
-        "KeyWord": keyword,
-    });
-    if device_pw != 0 {
-        if let Some(obj) = body.as_object_mut() {
-            obj.insert("DevicePassword".to_string(), json!(device_pw));
+    let make_request = |creds: &DivoomCredentials| -> Value {
+        let mut body = json!({
+            "Command": "Weather/SearchCity",
+            "Token": creds.token,
+            "UserId": creds.user_id,
+            "DeviceId": device_id,
+            "KeyWord": keyword,
+        });
+        if device_pw != 0 {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("DevicePassword".to_string(), json!(device_pw));
+            }
         }
-    }
+        body
+    };
 
     let url = format!("{}/Weather/SearchCity", BASE_URL);
-    let resp = client.post(&url).json(&body).send().await
+    let mut req_body = make_request(&creds);
+    let mut resp = client.post(&url).json(&req_body).send().await
         .map_err(|e| e.to_string())?;
-    let data: Value = resp.json().await.map_err(|e| e.to_string())?;
-    let rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+    let mut data: Value = resp.json().await.map_err(|e| e.to_string())?;
+    let mut rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+
+    // Same expired-token family (RC 9/10/11) that fetch_gallery/get_category_file_list
+    // already retry on — this endpoint was missing the self-heal.
+    if rc == 9 || rc == 10 || rc == 11 {
+        creds = get_credentials(true).await?;
+        req_body = make_request(&creds);
+        resp = client.post(&url).json(&req_body).send().await
+            .map_err(|e| e.to_string())?;
+        data = resp.json().await.map_err(|e| e.to_string())?;
+        rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+    }
+
     if rc != 0 {
         let msg = data.get("ReturnMessage").and_then(|v| v.as_str()).unwrap_or("Unknown cloud error");
         return Err(format!("Weather/SearchCity failed (RC={rc}): {msg}"));

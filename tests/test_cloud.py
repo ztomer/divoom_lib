@@ -114,9 +114,11 @@ def test_search_weather_city():
 
 
 def test_category_file_list_rc_nonzero_raises():
+    # RC 9/10/11 are the "expired token" family (retried, see the tests below) -
+    # use a genuinely non-retryable code here to test the hard-failure path.
     def fake_fail(path, body):
         if path == "GetCategoryFileListV2":
-            return {"ReturnCode": 9, "ReturnMessage": "bad"}
+            return {"ReturnCode": 5, "ReturnMessage": "bad"}
         raise AssertionError(path)
     c = _client()
     with patch.object(divoom_auth, "_post", side_effect=fake_fail):
@@ -124,4 +126,91 @@ def test_category_file_list_rc_nonzero_raises():
             c.get_category_file_list(7)
             assert False, "expected RuntimeError"
         except RuntimeError as e:
-            assert "RC=9" in str(e)
+            assert "RC=5" in str(e)
+
+
+def test_category_file_list_retries_once_on_expired_token():
+    """RC 9/10/11 ('token expired') self-heals with one forced credential
+    refresh + retry, mirroring divoomd's fetch_gallery/get_category_file_list
+    (cloud_category.rs) - this Python client was missing that retry."""
+    calls = {"n": 0}
+
+    def fake_expired_then_ok(path, body):
+        if path == "APP/GetServerUTC":
+            return {"UTC": 1700000000}
+        if path == "User/NewGuest":
+            return {"ReturnCode": 0, "Token": 99999, "UserId": 67890}
+        if path == "GetCategoryFileListV2":
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"ReturnCode": 10, "ReturnMessage": "token expired"}
+            assert body["Token"] == 99999  # used the refreshed token
+            return {"ReturnCode": 0, "FileList": [{"FileId": "1", "FileName": "Neon"}]}
+        raise AssertionError(path)
+
+    c = _client()
+    with patch.object(divoom_auth, "_load_virtual_device", return_value=VDEV), \
+         patch.object(divoom_auth, "_post", side_effect=fake_expired_then_ok):
+        files = c.get_category_file_list(7)
+    assert calls["n"] == 2
+    assert files[0]["FileName"] == "Neon"
+
+
+def test_search_weather_city_rc_nonzero_raises():
+    def fake_fail(path, body):
+        if path == "Weather/SearchCity":
+            return {"ReturnCode": 5, "ReturnMessage": "bad"}
+        raise AssertionError(path)
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=fake_fail):
+        try:
+            c.search_weather_city("New")
+            assert False, "expected RuntimeError"
+        except RuntimeError as e:
+            assert "RC=5" in str(e)
+
+
+def test_ensure_creds_authenticates_lazily_when_none_supplied():
+    """A CloudClient built with no creds authenticates on first real call."""
+    c = cloud.CloudClient()
+    with patch.object(divoom_auth, "_load_virtual_device", return_value=VDEV), \
+         patch.object(divoom_auth, "_post", side_effect=_fake_post):
+        files = c.get_category_file_list(7)
+    assert files[0]["FileName"] == "Neon"
+    assert c.creds is not None and c.device_id == VDEV["BluetoothDeviceId"]
+
+
+def test_no_device_password_omits_field_from_request():
+    """device_pw=0 (no bound device) must not send a DevicePassword field."""
+    c = cloud.CloudClient(
+        creds=divoom_auth.DivoomCredentials(token=12345, user_id=67890),
+        device_id=VDEV["BluetoothDeviceId"], device_pw=0)
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        c.get_category_file_list(7)
+        c.search_weather_city("New")
+    for call in post.call_args_list:
+        assert "DevicePassword" not in call.args[1]
+
+
+def test_search_weather_city_retries_once_on_expired_token():
+    calls = {"n": 0}
+
+    def fake_expired_then_ok(path, body):
+        if path == "APP/GetServerUTC":
+            return {"UTC": 1700000000}
+        if path == "User/NewGuest":
+            return {"ReturnCode": 0, "Token": 99999, "UserId": 67890}
+        if path == "Weather/SearchCity":
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"ReturnCode": 9, "ReturnMessage": "token expired"}
+            assert body["Token"] == 99999
+            return {"ReturnCode": 0, "CityList": [{"CityId": "NYC", "Name": "New York"}]}
+        raise AssertionError(path)
+
+    c = _client()
+    with patch.object(divoom_auth, "_load_virtual_device", return_value=VDEV), \
+         patch.object(divoom_auth, "_post", side_effect=fake_expired_then_ok):
+        cities = c.search_weather_city("New")
+    assert calls["n"] == 2
+    assert cities[0]["Name"] == "New York"

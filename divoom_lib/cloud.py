@@ -69,6 +69,20 @@ class CloudClient:
 
     # ── clock-face store ──────────────────────────────────────────────────
 
+    # RC 9/10/11 are the server's "token expired/invalid" family (same codes
+    # gallery_sync.py's fetch_gallery already retries on) — one retry with a
+    # forced credential refresh self-heals a stale token instead of hard-failing.
+    _EXPIRED_RCS = (9, 10, 11)
+
+    def _post_with_refresh(self, cmd: str, body_fn) -> dict:
+        creds = self._ensure_creds()
+        data = _auth._post(cmd, body_fn(creds))
+        rc = data.get("ReturnCode", -1)
+        if rc in self._EXPIRED_RCS:
+            creds = self.authenticate(force=True)
+            data = _auth._post(cmd, body_fn(creds))
+        return data
+
     def get_category_file_list(
         self,
         classify: int,
@@ -78,26 +92,29 @@ class CloudClient:
         limit: int = 20,
         page: int = 1,
     ) -> list[dict]:
-        creds = self._ensure_creds()
         start = (page - 1) * limit + 1
         end = page * limit * 2
-        body: dict[str, Any] = {
-            "Command": "GetCategoryFileListV2",
-            "Token": creds.token,
-            "UserId": creds.user_id,
-            "DeviceId": self.device_id,
-            "Classify": classify,
-            "FileSort": file_sort,
-            "FileType": file_type,
-            "FileSize": 0,
-            "Version": 19,
-            "StartNum": start,
-            "EndNum": end,
-            "RefreshIndex": 0,
-        }
-        if self.device_pw:
-            body["DevicePassword"] = self.device_pw
-        data = _auth._post("GetCategoryFileListV2", body)
+
+        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "Command": "GetCategoryFileListV2",
+                "Token": creds.token,
+                "UserId": creds.user_id,
+                "DeviceId": self.device_id,
+                "Classify": classify,
+                "FileSort": file_sort,
+                "FileType": file_type,
+                "FileSize": 0,
+                "Version": 19,
+                "StartNum": start,
+                "EndNum": end,
+                "RefreshIndex": 0,
+            }
+            if self.device_pw:
+                body["DevicePassword"] = self.device_pw
+            return body
+
+        data = self._post_with_refresh("GetCategoryFileListV2", _body)
         rc = data.get("ReturnCode", -1)
         if rc != 0:
             raise RuntimeError(
@@ -112,17 +129,19 @@ class CloudClient:
     # ── weather city search ───────────────────────────────────────────────
 
     def search_weather_city(self, keyword: str) -> list[dict]:
-        creds = self._ensure_creds()
-        body: dict[str, Any] = {
-            "Command": WEATHER_SEARCH_CMD,
-            "Token": creds.token,
-            "UserId": creds.user_id,
-            "DeviceId": self.device_id,
-            "KeyWord": keyword,
-        }
-        if self.device_pw:
-            body["DevicePassword"] = self.device_pw
-        data = _auth._post(WEATHER_SEARCH_CMD, body)
+        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "Command": WEATHER_SEARCH_CMD,
+                "Token": creds.token,
+                "UserId": creds.user_id,
+                "DeviceId": self.device_id,
+                "KeyWord": keyword,
+            }
+            if self.device_pw:
+                body["DevicePassword"] = self.device_pw
+            return body
+
+        data = self._post_with_refresh(WEATHER_SEARCH_CMD, _body)
         rc = data.get("ReturnCode", -1)
         if rc != 0:
             raise RuntimeError(
