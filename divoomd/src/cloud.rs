@@ -11,9 +11,9 @@ use md5::{Md5, Digest};
 
 type HmacMd5 = Hmac<Md5>;
 
-const BASE_URL: &str = "https://appin.divoom-gz.com";
+pub(crate) const BASE_URL: &str = "https://appin.divoom-gz.com";
 const HMAC_KEY: &[u8] = b"DivoomBluetoothDevice<>?";
-const TIMEOUT_SECS: u64 = 15;
+pub(crate) const TIMEOUT_SECS: u64 = 15;
 const AUTH_FAIL_COOLDOWN_SECS: u64 = 120;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +43,12 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
 }
 
 use crate::cloud_store::{load_cache, load_config, save_cache};
+
+// Cloud gallery / category / weather endpoints live in `cloud_category.rs` to
+// keep this file under the 500-line house limit.
+pub use crate::cloud_category::{
+    fetch_gallery, get_category_file_list, search_weather_city, CLOCK_FACE_CLASSIFY,
+};
 
 fn md5_hex(s: &str) -> String {
     let mut hasher = Md5::new();
@@ -123,10 +129,19 @@ async fn login_guest() -> Result<DivoomCredentials, String> {
     let utc = get_server_utc().await;
     let utc_str = utc.to_string();
     let utc_encrypt = hmac_md5_hex(&utc_str);
+    // R61 fix: the server (post auth-flow change) requires the bound device's
+    // identity on User/NewGuest — a request without Type/SubType/DeviceId/
+    // devicePassword is rejected with RC=10. From decompiled
+    // BlueDeviceNewDeviceRequest + BaseRequestJson.
+    let (device_id, device_pw, dev_type, dev_subtype) = load_virtual_device();
     let body = json!({
         "Command": "User/NewGuest",
         "UTC": utc_str,
         "UTCEncrypt": utc_encrypt,
+        "Type": dev_type,
+        "SubType": dev_subtype,
+        "DeviceId": device_id,
+        "devicePassword": device_pw,
         "Token": 0,
         "UserId": 0,
     });
@@ -201,84 +216,25 @@ pub async fn get_credentials(force_refresh: bool) -> Result<DivoomCredentials, S
     }
 }
 
-fn load_virtual_device() -> (i64, String) {
+pub(crate) fn load_virtual_device() -> (i64, i64, i64, i64) {
     let mut device_id = 0i64;
-    let mut device_pw = String::new();
+    let mut device_pw = 0i64;
+    let mut dev_type = 0i64;
+    let mut dev_subtype = 0i64;
     if let Some(mut path) = config_dir() {
         path.push("virtual_device.json");
         if path.exists() {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 if let Ok(val) = serde_json::from_str::<Value>(&content) {
                     device_id = val.get("BluetoothDeviceId").and_then(|v| v.as_i64()).unwrap_or(0);
-                    device_pw = val.get("DevicePassword").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    device_pw = val.get("DevicePassword").and_then(|v| v.as_i64()).unwrap_or(0);
+                    dev_type = val.get("Type").and_then(|v| v.as_i64()).unwrap_or(0);
+                    dev_subtype = val.get("SubType").and_then(|v| v.as_i64()).unwrap_or(0);
                 }
             }
         }
     }
-    (device_id, device_pw)
-}
-
-pub async fn fetch_gallery(
-    classify: i64,
-    limit: i64,
-    file_sort: i64,
-    file_size: i64,
-) -> Result<Value, String> {
-    let mut creds = get_credentials(false).await?;
-    let (device_id, device_pw) = load_virtual_device();
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(TIMEOUT_SECS))
-        .user_agent("okhttp/4.12.0")
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    let make_request = |creds: &DivoomCredentials| -> Value {
-        let mut body = json!({
-            "Command": "GetCategoryFileListV2",
-            "Token": creds.token,
-            "UserId": creds.user_id,
-            "DeviceId": device_id,
-            "Classify": classify,
-            "FileSort": file_sort,
-            "FileType": 5,
-            "FileSize": file_size,
-            "Version": 19,
-            "StartNum": 1,
-            "EndNum": limit * 2,
-            "RefreshIndex": 0
-        });
-        if !device_pw.is_empty() {
-            if let Some(obj) = body.as_object_mut() {
-                obj.insert("DevicePassword".to_string(), json!(device_pw));
-            }
-        }
-        body
-    };
-
-    let url = format!("{}/GetCategoryFileListV2", BASE_URL);
-    let mut req_body = make_request(&creds);
-    let mut resp = client.post(&url).json(&req_body).send().await
-        .map_err(|e| e.to_string())?;
-    
-    let mut data: Value = resp.json().await.map_err(|e| e.to_string())?;
-    let mut rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
-
-    if rc == 9 || rc == 10 || rc == 11 {
-        creds = get_credentials(true).await?;
-        req_body = make_request(&creds);
-        resp = client.post(&url).json(&req_body).send().await
-            .map_err(|e| e.to_string())?;
-        data = resp.json().await.map_err(|e| e.to_string())?;
-        rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
-    }
-
-    if rc != 0 {
-        let msg = data.get("ReturnMessage").and_then(|v| v.as_str()).unwrap_or("Unknown cloud error");
-        return Err(format!("GetCategoryFileListV2 failed (RC={rc}): {msg}"));
-    }
-
-    Ok(data)
+    (device_id, device_pw, dev_type, dev_subtype)
 }
 
 #[allow(dead_code)]

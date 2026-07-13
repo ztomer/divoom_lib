@@ -49,6 +49,23 @@ HMAC_KEY   = b"DivoomBluetoothDevice<>?"  # from P2/a.java
 TIMEOUT    = 15
 CONFIG_FILE = Path.home() / ".config" / "divoom-control" / "config.ini"
 CACHE_FILE  = Path.home() / ".config" / "divoom-control" / "auth_token.json"
+VIRTUAL_DEVICE_PATHS = [
+    Path.home() / ".config" / "divoom-control" / "virtual_device.json",
+    Path(__file__).resolve().parent.parent / "api_scraper" / "divoom_docs" / "virtual_device.json",
+]
+
+
+def _load_virtual_device() -> dict:
+    """Return the bound device's identity (BluetoothDeviceId / DevicePassword /
+    Type / SubType) used to sign cloud requests. Mirrors the lookup in
+    ``divoom_gui.gui_api``. Empty dict if no virtual device is configured."""
+    for p in VIRTUAL_DEVICE_PATHS:
+        if p.exists():
+            try:
+                return json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                return {}
+    return {}
 
 
 @dataclass
@@ -158,12 +175,23 @@ def _login_guest() -> DivoomCredentials:
     utc_encrypt = _hmac_md5(utc_str)
     print_info(f"UTC={utc_str}  UTCEncrypt={utc_encrypt}")
 
+    # R61 fix: the server (post-auth-flow-change) requires the bound device's
+    # identity on User/NewGuest — a request without Type/SubType/DeviceId/
+    # devicePassword is rejected with RC=10. The fields come from the virtual
+    # device file (same source the GUI loads). Matches decompiled
+    # BlueDeviceNewDeviceRequest (type/subType/utc/utcEncrypt) + BaseRequestJson
+    # (DeviceId/devicePassword).
+    dev = _load_virtual_device()
     body = {
-        "Command":    "User/NewGuest",
-        "UTC":        utc_str,
-        "UTCEncrypt": utc_encrypt,
-        "Token":      0,
-        "UserId":     0,
+        "Command":       "User/NewGuest",
+        "UTC":           utc_str,
+        "UTCEncrypt":    utc_encrypt,
+        "Type":          dev.get("Type", 0),
+        "SubType":       dev.get("SubType", 0),
+        "DeviceId":      dev.get("BluetoothDeviceId", 0),
+        "devicePassword": dev.get("DevicePassword", 0),
+        "Token":         0,
+        "UserId":        0,
     }
     data = _post("User/NewGuest", body)
     rc   = data.get("ReturnCode", -1)

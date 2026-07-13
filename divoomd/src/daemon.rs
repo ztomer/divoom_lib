@@ -360,7 +360,8 @@ impl Daemon {
             }
 
             "fetch_gallery" | "save_credentials" | "get_credentials"
-            | "get_cached_credentials" => {
+            | "get_cached_credentials" | "get_category_file_list"
+            | "list_clock_faces" | "search_weather_city" => {
                 crate::cloud_cmds::handle(&req.command, &req).await
             }
 
@@ -368,40 +369,6 @@ impl Daemon {
                 "command not implemented in the native daemon yet: {other}"
             )),
         }
-    }
-
-    async fn device_status(&self) -> Value {
-        let connected = self.device.lock().await.is_some();
-        let id_val = self.device_id.lock().await.clone();
-
-        let (mac, lan_ip) = if let Some(ref dev) = *self.device.lock().await {
-            match &**dev {
-                #[cfg(feature = "ble")]
-                DeviceTransport::Ble(_) => {
-                    (id_val.map(Value::String).unwrap_or(Value::Null), Value::Null)
-                }
-                DeviceTransport::Spp(_) => {
-                    (id_val.map(Value::String).unwrap_or(Value::Null), Value::Null)
-                }
-                DeviceTransport::Lan(l) => {
-                    (Value::Null, Value::String(l.device_ip.clone()))
-                }
-                DeviceTransport::Mock(_) => {
-                    (id_val.map(Value::String).unwrap_or(Value::Null), Value::Null)
-                }
-            }
-        } else {
-            (id_val.map(Value::String).unwrap_or(Value::Null), Value::Null)
-        };
-
-        json!({
-            "success": true,
-            "connected": connected,
-            "connection_state": if connected { "connected" } else { "disconnected" },
-            "mac": mac,
-            "lan_ip": lan_ip,
-            "wall": false,
-        })
     }
 
     #[cfg(feature = "ble")]

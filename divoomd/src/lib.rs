@@ -17,6 +17,7 @@ pub mod central;
 pub mod command_queue;
 pub mod commands;
 pub mod daemon;
+mod daemon_status;
 #[cfg(feature = "ble")]
 pub mod daemon_ble;
 pub mod framing;
@@ -41,6 +42,7 @@ pub mod spp;
 pub mod cloud;
 pub mod cloud_cmds;
 pub mod cloud_store;
+mod cloud_category;
 pub mod mcp;
 pub mod mcp_tools;
 pub mod media;

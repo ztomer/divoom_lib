@@ -65,6 +65,32 @@ pub async fn handle(command: &str, req: &Request) -> Value {
             None => json!({ "success": true, "credentials": serde_json::Value::Null }),
         },
 
+        "get_category_file_list" => {
+            let classify = req.args.get("classify").and_then(|v| v.as_i64())
+                .unwrap_or(crate::cloud::CLOCK_FACE_CLASSIFY);
+            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20);
+            match crate::cloud::get_category_file_list(classify, limit).await {
+                Ok(res) => json!({ "success": true, "result": res }),
+                Err(e) => err_reply(&e),
+            }
+        }
+
+        "list_clock_faces" => {
+            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20);
+            match crate::cloud::get_category_file_list(crate::cloud::CLOCK_FACE_CLASSIFY, limit).await {
+                Ok(res) => json!({ "success": true, "result": res }),
+                Err(e) => err_reply(&e),
+            }
+        }
+
+        "search_weather_city" => {
+            let keyword = req.args.get("keyword").and_then(|v| v.as_str()).unwrap_or("");
+            match crate::cloud::search_weather_city(keyword).await {
+                Ok(res) => json!({ "success": true, "result": res }),
+                Err(e) => err_reply(&e),
+            }
+        }
+
         other => err_reply(&format!("not a cloud command: {other}")),
     }
 }
