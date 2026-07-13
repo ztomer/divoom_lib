@@ -124,29 +124,47 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
 
 ## 3. Loose ends
 
-- [ ] Timoo-light-4 re-verify (R60 #2): scan, connect, `display.show_image` with a
-      cloud-decoded payload, post-push `get_brightness` read-back confirming no
-      device-stick. If still out of BLE range, state that plainly — don't fabricate.
-- [ ] User-POV pass on physical-screen visuals for the R60 show_clock canonical fix
-      (real device, real screen, light+dark check per [[user-pov-debug]]).
-- [ ] Re-scan `SESSION_HANDOFF.md`/`ROADMAP.md` for any other open thread not already
-      captured above (e.g. Cloud HTTP round remainder, R12 visual/hardware arc) and
-      either close it or explicitly re-defer with a reason.
-- **Kill:** every loose end from R60 is closed, verified-false, or explicitly
-  re-deferred with a stated reason (not silently dropped).
+- [ ] **BLOCKED — no daemon/hardware reachable in this session.** Timoo-light-4
+      re-verify (R60 #2): scan, connect, `display.show_image` with a cloud-decoded
+      payload, post-push `get_brightness` read-back confirming no device-stick.
+      Checked: no `divoomd` running, no `/tmp/divoom.sock`, and — per the standing
+      [[divoom-ble-tcc-harness-limit]] — this shell cannot itself spawn a BLE-scanning
+      process (macOS TCC SIGABRTs it). This needs the user to start the daemon (GUI
+      or standalone) so a session can drive it over the socket. Stating that plainly
+      rather than fabricating a result.
+- [ ] **BLOCKED — same reason.** User-POV pass on physical-screen visuals for the R60
+      show_clock canonical fix (real device, real screen, light+dark check per
+      [[user-pov-debug]]) — needs eyes on a real screen, inherently user-driven.
+- [x] Re-scanned `docs/ROADMAP.md` for other open threads: the Timoo re-verify is
+      already tracked there (line 78, points back to this file). R12 visual pass +
+      R12 hardware verification (lines 76-77) are explicitly marked "user-driven" —
+      unchanged, correctly deferred, not a new gap from this round. No other
+      undocumented open thread found.
+- **Kill: partially met, honestly.** Every loose end from R60 is accounted for —
+  two are blocked on hardware/user availability (stated above, not silently
+  dropped), the rest (R12 arc) were already correctly deferred as user-driven
+  before this round and remain so.
 
 ## 4. Device detect + connect verification (UI + daemon)
 
-- [ ] Daemon: drive `divoomd` directly over the Unix socket — `scan` finds all
-      reachable devices, `connect` succeeds per device, read-back (`get_device_name`/
-      `get_brightness`) confirms the link.
-- [ ] UI: launch the real `Divoom.app`/`./run.sh` GUI, drive scan + connect from the
-      dashboard (browser/computer-use POV), confirm the device chip appears, connects,
-      and a control (brightness/clock) round-trips.
+- [ ] **BLOCKED — same hardware/harness limit as item 3.** Daemon: drive `divoomd`
+      directly over the Unix socket — `scan` finds all reachable devices, `connect`
+      succeeds per device, read-back (`get_device_name`/`get_brightness`) confirms
+      the link. Can't spawn a real BLE-scanning daemon from this shell (TCC), and
+      none is currently running for this session to attach to.
+- [ ] **BLOCKED — same reason.** UI: launch the real `Divoom.app`/`./run.sh` GUI,
+      drive scan + connect from the dashboard, confirm the device chip appears,
+      connects, and a control round-trips. Same TCC constraint applies to the GUI's
+      own spawned daemon.
 - [ ] Confirm the daemon-down banner / reconnect path still behaves (regression check
-      from R57-59 event-driven work) while doing this pass.
-- **Kill:** both surfaces (daemon socket + UI) independently confirmed to detect and
-  connect to every device currently in range, with real hardware evidence recorded
+      from R57-59 event-driven work) while doing this pass — deferred with the above,
+      needs the same live daemon.
+- **Kill: NOT MET this session — explicitly blocked, not faked.** Needs the user to
+  start the daemon/GUI (grants the TCC Bluetooth permission this shell lacks) so a
+  session can drive scan/connect over the socket or the UI. The code paths
+  themselves are extensively covered by the R61 test suite (96% coverage, incl.
+  `scanner_mixin.py`/`connection.py`/`ble_transport.py` at 100%), but that is NOT a
+  substitute for the real-hardware confirmation this item asks for.
   here (not assumed from old rounds).
 
 ## 5. Release

@@ -68,9 +68,24 @@ Claude) should read this on entry and **update it at the end of every round**
   session couldn't verify (no APK decompile source or live cloud credentials
   available) — left as documented, unverified, not a regression.
 
-  **Next: item 3 (chase loose ends)** — Timoo-light-4 re-verify + user-POV
-  physical-screen visuals for the R60 show_clock fix, per PLANNING_ROUND61.md
-  section 3. Both need real hardware in BLE range.
+  **Items 3 (loose ends) + 4 (device detect/connect verification) BLOCKED — need
+  the user.** No `divoomd` running, no `/tmp/divoom.sock`, and this shell can't
+  itself spawn a BLE-scanning process (macOS TCC SIGABRTs it — the standing
+  [[divoom-ble-tcc-harness-limit]]). Both items need the user to start the daemon
+  (GUI or standalone) so a session can drive scan/connect over the socket or the
+  UI. Stating that plainly per PLANNING_ROUND61.md rather than faking a result.
+  Everything else NOT gated on live hardware is done: Timoo re-verify is tracked
+  in `ROADMAP.md`; no other undocumented loose end found; the R12 visual/hardware
+  arc was already correctly marked user-driven before this round.
+
+  **Item 5 (cut a release) — paused pending user input, not attempted
+  autonomously.** Publishing a tag/GitHub release/Homebrew cask bump is a public,
+  hard-to-reverse action; this project's own history (R57-R60) shows the pattern
+  of the user driving the final release cut personally even when the underlying
+  work is done. Combined with items 3-4 being blocked (no hardware confirmation
+  this round for the show_clock fix or device connectivity), the responsible next
+  step is to ask the user how they want to proceed, not push a release
+  unattended.
 
 - **R60 open-thread verification (2026-07-12) — DONE + checkpoint `v0.22.8` (user
   drives the release).** Roadmap
