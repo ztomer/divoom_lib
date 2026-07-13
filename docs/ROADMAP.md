@@ -95,8 +95,18 @@ Remaining 200+ endpoints are follow-on rounds.
 
 ### Deferred (R12 §D)
 
-See `docs/archive/superseded/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
-- `pic_scan_ctrl` 0x35 claim — lib says it sends 0x35 but the decompiled APK has no such command ID.
+See `docs/archive/rounds/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
+- `pic_scan_ctrl` 0x35 claim — **partially resolved (2026-07-13, real hardware).**
+  Hardware-tested on a real Pixoo-1: both `control=0` (mode/speed) and
+  `control=1` (image-data) GATT writes for 0x35 ACK cleanly — no rejection,
+  error, or disconnect, device stays responsive after. This is transport-level
+  confirmation only (ACK != device-confirmed semantic handling — a firmware
+  can silently ACK-and-drop an unrecognized opcode); no visual on-device
+  effect was confirmed (no camera on the physical device). Upgraded from
+  "wholly untested" to "accepted without error by the device's BLE stack,"
+  not fully verified as functionally correct. See the comment at
+  `divoom_lib/display/drawing.py::pic_scan_ctrl` / `divoomd/src/device_call/
+  drawing.rs` for the full writeup.
 - Cloud HTTP surface (above, now active in R61).
 
 ---
@@ -135,8 +145,18 @@ is present); the Python backend is **kept as the reference/fallback implementati
 never deleted** (per user directive). Niche subsystems (drawing-pad, SD-music,
 animation gif-chunk primitives) are wire-tested but not hardware-verified.
 
-**Remaining (optional):** re-verify Ditoo when in range; hardware-exercise the niche
-subsystems if/when those device flows are available.
+**Remaining (optional): DONE (2026-07-13, real hardware).** Ditoo-light-2 was back
+in range — connected, fetched a real cloud gallery file (`fetch_gallery`
+classify=18), pushed it via `sync_artwork` (`success:true`), and a post-push
+`get_brightness` read-back matched the pre-push value — no device-stick,
+matching the same pattern already confirmed on Pixoo/Timoo. Niche subsystems
+hardware-exercised: `music.app_need_get_music_list` (SD music query) and
+`drawing.drawing_mul_pad_enter`/`drawing_pad_exit` (drawing-pad round-trip)
+both ACK cleanly; `animation.app_get_user_define_info` (0x8e read-back)
+timed out with no reply on this Ditoo — inconclusive (unsupported vs. no
+saved slot to report) but confirmed non-destructive: no crash/wedge, device
+stayed responsive to further calls. Findings documented inline at each
+call site.
 
 ### Native menubar (done) + UI decision (2026-06-30)
 

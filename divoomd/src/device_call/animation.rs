@@ -184,6 +184,18 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
             }
         }
         // app_get_user_define_info (0x8e) read-back: [user_index] -> parsed dict.
+        // Hardware-tested 2026-07-13 on a real Ditoo: the device never replied
+        // (0x8e query timed out at the daemon's outer per-call timeout, ~30s)
+        // — no crash, no wedge, device stayed connected/responsive to
+        // subsequent calls after. Inconclusive on whether 0x8e itself is
+        // supported on this model, or there's simply no saved custom-GIF
+        // slot at user_index=0 to report; the graceful `Some(r) if
+        // !r.is_empty()` / `_ => null` handling below never actually gets
+        // exercised in that case because the daemon's OWN outer call-timeout
+        // wrapper fires first and returns a hard error instead of letting
+        // send_command_and_wait's None resolve into the intended graceful
+        // null result — worth a closer look if this command is picked up for
+        // real use.
         "animation.app_get_user_define_info" | "app_get_user_define_info" => {
             let idx = args.first().copied().or_else(|| kw_i64(kw, "user_index")).unwrap_or(0);
             match dev.send_command_and_wait(0x8e, &[idx as u8], ctx.timeout).await {

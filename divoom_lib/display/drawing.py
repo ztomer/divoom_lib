@@ -423,8 +423,21 @@ class Drawing:
         self.logger.info(f"Picture scan control: control={control} (0x35)...")
         # R12 §D audit: 0x35 has NO entry in `SppProc$CMD_TYPE.java` (decompiled
         # APK). The method claims to send command id 0x35 but the device's
-        # command table doesn't list it. Treat as UNVERIFIED until a real
-        # device acknowledges the call. See docs/PLANNING_ROUND12_D_AUDIT.md.
+        # command table doesn't list it. See docs/PLANNING_ROUND12_D_AUDIT.md.
+        # Hardware-tested 2026-07-13 on a real Pixoo-1: both control=0
+        # (mode/speed) and control=1 (image-data) GATT writes ACK cleanly —
+        # no rejection, error, or disconnect — and the device stays connected
+        # and responsive to subsequent calls afterward. This is TRANSPORT-
+        # level confirmation only (the write-with-response ACK, same as any
+        # BLE write); it does not prove the device's firmware actually
+        # recognizes 0x35 semantically (a firmware can silently ACK-and-drop
+        # an unrecognized opcode — no confirmation channel exists to tell the
+        # two apart, matching the same ACK≠device-confirmed caveat as
+        # custom_art_push/hot_update elsewhere in this codebase). No visual
+        # effect on the device screen was confirmed (no camera on the physical
+        # device during this test). Net: upgraded from "wholly untested" to
+        # "accepted without error by the device's BLE stack" — not fully
+        # verified as functionally correct.
         args = [control]
 
         handler = self._psc_handlers.get(control)

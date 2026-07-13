@@ -2,9 +2,14 @@
 //! `divoom_lib/display/drawing.py`. Low-level; not used by the GUI/MCP/CLI, ported
 //! verbatim for device_call dispatch parity. Byte orders match Python exactly.
 //!
-//! NOTE: `pic_scan_ctrl` (0x35) is UNVERIFIED — the decompiled APK has no 0x35
-//! entry (see docs/PLANNING_ROUND12_D_AUDIT.md); ported to match the Python lib,
-//! which may itself be wrong. List args (offset_list/data/pic_data/image_data)
+//! NOTE: `pic_scan_ctrl` (0x35) has no entry in the decompiled APK's command
+//! table (see docs/PLANNING_ROUND12_D_AUDIT.md); ported to match the Python
+//! lib, which may itself be wrong. Hardware-tested 2026-07-13 on a real
+//! Pixoo-1: both control=0 and control=1 GATT writes ACK cleanly (no
+//! rejection/disconnect), device stays responsive after. Transport-level
+//! confirmation only — ACK != device-confirmed semantic handling (a firmware
+//! can silently ACK-and-drop an unrecognized opcode); no visual on-device
+//! effect was confirmed. List args (offset_list/data/pic_data/image_data)
 //! arrive as JSON arrays in kwargs (or blobs[0] for the big chunk).
 
 use serde_json::{json, Map, Value};
