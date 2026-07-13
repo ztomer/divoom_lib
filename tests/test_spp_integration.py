@@ -19,15 +19,31 @@ async def test_spp_not_routed_for_unknown_protocol():
     mock_paired_device.getAddressString.return_value = "11-75-58-54-b9-13"
     
     mock_iobluetooth.IOBluetoothDevice.pairedDevices.return_value = [mock_paired_device]
-    
-    # Construct Divoom with name Timoo, protocol unset (None = autodetect)
-    divoom = Divoom(mac="11-75-58-54-b9-13", device_name="Timoo",
-                     use_ios_le_protocol=None)
-    
-    with patch("divoom_lib.bt_spp_transport.BTSppTransport") as MockTransport:
+
+    # BLETransport.__init__ resolves BleakClient via a call-time `from .divoom
+    # import BleakClient` (not the ble_transport module-level name), so the
+    # patch target is divoom_lib.divoom.BleakClient. Without this, connect()
+    # awaits a REAL BleakClient.connect() before any SPP-routing check runs,
+    # which on macOS invokes CoreBluetooth directly and SIGABRTs under a shell
+    # without Bluetooth TCC authorization (no such device exists at this
+    # address anyway — the test wants a clean raise, not a real radio probe).
+    # Matching `.address` keeps BLETransport.connect() from discarding this
+    # mock and re-instantiating a real client (ble_transport.py only replaces
+    # self.client when the address doesn't match).
+    with patch("divoom_lib.bt_spp_transport.BTSppTransport") as MockTransport, \
+            patch("divoom_lib.divoom.BleakClient") as MockBleakClient:
+        mock_ble_client = MockBleakClient.return_value
+        mock_ble_client.address = "11-75-58-54-b9-13"
+        mock_ble_client.is_connected = False
+        mock_ble_client.connect = AsyncMock(side_effect=RuntimeError("no such device"))
+
+        # Construct Divoom with name Timoo, protocol unset (None = autodetect)
+        divoom = Divoom(mac="11-75-58-54-b9-13", device_name="Timoo",
+                         use_ios_le_protocol=None)
+
         # BLE connect will be attempted (no SPP routing for unknown protocol)
-        # Since there's no real BLE device at this address, it raises. The
-        # important check: SPP transport was NEVER instantiated.
+        # and simulated to fail. The important check: SPP transport was NEVER
+        # instantiated.
         with pytest.raises(DeviceConnectionError):
             await divoom.connect()
         MockTransport.assert_not_called()
