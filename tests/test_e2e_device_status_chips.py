@@ -277,6 +277,90 @@ async def test_merge_discovered_devices_unions_by_address():
 
 
 @pytest.mark.asyncio
+async def test_restored_device_shows_not_in_range_until_confirmed():
+    # R61 follow-up (user-reported): session-restore populates discoveredDevices
+    # from the persisted known-devices cache — NOT devices confirmed present
+    # this session. Before the fix, these looked identical to a live/detected
+    # chip; unconfirmed:true must produce the same "not in range" treatment as
+    # the knownPending merge already gets.
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            res = await page.evaluate("""() => {
+                window.DivoomState.discoveredDevices =
+                    [{address:'AA', name:'Ditoo', unconfirmed:true}];
+                window.renderDeviceDots();
+                const c = document.querySelector('#device-dots .device-chip');
+                return { known: c.classList.contains('chip-known'),
+                         badge: c.querySelector('.device-chip-state')?.textContent || '',
+                         title: c.title };
+            }""")
+            assert res["known"] is True
+            assert "not in range" in res["badge"]
+            assert "not in range" in res["title"]
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_scan_merge_clears_unconfirmed_flag():
+    # A device restored as unconfirmed that a REAL scan then finds must lose
+    # the "not in range" badge — mergeDiscoveredDevices' union-only merge (R46
+    # #5) can add/update an address but never on its own downgrades one, so
+    # clearing unconfirmed explicitly on a scan hit is what actually fixes it.
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            res = await page.evaluate("""() => {
+                window.DivoomState.discoveredDevices =
+                    [{address:'AA', name:'Ditoo', unconfirmed:true}];
+                window.mergeDiscoveredDevices([{address:'AA', name:'Ditoo'}]);
+                window.renderDeviceDots();
+                const c = document.querySelector('#device-dots .device-chip');
+                return { known: c.classList.contains('chip-known'),
+                         badge: c.querySelector('.device-chip-state')?.textContent || '' };
+            }""")
+            assert res["known"] is False
+            assert res["badge"] == ""
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_active_device_never_shows_not_in_range_even_if_unconfirmed():
+    # A device can be BOTH the currently-connected/active one AND still
+    # carry a stale unconfirmed flag (the confirming scan/activity update
+    # hasn't landed yet) — the active dot is the stronger, more current
+    # signal and must never be contradicted by a "not in range" badge.
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            res = await page.evaluate("""() => {
+                window.DivoomState.discoveredDevices =
+                    [{address:'AA', name:'Ditoo', unconfirmed:true}];
+                document.getElementById('banner-device-mac').textContent = 'AA';
+                window.renderDeviceDots();
+                const c = document.querySelector('#device-dots .device-chip');
+                return { active: c.classList.contains('chip-active'),
+                         known: c.classList.contains('chip-known'),
+                         badge: c.querySelector('.device-chip-state')?.textContent || '',
+                         title: c.title };
+            }""")
+            assert res["active"] is True
+            assert res["known"] is False
+            assert res["badge"] == ""
+            assert "not in range" not in res["title"]
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
 async def test_render_device_dots_empty_state_no_crash():
     pytest.importorskip("playwright.async_api")
     from playwright.async_api import async_playwright

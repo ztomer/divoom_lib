@@ -13,7 +13,11 @@ window.mergeDiscoveredDevices = function(fresh) {
         if (d && d.address) byAddr[d.address] = d;
     });
     (fresh || []).forEach(d => {
-        if (d && d.address) byAddr[d.address] = Object.assign(byAddr[d.address] || {}, d);
+        // A fresh scan finding this address means it's confirmed present RIGHT
+        // NOW — clear any leftover "unconfirmed" (session-restore/known-cache)
+        // flag, since the union-only merge below never downgrades an address
+        // that a later scan simply doesn't happen to re-find.
+        if (d && d.address) byAddr[d.address] = Object.assign(byAddr[d.address] || {}, d, { unconfirmed: false });
     });
     window.DivoomState.discoveredDevices = Object.values(byAddr);
     return window.DivoomState.discoveredDevices;
@@ -47,6 +51,10 @@ window.refreshOwnedDevices = function() {
                 });
                 changed = true;
             } else {
+                // The daemon reporting ANY activity entry for this mac means it
+                // currently owns/knows the device — definitely present, not just
+                // remembered from a prior session.
+                if (known.unconfirmed) { known.unconfirmed = false; changed = true; }
                 if (info.name && known.name !== info.name) {
                     known.name = info.name; changed = true;
                 }
@@ -80,6 +88,11 @@ window.renderDeviceDots = function() {
             kind: d.activityKind || "",
             // G5: an owned device whose link degraded/dropped (self-healing).
             degraded: d.activityState === "degraded" || d.activityState === "disconnected",
+            // Restored from a prior session/known-devices cache, not yet
+            // confirmed present by a scan or the daemon's owned-device
+            // activity this session — same "not in range" treatment as the
+            // knownPending merge below.
+            known: !!d.unconfirmed,
         });
     });
     (window.DivoomState.registeredLanDevices || []).forEach(d => {
@@ -110,7 +123,7 @@ window.renderDeviceDots = function() {
         chip.dataset.value = e.value;
         chip.title = e.degraded ? `${e.name} — ${e.kind} (reconnecting)`
                    : e.streaming ? `${e.name} — ${e.kind}`
-                   : e.known ? `${e.name} — not in range (click to retry)` : e.name;
+                   : (e.known && !isActive) ? `${e.name} — not in range (click to retry)` : e.name;
         chip.setAttribute("role", "tab");
         chip.setAttribute("aria-selected", isActive ? "true" : "false");
 
@@ -141,7 +154,10 @@ window.renderDeviceDots = function() {
             st.className = "device-chip-state";
             st.textContent = e.kind;
             chip.appendChild(st);
-        } else if (e.known) {
+        } else if (e.known && !isActive) {
+            // Never mislabel the actively-connected device "not in range" —
+            // it clearing (unconfirmed=false) usually races a fast connect,
+            // but active status is the stronger, more current signal.
             const st = document.createElement("span");
             st.className = "device-chip-state device-chip-state-known";
             st.textContent = "not in range";

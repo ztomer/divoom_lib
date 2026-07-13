@@ -361,7 +361,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     if (conf.slots) { window.DivoomState.assignedSlots = conf.slots; window.renderArrangerCanvas(); }
                     if (conf.devices && conf.devices.length > 0) {
-                        window.DivoomState.discoveredDevices = conf.devices;
+                        // R61 follow-up (user-reported): these are PERSISTED devices
+                        // from a prior session, not devices confirmed present right
+                        // now. Tag them unconfirmed so renderDeviceDots() shows the
+                        // existing "not in range" treatment until a real scan or the
+                        // daemon's owned-device activity confirms them — without
+                        // this, mergeDiscoveredDevices' union-only scan merge (R46 #5)
+                        // can add/update but never downgrade an address, so every
+                        // device ever seen looked permanently in-range after every
+                        // restart, even when genuinely unreachable.
+                        window.DivoomState.discoveredDevices =
+                            conf.devices.map(d => Object.assign({}, d, { unconfirmed: true }));
                         if (window.populateDeviceSelectors) window.populateDeviceSelectors(conf.devices);
                         window.renderArrangerCanvas();
                     }
