@@ -223,7 +223,7 @@ Remaining command-parity gaps (Rust ← Python):
   hardware to verify.
 
 Staged rollout (each step reversible until 5.3):
-- [ ] **5.1** Flip `DIVOOM_USE_RUST_DAEMON` default to on in `daemon_client.py` /
+- [x] **5.1** Flip `DIVOOM_USE_RUST_DAEMON` default to on in `daemon_client.py` /
   GUI launcher — **only after 5.0a/5.0b land** (else GUI/CLI calls hit missing
   commands). Reversible via the env flag.
 - [ ] **5.2** Soak: run GUI + menubar + MCP against the Rust default for a defined

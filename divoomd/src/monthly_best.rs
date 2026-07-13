@@ -201,10 +201,11 @@ async fn sync_files_to_device(
             continue;
         }
 
-        // Resolve to a displayable image (GIF/PNG/JPG/magic-43) and show it. Do
-        // NOT raw-stream undecodable containers (magic 9/18/26 AES, 0xAA hot) — the
-        // device can't parse them and sticks in its loading animation. Those need
-        // the frame→GIF / LZO decoders that are not yet ported; skip honestly.
+        // Resolve to a displayable image and show it. `media::resolve_to_gif`
+        // handles GIF/PNG/JPG, magic-43, and the cloud/hot containers (magic 9/18/26
+        // AES+LZO, 0xAA) by re-encoding them to an animated GIF the device can
+        // render. The only honest-error path is a truly unrecognized container,
+        // which would otherwise stick the device in its loading animation.
         let success = match crate::media::resolve_to_gif(&file_bytes) {
             Some(img) => {
                 let req_show = Request {

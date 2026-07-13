@@ -131,14 +131,15 @@ pub(crate) fn is_image_header(d: &[u8]) -> bool {
         || d.starts_with(b"\xff\xd8")
 }
 
-/// Resolve a downloaded cloud payload to displayable image-file bytes
-/// (GIF/PNG/JPG) the `image` crate can decode — the subset of Python's
-/// `media_decoder.resolve_to_gif` that yields a directly-renderable file.
+/// Resolve a downloaded cloud payload to a SINGLE displayable image-file
+/// (GIF/PNG/JPG) the `image` crate can decode — the image-only subset used by
+/// callers that need one static file. GIF/PNG/JPG pass through; magic-43 is
+/// unwrapped to its embedded image.
 ///
-/// Returns None for containers whose decoders produce raw RGB frame lists:
-/// magic 9/18/26 (AES; 18/26 also LZO) and 0xAA (hot). Those need a frame→GIF
-/// encode (and an LZO decoder for 18/26) that is not yet ported — callers must
-/// fail honestly rather than stream undecodable bytes (which sticks the device).
+/// The full cloud/hot container handling (magic 9/18/26 → AES/LZO frames, 0xAA
+/// hot → palette-delta frames, all re-encoded to an animated GIF) lives in
+/// `media::resolve_to_gif`, which is what `sync_artwork` / `get_animated_preview`
+/// use. This function returns None for animated containers by design.
 pub(crate) fn resolve_to_image_bytes(data: &[u8]) -> Option<Vec<u8>> {
     if data.len() < 4 {
         return None;
@@ -168,7 +169,8 @@ pub(crate) fn decode_magic43(data: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// Decode a cloud container (magic 9 → AES-CBC 16x16 RGB) into raw 768-byte frames.
-/// Returns (frames, duration_ms). Magic 18/26 (LZO) not implemented here (no lzo dep).
+/// Returns (frames, duration_ms). Magic 18/26 (AES + LZO) are handled by
+/// `decode_cloud_magic18_26` (the LZO dependency is `minilzo_rs`).
 pub(crate) fn decode_cloud_magic9(data: &[u8]) -> Option<(Vec<Vec<u8>>, u32)> {
     if data.len() < 5 || data[0] != 9 { return None; }
     let total_frames = data[1] as usize;

@@ -4,13 +4,13 @@
 //! `display.show_image` (which resizes NEAREST to the device size and 0x8B-streams,
 //! matching the Python resize-then-show path).
 //!
-//! PARITY NOTE: Python's `resolve_to_gif` also decodes AES cloud containers
-//! (magic 9/18/26) and 0xAA hot files. The native daemon currently resolves
-//! GIF/PNG/JPG and magic-43 (which covers files the device can render directly);
-//! magic 9/18/26 (AES, +LZO for 18/26) and 0xAA decode to raw RGB frame lists and
-//! are NOT yet ported. For those we return an HONEST error rather than raw-streaming
-//! undecodable bytes — raw-streaming a container the device can't parse leaves it
-//! stuck in its loading animation (observed on a Timoo with a magic-18 file).
+//! PARITY NOTE: Python's `media_decoder.resolve_to_gif` decodes AES cloud
+//! containers (magic 9/18/26, with LZO for 18/26) and 0xAA hot files. The native
+//! daemon matches this exactly via `media::resolve_to_gif` (see `art_codec.rs`):
+//! magic 9 → AES frames, 18/26 → AES+LZO tiles, 0xAA → palette-delta frames, all
+//! re-encoded to an animated GIF the device can render; plus GIF/PNG/JPG and
+//! magic-43. The only honest-error path is a truly unrecognized container (line
+//! 107), which would otherwise stick the device in its loading animation.
 
 use base64::Engine;
 use serde_json::{json, Value};

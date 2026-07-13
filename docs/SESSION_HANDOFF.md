@@ -845,24 +845,27 @@ Claude) should read this on entry and **update it at the end of every round**
   shown as connected. Fixed in `divoom_gui/web_ui/connection_events.js` — an explicit
   `disconnected` state now flips the dot + `appConnected` to false. **This fix is NOT yet
   released** (v0.22.2 shipped before it); cut a patch (0.22.3) when convenient.
-- **BLOCKER — cloud image-decode parity (the big one).** The native daemon only
-  resolves GIF/PNG/JPG + magic-43; real Pixoo gallery content is dominated by
-  **magic 9/18/26 (AES; 18/26 also LZO+tiled) and 0xAA (hot)** containers — 0 of 3
-  gallery pages were directly renderable. `sync_artwork`/`monthly_best` now
-  honest-error on these (no more device-bricking) but can't render them. Complete
-  parity requires porting `media_decoder.resolve_to_gif` fully: decode those
-  containers → frames → GIF-encode (image crate) so the unified `show_image` path
-  renders them. magic 18/26 needs an **LZO dependency** + `_compact_tiles`. Ground-
-  truth oracle available: the Alexlay magic-18 file + Python's decoded 32×32/6f GIF.
-  Verify per-format against Python, then on the 4 devices (Ditoo/Tivoo-Max/Timoo/
-  Pixoo). **Existing Rust decoders:** `art_codec` has AES-CBC + `decode_cloud_magic9`
-  + `decode_hot_file` (raw frames) + `decode_magic43`; MISSING: magic 18/26 LZO,
-  frame→GIF encode.
-- **device_call method-level parity audit** — top-level commands are at parity;
-  still owe a method-by-method diff of `device_call` (Rust `device_call/*` vs the
-  Python `Divoom` API surface) to confirm nothing else is missing.
-- **Phase 5 default-flip** — gated on the decode parity above; flip
-  `DIVOOM_USE_RUST_DAEMON` default on (prefer Rust when the binary exists, else
+- **BLOCKER — cloud image-decode parity: RESOLVED (verified R60).** The native
+  daemon's `media::resolve_to_gif` (`divoomd/src/media.rs`) already decodes magic
+  9 (AES), 18/26 (AES + **LZO via `minilzo_rs`**), 0xAA (hot palette-delta) →
+  animated GIF, plus GIF/PNG/JPG + magic-43. `sync_artwork`/`monthly_best` call it
+  (so magic 9/18/26/0xAA now render; only a truly unrecognized container
+  honest-errors). The earlier "MISSING: LZO / frame→GIF" note was STALE — the code
+  was completed in a later round but the docstrings weren't updated. R60 stripped
+  the false "not ported" docstrings (`sync_artwork.rs:7`, `art_codec.rs:134`,
+  `monthly_best.rs:204`). Remaining: **hardware re-verify** the 4 magics render on
+  the 4 devices (R60 #2) — the device is kept in the loop per standing directive.
+  Plan + verified status: `docs/PLANNING_ROUND60.md`.
+- **device_call method-level parity audit: RESOLVED (verified R60).** ROADMAP +
+  `PLANNING_NATIVE_PORT_HARDENING.md` Phase 4 Tier A/B confirm 54→0 gaps vs the
+  Python Divoom API; dispatch in `divoomd/src/device_call/mod.rs:32` (+ per-module
+  `handle`). R60 #4 proposes a *durable* structural test (enumerate Python facade
+  methods ↔ Rust handlers) so a new method without a handler fails CI.
+- **Phase 5 default-flip: RESOLVED (verified R60).** `daemon_client.py:200-208`
+  already defaults to the Rust daemon when the binary is present (explicit
+  `DIVOOM_USE_RUST_DAEMON=0/1` overrides). The `5.1` checkbox in
+  `PLANNING_NATIVE_PORT_HARDENING.md` was stale; ticked in R60. Phase 5 *archival*
+  (mark Python daemon reference-only, never delete) remains — see below.
   Python) in `daemon_client.py`, then soak GUI/menubar/MCP.
 - **Phase 5 archival = ARCHIVE, NOT DELETE (user directive 2026-06-28).** Keep the
   Python `divoom_daemon`/`divoom_lib` as the **reference implementation** (it's
