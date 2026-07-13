@@ -15,6 +15,18 @@ throughout. Sections below (unversioned, same day) are this release's detail.
 **RELEASED**: tag + GitHub release + Homebrew cask, all live and verified —
 https://github.com/ztomer/divoom_lib/releases/tag/v0.22.9
 
+## R61: test-noise fix (2026-07-13)
+
+- **test(owner_live): silence a spurious "coroutine was never awaited"
+  RuntimeWarning.** Two `test_owner_live_coverage.py` tests point
+  `DeviceOwner._loop` at a closed event loop to verify `owner_live.py`'s
+  `live_job_stop`/`stop_all_live_jobs` swallow `asyncio.run_coroutine_threadsafe()`'s
+  `RuntimeError` cleanly; the coroutine object never got scheduled in that
+  path, so it warned on GC. Fixed by capturing the coroutine and calling
+  `coro.close()` only when scheduling itself failed synchronously — not on a
+  `.result()` timeout, where the coroutine is already a running Task. All 26
+  tests pass under `-W error::RuntimeWarning`; full suite 3171 passed.
+
 ## R61: hardware verification + UI clarity fix (2026-07-13)
 
 - **verify(hardware): Timoo-light-4 re-verify (R60 #2) — DONE.** With the real

@@ -125,6 +125,24 @@ Claude) should read this on entry and **update it at the end of every round**
   CLASSIFY` APK verification remain user-driven/unverified, not regressions)
   are in `docs/PLANNING_ROUND61.md`.
 
+- **Follow-up (2026-07-13): test-noise fix in `tests/test_owner_live_coverage.py`.**
+  Two tests that point `DeviceOwner._loop` at a closed event loop to verify
+  `owner_live.py`'s `live_job_stop`/`stop_all_live_jobs` swallow the
+  `asyncio.run_coroutine_threadsafe()` `RuntimeError` cleanly were tripping a
+  `RuntimeWarning: coroutine '...' was never awaited` at teardown — harmless
+  but could mask a real un-awaited-coroutine bug later. Fixed in `owner_live.py`
+  by capturing the coroutine in a local before scheduling and calling
+  `coro.close()` only in the branch where `run_coroutine_threadsafe()` itself
+  raised synchronously (closed/dead loop, so the coroutine was never wrapped
+  into a Task) — not on a `.result(timeout=...)` timeout, where the coroutine
+  is already owned by a running Task and closing it out-of-band would be
+  unsafe. Verified with `pytest tests/test_owner_live_coverage.py -q -W
+  error::RuntimeWarning` (26 passed, no warnings); full suite 3171 passed, 108
+  skipped, 9 pre-existing failures unrelated (the `test_daemon_connect_edge_e2e.py`
+  / `test_control_server.py` tests that need a real daemon process — reproduced
+  identically on clean `HEAD`, confirming the known [[divoom-ble-tcc-harness-limit]]
+  and not a regression).
+
 - **R60 open-thread verification (2026-07-12) — DONE + checkpoint `v0.22.8` (user
   drives the release).** Roadmap
   `docs/PLANNING_ROUND60.md`: #1 (docstring strip) DONE; #4 (durable

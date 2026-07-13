@@ -231,13 +231,23 @@ class OwnerLiveMixin:
             await self._drain_cmd_queue()   # settle any in-flight push it submitted
             return True
 
+        coro = _stop_on_loop()
         try:
-            stopped = asyncio.run_coroutine_threadsafe(
-                _stop_on_loop(), self._loop).result(timeout=10)
+            future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         except Exception as e:
+            # run_coroutine_threadsafe failed synchronously (e.g. a closed loop) —
+            # coro was never wrapped into a Task, so it'd otherwise warn "never awaited".
             logger.warning("live_job_stop: await-cancel failed for %s/%s: %s", mac, kind, e)
+            coro.close()
             self._live_tasks.pop(key, None)   # best effort
             stopped = True
+        else:
+            try:
+                stopped = future.result(timeout=10)
+            except Exception as e:
+                logger.warning("live_job_stop: await-cancel failed for %s/%s: %s", mac, kind, e)
+                self._live_tasks.pop(key, None)   # best effort
+                stopped = True
         if not stopped:
             return {"success": True, "stopped": False}
 
@@ -346,12 +356,21 @@ class OwnerLiveMixin:
                     pass
 
         if self._loop is not None:
+            coro = _stop_all_on_loop()
             try:
-                asyncio.run_coroutine_threadsafe(
-                    _stop_all_on_loop(), self._loop).result(timeout=10)
+                future = asyncio.run_coroutine_threadsafe(coro, self._loop)
             except Exception as e:
+                # never wrapped into a Task (e.g. a closed loop) — close explicitly
+                # so it doesn't warn "coroutine was never awaited".
                 logger.warning("stop_all_live_jobs await-cancel failed: %s", e)
+                coro.close()
                 self._live_tasks.clear()
+            else:
+                try:
+                    future.result(timeout=10)
+                except Exception as e:
+                    logger.warning("stop_all_live_jobs await-cancel failed: %s", e)
+                    self._live_tasks.clear()
         else:
             self._live_tasks.clear()
         # G1: the screens are no longer streaming — mark idle so the menubar /
