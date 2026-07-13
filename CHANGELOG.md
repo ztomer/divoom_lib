@@ -4,6 +4,51 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.11 — device-selector honesty fix, menubar D glyph, CSS-token migration
+
+Closes out the three remaining R61-follow-up threads (hardware-confirmed
+in the previous session) plus a real user-reported UI bug found while
+verifying them live.
+
+- **fix(ui): the sidebar device chips no longer show stale devices as if
+  in range.** Session restore wrote the persisted known-devices cache
+  straight into `discoveredDevices` as if every device were freshly
+  detected; the union-only scan merge (R46 #5) could add/update an
+  address but never downgrade one a scan didn't re-find, so a device
+  once seen looked permanently available forever after, even genuinely
+  unreachable. Confirmed live: a real scan against the running daemon
+  found only 2 of 4 known devices, matching the report exactly. Tagged
+  restored devices `unconfirmed: true`; they now get the existing "not
+  in range" badge until a real scan or the daemon's owned-device
+  activity confirms them. 3 new regression tests, proved to fail
+  without the fix before landing it.
+- **feat(menubar): replaced the bland status square with a styled "D"
+  glyph.** User feedback after seeing the shipped icon live: a plain
+  colored square wasn't recognizable. `make_icon()` now draws a
+  stylized D silhouette (flat left edge, rounded bowl) outlined in a
+  fixed light border with the status color filling the interior —
+  legible as a shape before even checking color. Verified live: green
+  while connected, swaps to orange on disconnect.
+- **Both R61-follow-up hardware verifications confirmed live**
+  (menubar connect/disconnect/degraded feedback; the daemon-down banner
+  and its auto-reconnect + manual-Reconnect paths) — see
+  `docs/ROADMAP.md`'s open-workstreams table for the detailed writeup.
+- **style: inline-style → CSS-token migration, batches 3-5.**
+  `templates_routines.js`, `templates_widgets.js`, `templates_settings.js`
+  — 56 of 111 occurrences moved to utility classes or deleted as
+  redundant with an existing rule; the remainder deliberately left
+  inline per the plan's one-off-sizing/unique-composition exceptions.
+  8 new utility classes. Verified via `getComputedStyle()` diffing
+  against the pre-migration box model for every migrated element —
+  zero divergences.
+- **fix(tests): weather-card regex tolerated only an exact class
+  string**, so the CSS migration's new `.clip-shrink` class broke a
+  test that wasn't actually about class names. Widened to pin the
+  element id instead.
+
+Full suite: 3200 passed, 0 failed, 97 skipped. `cargo test` clean in
+`divoomd` and `native-port/divoom-menubar`.
+
 ## v0.22.10 — R61 follow-up: full daemon+UI e2e connect/disconnect verification
 
 Closed a real e2e coverage gap (user-directed): prior UI e2e tests drove the
