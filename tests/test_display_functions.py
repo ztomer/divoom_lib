@@ -65,8 +65,8 @@ class TestDisplayFunctions(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result_default)
         await asyncio.sleep(2)
         
-        logger.info("Showing clock with weather and temp")
-        result_weather = await self.divoom.display.show_clock(weather=True, temp=True)
+        logger.info("Showing clock with humidity, weather and date")
+        result_weather = await self.divoom.display.show_clock(humidity=True, weather=True, date=True)
         self.assertTrue(result_weather)
         await asyncio.sleep(2)
 

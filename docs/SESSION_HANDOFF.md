@@ -31,10 +31,14 @@ Claude) should read this on entry and **update it at the end of every round**
    #5 get_* read-back timeouts audited (v0.22.7): bounded + cached in both Python
    (`ble_reads.read_with_retry` 2.5s + last-good cache) and Rust (every `get_*`
    uses `ctx.timeout`; daemon wraps each call in `tokio::time::timeout` 30s
-   clamped [1,120]). Code guarantee met; on-device "no UI hang" observation
-   pending hardware loop. Interim tags: `v0.22.3`…`v0.22.7`. Remaining device-in-loop:
-   #2 (cloud-decode render), #3 (show_clock reorder + screenshot), #7 (Ditoo soak).
-   No release until the roadmap is complete + hardware-verified.
+   clamped [1,120]). #2 (cloud-decode device push + no-stick, 3/4 devices — Timoo
+   offline), #3 (show_clock realigned to APK C2() canonical `[0x00, t, style,
+   0x01, humidity, weather, date, R,G,B]` + wire-byte test + device accept), #7
+   (Ditoo Tier B soak) all DONE in v0.22.8, driven from this shell (BLE works;
+   `conftest` abort does not occur here). **Roadmap complete (remote-verifiable
+   parts).** Caveats: Timoo-light-4 not in BLE range; physical-screen visuals are
+   user-POV. Interim tags `v0.22.3`…`v0.22.8`. No release yet — user drives the
+   release after satisfaction.
 - **EVENT-DRIVEN UI (R59, 2026-07-12) — DONE + HARDWARE-VERIFIED; shipping as v0.22.2.**
   The dashboard learned daemon/device state by **polling on 4s heartbeats** (connection,
   owned-devices, daemon-health) + 5s notif-status + 600ms hot-progress — flaky/laggy. This

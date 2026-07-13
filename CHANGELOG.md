@@ -4,6 +4,25 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.8 — R60 #2/#3/#7: hardware-in-loop verification (Ditoo soak, cloud-decode, show_clock)
+
+- **fix(display): `show_clock()` realigned to APK `C2()` canonical frame**
+  `[0x00, time_type, style, 0x01, humidity, weather, date, R, G, B]`
+  (`display/__init__.py:51`). Its overlay params were `weather, temp, calendar`
+  but the device's 0x45 clock env frame reads positions 4/5/6 as
+  `humidity/weather/date` — a real divergence. Renamed overlay params to
+  `(humidity, weather, date)` (web UI only used `clock`+`color`; one hardware
+  test updated). Added `tests/test_show_clock_wire.py` (3 cases) pinning the
+  exact wire bytes. On-device accept verified on Pixoo-1 (no stick).
+- **verify(hardware #2):** cloud-decode decoders green both langs (Rust `media`
+  2/2, Python 11/11 against magic-9/18/26/0xAA); `display.show_image` pushed to
+  Pixoo-1 / Tivoo-Max-light-3 / Ditoo-light-2 with post-push read-back (no
+  device-stick). Timoo-light-4 was not in BLE range this run.
+- **verify(hardware #7):** Ditoo-light-2 passed Tier B soak (connect →
+  brightness → show_clock → show_design → read-back → disconnect, no stick).
+- Caveat: physical-screen visuals of clock overlays / cloud render are user-POV
+  (device can't be remote-screenshot). (Interim checkpoint — not a release.)
+
 ## v0.22.7 — R60 #5: get_* read-back timeout audit (bounded + cached)
 
 - **audit(round60 #5):** confirmed `get_*` read-backs are bounded + cached in

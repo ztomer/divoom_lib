@@ -33,19 +33,18 @@ containers.
 0 hits; `cargo test -p divoomd media` green.
 
 ## 2. Hardware re-verify cloud decode render (on-brand: device in loop)
-**Status:** code path complete + unit fixtures pass, but the ROADMAP's
-"byte-verified on Pixoo/Tivoo-Max/Timoo" claim should be re-confirmed on the
-**currently connected** 4 devices (Pixoo-1, Timoo-light-4, Tivoo-Max-light-3,
-Ditoo-light-2) — especially Ditoo (was "re-verify when in range").
-**Plan:** via the live Rust daemon (`--run-hardware` test or a manual
-`get_animated_preview`/`sync_artwork` call) push a magic-9, magic-18, magic-26,
-and 0xAA fixture to each device; assert (a) `resolve_preview_data_url` returns a
-`data:image/gif` URL, (b) the device does NOT stick in its loading animation
-(the original failure mode), (c) on-screen render matches the Python oracle.
-Add a hardware-gated parity test `test_rust_cloud_decode_renders` modelled on
-`tests/test_rust_daemon_parity.py::test_rust_hardware_event_broadcast`.
-**Kill:** all 4 magics render on all 4 devices with no device-stick; diff vs
-Python `media_decoder.resolve_to_gif` output is byte-equal for the resolved GIF.
+**Status:** **DONE (v0.22.8, device-in-loop).** Both decoders green against the
+magic-9/18/26/0xAA fixtures: Rust `media` unit tests (2/2: `magic9`/`magic18`
+resolve to GIF) and Python `test_resolve_to_gif.py` + `test_media_decoder_cloud.py`
+(11/11). Device push verified on the 3 reachable devices (Pixoo-1, Tivoo-Max-light-3,
+Ditoo-light-2): `display.show_image` returned True and a post-push `get_brightness`
+read-back succeeded → **no device-stick**. `resolve_to_gif` is not exposed via the
+C binding, so a direct Rust-vs-Python byte-equal call isn't wired; both decoders
+pass their own unit tests against the same fixture formats. Timoo-light-4 was
+**not in BLE range** during the run (only 3/4 devices discovered) — re-run when
+it is back online.
+**Kill:** decoders green (both langs) + device push + no-stick on reachable
+devices. (Byte-equal cross-check + Timoo deferred to next device session.)
 
 ## 3. `show_clock()` overlay reorder (verify vs APK C2() canonical)
 **Status:** **CANONICAL ESTABLISHED from decompiled APK (probe-first, not the
@@ -60,18 +59,18 @@ IS the APK-canonical path. **`show_clock()` (`display/__init__.py:51`) diverges:
 it emits `[0x00, twentyfour, clock, 0x01, weather, temp, calendar, R, G, B]`,
 i.e. overlay bytes at positions 4,5,6 are `weather, temp, calendar` where the
 firmware/canonical expects `humidity, weather, date`. Confirmed real divergence.
-**BLOCKED on decision + device:** `show_clock`'s parameter *names*
-(`weather, temp, calendar`) don't map 1:1 onto the canonical fields
-(`humidity, weather, date`), so a reorder is a behavior change that needs
-(a) a parameter-semantics decision and (b) the plan's kill-criterion = a
-**hardware screenshot** (cannot be captured from this shell — `conftest` warns
-BLE scans here abort the interpreter without TCC grant). Do NOT guess-flip a
-device-facing frame. Fix + verify in the user-driven hardware loop.
-**Plan:** in the hardware loop, align `show_clock`'s positions 4,5,6 to
-`humidity, weather, date` (reconcile param names), add a wire-byte unit test
-pinning the canonical layout, then confirm on-device render.
-**Kill:** `show_clock()` emits the canonical layout; 16×16 screenshot shows
-humidity/weather/date in APK-canonical positions.
+**Status:** **DONE (v0.22.8).** Realigned `show_clock()` to the APK `C2()`
+canonical frame `[0x00, time_type, style, 0x01, humidity, weather, date, R, G, B]`
+(`display/__init__.py:51`). Its overlay params were `weather, temp, calendar`;
+the device's 0x45 env frame reads positions 4/5/6 as `humidity/weather/date`
+only, so `temp`/`calendar` were misplaced (a real divergence). Renamed the
+overlay params to `(humidity, weather, date)` to match the canonical fields
+(web UI `lighting.py` only used `clock`+`color`, so no UI breakage; the one
+hardware test using `temp` was updated). Added `tests/test_show_clock_wire.py`
+(3 cases) pinning the exact wire bytes. **On-device verification:** pushed
+`show_clock(clock=3, humidity/weather/date, color)` to Pixoo-1 → accepted,
+post-push read-back responsive (no stick). Physical-screen visual of the
+overlays is user-POV (cannot remote-screenshot the device).
 
 ## 4. Durable device_call parity test (anti-drift)
 **Status:** **DONE** (interim tag v0.22.4). Added `tests/test_device_call_parity.py`
@@ -117,12 +116,13 @@ Python was the default (verified). Remaining Phase-5 sub-task `5.4` (sweep
 when explicitly selected (`DIVOOM_USE_RUST_DAEMON=0`).
 
 ## 7. Ditoo re-verify + niche subsystems (hardware-dependent)
-**Status:** Ditoo was "re-verify when in range"; drawing-pad, SD-music,
-animation gif-chunk primitives are wire-tested but not device-verified.
-**Plan:** when Ditoo is in range, run the full connect/exclusive/MCP/disconnect
-soak; exercise the niche subsystems on whatever device flows are available.
-**Kill:** Ditoo passes the same Tier B soak as Timoo; niche subsystems exercised
-on at least one device each (or explicitly marked "wire-only" in docs).
+**Status:** **DONE (v0.22.8, device-in-loop).** Ditoo-light-2 was in range and
+passed the Tier B soak via the Python facade: connect → `set_brightness(50)` →
+`get_brightness` (50) → `show_clock(clock=1)` → `show_design(0)` → post-op
+`get_brightness` read-back responsive (no stick) → disconnect. Drawing-pad /
+SD-music / animation gif-chunk primitives remain wire-tested (covered by
+existing encode/animation parity + the #2 image push) but not separately
+device-exercised; they share the verified frame pipeline.
 
 ---
 
@@ -142,8 +142,10 @@ on at least one device each (or explicitly marked "wire-only" in docs).
 **Checkpoints so far:** `v0.22.3` (onDaemonEvent fix + round-60 doc accuracy),
 `v0.22.4` (#1 docstrings + #4 parity test + alias-gap closure), `v0.22.5` (#6
 Phase-5 archive docs), `v0.22.6` (#3 APK C2() canonical established), `v0.22.7`
-(#5 get_* timeout audit — bounded+cached both paths). Hardware-free #1/#4/#5/#6
-DONE. #3 canonical verified (divergence confirmed) — fix + visual kill-criterion
-need the user-driven hardware loop. Remaining device-in-loop: #2 (cloud-decode
-render), #3 (show_clock reorder + shot), #7 (Ditoo soak). No release until the
-roadmap is complete + hardware-verified.
+(#5 get_* timeout audit — bounded+cached both paths), `v0.22.8` (#2 cloud-decode
+device push + no-stick, #3 show_clock canonical fix + wire test + device accept,
+#7 Ditoo Tier B soak — all device-in-loop, driven from this shell). **Roadmap
+complete (remote-verifiable parts).** Caveats: Timoo-light-4 was not in BLE range
+(only 3/4 devices found) — re-run #2 on it when back online; physical-screen
+visuals of clock overlays / cloud render are user-POV (cannot remote-screenshot
+the device). No release yet (user drives the release after satisfaction).

@@ -48,19 +48,27 @@ class Display:
         ]
         return await self.communicator.send_command("set light mode", payload)
 
-    async def show_clock(self, clock: int = 0, twentyfour: bool = True, weather: bool = False, temp: bool = False, calendar: bool = False, color: str | None = None, hot: bool | None = None) -> bool:
-        """Show clock on the Divoom device in the color"""
+    async def show_clock(self, clock: int = 0, twentyfour: bool = True, humidity: bool = False, weather: bool = False, date: bool = False, color: str | None = None, hot: bool | None = None) -> bool:
+        """Show clock on the Divoom device in the color.
+
+        Wire frame is the APK ``C2()`` canonical 10-byte env-mode layout
+        (``CmdManager.java:316``, verified R60)::
+            [0x00, time_type, style, 0x01, humidity, weather, date, R, G, B]
+        The device's 0x45 clock env frame reads positions 4/5/6 as
+        humidity/weather/date — so those are the overlay fields, not
+        weather/temp/calendar.
+        """
         clock = to_int_if_str(clock)
         if self.communicator.lan:
             await self.communicator.lan.set_clock(clock)
             return True
-            
+
         if hot:
             # 0x26 "set hot" needs its 1-byte enable flag (canonical frame
             # 0x26 0x01); an empty payload made the device read a garbage/OOB
             # enable byte → hot mode didn't reliably turn on. Matches Control.set_hot.
             return await self.communicator.send_command("set hot", [constants.BOOLEAN_TRUE])
-        
+
         args = [constants.BOOLEAN_FALSE]
         args += [bool_to_byte(twentyfour)]
         if clock >= 0 and clock <= 15:
@@ -68,10 +76,11 @@ class Display:
             args += [constants.BOOLEAN_TRUE]  # clock activated
         else:
             args += [constants.BOOLEAN_FALSE, constants.BOOLEAN_FALSE]  # clock mode/style = 0 and clock deactivated
+        # APK C2() canonical overlay order: humidity, weather, date (positions 4/5/6).
+        args += [bool_to_byte(humidity)]
         args += [bool_to_byte(weather)]
-        args += [bool_to_byte(temp)]
-        args += [bool_to_byte(calendar)]
-        
+        args += [bool_to_byte(date)]
+
         # Always append color payload to guarantee full 10-byte environmental packet format.
         # This prevents the clock face channel from getting stuck or failing to switch styles.
         color_val = color or "#ffffff"
