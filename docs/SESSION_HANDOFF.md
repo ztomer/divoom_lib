@@ -90,7 +90,23 @@ Claude) should read this on entry and **update it at the end of every round**
   tray}.rs`, `native-port/divoom-menubar/src/state.rs` (new), `tests/
   e2e_gui_bridge.py` (new), `tests/test_e2e_gui_daemon_connect_disconnect.py`
   (new), `tests/test_e2e_live_hardware_connect_disconnect.py` (new), `tests/
-  conftest.py`. Not yet committed.
+  conftest.py`.
+
+  **SHIPPED: committed, tagged, released as v0.22.10** (user: "commit, tag,
+  push, cut a release"). `main` had moved ahead since this was written (the
+  `pkill`/RuntimeWarning follow-ups below had already landed and v0.22.9 was
+  already live) — synced onto it first, resolved `CHANGELOG.md`/
+  `PLANNING_ROUND61.md` conflicts by hand, reran full verification (3197
+  Python passed, 0 failed, 97 skipped; `cargo test` clean in `divoomd` +
+  `native-port/divoom-menubar`), then ran `scripts/release.sh`: DMG built,
+  tag pushed, GitHub release published
+  (https://github.com/ztomer/divoom_lib/releases/tag/v0.22.10), Homebrew
+  cask bumped. `docs/PLANNING_ROUND61.md` archived to `docs/archive/rounds/`
+  (round fully closed); `docs/ROADMAP.md` refreshed to match. One open
+  thread carried forward: live-hardware confirmation of the new menubar
+  connection-feedback feature (daemon/menubar wasn't running by the time
+  the opt-in pass was ready) — tracked in `docs/ROADMAP.md`'s open
+  workstreams, not lost.
 
 - **R61 follow-up (2026-07-13): `task_0bec8493` device-loop thread-teardown
   audit DONE.** Audited every daemon/owner test fixture that spins up a real

@@ -237,7 +237,7 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
   own test coverage — its real-hardware confirmation is the one item still
   open, tracked above, not faked or assumed.
 
-## 5. Release — DONE, shipped as v0.22.9
+## 5. Release — DONE, shipped as v0.22.9, follow-up shipped as v0.22.10
 
 - [x] All of 0-4 committed and green (3195+ passed, 0 failed each run; `cargo check`
       clean; no-emoji + file-size gates clean throughout).
@@ -259,6 +259,20 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
 - **Kill: MET.** Tag pushed, GitHub release published
   (https://github.com/ztomer/divoom_lib/releases/tag/v0.22.9), Homebrew cask
   updated + audited clean.
+- [x] **Follow-up (2026-07-13, user-directed "full e2e verification tests...").**
+      Item 4's UI half is now backed by real automated daemon+UI e2e coverage
+      (not just visual confirmation), plus a real menubar connection-feedback
+      gap was found and fixed (see item 4 above for detail). Synced onto
+      `main` first (it had moved ahead — the `pkill` and RuntimeWarning
+      follow-up tasks from item 4's earlier notes had already landed, and
+      v0.22.9 was already live), resolved doc conflicts, bumped
+      `pyproject.toml` 0.22.9 -> 0.22.10, ran `scripts/release.sh` again.
+      DMG built (`dist/Divoom-v0.22.10.dmg`, sha256 `8c6eb4ab...`), tag
+      pushed, GitHub release published
+      (https://github.com/ztomer/divoom_lib/releases/tag/v0.22.10), Homebrew
+      cask bumped to 0.22.10. Full suite: 3197 passed, 0 failed, 97 skipped;
+      `cargo test` clean in `divoomd` and `native-port/divoom-menubar`.
+- **Kill (follow-up): MET.**
 
 ---
 
@@ -278,6 +292,19 @@ _Each /loop iteration appends one line here: date, item worked, outcome._
   (device-chip "not in range" clarity) while the app was live. Item 5: user said
   "ship it" — released as v0.22.9 (DMG + GitHub release + Homebrew cask, all
   verified). **R61 complete — all 6 items closed.**
+- 2026-07-13 (follow-up): user asked for "full e2e verification tests with
+  daemon/ui/correctness when connecting disconnecting from devices with
+  clear feedback" — closed a real gap item 4 hadn't (UI e2e was JS-mocked,
+  never touched a real daemon). Built a real daemon<->GUI e2e bridge, a
+  mock-transport drop simulation, and (found + fixed along the way) the
+  native menubar's icon never reflected device connect/disconnect at all.
+  Also closed the device-loop thread-teardown audit filed as a follow-up
+  during item 1. User then said "commit, tag, push, cut a release" — synced
+  onto `main` (had moved ahead since item 5), resolved doc conflicts,
+  shipped as **v0.22.10**. **R61 follow-up complete.** This file is now
+  archived to `docs/archive/rounds/` — see `docs/ROADMAP.md` for ongoing
+  open threads (the one this follow-up left open: live-hardware
+  confirmation of the new menubar feedback, tracked there).
 
 ## Risks / open questions (carried from prior draft)
 

@@ -43,9 +43,10 @@ See `docs/PLANNING_ROUND*.md` for detailed scope per round.
 | **R57** | Daemon connect-robustness (dead CoreBluetooth wedge) + bulletproof tests | — | `scanner_mixin.py`, `daemon_connect.rs` |
 | **R58+R59** | `divoomd` rename + daemon hardening + **event-driven UI** (broadcast/subscribe: `status`/`owned_devices`/`notif_status`/`hot_progress`/`degraded`) | — | `socket_server.rs`, `daemon_connect.rs`, `connection_events.js` |
 | **R60** | Open-thread verification: docstring strip, durable `device_call` parity test (caught + closed 15 key-alias gaps), `show_clock()` realigned to APK `C2()` canonical, `get_*` read-back timeouts bounded+cached, Python daemon marked REFERENCE/FALLBACK, Ditoo soak, cloud-decode push (3/4 devices) | — | `tests/test_device_call_parity.py`, `display/__init__.py`, `divoom_daemon/*` |
-| **R61** | Release v0.22.9 + doc prune + **Cloud HTTP** (`UserNewGuest` RC=10 fix + clock-face store) + coverage gate (≥95%) | — | `divoom_auth.py`, `cloud.py`, `cloud_cmds.rs` |
+| **R61** | Release v0.22.9 + doc prune + **Cloud HTTP** (`UserNewGuest` RC=10 fix + clock-face store) + coverage gate (≥95%, hit 96%) + hardware-verified device detect/connect | — | `divoom_auth.py`, `cloud.py`, `cloud_cmds.rs` |
+| **R61 follow-up** | Release v0.22.10 — real daemon+UI e2e connect/disconnect verification (mock-transport drop simulation, `tests/e2e_gui_bridge.py`) + **native menubar now shows device connect/disconnect/degraded** (previously only reflected the notification monitor) + device-loop thread-teardown hardening | 3197/97/0 | `divoomd/src/daemon_mock.rs`, `native-port/divoom-menubar/src/state.rs`, `tests/test_e2e_gui_daemon_connect_disconnect.py` |
 
-Suite: Rust 63 passed / Python ~1750 passed / ~140 skipped (see `CHANGELOG.md` + CI).
+Suite: Rust 63+ passed / Python 3197 passed / 97 skipped (see `CHANGELOG.md` + CI).
 
 ---
 
@@ -75,7 +76,8 @@ gated on an explicit user sign-off + soak (not scheduled).
 | **`get_*` read-back timeouts** | — | **DONE (R60)** — bounded + cached in both Python (`ble_reads.read_with_retry` 2.5s + last-good cache) and Rust (every `get_*` uses `ctx.timeout`; daemon wraps call in `tokio::time::timeout` 30s clamped [1,120]). |
 | **R12 visual pass** | user-driven | Glass tab strip, appbar corners, etc. |
 | **R12 hardware verification** | user-driven | Album cover, custom-art/live/weather on real device. |
-| **Timoo-light-4 re-verify (R60 #2)** | device in range | Timoo was out of BLE range in R60 and R61; re-run cloud-decode `show_image` push + no-stick when reachable — tracked as `PLANNING_ROUND61.md` item 3. |
+| **Menubar connection-feedback: live-hardware confirmation** | daemon/menubar running | R61 follow-up (v0.22.10) fixed a real gap — the native menubar's icon never reflected device BLE/LAN connect/disconnect, only the notification monitor. Fixed + covered by 10 automated tests (6 unit, 3 integration against a fake daemon), but not yet eyeballed against a real running menubar — the live session that prompted the fix had ended by the time the opt-in `--run-hardware` pass was ready. Run `pytest tests/test_e2e_live_hardware_connect_disconnect.py --run-hardware` (read-only) next time the daemon's up, and glance at the actual tray icon through a real connect/disconnect. |
+| **Daemon-down banner / reconnect regression check** | daemon running | Deferred across R61 and its follow-up — needs a live daemon to kill mid-session, which would disrupt whatever's using it at the time. |
 | **Inline-style → CSS-token migration, batches 3-5** | — | Batches 1-2 shipped (utility layer + `templates_tools.js`/`templates_monthly_best.js`); `templates_routines.js` (21), `templates_widgets.js` (51), `templates_settings.js` (~39 today) never migrated. Low priority, purely visual polish, no test net — see `docs/archive/superseded/PLANNING_inline_styles.md` for the batch plan if picked up. |
 
 ### Divoom Cloud HTTP (200+ endpoints)
@@ -161,18 +163,21 @@ deleted. Independent of the parked v0.21.0 release (daemon BT grant).
 
 ## Planning docs by round
 
-Historical round plans (R3–R60) are archived under `docs/archive/rounds/`, and
+Historical round plans (R3–R61) are archived under `docs/archive/rounds/`, and
 fully-shipped/superseded workstream plans under `docs/archive/superseded/`
-(recover either from git history if needed). Active planning doc at repo root:
+(recover either from git history if needed). No active planning doc at repo
+root right now — the open items above are small/independent enough not to
+need one; start a new `PLANNING_ROUND62.md` when the next round's scope
+needs its own plan.
 
-- `PLANNING_ROUND61.md` — this round (release + doc prune + Cloud HTTP + coverage).
-
-Archived this round (R61 #0, all fully shipped or superseded — see each file's
-own status header for detail): `PLANNING_ROUND57.md`/`58`/`59`/`60`,
+Archived in R61 (#0, all fully shipped or superseded — see each file's own
+status header for detail): `PLANNING_ROUND57.md`/`58`/`59`/`60`,
 `PLANNING_BLE_HARDENING.md`, `PLANNING_SOCKET_HARDENING.md`,
 `PLANNING_daemon_ownership.md`, `PLANNING_NATIVE_PORT_HARDENING.md`,
 `PLANNING_NEXT_PHASE.md`, `PLANNING_inline_styles.md` (batches 3-5 tracked above
 instead), `ARCH_GAP_SCAN_2026-06.md`, `PARITY_TRACKER_NATIVE_UI.md`.
+Archived after R61 shipped (v0.22.9) and its e2e-verification follow-up
+shipped (v0.22.10): `PLANNING_ROUND61.md`.
 
 
 
