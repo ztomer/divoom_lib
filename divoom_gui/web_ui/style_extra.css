@@ -99,6 +99,15 @@
 .gap-10 { gap: 10px; }
 .gap-12 { gap: 12px; }
 .gap-14 { gap: 14px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-18 { margin-bottom: 18px; }
+.mt-6  { margin-top: 6px; }
+
+/* Batch 4 (templates_widgets.js): the recurring "flex child that must be
+   allowed to shrink below its content size" composition — min-width:0 pairs
+   with overflow:hidden on the widget card + card-body wrappers so narrow
+   grid columns don't force the card to overflow (Rams #5 unobtrusive). */
+.clip-shrink { min-width: 0; overflow: hidden; }
 
 /* Typography: the recurring label/caption shapes from the templates. */
 .label-sm {
@@ -115,6 +124,15 @@
 }
 .text-sm      { font-size: 13px; color: var(--text-main); }
 .text-mono-sm { font-family: var(--font-mono); font-size: 11px; }
+/* Settings table captions ("Discovered Bluetooth Screens" etc.) — the muted,
+   translucent-white caption above a braun-table (batch 5, templates_settings.js). */
+.label-caption {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-bottom: 8px;
+    display: block;
+}
+.text-12      { font-size: 12px; }
 
 /* Semantic status colours (tokens defined in style.css :root). */
 .text-warn  { color: var(--warn); }
@@ -137,6 +155,12 @@
 .grid-layout.three-cols {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     align-items: stretch;
+}
+
+/* Single-column narrow settings forms (Divoom/Connectivity/Appearance tabs).
+   The max-width varies with content so it stays inline (batch 5). */
+.grid-layout.single-col {
+    grid-template-columns: 1fr;
 }
 
 /* Align scanner and Wi-Fi card heights to stretch in Settings tab */

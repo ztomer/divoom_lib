@@ -8,7 +8,7 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                      (defined in tabs.css) — same active state as Channels and
                      Tools. The glass-card wrapper unifies appearance with
                      the Channels tab row, which sits inside a card header. -->
-                <div class="tabs-section" style="width:100%; box-sizing:border-box;">
+                <div class="tabs-section" style="width:100%;">
                 <div class="tabs-row" role="tablist" aria-label="Settings">
                     <button class="tab-btn active" data-settings-tab="settings-devices" data-tab="settings-devices" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Devices</button>
                     <button class="tab-btn" data-settings-tab="settings-divoom" data-tab="settings-divoom" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 12h6a3 3 0 0 0 .4-6A4 4 0 0 0 4 7a3 3 0 0 0 1 5z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>Divoom</button>
@@ -28,13 +28,13 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                 <h3>Bluetooth Scanner</h3>
                             </div>
                             <div class="card-body">
-                                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                                <div class="flex gap-10" style="margin-bottom:15px;">
                                     <div style="flex:1;">
-                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Timeout (s)</label>
+                                        <label class="form-label label-xs">Timeout (s)</label>
                                         <input type="number" id="scan-timeout" min="3" max="120" value="${window.SCAN_TIMEOUT_DEFAULT}" class="text-input">
                                     </div>
                                     <div style="flex:1;">
-                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Devices</label>
+                                        <label class="form-label label-xs">Devices</label>
                                         <input type="number" id="scan-limit" min="0" max="10" value="4" class="text-input">
                                     </div>
                                 </div>
@@ -44,7 +44,7 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                 </button>
 
                                 <div style="margin-top: 20px;">
-                                    <label style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:8px; display:block;">Discovered Bluetooth Screens</label>
+                                    <label class="label-caption">Discovered Bluetooth Screens</label>
                                     <table class="braun-table">
                                         <thead>
                                             <tr>
@@ -68,23 +68,23 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                                 <h3>Wi-Fi Screens</h3>
                             </div>
                             <div class="card-body">
-                                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                                <div class="flex gap-10" style="margin-bottom:15px;">
                                     <div style="flex:2;">
-                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">IP Address</label>
+                                        <label class="form-label label-xs">IP Address</label>
                                         <input type="text" id="lan-ip-input" class="text-input" placeholder="192.168.1.42">
                                     </div>
                                     <div style="flex:1;">
-                                        <label class="form-label" style="font-size:10px; margin-bottom:4px; display:block;">Token</label>
+                                        <label class="form-label label-xs">Token</label>
                                         <input type="number" id="lan-token-input" class="text-input" value="0" min="0">
                                     </div>
                                     <div style="display:flex; align-items:flex-end;">
-                                        <button id="add-lan-btn" class="glow-btn compact" style="margin-bottom:0; height:38px;">Add</button>
+                                        <button id="add-lan-btn" class="glow-btn compact" style="height:38px;">Add</button>
                                     </div>
                                 </div>
                                 <div class="lan-probe-result" id="lan-probe-result" style="margin-bottom:10px;"></div>
 
                                 <div style="margin-top: 10px;">
-                                    <label style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:8px; display:block;">Registered Wi-Fi Screens</label>
+                                    <label class="label-caption">Registered Wi-Fi Screens</label>
                                     <table class="braun-table">
                                         <thead>
                                             <tr>
@@ -115,7 +115,7 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
 
                 <!-- 2. DIVOOM TAB -->
                 <div class="settings-tab-content" id="settings-divoom">
-                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
+                    <div class="grid-layout single-col" style="max-width: 540px;">
                         <!-- Divoom Cloud -->
                         <div class="card glass-card">
                             <div class="card-header">
@@ -147,25 +147,25 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                      explainer legend was removed — the four corner transport dots
                      already communicate state, and the prose was redundant. -->
                 <div class="settings-tab-content" id="settings-connectivity">
-                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
+                    <div class="grid-layout single-col" style="max-width: 540px;">
                     <!-- R40 §9: daemon (menu bar) lifecycle. -->
                     <div class="card glass-card">
                         <div class="card-header flex-header">
                             <h3>Background agent</h3>
-                            <label class="switch" title="Keep the daemon + menu bar running after the dashboard quits" style="margin:0;"><input type="checkbox" id="keep-daemon-toggle"><span class="slider-round"></span></label>
+                            <label class="switch" title="Keep the daemon + menu bar running after the dashboard quits"><input type="checkbox" id="keep-daemon-toggle"><span class="slider-round"></span></label>
                         </div>
                         <div class="card-body">
-                            <p class="panel-hint" style="margin:0;">Keep the menu-bar agent (and the device daemon) running when you quit the dashboard. When off, quitting the dashboard also closes the menu bar, and choosing <em>Quit Divoom</em> from the menu bar also closes the dashboard.</p>
+                            <p class="panel-hint">Keep the menu-bar agent (and the device daemon) running when you quit the dashboard. When off, quitting the dashboard also closes the menu bar, and choosing <em>Quit Divoom</em> from the menu bar also closes the dashboard.</p>
                         </div>
                     </div>
                     <!-- Menu-bar cleanup on quit (only applies when Background agent is off). -->
                     <div class="card glass-card">
                         <div class="card-header flex-header">
                             <h3>Quit menu bar with dashboard</h3>
-                            <label class="switch" title="Also quit the menu-bar agent when you close the dashboard" style="margin:0;"><input type="checkbox" id="quit-menubar-toggle"><span class="slider-round"></span></label>
+                            <label class="switch" title="Also quit the menu-bar agent when you close the dashboard"><input type="checkbox" id="quit-menubar-toggle"><span class="slider-round"></span></label>
                         </div>
                         <div class="card-body">
-                            <p class="panel-hint" style="margin:0;">On (default): closing the dashboard also quits the menu-bar agent for a fully clean shutdown (no leftover tray icon). Off: the menu bar keeps running so you can relaunch the dashboard from it. Ignored when <em>Background agent</em> is on.</p>
+                            <p class="panel-hint">On (default): closing the dashboard also quits the menu-bar agent for a fully clean shutdown (no leftover tray icon). Off: the menu bar keeps running so you can relaunch the dashboard from it. Ignored when <em>Background agent</em> is on.</p>
                         </div>
                     </div>
                     <!-- R15 §5: MCP server (Model Context Protocol) — exposes
@@ -176,17 +176,17 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                         <div class="card-header flex-header">
                             <h3>MCP Server</h3>
                             <!-- R42 §9: toggle lives header-right, like Background agent. -->
-                            <label class="switch" title="Run the MCP server" style="margin:0;">
+                            <label class="switch" title="Run the MCP server">
                                 <input type="checkbox" id="mcp-toggle">
                                 <span class="slider-round"></span>
                             </label>
                         </div>
-                        <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
-                            <p class="panel-hint" style="margin:0;">Runs <code>divoom-control mcp-server</code> which routes all device calls through the daemon. Point any MCP-compatible client at this machine's <code>divoom-control</code> binary; see <code>docs/MCP_SERVER.md</code> for setup.</p>
-                            <div style="display:flex; gap:10px; align-items:center;">
-                                <span id="mcp-status-detail" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; margin-left:auto;">PID: --</span>
+                        <div class="card-body col gap-10">
+                            <p class="panel-hint">Runs <code>divoom-control mcp-server</code> which routes all device calls through the daemon. Point any MCP-compatible client at this machine's <code>divoom-control</code> binary; see <code>docs/MCP_SERVER.md</code> for setup.</p>
+                            <div class="row gap-10">
+                                <span id="mcp-status-detail" class="panel-hint text-mono-sm" style="margin-left:auto;">PID: --</span>
                             </div>
-                            <pre id="mcp-log" class="panel-hint" style="font-family: var(--font-mono); font-size: 11px; max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px; margin: 0; white-space: pre-wrap;">No log entries yet.</pre>
+                            <pre id="mcp-log" class="panel-hint text-mono-sm" style="max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px; white-space: pre-wrap;">No log entries yet.</pre>
                         </div>
                     </div>
                     </div>
@@ -194,7 +194,7 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
 
                 <!-- 4. APPEARANCE TAB -->
                 <div class="settings-tab-content" id="settings-appearance">
-                    <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 540px;">
+                    <div class="grid-layout single-col" style="max-width: 540px;">
                         <!-- Aesthetic Theme Mode -->
                         <div class="card glass-card">
                             <div class="card-header">
@@ -232,11 +232,11 @@ window.DivoomTemplates.settings = `                <!-- R15 §1+§7: tab chrome 
                             <div class="card-header">
                                 <h3>Backup &amp; Restore</h3>
                             </div>
-                            <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
-                                <p style="font-size:11px; color:rgba(255,255,255,0.45); margin:0;">
+                            <div class="card-body col gap-12">
+                                <p style="font-size:11px; color:rgba(255,255,255,0.45);">
                                     Export or import your entire configuration, presets, alarms, and settings.
                                 </p>
-                                <div style="display:flex; gap:10px; margin-top:4px;">
+                                <div class="flex gap-10" style="margin-top:4px;">
                                     <button id="export-settings-btn" class="glow-btn compact" title="Export settings to JSON file">
                                         Export to File...
                                     </button>

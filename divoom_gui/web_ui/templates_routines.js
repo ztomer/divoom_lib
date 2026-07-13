@@ -3,7 +3,7 @@
    Schedule > Schedule collision). Code identifiers (routines-*) unchanged. */
 window.DivoomTemplates = window.DivoomTemplates || {};
 window.DivoomTemplates.routines = `
-        <div class="tabs-section" style="width:100%; box-sizing:border-box;">
+        <div class="tabs-section">
         <div class="tabs-row" role="tablist" aria-label="Schedule">
             <button class="tab-btn active" data-routines-tab="routines-schedule" data-tab="routines-schedule" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8L8 11L12 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Auto-Sync</button>
             <button class="tab-btn" data-routines-tab="routines-time" data-tab="routines-time" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Time</button>
@@ -23,10 +23,10 @@ window.DivoomTemplates.routines = `
                     </label>
                 </div>
                 <div class="card-body">
-                    <div id="sync-targets-list" class="sync-targets-list" style="margin-bottom:18px;"></div>
+                    <div id="sync-targets-list" class="sync-targets-list mb-18"></div>
 
-                    <div style="margin-bottom:18px;">
-                        <label class="form-label" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;">Sync every</label>
+                    <div class="mb-18">
+                        <label class="form-label label-sm">Sync every</label>
                         <div class="tabs-row" role="tablist" id="routines-interval-tabs">
                             <button class="tab-btn active" data-interval="3600">1h</button>
                             <button class="tab-btn" data-interval="21600">6h</button>
@@ -50,18 +50,18 @@ window.DivoomTemplates.routines = `
                 <div class="card-header flex-header">
                     <h3>Anniversary / Memorial</h3>
                     <!-- R40 §4: Enabled is a header-right toggle. -->
-                    <label class="switch" title="Enable anniversary display" style="margin:0;"><input type="checkbox" id="memorial-enabled" checked><span class="slider-round"></span></label>
+                    <label class="switch" title="Enable anniversary display"><input type="checkbox" id="memorial-enabled" checked><span class="slider-round"></span></label>
                 </div>
-                <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div class="card-body col gap-12">
+                    <div class="row wrap gap-10">
                         <input type="text" id="memorial-title" class="text-input" maxlength="16" style="flex:1; min-width:120px;" placeholder="Title (e.g. Birthday)">
                     </div>
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                        <span class="form-label" style="font-size:12px;">Date</span>
+                    <div class="row wrap gap-8">
+                        <span class="form-label text-12">Date</span>
                         <input type="number" id="memorial-month" class="text-input" min="1" max="12" value="1" style="width:60px;" title="month">
                         <span>/</span>
                         <input type="number" id="memorial-day" class="text-input" min="1" max="31" value="1" style="width:60px;" title="day">
-                        <span class="form-label" style="font-size:12px; margin-left:8px;">at</span>
+                        <span class="form-label text-12" style="margin-left:8px;">at</span>
                         <input type="number" id="memorial-hour" class="text-input" min="0" max="23" value="9" style="width:60px;" title="hour">
                         <span>:</span>
                         <input type="number" id="memorial-min" class="text-input" min="0" max="59" value="0" style="width:60px;" title="minute">
