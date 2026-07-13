@@ -63,12 +63,22 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
       gui_main.py -> 99% with two narrow individually-justified `# pragma: no cover`
       lines (documented in the commit). TOTAL 76% -> **83%** (3043 -> 2051 missed).
       Full suite: 2499 passed, 0 failed, 91 skipped.
-- [ ] Wave 3 in flight (8 agents): animation_user.py, media_decoder.py,
-      api/connection.py + gui_api.py, daemon owner_live/owner_connect/owner_art.py,
-      mcp_control.py + mcp_server.py, connection.py + ble_transport.py (highest BLE-
-      hazard files, explicitly briefed on the test_spp_integration.py crash class),
-      spp_bridge.py + divoom_auth.py, native/image_encoder.py + daemon_client.py +
-      tools/hot_update.py.
+- [x] Wave 3 (commit `504e2c3`, partial — 6 of 8 agents hit the account's session/
+      usage limit mid-task, resets 5:10am America/Toronto; salvaged and verified all
+      work left on disk, fixed 2 broken tests from the cut-off connection+ble_transport
+      agent): animation_user.py, mcp_control.py, mcp_server.py, media_decoder.py,
+      owner_connect.py, spp_bridge.py, divoom_auth.py, image_encoder.py,
+      daemon_client.py, api/connection.py + gui_api.py, ble_transport.py (partial) all
+      landed. connection.py and owner_live.py/owner_art.py didn't land (agent cut off).
+      TOTAL 83% -> **90%** (2051 -> 1238 missed). Full suite: 2792 passed, 0 failed,
+      92 skipped.
+- [ ] Wave 4 in flight (7 agents, 18 files): owner_live.py + owner_art.py (picking up
+      wave 3's drop), connection.py (picking up wave 3's drop, same BLE-hazard
+      briefing), tools/hot_update.py + hotchannel_config.py, daemon core (live_jobs,
+      command_queue, daemon_protocol, daemon.py), display package (init, text,
+      animation, animation_8b), wall.py + media_source_feishin.py + lan_transport.py,
+      macos_notifications.py + lifecycle_mixin.py + control_server.py + api/widgets.py
+      + socket_server.py.
 - [ ] Further waves as needed on the next-biggest remaining gaps until >= 95%.
 - [ ] Add defensible `[tool.coverage.report] exclude_lines` / `[tool.coverage.run] omit`
       only for genuinely untestable surface (CLI entrypoints, `__main__` blocks,
