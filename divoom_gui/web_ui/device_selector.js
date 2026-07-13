@@ -109,7 +109,8 @@ window.renderDeviceDots = function() {
         // data-value: R34 §2 — connectDevice pulses this element while connecting.
         chip.dataset.value = e.value;
         chip.title = e.degraded ? `${e.name} — ${e.kind} (reconnecting)`
-                   : e.streaming ? `${e.name} — ${e.kind}` : e.name;
+                   : e.streaming ? `${e.name} — ${e.kind}`
+                   : e.known ? `${e.name} — not in range (click to retry)` : e.name;
         chip.setAttribute("role", "tab");
         chip.setAttribute("aria-selected", isActive ? "true" : "false");
 
@@ -127,7 +128,9 @@ window.renderDeviceDots = function() {
         chip.appendChild(dotEl);
         chip.appendChild(nameEl);
 
-        // Right-aligned state badge — only when non-idle (streaming or degraded).
+        // Right-aligned state badge — only when non-idle (streaming, degraded,
+        // or known-but-currently-undetected). Rams R4: a faded chip alone is too
+        // subtle to read as "not connectable right now" at a glance — say so.
         if (e.degraded) {
             const st = document.createElement("span");
             st.className = "device-chip-state";
@@ -137,6 +140,11 @@ window.renderDeviceDots = function() {
             const st = document.createElement("span");
             st.className = "device-chip-state";
             st.textContent = e.kind;
+            chip.appendChild(st);
+        } else if (e.known) {
+            const st = document.createElement("span");
+            st.className = "device-chip-state device-chip-state-known";
+            st.textContent = "not in range";
             chip.appendChild(st);
         }
 

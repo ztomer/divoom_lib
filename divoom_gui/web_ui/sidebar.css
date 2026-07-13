@@ -384,6 +384,11 @@
     opacity: 0.85;
     background: rgba(255, 255, 255, 0.04);
 }
+/* Explicit "not in range" text badge — opacity alone (chip-known above) reads
+   too subtly as "not connectable right now"; say it, don't just fade it. */
+.device-chip-state-known {
+    font-style: italic;
+}
 
 /* Virtual Wall — same chip vocabulary as devices but dashed border to mark it
    as a composite (not a single screen). "Joined panels" glyph (bounding rect +

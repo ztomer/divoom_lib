@@ -139,7 +139,10 @@ async def test_known_undetected_chip_is_distinct():
                     bbKnown: bb.classList.contains('chip-known'),
                     bbActive: bb.classList.contains('chip-active'),
                     bbStreaming: bb.classList.contains('chip-streaming'),
+                    bbBadge: bb.querySelector('.device-chip-state')?.textContent || '',
+                    bbTitle: bb.title,
                     aaKnown: aa.classList.contains('chip-known'),
+                    aaBadge: aa.querySelector('.device-chip-state')?.textContent || '',
                 };
             }""")
             assert res["count"] == 2
@@ -147,6 +150,13 @@ async def test_known_undetected_chip_is_distinct():
             assert res["bbActive"] is False
             assert res["bbStreaming"] is False
             assert res["aaKnown"] is False
+            # A faded chip alone is too subtle at a glance - it must SAY it's
+            # not currently reachable, not just look dimmer (the actual bug
+            # report: "4 devices listed, only 3 online" with no clear signal
+            # of which was which).
+            assert "not in range" in res["bbBadge"]
+            assert "not in range" in res["bbTitle"]
+            assert res["aaBadge"] == ""
         finally:
             await browser.close()
 
