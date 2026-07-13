@@ -10,7 +10,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
     let timeout = ctx.timeout;
 
     match method {
-        "device.get_device_name" | "get_device_name" => {
+        "system.get_device_name" | "device.get_device_name" | "get_device_name" => {
             if let Some(name) = dev.device_name() {
                 if !name.trim().is_empty() {
                     return json!({"success": true, "result": name});
@@ -35,7 +35,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 _ => json!({"success": true, "result": Value::Null}),
             }
         }
-        "device.set_device_name" | "set_device_name" => {
+        "system.set_device_name" | "device.set_device_name" | "set_device_name" => {
             let name = raw_args.first()
                 .and_then(|v| v.as_str())
                 .or_else(|| kw.and_then(|v| v.get("name")).and_then(|v| v.as_str()))
@@ -57,7 +57,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_device_name failed: {e}")),
             }
         }
-        "device.get_brightness" | "get_brightness" | "display.get_brightness" => {
+        "system.get_brightness" | "device.get_brightness" | "get_brightness" | "display.get_brightness" => {
             match dev.send_command_and_wait(0x46, &[], timeout).await {
                 Some(p) if p.len() >= 7 => json!({"success": true, "result": p[6] as i64}),
                 _ => json!({"success": true, "result": Value::Null}),
@@ -84,7 +84,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 _ => json!({"success": true, "result": Value::Null}),
             }
         }
-        "device.set_brightness" | "set_brightness" | "display.set_brightness" => {
+        "system.set_brightness" | "device.set_brightness" | "set_brightness" | "display.set_brightness" => {
             let val = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("brightness")).and_then(|v| v.as_i64()))
                 .unwrap_or(0).clamp(0, 100) as u8;
@@ -369,7 +369,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_radio_frequency failed: {e}")),
             }
         }
-        "device.set_low_power_switch" | "set_low_power_switch" | "device.set_low_power" | "set_low_power" => {
+        "system.set_low_power_switch" | "device.set_low_power_switch" | "set_low_power_switch" | "device.set_low_power" | "set_low_power" => {
             let on_off_val = raw_args.first()
                 .or_else(|| kw.and_then(|v| v.get("on_off")))
                 .or_else(|| kw.and_then(|v| v.get("enabled")));
@@ -383,13 +383,13 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_low_power_switch failed: {e}")),
             }
         }
-        "device.get_low_power_switch" | "get_low_power_switch" | "device.get_low_power" | "get_low_power" => {
+        "system.get_low_power_switch" | "device.get_low_power_switch" | "get_low_power_switch" | "device.get_low_power" | "get_low_power" => {
             match dev.send_command_and_wait(0xb3, &[], timeout).await {
                 Some(p) if p.len() >= 1 => json!({"success": true, "result": p[0] as i64}),
                 _ => json!({"success": true, "result": Value::Null}),
             }
         }
-        "device.set_auto_power_off" | "set_auto_power_off" | "sound.set_auto_power_off" => {
+        "system.set_auto_power_off" | "device.set_auto_power_off" | "set_auto_power_off" | "sound.set_auto_power_off" => {
             let minutes = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("minutes")).and_then(|v| v.as_i64()))
                 .unwrap_or(0) as u16;
@@ -399,7 +399,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_auto_power_off failed: {e}")),
             }
         }
-        "device.get_auto_power_off" | "get_auto_power_off" | "sound.get_auto_power_off" => {
+        "system.get_auto_power_off" | "device.get_auto_power_off" | "get_auto_power_off" | "sound.get_auto_power_off" => {
             match dev.send_command_and_wait(0xac, &[], timeout).await {
                 Some(p) if p.len() >= 2 => {
                     let minutes = u16::from_le_bytes([p[0], p[1]]) as i64;

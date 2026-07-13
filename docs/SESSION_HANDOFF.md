@@ -18,6 +18,14 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R60 open-thread verification (2026-07-12) — in progress.** Roadmap
+  `docs/PLANNING_ROUND60.md`: #1 (docstring strip) DONE; #4 (durable
+  device_call parity test) DONE at v0.22.4 — the test caught 15 key-alias gaps
+  (`system.*`/`sound.*`/`device.get_work_mode` prefixes) now closed with alias
+  arms in `device_call/mod.rs` + submodules. Interim tags: `v0.22.3`
+  (onDaemonEvent fix + doc accuracy), `v0.22.4` (parity + aliases). Next: #6
+  (Phase-5 archive docs), then hardware items #2/#3/#5/#7 with the 4 devices in
+  the loop. No release until the roadmap is complete.
 - **EVENT-DRIVEN UI (R59, 2026-07-12) — DONE + HARDWARE-VERIFIED; shipping as v0.22.2.**
   The dashboard learned daemon/device state by **polling on 4s heartbeats** (connection,
   owned-devices, daemon-health) + 5s notif-status + 600ms hot-progress — flaky/laggy. This
@@ -843,8 +851,7 @@ Claude) should read this on entry and **update it at the end of every round**
   The rewrite **caught a real bug**: `onDaemonEvent` ignored `state:"disconnected"` when
   `connected:true`, so a daemon reporting that honest state (the P6 regression case) was
   shown as connected. Fixed in `divoom_gui/web_ui/connection_events.js` — an explicit
-  `disconnected` state now flips the dot + `appConnected` to false. **This fix is NOT yet
-  released** (v0.22.2 shipped before it); cut a patch (0.22.3) when convenient.
+  `disconnected` state now flips the dot + `appConnected` to false. **Released in v0.22.3.**
 - **BLOCKER — cloud image-decode parity: RESOLVED (verified R60).** The native
   daemon's `media::resolve_to_gif` (`divoomd/src/media.rs`) already decodes magic
   9 (AES), 18/26 (AES + **LZO via `minilzo_rs`**), 0xAA (hot palette-delta) →
@@ -859,8 +866,11 @@ Claude) should read this on entry and **update it at the end of every round**
 - **device_call method-level parity audit: RESOLVED (verified R60).** ROADMAP +
   `PLANNING_NATIVE_PORT_HARDENING.md` Phase 4 Tier A/B confirm 54→0 gaps vs the
   Python Divoom API; dispatch in `divoomd/src/device_call/mod.rs:32` (+ per-module
-  `handle`). R60 #4 proposes a *durable* structural test (enumerate Python facade
-  methods ↔ Rust handlers) so a new method without a handler fails CI.
+  `handle`). **R60 #4 DONE (v0.22.4):** added `tests/test_device_call_parity.py`
+  (hardware-free static guard) which caught 15 key-alias gaps (`system.*` /
+  `sound.*` / `device.get_work_mode` prefixes the Rust side only handled under a
+  different group) — closed by adding alias arms in `mod.rs` + each submodule
+  `handle`. `divoomd` now accepts the exact Python facade keys.
 - **Phase 5 default-flip: RESOLVED (verified R60).** `daemon_client.py:200-208`
   already defaults to the Rust daemon when the binary is present (explicit
   `DIVOOM_USE_RUST_DAEMON=0/1` overrides). The `5.1` checkbox in

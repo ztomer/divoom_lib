@@ -102,10 +102,10 @@ pub async fn handle_device_call(
 
             match method {
                 // basic.rs commands:
-                "device.get_device_name" | "get_device_name" |
-                "device.set_device_name" | "set_device_name" |
-                "device.get_brightness" | "get_brightness" |
-                "device.set_brightness" | "set_brightness" |
+                "system.get_device_name" | "device.get_device_name" | "get_device_name" |
+                "system.set_device_name" | "device.set_device_name" | "set_device_name" |
+                "system.get_brightness" | "device.get_brightness" | "get_brightness" |
+                "system.set_brightness" | "device.set_brightness" | "set_brightness" |
                 "device.show_clock" | "show_clock" |
                 "device.show_image" | "show_image" |
                 "display.show_image" | "display.display_image" |
@@ -127,10 +127,10 @@ pub async fn handle_device_call(
                 "music.set_volume" | "set_volume" |
                 "music.get_volume" | "get_volume" |
                 "radio.set_radio_frequency" | "set_radio_frequency" | "radio.set_radio" | "set_radio" |
-                "device.set_low_power_switch" | "set_low_power_switch" | "device.set_low_power" | "set_low_power" |
-                "device.get_low_power_switch" | "get_low_power_switch" | "device.get_low_power" | "get_low_power" |
-                "device.set_auto_power_off" | "set_auto_power_off" | "sound.set_auto_power_off" |
-                "device.get_auto_power_off" | "get_auto_power_off" | "sound.get_auto_power_off" => {
+                "system.set_low_power_switch" | "device.set_low_power_switch" | "set_low_power_switch" | "device.set_low_power" | "set_low_power" |
+                "system.get_low_power_switch" | "device.get_low_power_switch" | "get_low_power_switch" | "device.get_low_power" | "get_low_power" |
+                "system.set_auto_power_off" | "device.set_auto_power_off" | "set_auto_power_off" | "sound.set_auto_power_off" |
+                "system.get_auto_power_off" | "device.get_auto_power_off" | "get_auto_power_off" | "sound.get_auto_power_off" => {
                     basic::handle(method, ctx).await
                 }
 
@@ -152,7 +152,7 @@ pub async fn handle_device_call(
                 "sleep.get_sleep_scene" | "get_sleep_scene" |
                 "sleep.set_sleep_scene_listen" | "set_sleep_scene_listen" |
                 "sleep.set_scene_volume" | "set_scene_volume" |
-                "sleep.set_sleep_color" | "set_sleep_color" |
+                "sound.set_sleep_color" | "sleep.set_sleep_color" | "set_sleep_color" |
                 "sleep.set_sleep_light" | "set_sleep_light" |
                 "sleep.set_sleep_scene" | "set_sleep_scene" => {
                     sleep::handle(method, ctx).await
@@ -214,8 +214,8 @@ pub async fn handle_device_call(
                 "system.set_date_time" | "set_date_time" | "sync_time" | "time.set_date_time" |
                 "time.set_hour_type" | "set_hour_type" | "system.set_hour_type" |
                 "bluetooth.set_bluetooth_password" | "set_bluetooth_password" | "system.set_bluetooth_password" |
-                "system.get_work_mode" | "get_work_mode" |
-                "system.set_work_mode" | "set_work_mode" |
+                "device.get_work_mode" | "system.get_work_mode" | "get_work_mode" |
+                "device.set_work_mode" | "system.set_work_mode" | "set_work_mode" |
                 "system.set_channel" | "set_channel" | "device.set_channel" |
                 "control.set_light_mode" |
                 "control.set_hot" | "set_hot" |
@@ -228,12 +228,12 @@ pub async fn handle_device_call(
                 "system.get_net_temp_disp" | "get_net_temp_disp" | "device.get_net_temp_disp" |
                 "system.send_current_temp" | "send_current_temp" | "device.send_current_temp" |
                 "system.set_temp_type" | "set_temp_type" | "device.set_temp_type" |
-                "system.set_song_display_control" | "set_song_display_control" | "device.set_song_display_control" |
-                "system.set_power_on_voice_volume" | "set_power_on_voice_volume" | "device.set_power_on_voice_volume" |
+                "sound.set_song_display_control" | "system.set_song_display_control" | "set_song_display_control" | "device.set_song_display_control" |
+                "sound.set_power_on_voice_volume" | "system.set_power_on_voice_volume" | "set_power_on_voice_volume" | "device.set_power_on_voice_volume" |
                 "system.set_power_on_channel" | "device.set_power_on_channel" |
                 "system.set_boot_gif" | "device.set_boot_gif" |
-                "system.set_sound_control" | "set_sound_control" | "device.set_sound_control" |
-                "system.get_sound_control" | "get_sound_control" | "device.get_sound_control" => {
+                "sound.set_sound_control" | "system.set_sound_control" | "set_sound_control" | "device.set_sound_control" |
+                "sound.get_sound_control" | "system.get_sound_control" | "get_sound_control" | "device.get_sound_control" => {
                     system::handle(method, ctx).await
                 }
 

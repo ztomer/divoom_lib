@@ -102,7 +102,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_scene_volume failed: {e}")),
             }
         }
-        "sleep.set_sleep_color" | "set_sleep_color" => {
+        "sound.set_sleep_color" | "sleep.set_sleep_color" | "set_sleep_color" => {
             let color_val = raw_args.first()
                 .or_else(|| kw.and_then(|v| v.get("color")));
             let [r, g, b] = if let Some(cv) = color_val {

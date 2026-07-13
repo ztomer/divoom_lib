@@ -4,6 +4,22 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.4 — durable device_call parity + key-alias closure (R60)
+
+- **test(parity):** added `tests/test_device_call_parity.py` — hardware-free,
+  static anti-drift guard. It enumerates the public callable methods of the
+  Python `Divoom` facade (class-level, no device) and asserts `divoomd`'s
+  `device_call/*` dispatch has a handler for every `<submodule>.<method>` key.
+  Proven to fail when a handler is dropped.
+- **fix(parity):** the test caught 15 key-alias gaps. The Python facade exposes
+  `system.get_brightness` / `system.set_*` / `device.get_work_mode` /
+  `sound.*` keys that `divoomd` previously only handled under a different group
+  prefix (`device.*` / `display.*` / `sleep.*`). Because `device_call` forwards
+  the verbatim key to `divoomd`, a client using the `system.*` prefix would
+  break under the Rust daemon. Added alias arms in `device_call/mod.rs` and each
+  submodule `handle` so `divoomd` accepts the exact Python facade keys.
+  `cargo build --bin divoomd` clean. (Interim checkpoint — not a release.)
+
 ## v0.22.3 — event-handler fix + doc accuracy (R60)
 
 - **fix(ui): `onDaemonEvent` now honors an explicit `disconnected` state.** A daemon

@@ -77,13 +77,13 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_bluetooth_password failed: {e}")),
             }
         }
-        "system.get_work_mode" | "get_work_mode" => {
+        "device.get_work_mode" | "system.get_work_mode" | "get_work_mode" => {
             match dev.send_command_and_wait(0x13, &[], timeout).await {
                 Some(p) if p.len() >= 1 => json!({"success": true, "result": p[0] as i64}),
                 _ => json!({"success": true, "result": Value::Null}),
             }
         }
-        "system.set_work_mode" | "set_work_mode" => {
+        "device.set_work_mode" | "system.set_work_mode" | "set_work_mode" => {
             let mode = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("mode")).and_then(|v| v.as_i64()))
                 .unwrap_or(0) as u8;
@@ -263,7 +263,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_temp_type failed: {e}")),
             }
         }
-        "system.set_song_display_control" | "set_song_display_control" | "device.set_song_display_control" => {
+        "sound.set_song_display_control" | "system.set_song_display_control" | "set_song_display_control" | "device.set_song_display_control" => {
             let control = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("control")).and_then(|v| v.as_i64()))
                 .unwrap_or(0) as u8;
@@ -272,7 +272,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_song_display_control failed: {e}")),
             }
         }
-        "system.set_power_on_voice_volume" | "set_power_on_voice_volume" | "device.set_power_on_voice_volume" => {
+        "sound.set_power_on_voice_volume" | "system.set_power_on_voice_volume" | "set_power_on_voice_volume" | "device.set_power_on_voice_volume" => {
             let control = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("control")).and_then(|v| v.as_i64()))
                 .unwrap_or(0) as u8;
@@ -325,7 +325,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_boot_gif failed: {e}")),
             }
         }
-        "system.set_sound_control" | "set_sound_control" | "device.set_sound_control" => {
+        "sound.set_sound_control" | "system.set_sound_control" | "set_sound_control" | "device.set_sound_control" => {
             let enable = args.first().copied()
                 .or_else(|| kw.and_then(|v| v.get("enable")).and_then(|v| v.as_i64()))
                 .unwrap_or(0) as u8;
@@ -334,7 +334,7 @@ pub async fn handle(method: &str, ctx: CallCtx<'_>) -> Value {
                 Err(e) => err_reply(&format!("set_sound_control failed: {e}")),
             }
         }
-        "system.get_sound_control" | "get_sound_control" | "device.get_sound_control" => {
+        "sound.get_sound_control" | "system.get_sound_control" | "get_sound_control" | "device.get_sound_control" => {
             match dev.send_command_and_wait(0xa8, &[], timeout).await {
                 Some(p) if p.len() >= 1 => json!({"success": true, "result": p[0] as i64}),
                 _ => json!({"success": true, "result": Value::Null}),

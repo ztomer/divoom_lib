@@ -21,10 +21,9 @@ The real remaining work, in priority order:
 ---
 
 ## 1. Strip stale "not ported" docstrings (trivial, hardware-free)
-**Status:** `sync_artwork.rs:7-13` PARITY NOTE and `art_codec.rs:138-141`
-(`resolve_to_image_bytes`) docstrings still say magic 9/18/26/0xAA are "NOT
-yet ported / fail honestly". They ARE ported (`media.rs`). The misleading
-comments are a trap for the next session (they read as an open blocker).
+**Status:** **DONE** (commit `2be8a52`). `sync_artwork.rs` / `art_codec.rs` /
+`monthly_best.rs` docstrings rewritten to state the decoders exist.
+`grep -n "not yet ported" divoomd/src` → 0 hits; `cargo test -p divoomd media` green.
 **Plan:** rewrite both docstrings to state the decoders exist and
 `resolve_to_gif` is the full path; `resolve_to_image_bytes` stays the
 *image-only* subset (GIF/PNG/JPG/magic-43) used by callers that need a single
@@ -63,13 +62,20 @@ screenshot on a 16×16 device shows humidity/weather/date in the APK-canonical
 positions.
 
 ## 4. Durable device_call parity test (anti-drift)
-**Status:** parity claimed 54→0 but nothing *enforces* it — a new Python
-`Divoom` method with no Rust handler would silently regress.
-**Plan:** add a structural test that enumerates the public methods of the
-Python `Divoom` facade (`divoom_lib/divoom.py` + submodules) and asserts each
-has a matching handler in the Rust `device_call/*` dispatch (`mod.rs:32` →
-per-module `handle`). Mirror the existing framing/encode parity tests'
-philosophy. Keep it in the default (non-hardware) suite so CI catches drift.
+**Status:** **DONE** (interim tag v0.22.4). Added `tests/test_device_call_parity.py`
+(hardware-free, static): enumerates the Python facade's public callable methods
+(class-level, no device) and asserts `divoomd/src/device_call/*.rs` has a
+handler for each. During implementation this test **caught 15 real key-alias
+gaps**: the Python facade exposes `system.get_brightness` / `system.set_*`
+/ `device.get_work_mode` / `sound.*` keys that `divoomd` only handled under a
+*different* group prefix (`device.*` / `display.*` / `sleep.*`). Since
+`device_call` forwards the verbatim key to `divoomd`, a client using the
+`system.*` prefix would break under Rust. Closed by adding alias arms in
+`mod.rs` + each submodule `handle` so `divoomd` accepts the exact Python facade
+keys. `cargo build --bin divoomd` clean; parity test green; regression-detection
+verified (dropping one key turns it red).
+**Plan:** structural test enumerates `Divoom` facade public methods and asserts a
+matching Rust handler (mirrors framing/encode parity tests).
 **Kill:** test fails if any Python method lacks a Rust handler; green today.
 
 ## 5. `get_*` read-back timeouts on real hardware (mitigated; bound it)
@@ -114,5 +120,7 @@ on at least one device each (or explicitly marked "wire-only" in docs).
 4. **#2 / #3 / #5 / #7** require hardware / APK cross-check → verify on the
    real devices (Ditoo when in range) before marking done.
 
-**Next concrete step:** implement #1 + #4 (both hardware-free, keep CI green),
-then move to #2 (hardware re-verify) with the 4 devices in the loop.
+**Checkpoints so far:** `v0.22.3` (onDaemonEvent fix + round-60 doc accuracy),
+`v0.22.4` (#1 docstrings + #4 parity test + alias-gap closure). Next up: #6
+(Phase-5 archive docs), then hardware items #2/#3/#5/#7 with the 4 devices in
+the loop.
