@@ -4,6 +4,18 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## R61: test-noise fix (2026-07-13)
+
+- **test(owner_live): silence a spurious "coroutine was never awaited"
+  RuntimeWarning.** Two `test_owner_live_coverage.py` tests point
+  `DeviceOwner._loop` at a closed event loop to verify `owner_live.py`'s
+  `live_job_stop`/`stop_all_live_jobs` swallow `asyncio.run_coroutine_threadsafe()`'s
+  `RuntimeError` cleanly; the coroutine object never got scheduled in that
+  path, so it warned on GC. Fixed by capturing the coroutine and calling
+  `coro.close()` only when scheduling itself failed synchronously — not on a
+  `.result()` timeout, where the coroutine is already a running Task. All 26
+  tests pass under `-W error::RuntimeWarning`; full suite 3171 passed.
+
 ## R61: hardware verification + UI clarity fix (2026-07-13)
 
 - **verify(hardware): Timoo-light-4 re-verify (R60 #2) — DONE.** With the real
