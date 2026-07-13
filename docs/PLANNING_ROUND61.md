@@ -57,12 +57,18 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
       cli_commands.py, monthly_best_daemon.py, presets_manager.py, media_sync.py,
       gallery_hot_api.py, gallery_sync.py — all 20-61% -> 98-100%. TOTAL 69% -> **76%**
       (3941 -> 3043 missed). Full suite: 2184 passed, 0 failed, 91 skipped.
-- [ ] Wave 2 in flight: scanner_mixin.py, utils/media_source.py, bt_spp_rfcomm.py +
-      bt_spp_transport.py, api/tools.py + api/lighting.py, media/music.py,
-      device_owner.py, gui_main.py + audio_visualizer.py (the last pair explicitly
-      instructed to draw an honest testable/untestable line with documented
-      `# pragma: no cover` only on the genuine mainloop/hardware-capture lines, not
-      as a blanket exclusion).
+- [x] Wave 2 (commit `11d5beb`): scanner_mixin.py, utils/media_source.py,
+      bt_spp_rfcomm.py, bt_spp_transport.py, api/tools.py, api/lighting.py,
+      media/music.py, device_owner.py, audio_visualizer.py all -> 99-100%;
+      gui_main.py -> 99% with two narrow individually-justified `# pragma: no cover`
+      lines (documented in the commit). TOTAL 76% -> **83%** (3043 -> 2051 missed).
+      Full suite: 2499 passed, 0 failed, 91 skipped.
+- [ ] Wave 3 in flight (8 agents): animation_user.py, media_decoder.py,
+      api/connection.py + gui_api.py, daemon owner_live/owner_connect/owner_art.py,
+      mcp_control.py + mcp_server.py, connection.py + ble_transport.py (highest BLE-
+      hazard files, explicitly briefed on the test_spp_integration.py crash class),
+      spp_bridge.py + divoom_auth.py, native/image_encoder.py + daemon_client.py +
+      tools/hot_update.py.
 - [ ] Further waves as needed on the next-biggest remaining gaps until >= 95%.
 - [ ] Add defensible `[tool.coverage.report] exclude_lines` / `[tool.coverage.run] omit`
       only for genuinely untestable surface (CLI entrypoints, `__main__` blocks,
