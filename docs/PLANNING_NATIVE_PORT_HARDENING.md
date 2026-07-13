@@ -206,7 +206,9 @@ non-blocking), with real-radio on those OSes explicitly accepted as untested.
 
 ## Phase 5 — Python backend deprecation & archival (gated on 1–4)
 
-**Goal:** make the Rust daemon the default and retire the Python daemon backend.
+**Goal:** make the Rust daemon (`divoomd`) the default; mark the Python daemon
+**reference-only (archive, NOT delete)** per user directive 2026-06-28. The Python
+backend stays in-tree as the parity oracle + fallback (`DIVOOM_USE_RUST_DAEMON=0`).
 
 **Readiness audit (2026-06-28).** A socket-command diff (Rust dispatch vs Python
 daemon) found the Rust daemon **NOT yet at full parity**. Closing this is the gate
@@ -234,8 +236,9 @@ Staged rollout (each step reversible until 5.3):
 - [ ] **5.4** Update `README`, `ROADMAP.md`, `AGENTS.md` to declare Rust
   authoritative, Python the historical reference.
 
-**Exit:** Rust is the default daemon (post-soak); Python backend archived (with
-sign-off); docs updated.
+**Exit:** Rust (`divoomd`) is the default daemon; Python daemon marked
+reference-only (kept in-tree, never deleted) and usable via
+`DIVOOM_USE_RUST_DAEMON=0`; docs declare Rust authoritative.
 
 **STATUS: in progress / gated.** Command parity 1/3 closed (`shutdown`); `probe_lan`
 + `sync_artwork` remain before the default-flip; archival (5.3) is held for an

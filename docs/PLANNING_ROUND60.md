@@ -88,14 +88,16 @@ so the UI never hangs on a slow/unresponsive device; align Python + Rust paths.
 hang observed on a deliberately slow device.
 
 ## 6. Phase 5 archive — mark Python daemon reference-only (never delete)
-**Status:** Phases 1–4 DONE; Rust is the default (verified #3). `PLANNING_NATIVE_PORT_HARDENING.md:226`
-`5.1` checkbox is stale (code already defaults Rust). Phase 5 = "Python backend
-deprecation & archival," gated on 1–4.
-**Plan:** (a) tick `5.1` in the hardening plan; (b) add a prominent header to
-the Python daemon modules: "REFERENCE/FALLBACK — Rust `divoomd` is the default;
-kept per user directive, do not delete"; (c) update launch/docs wording.
-**Kill:** no code behavior change; docs reflect reality; Python path still
-works when explicitly selected (`DIVOOM_USE_RUST_DAEMON=0`).
+**Status:** **DONE** (interim tag v0.22.5). `5.1` already ticked
+(`PLANNING_NATIVE_PORT_HARDENING.md:226`). Added REFERENCE/FALLBACK banners to
+`divoom_daemon/__init__.py`, `divoom_daemon/daemon.py`, `divoom_daemon/device_owner.py`
+stating Rust `divoomd` is the default and the Python daemon is kept (do not
+delete; `DIVOOM_USE_RUST_DAEMON=0`). Corrected the hardening-plan Phase-5 goal +
+Exit wording to "archive, not delete." No `README`/`ROADMAP`/`AGENTS` claimed
+Python was the default (verified). Remaining Phase-5 sub-task `5.4` (sweep
+`README`/`ROADMAP`/`AGENTS` to *declare* Rust authoritative) is a no-op here.
+**Kill:** no code behavior change; docs reflect reality; Python path still works
+when explicitly selected (`DIVOOM_USE_RUST_DAEMON=0`).
 
 ## 7. Ditoo re-verify + niche subsystems (hardware-dependent)
 **Status:** Ditoo was "re-verify when in range"; drawing-pad, SD-music,
@@ -121,6 +123,6 @@ on at least one device each (or explicitly marked "wire-only" in docs).
    real devices (Ditoo when in range) before marking done.
 
 **Checkpoints so far:** `v0.22.3` (onDaemonEvent fix + round-60 doc accuracy),
-`v0.22.4` (#1 docstrings + #4 parity test + alias-gap closure). Next up: #6
-(Phase-5 archive docs), then hardware items #2/#3/#5/#7 with the 4 devices in
+`v0.22.4` (#1 docstrings + #4 parity test + alias-gap closure), `v0.22.5` (#6
+Phase-5 archive docs). Next up: hardware items #2/#3/#5/#7 with the 4 devices in
 the loop.

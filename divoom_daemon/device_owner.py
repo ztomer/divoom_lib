@@ -1,4 +1,7 @@
-"""Device ownership for the Divoom daemon — single BLE/LAN device + wall lifecycle."""
+"""REFERENCE/FALLBACK — Rust `divoomd` is the default daemon. This Python module
+is the reference/fallback (kept per user directive 2026-06-28; do not delete).
+
+Device ownership for the Divoom daemon — single BLE/LAN device + wall lifecycle."""
 from __future__ import annotations
 
 import base64

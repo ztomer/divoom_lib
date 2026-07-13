@@ -4,6 +4,17 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.5 — Phase-5 archive: Python daemon marked reference-only (R60)
+
+- **docs(phase5):** marked the Python daemon `REFERENCE/FALLBACK` — Rust
+  `divoomd` is the default (per `DIVOOM_USE_RUST_DAEMON`); the Python daemon is
+  kept as the parity oracle + fallback (`DIVOOM_USE_RUST_DAEMON=0`), **never
+  deleted** (user directive 2026-06-28). Banners added to `divoom_daemon/__init__.py`,
+  `divoom_daemon/daemon.py`, `divoom_daemon/device_owner.py`. Corrected
+  `PLANNING_NATIVE_PORT_HARDENING.md` Phase-5 goal + Exit wording to "archive, not
+  delete." No `README`/`ROADMAP`/`AGENTS` claimed Python was the default. (Interim
+  checkpoint — not a release.)
+
 ## v0.22.4 — durable device_call parity + key-alias closure (R60)
 
 - **test(parity):** added `tests/test_device_call_parity.py` — hardware-free,

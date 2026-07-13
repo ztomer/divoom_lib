@@ -1,4 +1,8 @@
-"""Headless Divoom daemon (R16) — the single owner of the device connection and
+"""REFERENCE/FALLBACK — Rust `divoomd` is the default daemon. This Python daemon
+is the reference/fallback (kept per user directive 2026-06-28; do not delete;
+select with `DIVOOM_USE_RUST_DAEMON=0`). See `divoom_daemon/daemon_client.py`.
+
+Headless Divoom daemon (R16) — the single owner of the device connection and
 the macOS notification monitor + routing.
 
 It listens to the OS notification stream, routes notifications to the device, and

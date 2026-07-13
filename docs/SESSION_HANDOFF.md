@@ -22,10 +22,10 @@ Claude) should read this on entry and **update it at the end of every round**
   `docs/PLANNING_ROUND60.md`: #1 (docstring strip) DONE; #4 (durable
   device_call parity test) DONE at v0.22.4 — the test caught 15 key-alias gaps
   (`system.*`/`sound.*`/`device.get_work_mode` prefixes) now closed with alias
-  arms in `device_call/mod.rs` + submodules. Interim tags: `v0.22.3`
-  (onDaemonEvent fix + doc accuracy), `v0.22.4` (parity + aliases). Next: #6
-  (Phase-5 archive docs), then hardware items #2/#3/#5/#7 with the 4 devices in
-  the loop. No release until the roadmap is complete.
+  arms in `device_call/mod.rs` + submodules; #6 (Phase-5 archive docs) DONE at
+  v0.22.5 — Python daemon marked REFERENCE/FALLBACK, kept (`DIVOOM_USE_RUST_DAEMON=0`).
+  Interim tags: `v0.22.3`, `v0.22.4`, `v0.22.5`. Next: hardware items #2/#3/#5/#7
+  with the 4 devices in the loop. No release until the roadmap is complete.
 - **EVENT-DRIVEN UI (R59, 2026-07-12) — DONE + HARDWARE-VERIFIED; shipping as v0.22.2.**
   The dashboard learned daemon/device state by **polling on 4s heartbeats** (connection,
   owned-devices, daemon-health) + 5s notif-status + 600ms hot-progress — flaky/laggy. This
@@ -874,9 +874,11 @@ Claude) should read this on entry and **update it at the end of every round**
 - **Phase 5 default-flip: RESOLVED (verified R60).** `daemon_client.py:200-208`
   already defaults to the Rust daemon when the binary is present (explicit
   `DIVOOM_USE_RUST_DAEMON=0/1` overrides). The `5.1` checkbox in
-  `PLANNING_NATIVE_PORT_HARDENING.md` was stale; ticked in R60. Phase 5 *archival*
-  (mark Python daemon reference-only, never delete) remains — see below.
-  Python) in `daemon_client.py`, then soak GUI/menubar/MCP.
+   `PLANNING_NATIVE_PORT_HARDENING.md` was stale; ticked in R60. Phase 5 *archival*
+   (mark Python daemon reference-only, never delete) **DONE in v0.22.5** — REFERENCE/FALLBACK
+   banners added to `divoom_daemon/__init__.py`, `daemon.py`, `device_owner.py`; hardening-plan
+   Phase-5 wording corrected to "archive, not delete." Python still selectable via
+   `DIVOOM_USE_RUST_DAEMON=0`.
 - **Phase 5 archival = ARCHIVE, NOT DELETE (user directive 2026-06-28).** Keep the
   Python `divoom_daemon`/`divoom_lib` as the **reference implementation** (it's
   mostly complete and is the parity oracle). Do not delete it. "Archival" means
