@@ -40,8 +40,12 @@ See `docs/PLANNING_ROUND*.md` for detailed scope per round.
 | **R54** | Notifications, schemas, TCP/token auth & Rust auto-spawn | **1185/75/0** | `macos_notifications.rs`, `socket_server.rs`, `daemon_client.py` |
 | **R55** | Bluetooth Classic SPP subprocess bridge integration | **1185/75/0** | `spp_bridge.py`, `spp.rs`, `transport.rs`, `daemon_connect.rs` |
 | **R56** | Cloud Auth, Category Gallery API & Monthly Best Loop | **1703/87/0** | `cloud.rs`, `monthly_best.rs`, `daemon.rs`, `basic.rs` |
+| **R57** | Daemon connect-robustness (dead CoreBluetooth wedge) + bulletproof tests | — | `scanner_mixin.py`, `daemon_connect.rs` |
+| **R58+R59** | `divoomd` rename + daemon hardening + **event-driven UI** (broadcast/subscribe: `status`/`owned_devices`/`notif_status`/`hot_progress`/`degraded`) | — | `socket_server.rs`, `daemon_connect.rs`, `connection_events.js` |
+| **R60** | Open-thread verification: docstring strip, durable `device_call` parity test (caught + closed 15 key-alias gaps), `show_clock()` realigned to APK `C2()` canonical, `get_*` read-back timeouts bounded+cached, Python daemon marked REFERENCE/FALLBACK, Ditoo soak, cloud-decode push (3/4 devices) | — | `tests/test_device_call_parity.py`, `display/__init__.py`, `divoom_daemon/*` |
+| **R61** | Release v0.22.9 + doc prune + **Cloud HTTP** (`UserNewGuest` RC=10 fix + clock-face store) + coverage gate (≥95%) | — | `divoom_auth.py`, `cloud.py`, `cloud_cmds.rs` |
 
-Suite: Rust 58 passed / Python 1703 passed / 87 skipped.
+Suite: Rust 63 passed / Python ~1750 passed / ~140 skipped (see `CHANGELOG.md` + CI).
 
 ---
 
@@ -66,33 +70,30 @@ Native-port hardening is the active near-term track — see
 
 | Workstream | Depends on | Notes |
 |-----------|-----------|-------|
-| **`show_clock()` overlay reorder** | — | Align overlay positions with APK C2() layout (current has mismatched humidity/weather/date coords). |
-| **`get_*` read-back timeouts** | — | Real hardware read-back commands time out (mitigated: alarms `alarms.json` cache). |
+| **`show_clock()` overlay reorder** | — | **DONE (R60)** — realigned to APK `C2()` canonical `[0x00, t, style, 0x01, humidity, weather, date, R,G,B]`; wire-byte test added. |
+| **`get_*` read-back timeouts** | — | **DONE (R60)** — bounded + cached in both Python (`ble_reads.read_with_retry` 2.5s + last-good cache) and Rust (every `get_*` uses `ctx.timeout`; daemon wraps call in `tokio::time::timeout` 30s clamped [1,120]). |
 | **R12 visual pass** | user-driven | Glass tab strip, appbar corners, etc. |
 | **R12 hardware verification** | user-driven | Album cover, custom-art/live/weather on real device. |
+| **Timoo-light-4 re-verify (R60 #2)** | device in range | Timoo was out of BLE range in R60 and R61; re-run cloud-decode `show_image` push + no-stick when reachable. |
 
 ### Divoom Cloud HTTP (200+ endpoints)
 
-**Status: DEFERRED** (R9 §D, R12_D_AUDIT). Would be its own round.
+**Status: IN PROGRESS (R61).** Stand up a thin cloud HTTP client + fix `UserNewGuest`
+`RC=10` (auth flow changed — see `divoom_lib/divoom_auth.py` vs decompiled
+`LoginServer.java`). First slice: **clock-face store** (browse clock faces from the
+cloud) + 1–2 dependent endpoints, with Python + `divoomd` Rust parity and tests.
+Remaining 200+ endpoints are follow-on rounds.
 
-The official Divoom app communicates with `appin.divoom-gz.com` via HTTP/JSON for:
-- Clock-face store (browse, download, upload)
-- Weather city search
-- Pomodoro timer presets
-- White-noise tracks
-- TTS (text-to-speech)
-- Community gallery (browse, upload, like, comment)
-
-**Blockers:**
-1. **Cloud auth broken**: `UserNewGuest` returns `RC=10` (the public API may have changed or requires a different flow).
-2. **Scope**: 200+ endpoints. A useful round would pick a small set (clock-face store + 1-2 others), not all of them.
-3. **New transport**: requires a new `divoom_lib/cloud/` module — the library is currently BLE-only + device LAN.
+**Blockers (R9 §D, R12_D_AUDIT):**
+1. ~~Cloud auth broken (`RC=10`)~~ — being addressed in R61.
+2. Scope: 200+ endpoints — R61 picks clock-face store + 1–2 others.
+3. New transport: `divoom_lib/cloud.py` module (library was BLE-only + device LAN).
 
 ### Deferred (R12 §D)
 
-See `docs/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
+See `docs/archive/superseded/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
 - `pic_scan_ctrl` 0x35 claim — lib says it sends 0x35 but the decompiled APK has no such command ID.
-- Cloud HTTP surface (above).
+- Cloud HTTP surface (above, now active in R61).
 
 ---
 
@@ -158,33 +159,17 @@ deleted. Independent of the parked v0.21.0 release (daemon BT grant).
 
 ## Planning docs by round
 
-| Round | Doc | Status |
-|-------|-----|--------|
-| R3 | `docs/PLANNING_ROUND3.md` | archived |
-| R4 | `docs/PLANNING_ROUND4.md` | archived |
-| R5 | `docs/PLANNING_ROUND5.md` | archived |
-| R7–8 | `docs/PLANNING_ROUND7.md`, `docs/PLANNING_ROUND8.md` | archived |
-| R9 | `docs/PLANNING_ROUND9.md` | archived |
-| R10 | `docs/PLANNING_ROUND10.md` | archived |
-| R11 | `docs/PLANNING_ROUND11.md` | archived |
-| R12 | `docs/PLANNING_ROUND12.md` | archived |
-| R12_D | `docs/PLANNING_ROUND12_D_AUDIT.md` | current |
-| R13 | `docs/PLANNING_ROUND13.md` | archived |
-| R14 | `docs/PLANNING_ROUND14.md` | archived |
-| R15 | `docs/PLANNING_ROUND15.md` | archived |
-| R16–17 | `docs/PLANNING_ROUND16.md`, `docs/PLANNING_ROUND17.md` | archived |
-| R19–20 | `docs/PLANNING_ROUND19.md`, `docs/PLANNING_ROUND20.md` | archived |
-| R23–24 | `docs/PLANNING_ROUND23.md`, `docs/PLANNING_ROUND24.md` | archived |
-| R26 | `docs/PLANNING_ROUND26.md` | current |
-| R27 | *(missing — only CHANGELOG + SESSION_HANDOFF)* | backfill wanted |
-| R28 | `docs/PLANNING_ROUND28.md` | current |
-| R29 | `docs/PLANNING_ROUND29.md` | current |
-| R30 | `docs/PLANNING_ROUND30.md` | current |
-| R31 | `docs/PLANNING_ROUND31.md` | current |
-| R32 | `docs/PLANNING_ROUND32.md` | current |
-| R34 | `docs/PLANNING_ROUND34.md` | archived |
-| R46 | `docs/PLANNING_ROUND46.md` | archived |
-| R54 | `docs/PLANNING_ROUND54.md` | archived |
-| R55 | `docs/PLANNING_ROUND55.md` | archived |
-| R56 | `docs/PLANNING_ROUND56.md` | archived |
+Historical round plans (R3–R56) are archived under `docs/archive/rounds/` (recover
+from git history if needed). Active planning docs at repo root:
+
+- `PLANNING_ROUND57.md`, `PLANNING_ROUND58.md`, `PLANNING_ROUND59.md` — native-port
+  hardening + event-driven UI.
+- `PLANNING_ROUND60.md` — open-thread verification (DONE).
+- `PLANNING_ROUND61.md` — this round (release + doc prune + Cloud HTTP + coverage).
+- `PLANNING_NATIVE_PORT_HARDENING.md` — Phase 5 (Python daemon archive, not delete).
+- `PLANNING_inline_styles.md`, `PLANNING_daemon_ownership.md` — next-phase UI work
+  (from `PLANNING_NEXT_PHASE.md`).
+- `PLANNING_BLE_HARDENING.md`, `PLANNING_SOCKET_HARDENING.md` — hardening reference.
+
+
 
