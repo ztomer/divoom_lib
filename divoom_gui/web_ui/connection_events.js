@@ -158,8 +158,9 @@ window.Divoom.onDaemonEvent = function(ev) {
     const dot = document.getElementById("global-status-dot");
     const connected = ev.connected === true;
     const degraded = ev.state === "degraded";
+    const dropped = ev.state === "disconnected";
     if (dot) {
-        if (!connected) {
+        if (!connected || dropped) {
             dot.className = "transport-dot inactive";
             dot.title = "Disconnected";
         } else if (degraded) {
@@ -173,9 +174,11 @@ window.Divoom.onDaemonEvent = function(ev) {
         }
         dot.removeAttribute("style");
     }
-    // A degraded link stays "connected" (the daemon self-heals); only a genuine
-    // drop flips appConnected so the rest of the UI stops acting connected.
-    window.DivoomState.appConnected = connected;
+    // A degraded link stays "connected" (the daemon self-heals); a genuine drop
+    // or an explicit `disconnected` state flips appConnected so the rest of the
+    // UI stops acting connected — an honest state must NOT be masked by a stale
+    // connected flag (the P6 honest-state regression).
+    window.DivoomState.appConnected = connected && !dropped;
     const mac = ev.lan_ip ? ("LAN:" + ev.lan_ip) : (ev.mac || null);
     const bannerName = document.getElementById("banner-device-name");
     const bannerMac = document.getElementById("banner-device-mac");

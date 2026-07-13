@@ -835,14 +835,16 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ### Open threads
 
-- **ORPHANED untracked tests (out of scope for R58/R59, NOT committed).** Three files are
-  untracked and were excluded from the v0.22.2 commit: `tests/test_device_status.py`,
-  `tests/test_e2e_device_status_chips.py`, `tests/test_e2e_device_status_dot.py`. They're
-  a device-status reporting suite (connection dot + known-but-undetected chips, R50-era)
-  referencing `scanner_mixin.get_connection_state` / `get_known_devices`. They predate the
-  R59 event-driven rework (which moved that state onto daemon `status`/`owned_devices`
-  events), so they likely need updating before they'll pass. Decide: update to the event
-  model or drop. Left as-is to keep the v0.22.2 commit scoped.
+- **Device-status tests updated to the event model (RESOLVED, committed after v0.22.2).**
+  `tests/test_device_status.py` (backend honesty), `tests/test_e2e_device_status_chips.py`,
+  `tests/test_e2e_device_status_dot.py` now drive the R59 live handlers
+  (`window.Divoom.onDaemonEvent` / `onOwnedDevices`) instead of the dead `refreshConnectionState`
+  / `refreshOwnedDevices` polls (which have no callers anymore — the 4s heartbeats are gone).
+  The rewrite **caught a real bug**: `onDaemonEvent` ignored `state:"disconnected"` when
+  `connected:true`, so a daemon reporting that honest state (the P6 regression case) was
+  shown as connected. Fixed in `divoom_gui/web_ui/connection_events.js` — an explicit
+  `disconnected` state now flips the dot + `appConnected` to false. **This fix is NOT yet
+  released** (v0.22.2 shipped before it); cut a patch (0.22.3) when convenient.
 - **BLOCKER — cloud image-decode parity (the big one).** The native daemon only
   resolves GIF/PNG/JPG + magic-43; real Pixoo gallery content is dominated by
   **magic 9/18/26 (AES; 18/26 also LZO+tiled) and 0xAA (hot)** containers — 0 of 3
