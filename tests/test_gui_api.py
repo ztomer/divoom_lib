@@ -482,8 +482,11 @@ class TestDivoomGuiAPI(unittest.TestCase):
         fake = MagicMock()
         fake.disconnect_device.return_value = {"success": True}
         fake.connect_device.return_value = {"success": True, "connected": True}
-        self.api._daemon_client = fake
-        with patch.object(type(self.api), "_device_name_for", return_value=None), \
+        # R57's reconnect_daemon() resets self._daemon_client and re-runs
+        # ensure_daemon(); patch the seam (as the sibling reconnect tests do),
+        # not the instance attr that reconnect_daemon() overwrites.
+        with patch("divoom_gui.daemon_bridge.ensure_daemon", return_value=fake), \
+             patch.object(type(self.api), "_device_name_for", return_value=None), \
              patch.object(type(self.api), "_persist_last_connected", return_value=None):
             success = self.api.connect_single_device("00:11:22:33:44:55")
         self.assertTrue(success)

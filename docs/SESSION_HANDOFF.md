@@ -18,7 +18,8 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **R60 open-thread verification (2026-07-12) — in progress.** Roadmap
+- **R60 open-thread verification (2026-07-12) — DONE + checkpoint `v0.22.8` (user
+  drives the release).** Roadmap
   `docs/PLANNING_ROUND60.md`: #1 (docstring strip) DONE; #4 (durable
   device_call parity test) DONE at v0.22.4 — the test caught 15 key-alias gaps
   (`system.*`/`sound.*`/`device.get_work_mode` prefixes) now closed with alias
@@ -39,6 +40,21 @@ Claude) should read this on entry and **update it at the end of every round**
    parts).** Caveats: Timoo-light-4 not in BLE range; physical-screen visuals are
    user-POV. Interim tags `v0.22.3`…`v0.22.8`. No release yet — user drives the
    release after satisfaction.
+- **Follow-up (2026-07-13):** (1) Investigated the red `tests` CI workflow — one
+  deterministic failure: `tests/test_gui_api.py::TestDivoomGuiAPI::
+  test_connect_single_device` mocked `self._daemon_client` but `connect_single_device`
+  routes through `self._client()` → `reconnect_daemon()` (R57) which resets the
+  client and re-runs `ensure_daemon()`, hitting a real daemon (timeout). **FIXED**
+  by patching `divoom_gui.daemon_bridge.ensure_daemon` (the seam the sibling
+  `reconnect_daemon` tests use). Pre-existing (R47), not an R60 regression. (2)
+  Event-driven audit: the daemon (`divoomd`) is fully broadcast/subscribe
+  (`status`/`owned_devices`/`hot_progress`/`degraded`), no poll loops; the 4s
+  `refreshConnectionState` heartbeat is no longer scheduled (R59). Only legit
+  external-data polls remain (`widgets.js` weather/stock/sysmon/music) + one
+  dead-code `pollProgress` in `gallery_hot.js`. (3) Roadmap leftovers: R60's 7
+  items complete (remote-verifiable); loose ends = Timoo-light-4 re-verify #2,
+  user-POV physical visuals, and the two long-deferred arcs (Cloud HTTP round;
+  R12 visual/hardware). Committed (no new tag — pending user release).
 - **EVENT-DRIVEN UI (R59, 2026-07-12) — DONE + HARDWARE-VERIFIED; shipping as v0.22.2.**
   The dashboard learned daemon/device state by **polling on 4s heartbeats** (connection,
   owned-devices, daemon-health) + 5s notif-status + 600ms hot-progress — flaky/laggy. This
@@ -856,6 +872,23 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ### Open threads
 
+- **CI `tests` workflow red (RESOLVED 2026-07-13).** Was one deterministic
+  failure: `tests/test_gui_api.py::TestDivoomGuiAPI::test_connect_single_device`
+  mocked `self._daemon_client` but `connect_single_device` routes through
+  `self._client()` → R57 `reconnect_daemon()` which resets the client + re-runs
+  `ensure_daemon()` (real daemon → timeout). Fixed to patch
+  `divoom_gui.daemon_bridge.ensure_daemon`. `tests/test_gui_api.py`: 55 passed.
+  Pre-existing (R47 `_client()` seam), surfaced only because CI has no daemon.
+  Not an R60 regression.
+- **Event-driven audit — fully event-driven (RESOLVED 2026-07-13).** `divoomd`
+  broadcasts `status`/`owned_devices`/`hot_progress`/`degraded` via
+  `tokio::sync::broadcast`; GUI subscribes + forwards to `onDaemonEvent`/
+  `onOwnedDevices`/`onNotifStatus`/`onHotProgress`. The 4s `refreshConnectionState`
+  heartbeat is **no longer scheduled** (R59 removed the interval). Remaining
+  `setInterval`s are legitimate external-data polls in `widgets.js`
+  (weather/stock/sysmon/music — no device event source). **Minor cleanup (optional,
+  not blocking):** `gallery_hot.js::pollProgress` is dead code (defined, never
+  `setInterval`'d; live path is `onHotProgress`) — delete it.
 - **Device-status tests updated to the event model (RESOLVED, committed after v0.22.2).**
   `tests/test_device_status.py` (backend honesty), `tests/test_e2e_device_status_chips.py`,
   `tests/test_e2e_device_status_dot.py` now drive the R59 live handlers

@@ -4,6 +4,28 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Follow-up (2026-07-13) — fix CI `tests` failure + event-driven audit
+
+- **fix(tests): `test_connect_single_device` mocked the wrong seam.**
+  The test set `self.api._daemon_client = fake`, but `ScannerMixin.connect_single_device`
+  (`scanner_mixin.py:279`) calls `self._client()` → `gui_api.py:84`, and R57's
+  `reconnect_daemon()` (scanner_mixin.py:127/133) *resets* `self._daemon_client = None`
+  then re-runs `ensure_daemon()` — overwriting the mock, so the call hit a real
+  daemon (timeout → CI red since ~17:54 on 07-12). Fixed to patch
+  `divoom_gui.daemon_bridge.ensure_daemon` (the seam the sibling `reconnect_daemon`
+  tests already use). `tests/test_gui_api.py`: 55 passed. Pre-existing, not an R60
+  regression (the `_client()` line dates to R47).
+- **audit(event-driven): daemon is fully event-driven; no poll loops remain.**
+  `divoomd` broadcasts `status` / `owned_devices` / `hot_progress` / `degraded` via
+  `tokio::sync::broadcast` (daemon_connect.rs, sync_artwork.rs, daemon.rs:467/476);
+  GUI subscribes + forwards to `onDaemonEvent`/`onOwnedDevices`/`onNotifStatus`/
+  `onHotProgress` (R59). The old 4s `refreshConnectionState` heartbeat is **no
+  longer scheduled anywhere** (R59 removed the interval) — only `window.Divoom.
+  onDaemonEvent` drives the dot now. Remaining timers are legitimate external-data
+  polls in `widgets.js` (weather/stock/sysmon/music — no device event source) and
+  one **dead-code** `pollProgress` in `gallery_hot.js` (defined, never `setInterval`'d;
+  the live path is `onHotProgress`). (Not released — pending user release cut.)
+
 ## v0.22.8 — R60 #2/#3/#7: hardware-in-loop verification (Ditoo soak, cloud-decode, show_clock)
 
 - **fix(display): `show_clock()` realigned to APK `C2()` canonical frame**
