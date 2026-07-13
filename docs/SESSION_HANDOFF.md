@@ -44,8 +44,9 @@ Claude) should read this on entry and **update it at the end of every round**
   carries connected+mac; honest snapshot; owned_devices), `test_gui_event_forwarder.py`
   (fake-window unit test of every event type + shutdown-follow). `test_p6_degraded_dot.py`
   updated to assert the event-driven design (now reads `connection_events.js`). **Release
-  v0.22.2: version bumped (pyproject 0.22.2); CHANGELOG + this handoff updated; DMG/Homebrew
-  cut via `scripts/release.sh` (see NEXT).** Plan: `docs/PLANNING_ROUND59.md`.
+  v0.22.2: RELEASED — DMG built + adhoc-signed, tag `v0.22.2` pushed, GitHub release created,
+  Homebrew cask bumped (sha `f670305134a03a966461ec397b31d8fbb4b8d1172e9d79a0aac43af14455746a`).
+  Divergence guard green (v0.22.1 is ancestor of HEAD).** Plan: `docs/PLANNING_ROUND59.md`.
 
 - **RENAME: `native-port/divoomd` → `divoomd` (repo root) — DONE (2026-07-12).** Per
   user decree the Rust daemon is **no longer a "port"** — it now lives at the repo
@@ -834,6 +835,14 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ### Open threads
 
+- **ORPHANED untracked tests (out of scope for R58/R59, NOT committed).** Three files are
+  untracked and were excluded from the v0.22.2 commit: `tests/test_device_status.py`,
+  `tests/test_e2e_device_status_chips.py`, `tests/test_e2e_device_status_dot.py`. They're
+  a device-status reporting suite (connection dot + known-but-undetected chips, R50-era)
+  referencing `scanner_mixin.get_connection_state` / `get_known_devices`. They predate the
+  R59 event-driven rework (which moved that state onto daemon `status`/`owned_devices`
+  events), so they likely need updating before they'll pass. Decide: update to the event
+  model or drop. Left as-is to keep the v0.22.2 commit scoped.
 - **BLOCKER — cloud image-decode parity (the big one).** The native daemon only
   resolves GIF/PNG/JPG + magic-43; real Pixoo gallery content is dominated by
   **magic 9/18/26 (AES; 18/26 also LZO+tiled) and 0xAA (hot)** containers — 0 of 3
