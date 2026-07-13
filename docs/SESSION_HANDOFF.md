@@ -28,9 +28,13 @@ Claude) should read this on entry and **update it at the end of every round**
    (pos 4,5,6 = `weather,temp,calendar`) diverge from canonical
    `humidity,weather,date`, but the fix + the plan's visual kill-criterion need the
    user-driven hardware loop (BLE scans here abort the interpreter per `conftest`).
-   Interim tags: `v0.22.3`…`v0.22.6`. Remaining device-in-loop: #2 (cloud-decode
-   render), #3 (show_clock reorder + screenshot), #5 (get_* timeout bounds), #7
-   (Ditoo soak). No release until the roadmap is complete + hardware-verified.
+   #5 get_* read-back timeouts audited (v0.22.7): bounded + cached in both Python
+   (`ble_reads.read_with_retry` 2.5s + last-good cache) and Rust (every `get_*`
+   uses `ctx.timeout`; daemon wraps each call in `tokio::time::timeout` 30s
+   clamped [1,120]). Code guarantee met; on-device "no UI hang" observation
+   pending hardware loop. Interim tags: `v0.22.3`…`v0.22.7`. Remaining device-in-loop:
+   #2 (cloud-decode render), #3 (show_clock reorder + screenshot), #7 (Ditoo soak).
+   No release until the roadmap is complete + hardware-verified.
 - **EVENT-DRIVEN UI (R59, 2026-07-12) — DONE + HARDWARE-VERIFIED; shipping as v0.22.2.**
   The dashboard learned daemon/device state by **polling on 4s heartbeats** (connection,
   owned-devices, daemon-health) + 5s notif-status + 600ms hot-progress — flaky/laggy. This

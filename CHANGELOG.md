@@ -4,6 +4,17 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.7 — R60 #5: get_* read-back timeout audit (bounded + cached)
+
+- **audit(round60 #5):** confirmed `get_*` read-backs are bounded + cached in
+  both paths. Python `divoom_lib/ble_reads.py::read_with_retry` uses
+  `asyncio.wait_for(..., timeout=2.5)` per attempt with a last-good cache
+  fallback. Rust every `get_*` handler passes `ctx.timeout`, and `daemon.rs`
+  wraps the whole `device_call` in `tokio::time::timeout` default **30s, clamped
+  [1s, 120s]** — so a `get_*` can never hang the device lock. Code guarantee
+  met; the on-device "no UI hang" observation remains for the hardware loop.
+  (Interim checkpoint — not a release.)
+
 ## v0.22.6 — R60 #3: APK C2() canonical established for show_clock (R60)
 
 - **investigation(round60 #3):** established the true APK `C2()` canonical from

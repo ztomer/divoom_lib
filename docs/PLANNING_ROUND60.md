@@ -91,13 +91,18 @@ matching Rust handler (mirrors framing/encode parity tests).
 **Kill:** test fails if any Python method lacks a Rust handler; green today.
 
 ## 5. `get_*` read-back timeouts on real hardware (mitigated; bound it)
-**Status:** real-hardware read-back (`get_alarms`, weather, etc.) can time out;
-currently mitigated by caches (`alarms.json`). `device_call/alarm.rs:10-14`
-honors a per-call `timeout` already.
-**Plan:** audit every `get_*` read-back for a bounded timeout + cached fallback
-so the UI never hangs on a slow/unresponsive device; align Python + Rust paths.
-**Kill:** every `get_*` returns within a bounded time or a cached value; no UI
-hang observed on a deliberately slow device.
+**Status:** **CODE AUDIT DONE (v0.22.7) — bounded + cached in both paths.**
+- Python: `divoom_lib/ble_reads.py::read_with_retry` uses
+  `asyncio.wait_for(factory(), timeout=2.5)` per attempt + last-good `ReadCache`
+  fallback (`from_cache=True` / `ok=False` with reason).
+- Rust: every `get_*` handler passes `ctx.timeout` (`basic.rs`/`system.rs`/
+  `sleep.rs`/`design.rs`/`music.rs`/`animation.rs`/`alarm.rs`); AND the daemon
+  wraps the whole call in `tokio::time::timeout` default **30s, clamped
+  [1s, 120s]** (`daemon.rs:442-448`) — so a `get_*` can never hang the device
+  lock past 120s. The plan's `alarm.rs:10-14` per-call timeout is honored.
+**Remaining:** the plan's kill-criterion "no UI hang observed on a deliberately
+slow device" is a *device observation* — needs the user-driven hardware loop.
+Code-level guarantee is satisfied.
 
 ## 6. Phase 5 archive — mark Python daemon reference-only (never delete)
 **Status:** **DONE** (interim tag v0.22.5). `5.1` already ticked
@@ -136,8 +141,9 @@ on at least one device each (or explicitly marked "wire-only" in docs).
 
 **Checkpoints so far:** `v0.22.3` (onDaemonEvent fix + round-60 doc accuracy),
 `v0.22.4` (#1 docstrings + #4 parity test + alias-gap closure), `v0.22.5` (#6
-Phase-5 archive docs), `v0.22.6` (#3 APK C2() canonical established). Hardware-free
-#1/#4/#6 DONE. #3 canonical verified (divergence confirmed) — fix + visual
-kill-criterion need the user-driven hardware loop. Remaining device-in-loop:
-#2 (cloud-decode render), #3 (show_clock reorder + shot), #5 (get_* timeout
-bounds), #7 (Ditoo soak). No release until the roadmap is complete + hardware-verified.
+Phase-5 archive docs), `v0.22.6` (#3 APK C2() canonical established), `v0.22.7`
+(#5 get_* timeout audit — bounded+cached both paths). Hardware-free #1/#4/#5/#6
+DONE. #3 canonical verified (divergence confirmed) — fix + visual kill-criterion
+need the user-driven hardware loop. Remaining device-in-loop: #2 (cloud-decode
+render), #3 (show_clock reorder + shot), #7 (Ditoo soak). No release until the
+roadmap is complete + hardware-verified.
