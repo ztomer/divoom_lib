@@ -814,5 +814,611 @@ class TestDivoomGuiAPI(unittest.TestCase):
         self.assertEqual(self.api._run_async(_quick(), timeout=5), 42)
 
 
+class TestToolsApiCoverage(unittest.TestCase):
+    """R61 planning item 1 coverage push: ToolsApi (divoom_gui/api/tools.py)
+    error paths, validation branches, and getters the main suite above
+    doesn't exercise directly (alarm cache disk I/O, exception handlers,
+    read-only getters, out-of-range validation reached via the collaborator
+    directly rather than through the GuiApi wrapper's pre-validation)."""
+
+    def setUp(self):
+        self.presets_patcher = patch("pathlib.Path.exists", return_value=False)
+        self.presets_patcher.start()
+        import tempfile
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.home_patcher = patch("pathlib.Path.home", return_value=Path(self.temp_dir.name))
+        self.home_patcher.start()
+        self.api = DivoomGuiAPI()
+        self.api.window = MagicMock()
+
+    def tearDown(self):
+        self.presets_patcher.stop()
+        self.home_patcher.stop()
+        self.temp_dir.cleanup()
+
+    # ---- alarm cache (disk fallback for flaky device read-back) --------
+
+    def test_load_alarm_cache_missing_file_returns_empty(self):
+        self.assertEqual(self.api.tools._load_alarm_cache(), [])
+
+    def test_load_alarm_cache_reads_real_file(self):
+        self.presets_patcher.stop()
+        try:
+            cache_path = self.api.tools._alarm_cache_path()
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps([{"status": 1}]), encoding="utf-8")
+            self.assertEqual(self.api.tools._load_alarm_cache(), [{"status": 1}])
+        finally:
+            self.presets_patcher.start()
+
+    def test_load_alarm_cache_corrupt_json_returns_empty(self):
+        self.presets_patcher.stop()
+        try:
+            cache_path = self.api.tools._alarm_cache_path()
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text("{not json", encoding="utf-8")
+            self.assertEqual(self.api.tools._load_alarm_cache(), [])
+        finally:
+            self.presets_patcher.start()
+
+    def test_load_alarm_cache_non_list_json_falls_through(self):
+        self.presets_patcher.stop()
+        try:
+            cache_path = self.api.tools._alarm_cache_path()
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps({"not": "a list"}), encoding="utf-8")
+            self.assertEqual(self.api.tools._load_alarm_cache(), [])
+        finally:
+            self.presets_patcher.start()
+
+    def test_store_alarm_cache_write_failure_is_logged_not_raised(self):
+        with patch("pathlib.Path.write_text", side_effect=OSError("disk full")):
+            self.api.tools._store_alarm_cache(0, {"status": 1})  # must not raise
+
+    def test_store_and_load_alarm_cache_roundtrip(self):
+        self.presets_patcher.stop()
+        try:
+            self.api.tools._store_alarm_cache(2, {"status": 1, "hour": 7, "minute": 30, "week": 0})
+            alarms = self.api.tools._load_alarm_cache()
+            self.assertEqual(len(alarms), 3)
+            self.assertEqual(alarms[2]["hour"], 7)
+        finally:
+            self.presets_patcher.start()
+
+    # ---- get_alarms: device happy/empty/exception + no-device cache ----
+
+    def test_get_alarms_device_success(self):
+        dev = MagicMock()
+        dev.alarm.get_alarm_time = AsyncMock(return_value=[{"status": 1}])
+        self.api.current_divoom = dev
+        self.assertEqual(json.loads(self.api.tools.get_alarms()), [{"status": 1}])
+
+    def test_get_alarms_device_empty_falls_back_to_cache(self):
+        dev = MagicMock()
+        dev.alarm.get_alarm_time = AsyncMock(return_value=[])
+        self.api.current_divoom = dev
+        self.assertEqual(json.loads(self.api.tools.get_alarms()), [])
+
+    def test_get_alarms_device_exception_falls_back_to_cache(self):
+        dev = MagicMock()
+        dev.alarm.get_alarm_time = AsyncMock(side_effect=RuntimeError("BLE gone"))
+        self.api.current_divoom = dev
+        self.assertEqual(json.loads(self.api.tools.get_alarms()), [])
+
+    def test_get_alarms_no_device_uses_cache(self):
+        self.api.current_divoom = None
+        self.assertEqual(json.loads(self.api.tools.get_alarms()), [])
+
+    # ---- set_alarm: both arms of the ok→cache-write branch + exception --
+
+    def test_set_alarm_rejected_by_device_skips_cache_write(self):
+        dev = MagicMock()
+        dev.alarm.set_alarm = AsyncMock(return_value=False)
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.tools.set_alarm(0, True, 6, 0, 0))
+        self.assertEqual(self.api.tools._load_alarm_cache(), [])
+
+    def test_set_alarm_exception_returns_false(self):
+        dev = MagicMock()
+        dev.alarm.set_alarm = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.tools.set_alarm(0, True, 6, 0, 0))
+
+    # ---- sleep aid: no-device + exception for both start and stop ------
+
+    def test_start_sleep_no_device(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.tools.start_sleep())
+
+    def test_start_sleep_exception(self):
+        dev = MagicMock()
+        dev.sleep.show_sleep = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.tools.start_sleep())
+
+    def test_stop_sleep_no_device(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.tools.stop_sleep())
+
+    def test_stop_sleep_exception(self):
+        dev = MagicMock()
+        dev.sleep.show_sleep = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.tools.stop_sleep())
+
+    # ---- _tool_call exception path (no-target arm is covered by the
+    # existing test_r8_no_device / test_r9_no_device tests) ---------------
+
+    def test_tool_call_exception_returns_false(self):
+        dev = MagicMock()
+        dev.timer.set_timer = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.tools.set_timer("start"))
+
+    # ---- get_device_name ------------------------------------------------
+
+    def test_get_device_name_success(self):
+        dev = MagicMock()
+        dev.device.get_device_name = AsyncMock(return_value="Bedroom Pixoo")
+        self.api.current_divoom = dev
+        self.assertEqual(self.api.tools.get_device_name(), "Bedroom Pixoo")
+
+    def test_get_device_name_no_device(self):
+        self.api.current_divoom = None
+        self.assertIsNone(self.api.tools.get_device_name())
+
+    def test_get_device_name_exception(self):
+        dev = MagicMock()
+        dev.device.get_device_name = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertIsNone(self.api.tools.get_device_name())
+
+    # ---- set_low_power (on/off coercion through DeviceSettings) --------
+
+    def test_set_low_power_on_and_off(self):
+        dev = MagicMock()
+        self.api.current_divoom = dev
+        with patch("divoom_lib.system.device_settings.DeviceSettings") as DS:
+            DS.return_value.set_low_power_switch = AsyncMock(return_value=True)
+            self.assertTrue(self.api.tools.set_low_power(True))
+            DS.return_value.set_low_power_switch.assert_called_with(1)
+            self.assertTrue(self.api.tools.set_low_power("off"))
+            DS.return_value.set_low_power_switch.assert_called_with(0)
+
+    # ---- factory_reset: ToolsApi's OWN confirm-token guard (defense in
+    # depth vs. the GuiApi wrapper's identical pre-check) ------------------
+
+    def test_tools_api_factory_reset_rejects_bad_token_directly(self):
+        dev = MagicMock()
+        dev.design.factory_reset = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.tools.factory_reset("nope"))
+        dev.design.factory_reset.assert_not_called()
+
+    # ---- scoreboard set/get: success, no-device, exception --------------
+
+    def test_set_scoreboard_success(self):
+        dev = MagicMock()
+        dev.scoreboard.set_scoreboard = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertTrue(self.api.set_scoreboard(1, 10, 20))
+        dev.scoreboard.set_scoreboard.assert_called_with(1, 10, 20)
+
+    def test_set_scoreboard_no_device(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.set_scoreboard(1))
+
+    def test_set_scoreboard_exception(self):
+        dev = MagicMock()
+        dev.scoreboard.set_scoreboard = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.set_scoreboard(1))
+
+    def test_get_scoreboard_state_success(self):
+        dev = MagicMock()
+        dev.scoreboard.get_scoreboard = AsyncMock(
+            return_value={"on_off": 1, "red_score": 5, "blue_score": 3})
+        self.api.current_divoom = dev
+        self.assertEqual(self.api.get_scoreboard_state(),
+                         {"on_off": 1, "red_score": 5, "blue_score": 3})
+
+    def test_get_scoreboard_state_no_device(self):
+        self.api.current_divoom = None
+        self.assertIsNone(self.api.get_scoreboard_state())
+
+    def test_get_scoreboard_state_exception(self):
+        dev = MagicMock()
+        dev.scoreboard.get_scoreboard = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertIsNone(self.api.get_scoreboard_state())
+
+    # ---- volume / brightness / work-mode getters ------------------------
+
+    def test_get_volume_success(self):
+        dev = MagicMock()
+        dev.music.get_volume = AsyncMock(return_value=8)
+        self.api.current_divoom = dev
+        self.assertEqual(self.api.get_volume(), 8)
+
+    def test_get_volume_no_device(self):
+        self.api.current_divoom = None
+        self.assertIsNone(self.api.get_volume())
+
+    def test_get_volume_exception(self):
+        dev = MagicMock()
+        dev.music.get_volume = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertIsNone(self.api.get_volume())
+
+    def test_get_brightness_success(self):
+        dev = MagicMock()
+        dev.device.get_brightness = AsyncMock(return_value=75)
+        self.api.current_divoom = dev
+        self.assertEqual(self.api.get_brightness(), 75)
+
+    def test_get_brightness_no_device(self):
+        self.api.current_divoom = None
+        self.assertIsNone(self.api.get_brightness())
+
+    def test_get_brightness_exception(self):
+        dev = MagicMock()
+        dev.device.get_brightness = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertIsNone(self.api.get_brightness())
+
+    def test_get_work_mode_success(self):
+        dev = MagicMock()
+        dev.device.get_work_mode = AsyncMock(return_value=2)
+        self.api.current_divoom = dev
+        self.assertEqual(self.api.get_work_mode(), 2)
+
+    def test_get_work_mode_no_device(self):
+        self.api.current_divoom = None
+        self.assertIsNone(self.api.get_work_mode())
+
+    def test_get_work_mode_exception(self):
+        dev = MagicMock()
+        dev.device.get_work_mode = AsyncMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertIsNone(self.api.get_work_mode())
+
+    # ---- send_notification: ToolsApi's own range guard, reached directly
+
+    def test_tools_send_notification_out_of_range_direct(self):
+        self.assertFalse(self.api.tools.send_notification(99))
+
+
+class TestLightingApiCoverage(unittest.TestCase):
+    """R61 planning item 1 coverage push: LightingApi
+    (divoom_gui/api/lighting.py) exception handlers, the text-render
+    scaling branches, and the getter/dispatch methods (set_brightness,
+    set_volume, display_wall_image, set_temperature_channel, set_clock_rich,
+    display_custom_art) not exercised by the main suite above."""
+
+    def setUp(self):
+        self.presets_patcher = patch("pathlib.Path.exists", return_value=False)
+        self.presets_patcher.start()
+        import tempfile
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.home_patcher = patch("pathlib.Path.home", return_value=Path(self.temp_dir.name))
+        self.home_patcher.start()
+        self.api = DivoomGuiAPI()
+        self.api.window = MagicMock()
+
+    def tearDown(self):
+        self.presets_patcher.stop()
+        self.home_patcher.stop()
+        self.temp_dir.cleanup()
+
+    # ---- _stop_live_widgets: best-effort, swallows client errors --------
+
+    def test_stop_live_widgets_swallows_client_error(self):
+        class _BadClient:
+            def live_jobs_stop_for(self):
+                raise RuntimeError("boom")
+        self.api._daemon_client = _BadClient()
+        self.api.lighting._stop_live_widgets()  # must not raise
+
+    # ---- exception handlers for the single-device static-takeover ops ---
+
+    def test_set_solid_light_exception(self):
+        dev = MagicMock()
+        dev.display.show_light = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.set_solid_light("#ff0000", 50))
+
+    def test_set_clock_exception(self):
+        dev = MagicMock()
+        dev.display.show_clock = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.set_clock(1))
+
+    def test_switch_channel_exception(self):
+        dev = MagicMock()
+        dev.display.switch_channel = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.switch_channel("clock"))
+
+    def test_set_vj_effect_exception(self):
+        dev = MagicMock()
+        dev.display.show_effects = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.set_vj_effect(1))
+
+    def test_set_visualization_exception(self):
+        dev = MagicMock()
+        dev.display.show_visualization = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.set_visualization(1))
+
+    # ---- push_text: outer exception + inner unlink-OSError swallow -----
+
+    def test_push_text_dispatch_exception_returns_false(self):
+        dev = MagicMock()
+        dev.display.show_image = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.push_text("HI"))
+
+    def test_push_text_unlink_oserror_is_swallowed(self):
+        dev = MagicMock()
+        dev.display.show_image = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        with patch("os.unlink", side_effect=OSError("already gone")):
+            self.assertTrue(self.api.lighting.push_text("HI"))
+
+    # ---- _device_size: exception in the state-getter callable falls
+    # back to the 16px default --------------------------------------------
+
+    def test_device_size_falls_back_to_16_on_error(self):
+        self.api.__dict__["_active_device_size"] = MagicMock(side_effect=RuntimeError("boom"))
+        self.assertEqual(self.api.lighting._device_size(), 16)
+
+    # ---- _render_text_png scaling branches -------------------------------
+
+    def test_render_text_png_scales_down_wide_overflow(self):
+        from divoom_gui.api.lighting import LightingApi
+        path = LightingApi._render_text_png("HELLO WORLD THIS IS LONG", "#00FF00", 16, 1)
+        try:
+            from PIL import Image
+            img = Image.open(path).convert("RGB")
+            self.assertEqual(img.size, (16, 16))
+        finally:
+            import os
+            os.unlink(path)
+
+    def test_render_text_png_scales_down_tall_overflow(self):
+        # At a small device size the fixed 16px-tall glyph overflows
+        # vertically even when the text is short — exercises the
+        # height-driven rescale branch (th * scale > sz).
+        from divoom_gui.api.lighting import LightingApi
+        path = LightingApi._render_text_png("HI", "#00FF00", 8, 1)
+        try:
+            from PIL import Image
+            img = Image.open(path).convert("RGB")
+            self.assertEqual(img.size, (8, 8))
+        finally:
+            import os
+            os.unlink(path)
+
+    def test_render_text_png_save_failure_reraises_and_cleans_up(self):
+        from divoom_gui.api.lighting import LightingApi
+        import glob
+        import os
+        import tempfile as _tempfile
+        pattern = str(Path(_tempfile.gettempdir()) / "divoom_text_*")
+        before = set(glob.glob(pattern))
+        with patch("PIL.Image.Image.save", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                LightingApi._render_text_png("HI", "#FFFFFF", 16, 1)
+        # Real cleanup outside the patched scope (unlink was NOT patched
+        # here, so _render_text_png's own except-branch already removed
+        # the orphaned temp file; assert no leak remains).
+        after = set(glob.glob(pattern))
+        for leaked in after - before:
+            os.unlink(leaked)
+        self.assertEqual(after - before, set())
+
+    def test_render_text_png_save_and_cleanup_both_fail(self):
+        """Both the save AND the best-effort unlink fail: the nested
+        ``except OSError: pass`` must swallow the cleanup error and the
+        original save error still propagates."""
+        from divoom_gui.api.lighting import LightingApi
+        import glob
+        import os
+        import tempfile as _tempfile
+        pattern = str(Path(_tempfile.gettempdir()) / "divoom_text_*")
+        before = set(glob.glob(pattern))
+        with patch("PIL.Image.Image.save", side_effect=OSError("disk full")), \
+             patch("os.unlink", side_effect=OSError("also gone")):
+            with self.assertRaises(OSError):
+                LightingApi._render_text_png("HI", "#FFFFFF", 16, 1)
+        # os.unlink was mocked out during the call, so the mkstemp'd file
+        # really does leak on disk; clean it up for real now that the
+        # patch is out of scope (best-effort — not the behavior under test).
+        for leaked in set(glob.glob(pattern)) - before:
+            os.unlink(leaked)
+
+    # ---- set_brightness: lan vs. BLE dispatch, exception, no-target ----
+
+    def test_set_brightness_uses_lan_when_present(self):
+        dev = MagicMock()
+        dev.lan = MagicMock()
+        dev.lan.set_brightness = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertTrue(self.api.lighting.set_brightness(80))
+        dev.lan.set_brightness.assert_called_with(80)
+
+    def test_set_brightness_uses_ble_when_no_lan(self):
+        dev = MagicMock()
+        dev.lan = None
+        dev.device.set_brightness = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertTrue(self.api.lighting.set_brightness(50))
+        dev.device.set_brightness.assert_called_with(50)
+
+    def test_set_brightness_exception(self):
+        dev = MagicMock()
+        dev.lan = None
+        dev.device.set_brightness = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.set_brightness(50))
+
+    def test_set_brightness_no_target(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.lighting.set_brightness(50))
+
+    # ---- set_volume: clamping + exception + no-target -------------------
+
+    def test_set_volume_clamps_high_and_low(self):
+        dev = MagicMock()
+        dev.music.set_volume = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertTrue(self.api.lighting.set_volume(999))
+        dev.music.set_volume.assert_called_with(15)
+        self.assertTrue(self.api.lighting.set_volume(-5))
+        dev.music.set_volume.assert_called_with(0)
+
+    def test_set_volume_exception(self):
+        dev = MagicMock()
+        dev.music.set_volume = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.set_volume(5))
+
+    def test_set_volume_no_target(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.lighting.set_volume(5))
+
+    # ---- display_wall_image: single-device path, wall path + previews,
+    # non-dict previews reset, previews exception, outer exception --------
+
+    def _wall_fake_client(self, previews_result=True):
+        fake = MagicMock()
+        fake.wall_configure.return_value = {"success": True, "wall": True}
+
+        def _device_call(method, args=None, kwargs=None, target="device",
+                         blobs=None, token=None):
+            if method == "get_last_previews":
+                if isinstance(previews_result, Exception):
+                    raise previews_result
+                return {"success": True, "result": previews_result}
+            return {"success": True, "result": True}
+        fake.device_call.side_effect = _device_call
+        return fake
+
+    def test_display_wall_image_no_target_is_handled_error(self):
+        self.api.current_divoom = None
+        self.api.wall_slots = {}
+        result = self.api.lighting.display_wall_image("/tmp/x.png", 16)
+        self.assertFalse(result["success"])
+        self.assertIn("error", result)
+        self.assertEqual(result["previews"], {})
+
+    def test_display_wall_image_single_device_path(self):
+        dev = MagicMock()
+        dev.display.show_image = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.api.wall_slots = {}
+        result = self.api.lighting.display_wall_image("/tmp/x.png", 16)
+        self.assertTrue(result["success"])
+        self.assertEqual(result["previews"], {})
+        dev.display.show_image.assert_awaited_once_with("/tmp/x.png")
+
+    def test_display_wall_image_wall_path_with_previews(self):
+        fake = self._wall_fake_client(previews_result={"AA:BB": "data:image/png;base64,xx"})
+        self.api._daemon_client = fake
+        self.api.wall_slots = {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16}}
+        result = self.api.lighting.display_wall_image("/tmp/x.png", 16)
+        self.assertTrue(result["success"])
+        self.assertEqual(result["previews"], {"AA:BB": "data:image/png;base64,xx"})
+
+    def test_display_wall_image_wall_path_non_dict_previews_resets_to_empty(self):
+        fake = self._wall_fake_client(previews_result="not-a-dict")
+        self.api._daemon_client = fake
+        self.api.wall_slots = {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16}}
+        result = self.api.lighting.display_wall_image("/tmp/x.png", 16)
+        self.assertTrue(result["success"])
+        self.assertEqual(result["previews"], {})
+
+    def test_display_wall_image_previews_exception_logged_not_raised(self):
+        fake = self._wall_fake_client(previews_result=RuntimeError("preview fetch boom"))
+        self.api._daemon_client = fake
+        self.api.wall_slots = {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16}}
+        result = self.api.lighting.display_wall_image("/tmp/x.png", 16)
+        self.assertTrue(result["success"])
+        self.assertEqual(result["previews"], {})
+
+    def test_display_wall_image_outer_exception_returns_error_dict(self):
+        self.api.current_divoom = None
+        self.api.wall_slots = {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16}}
+        fake = MagicMock()
+        fake.wall_configure.side_effect = RuntimeError("daemon exploded")
+        self.api._daemon_client = fake
+        result = self.api.lighting.display_wall_image("/tmp/x.png", 16)
+        self.assertFalse(result["success"])
+        self.assertIn("error", result)
+        self.assertEqual(result["previews"], {})
+
+    # ---- set_temperature_channel: success, exception, no-target --------
+
+    def test_set_temperature_channel_success(self):
+        dev = MagicMock()
+        dev.display.set_temperature_channel = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertTrue(self.api.lighting.set_temperature_channel(celsius=False, color="#00ff00"))
+        dev.display.set_temperature_channel.assert_called_with(celsius=False, color="#00ff00")
+
+    def test_set_temperature_channel_exception(self):
+        dev = MagicMock()
+        dev.display.set_temperature_channel = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.set_temperature_channel())
+
+    def test_set_temperature_channel_no_target(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.lighting.set_temperature_channel())
+
+    # ---- set_clock_rich: success, exception, no-target ------------------
+
+    def test_set_clock_rich_success(self):
+        dev = MagicMock()
+        dev.display.set_clock_rich = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertTrue(self.api.lighting.set_clock_rich(
+            style=2, twentyfour=False, humidity=True, weather=True, date=True, color="#123456"))
+        kw = dev.display.set_clock_rich.call_args.kwargs
+        self.assertEqual(kw["style"], 2)
+        self.assertTrue(kw["humidity"])
+        self.assertTrue(kw["weather"])
+
+    def test_set_clock_rich_exception(self):
+        dev = MagicMock()
+        dev.display.set_clock_rich = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.set_clock_rich())
+
+    def test_set_clock_rich_no_target(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.lighting.set_clock_rich())
+
+    # ---- display_custom_art: success, exception, no-target --------------
+
+    def test_display_custom_art_success(self):
+        dev = MagicMock()
+        dev.display.show_image = AsyncMock(return_value=True)
+        self.api.current_divoom = dev
+        self.assertTrue(self.api.lighting.display_custom_art("/tmp/art.png"))
+        dev.display.show_image.assert_awaited_once_with("/tmp/art.png")
+
+    def test_display_custom_art_exception(self):
+        dev = MagicMock()
+        dev.display.show_image = MagicMock(side_effect=RuntimeError("boom"))
+        self.api.current_divoom = dev
+        self.assertFalse(self.api.lighting.display_custom_art("/tmp/art.png"))
+
+    def test_display_custom_art_no_target(self):
+        self.api.current_divoom = None
+        self.assertFalse(self.api.lighting.display_custom_art("/tmp/art.png"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,8 +14,9 @@ for _loc in ("en_US.UTF-8", "C.UTF-8"):
     try:
         _locale.setlocale(_locale.LC_ALL, _loc)
         break
-    except Exception:
-        pass
+    except Exception:  # pragma: no cover - runs at import, before any fixture;
+        pass            # exercised by a subprocess in test_gui_main_bootstrap.py
+                         # (coverage can't attribute a child process's lines here)
 
 import os
 import sys

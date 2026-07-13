@@ -126,8 +126,8 @@ class AudioVisualizerWorker:
                     continue
 
                 samples = np.frombuffer(data, dtype=np.int16).astype(np.float32)
-                if len(samples) == 0:
-                    continue
+                if len(samples) == 0:  # pragma: no cover - defensive: unreachable given
+                    continue          # non-empty `data` already passed `if not data` above
 
                 window = window_full if len(samples) == CHUNK else np.hanning(len(samples))
                 fft_data = np.fft.rfft(samples * window)
