@@ -16,6 +16,7 @@ hardware tests are skipped by default. Run them against a real device with::
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -74,6 +75,7 @@ HARDWARE_TEST_MODULES = frozenset({
     "test_channel_rotation",
     "test_channel_switching",
     "test_display_functions",
+    "test_e2e_live_hardware_connect_disconnect",
     "test_game_functions",
     "test_light_functions",
     "test_music_functions",
@@ -111,3 +113,31 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if item.module.__name__.split(".")[-1] in HARDWARE_TEST_MODULES:
             item.add_marker(skip_hw)
+
+
+# R61: harness gate for a suspected cross-test hazard (a reproducible-only-under
+# -full-suite flake in test_owner_art_coverage.py, where a mock.patch()'d module
+# attribute was occasionally seen unmocked). Leading hypothesis: some
+# owner_with_device-style fixture's DeviceOwner.stop() returns before its
+# "device-loop" background thread (divoom_daemon/owner_loop.py) has actually
+# exited, letting it survive into a later, unrelated test. DeviceOwner.stop()
+# now joins that thread (and bounds its executor shutdown) to close the gap —
+# this fixture is the trip-wire: if a thread named "device-loop" is EVER still
+# alive after a test, fail LOUDLY and name the offending test, instead of
+# leaving it to surface as an unrelated mock/decode failure hundreds of tests
+# later. Scoped to this one thread name (unique to OwnerLoopMixin) so it can't
+# false-positive on unrelated threads (notification monitor, socket server...).
+@pytest.fixture(autouse=True)
+def _no_leaked_device_loop_threads():
+    yield
+    leaked = [t for t in threading.enumerate() if t.name == "device-loop" and t.is_alive()]
+    if leaked:
+        for t in leaked:
+            t.join(timeout=2.0)  # brief grace window for its own teardown
+        leaked = [t for t in leaked if t.is_alive()]
+    assert not leaked, (
+        f"{len(leaked)} 'device-loop' thread(s) survived past test teardown. "
+        "A DeviceOwner was created (directly or via an owner_with_device-style "
+        "fixture) without owner.stop() running on a guaranteed teardown path, "
+        "or stop() returned before its loop thread fully exited."
+    )

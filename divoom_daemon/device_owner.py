@@ -4,6 +4,7 @@ is the reference/fallback (kept per user directive 2026-06-28; do not delete).
 Device ownership for the Divoom daemon — single BLE/LAN device + wall lifecycle."""
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 import os
@@ -269,10 +270,33 @@ class DeviceOwner(OwnerArtMixin, OwnerConnectMixin, OwnerLiveMixin, OwnerLoopMix
                 pass
         loop = self._loop
         if loop is not None:
+            # R61: block (bounded) for any asyncio.to_thread() work still
+            # running on this loop's own default executor. _cmd_queue.stop()
+            # above only guarantees the QUEUE WORKER task is cancelled — if it
+            # was force-cancelled mid-item (the 2s shield timeout in
+            # _cancel_worker), a to_thread() call the item started (e.g. a real
+            # media decode) keeps running on its executor thread regardless,
+            # because loop.close() itself shuts the executor down with
+            # wait=False (doesn't wait for already-running threads). Without
+            # this, that orphaned thread can outlive stop() — and this whole
+            # test — and finish its call on a LATER test's watch, racing
+            # whatever that test mock.patch()ed on the same module attribute.
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    loop.shutdown_default_executor(timeout=3.0), loop
+                ).result(timeout=4.0)
+            except Exception:
+                pass
             try:
                 loop.call_soon_threadsafe(loop.stop)
             except Exception:
                 pass
+        thread = self._loop_thread
+        if thread is not None:
+            # Join so the thread (and its loop.close(), which runs in the
+            # thread's finally block) has actually finished before stop()
+            # returns, instead of racing whatever the caller does next.
+            thread.join(timeout=3.0)
         # Teardown the process-global BLE state tied to THIS loop, so a later
         # restart can't be handed a stale per-loop connect lock (id(loop) reuse) or
         # a registry entry pointing at a transport on the dead loop.

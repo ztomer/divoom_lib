@@ -183,6 +183,7 @@ impl Daemon {
             "scan" => self.cmd_scan(&req).await,
             "connect" => self.cmd_connect(&req).await,
             "disconnect" => self.cmd_disconnect().await,
+            "mock_simulate_drop" => crate::daemon_mock::cmd_mock_simulate_drop(self, &req).await,
             "device_call" => self.cmd_device_call(&req).await,
 
             "live_job_start" => {

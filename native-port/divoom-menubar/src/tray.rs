@@ -6,12 +6,8 @@
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
 use tray_icon::{TrayIcon, TrayIconBuilder};
 
+use crate::state::{resolve_icon_state, IconState};
 use crate::{daemon, launch};
-
-// Status glyph colours (match the app theme / pyobjc status states).
-const GREEN: [u8; 3] = [0x00, 0xcc, 0x66]; // a device is active
-const ORANGE: [u8; 3] = [0xff, 0x5a, 0x1f]; // daemon up / idle
-const RED: [u8; 3] = [0xff, 0x44, 0x44]; // daemon offline
 
 pub enum TrayAction {
     Quit,
@@ -25,14 +21,15 @@ pub struct Tray {
     notif_stop_id: MenuId,
     quit_id: MenuId,
     last_sig: String,
-    last_color: [u8; 3],
+    last_icon_state: Option<IconState>,
+    last_tooltip: String,
 }
 
 impl Tray {
     pub fn build() -> Option<Tray> {
         let icon = TrayIconBuilder::new()
             .with_tooltip("Divoom Control")
-            .with_icon(make_icon(ORANGE))
+            .with_icon(make_icon(IconState::Offline.color()))
             .build()
             .ok()?;
         let mut tray = Tray {
@@ -43,7 +40,8 @@ impl Tray {
             notif_stop_id: MenuId::new("notif_stop"),
             quit_id: MenuId::new("quit"),
             last_sig: String::new(),
-            last_color: ORANGE,
+            last_icon_state: None, // forces the first poll_daemon() to set icon + tooltip
+            last_tooltip: String::new(),
         };
         tray.rebuild(&[], false);
         Some(tray)
@@ -82,19 +80,25 @@ impl Tray {
     /// avoid rebuilding the menu while the user has it open).
     pub fn poll_daemon(&mut self) {
         let status = daemon::status();
-        let color = match status {
-            daemon::Status::Offline => RED,
-            daemon::Status::Active => GREEN,
-            daemon::Status::Idle => ORANGE,
-        };
-        if color != self.last_color {
-            let _ = self.icon.set_icon(Some(make_icon(color)));
-            self.last_color = color;
+        let offline = matches!(status, daemon::Status::Offline);
+        let notif_running = !offline && daemon::notifications_running();
+        // R61 follow-up: the icon previously reflected ONLY the notification
+        // monitor (`status`, above) — never whether a device is BLE/LAN
+        // connected. connection_state() adds that as the primary signal;
+        // notif_running now only affects the tooltip (see resolve_icon_state).
+        let connection_state = if offline { None } else { daemon::connection_state() };
+        let (icon_state, tooltip) =
+            resolve_icon_state(!offline, connection_state.as_deref(), notif_running);
+        if self.last_icon_state != Some(icon_state) {
+            let _ = self.icon.set_icon(Some(make_icon(icon_state.color())));
+            self.last_icon_state = Some(icon_state);
+        }
+        if tooltip != self.last_tooltip {
+            let _ = self.icon.set_tooltip(Some(&tooltip));
+            self.last_tooltip = tooltip;
         }
 
-        let offline = matches!(status, daemon::Status::Offline);
         let devices = if offline { Vec::new() } else { daemon::device_activity() };
-        let notif_running = !offline && daemon::notifications_running();
 
         let sig = format!(
             "{}|{}|{}",

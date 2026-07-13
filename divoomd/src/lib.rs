@@ -29,6 +29,7 @@ pub mod response;
 pub mod socket_server;
 pub mod device_call;
 pub mod daemon_connect;
+pub mod daemon_mock;
 pub mod live_jobs;
 pub mod wall;
 pub mod art_codec;

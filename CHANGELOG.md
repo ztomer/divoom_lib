@@ -4,6 +4,116 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.10 — R61 follow-up: full daemon+UI e2e connect/disconnect verification
+
+Closed a real e2e coverage gap (user-directed): prior UI e2e tests drove the
+real web_ui against a fully JS-mocked `pywebview.api` (no daemon ever
+touched); daemon e2e tests had no UI and no socket isolation. Built a real
+daemon <-> real GUI bridge, a new mock-transport drop simulation, and — found
+along the way, then fixed — a genuine product gap where the native menubar's
+icon never reflected device connect/disconnect at all. Also closed the
+device-loop thread-teardown audit filed as a follow-up from the v0.22.9
+round. Full suite: 3197 passed, 0 failed, 97 skipped.
+
+## R61: full daemon+UI e2e connect/disconnect verification (2026-07-13)
+
+- **test(daemon): mock transport can now simulate an unexpected mid-session
+  drop.** New `mock_simulate_drop` command (`divoomd/src/daemon_mock.rs`,
+  split out of `daemon_connect.rs` — the addition pushed it past the
+  500-LOC gate) walks the mock transport through the same degraded-then-
+  disconnected broadcast sequence a real BLE/LAN drop takes. Previously the
+  mock transport only supported clean connect/disconnect; there was no
+  hardware-free way to test the "link died on its own" UI feedback path.
+- **test(gui): new real-daemon <-> real-GUI e2e harness closes a coverage
+  gap.** The existing Playwright suite drove the real `web_ui` against a
+  fully JS-mocked `pywebview.api` (no daemon ever touched); nothing verified
+  the actual `divoom_gui` backend (`ConnectionApi`/`ScannerMixin`) against a
+  real daemon. `tests/e2e_gui_bridge.py` runs the real `DivoomGuiAPI` in an
+  isolated subprocess (redirected `HOME`, isolated socket path — never
+  touches the user's real config or the default `/tmp/divoom.sock`) behind a
+  small local HTTP bridge; `tests/test_e2e_gui_daemon_connect_disconnect.py`
+  drives the real UI against it plus a real (PID-tracked, never `pkill`)
+  `divoomd`. Covers: mock-connect -> active dot, drop -> inactive dot via
+  both the polling path and a live `subscribe()` event-relay (real
+  degraded/disconnected broadcasts reaching the real `onDaemonEvent`
+  handler), and a genuine `connect_single_device` failure (unreachable LAN,
+  no mock) reaching the toast. A CORS bug in the bridge's first version
+  (file://-loaded pages need `Access-Control-Allow-Origin` + OPTIONS
+  preflight handling) silently failed every fetch and was caught by the
+  harness itself before it shipped.
+- **feat(menubar): the tray icon now reflects device connect/disconnect —
+  it never did before.** Investigation for the e2e work found the icon
+  color was driven entirely by the macOS notification-monitor's state
+  (`get_status`), never by BLE/LAN device connection — a real product gap,
+  not just a testing gap. Added `native-port/divoom-menubar/src/state.rs`
+  (pure `resolve_icon_state`: offline > idle > degraded > connected,
+  mirroring the GUI's `transport-dot` precedence; notification activity
+  demoted to a tooltip detail instead of driving icon color) and a
+  `daemon::subscribe()` background thread (plain blocking `UnixStream` loop
+  — the crate has no async runtime and this doesn't need one) that wakes
+  the poll loop early on a live daemon broadcast. 10 new tests (6 pure unit,
+  3 integration against a fake Unix-socket daemon, all passing).
+- **test: opt-in live-hardware connect/disconnect pass.**
+  `tests/test_e2e_live_hardware_connect_disconnect.py`, gated behind the
+  existing `--run-hardware` flag, deliberately read-only (verifies the real
+  daemon's status fields are internally consistent; never issues a
+  connect/disconnect against a live shared daemon — no way to tell "safe to
+  disturb" from "user mid-session" from outside the process).
+
+## R61: device-loop thread teardown hardening (2026-07-13)
+
+- **fix(daemon): `DeviceOwner.stop()` didn't wait for its background thread or
+  in-flight `asyncio.to_thread()` work.** Follow-up to `task_0bec8493` (audit
+  device-loop thread teardown across the daemon test suite). Confirmed via
+  Python's own `asyncio` source that `loop.close()` shuts its default executor
+  down with `wait=False` — already-running executor threads (spawned by
+  `asyncio.to_thread()`, e.g. a real media decode) are NOT waited for, and
+  `stop()` never joined `self._loop_thread` either (a fd-leak regression test,
+  `test_device_loop_close.py`, already did this join manually to make its own
+  assertions deterministic — production code never did). `stop()` now blocks
+  (bounded, ~4s) on `loop.shutdown_default_executor()` before requesting the
+  loop stop, then joins `self._loop_thread` (bounded, 3s) before returning —
+  closing the gap that let orphaned background work outlive a test/daemon
+  shutdown. Audited every `owner_with_device`-style fixture across the 5
+  daemon/owner test files that spins up a real device loop (`test_owner_art_
+  coverage.py`, `test_owner_live_coverage.py`, `test_device_owner_coverage.py`,
+  `test_owner_connect_coverage.py`, `test_device_owner_custom_art.py`) plus
+  every standalone `DeviceOwner()`/`_device_loop()` use elsewhere
+  (`test_connect_reason.py`) — all correctly call `owner.stop()` on a
+  guaranteed (try/finally) teardown path; the gap was inside `stop()` itself,
+  not in any fixture.
+- **test: add a harness trip-wire for the leak class.** `tests/conftest.py`
+  gained an autouse fixture that fails loudly if any thread named
+  `"device-loop"` is still alive after a test — so a future recurrence points
+  directly at the offending test instead of surfacing as an unrelated mock/
+  decode failure hundreds of tests later.
+- **Verification:** ran the full 3273-test suite twice — once with the fix
+  (3179 passed, 1 unrelated failure, 108 skipped, zero leak-detector trips,
+  the originally-flaky `test_owner_art_coverage.py` test passed) and once on
+  clean HEAD as an apples-to-apples baseline (3180 passed, 0 failed, 108
+  skipped). The 1 failure in the fixed run
+  (`test_daemon_connect_edge_e2e.py::test_mock_connect_marks_device_
+  connected`, "timed out") was isolated per the `regression-isolate`
+  discipline and is NOT a regression from this fix — that test tears down its
+  daemon with `pkill -9` (SIGKILL bypasses all Python shutdown code, so
+  `stop()` is never even reached on that path). Root-caused instead to a
+  separate, pre-existing bug: `pkill -9 -f divoomd` never matches the Python-
+  daemon fallback's command line (`python -m divoom_lib.cli daemon ...` has
+  no literal "divoomd" substring), so it silently fails to kill prior daemons
+  in that test file, leaving orphans that can race later tests in the same
+  file. Confirmed live: found and cleaned up one such orphan (PID reparented
+  to init) after the runs. That same unscoped `pkill -f divoomd` is also a
+  safety concern — it matches ANY process on the machine with "divoomd" in
+  its command line, not just ones the test spawned; filed a follow-up task
+  (`task_4b6f060a`) to scope it to the test's own spawned PID. Also filed a
+  minor cleanup task (`task_ff25dadc`) for two pre-existing, deterministic
+  (non-flaky) "coroutine was never awaited" RuntimeWarnings in
+  `test_owner_live_coverage.py`, confirmed unrelated to this investigation.
+- Neither full-suite run reproduced the original `test_owner_art_coverage.py`
+  flake itself (it's documented as intermittent, not guaranteed every run),
+  so this closes the audit and the provable gap it identified rather than
+  claiming a confirmed kill of that specific flake.
+
 ## v0.22.9 — R61: coverage 69% -> 96%, cloud API parity fix, device-chip UI clarity
 
 R61's full scope, in order: doc cleanup, a 95% test-coverage push (hit 96%),

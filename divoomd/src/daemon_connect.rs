@@ -47,7 +47,7 @@ pub(crate) fn status_payload(connected: bool, device_id: Option<&str>, state: Op
 /// pushes the set on connect/disconnect instead of the UI polling
 /// `get_device_activity` every 4s. `devices` mirrors `get_device_activity`'s
 /// per-mac shape (`address`/`name`/`kind`/`state`) so the UI can reuse its merge.
-fn owned_devices_payload(device_id: Option<&str>) -> Value {
+pub(crate) fn owned_devices_payload(device_id: Option<&str>) -> Value {
     let devices = match device_id {
         Some(id) => vec![json!({
             "address": id,
@@ -435,4 +435,7 @@ mod scan_guard_tests {
         let res = daemon.cmd_device_call(&req).await;
         assert_eq!(res["success"], json!(true));
     }
+
+    // mock_simulate_drop's own tests live in daemon_mock.rs, next to the
+    // handler they cover (R61 follow-up, split to stay under the 500-LOC gate).
 }

@@ -9,8 +9,12 @@
 
 mod daemon;
 mod launch;
+mod state;
 mod tray;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use tao::event::{Event, StartCause};
@@ -19,12 +23,22 @@ use tray_icon::menu::MenuEvent;
 
 use tray::{Tray, TrayAction};
 
-/// Menu clicks forwarded into the loop so it wakes on interaction.
+/// Menu clicks forwarded into the loop so it wakes on interaction; DaemonEvent
+/// wakes it EARLY (before the next POLL tick) on a live status/owned_devices
+/// broadcast, so a connect/disconnect/degraded transition shows up promptly
+/// instead of waiting up to POLL seconds. poll_daemon() still does the actual
+/// state fetch + icon update on the main thread either way — this is purely
+/// a wake-up signal, never touches the TrayIcon itself off-thread.
 enum UserEvent {
     Menu(MenuEvent),
+    DaemonEvent,
 }
 
 const POLL: Duration = Duration::from_secs(2);
+// A dead/unreachable daemon shouldn't spin subscribe() in a tight reconnect
+// loop; back off between attempts. Matches POLL's cadence roughly, so a
+// daemon coming back up is noticed about as fast either way.
+const SUBSCRIBE_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 fn main() {
     #[allow(unused_mut)]
@@ -41,6 +55,30 @@ fn main() {
     MenuEvent::set_event_handler(Some(move |e| {
         let _ = proxy.send_event(UserEvent::Menu(e));
     }));
+
+    // Background thread: subscribe to the daemon's live status/owned_devices
+    // broadcast and wake the loop on every event (R61 follow-up). Reconnects
+    // with a fixed backoff if the daemon is down/drops the stream — never
+    // touches the TrayIcon itself, only nudges the loop to poll sooner.
+    let quitting = Arc::new(AtomicBool::new(false));
+    {
+        let proxy = event_loop.create_proxy();
+        let quitting = quitting.clone();
+        thread::spawn(move || {
+            while !quitting.load(Ordering::Relaxed) {
+                daemon::subscribe(
+                    |_ev| {
+                        let _ = proxy.send_event(UserEvent::DaemonEvent);
+                    },
+                    || quitting.load(Ordering::Relaxed),
+                );
+                if quitting.load(Ordering::Relaxed) {
+                    break;
+                }
+                thread::sleep(SUBSCRIBE_RETRY_DELAY);
+            }
+        });
+    }
 
     let mut tray: Option<Tray> = None;
 
@@ -62,6 +100,14 @@ fn main() {
                 }
                 *control_flow = ControlFlow::WaitUntil(Instant::now() + POLL);
             }
+            // A live daemon broadcast arrived — refresh now instead of
+            // waiting for the next POLL tick.
+            Event::UserEvent(UserEvent::DaemonEvent) => {
+                if let Some(t) = tray.as_mut() {
+                    t.poll_daemon();
+                }
+                *control_flow = ControlFlow::WaitUntil(Instant::now() + POLL);
+            }
             Event::UserEvent(UserEvent::Menu(ev)) => {
                 let quit = tray
                     .as_mut()
@@ -70,6 +116,7 @@ fn main() {
                     .unwrap_or(false);
                 if quit {
                     tray.take(); // drop the status item before exiting
+                    quitting.store(true, Ordering::Relaxed); // let the subscribe thread exit
                     *control_flow = ControlFlow::Exit;
                 } else {
                     *control_flow = ControlFlow::WaitUntil(Instant::now() + POLL);

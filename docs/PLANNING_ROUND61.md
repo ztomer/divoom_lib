@@ -91,6 +91,27 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
       error string, and filed a follow-up task (`task_0bec8493`) to audit
       device-loop thread teardown across the daemon test suite (the underlying
       hazard needs the full suite to reproduce).
+- [x] **`task_0bec8493` follow-up DONE (2026-07-13).** Audited every fixture
+      that spins up a real `DeviceOwner._device_loop()` thread across the 5
+      daemon/owner test files — all correctly call `owner.stop()` on a
+      guaranteed try/finally teardown path; no missing-teardown fixture found.
+      The actual gap was inside `stop()` itself: confirmed via `asyncio`
+      source that `loop.close()` shuts its default executor down with
+      `wait=False` (doesn't wait for already-running `asyncio.to_thread()`
+      work), and `stop()` never joined `self._loop_thread` either. Fixed:
+      `stop()` now bounds a `loop.shutdown_default_executor()` call (~4s) and
+      joins the loop thread (3s) before returning. Added an autouse
+      `tests/conftest.py` fixture that fails loudly if a `"device-loop"`
+      thread survives past a test, so a recurrence points at the offending
+      test directly. Verified with two full 3273-test suite runs (fixed vs.
+      clean-HEAD baseline, per the `regression-isolate` discipline) — the
+      fixed run's one unrelated failure was root-caused to a separate,
+      pre-existing `pkill -9 -f divoomd` scoping bug in
+      `test_daemon_connect_edge_e2e.py` (not a regression from this fix; see
+      `CHANGELOG.md`). Two follow-ups filed: `task_4b6f060a` (scope that pkill
+      to its own spawned PID — it's also unscoped enough to kill a real
+      running `divoomd` on the machine) and `task_ff25dadc` (minor, unrelated
+      RuntimeWarning cleanup noticed along the way).
 - **Kill: MET.** `coverage report` TOTAL = 96% >= 95%. No `omit`/`exclude_lines`
   additions were needed beyond the two narrow `# pragma: no cover` lines from wave 2
   (gui_main.py's subprocess-only locale fallback, audio_visualizer.py's defensively
@@ -151,35 +172,70 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
 
 ## 4. Device detect + connect verification (UI + daemon)
 
-- [x] **Daemon — DONE, hardware-confirmed.** Drove `divoomd` directly over
-      `/tmp/divoom.sock`: `scan` found Ditoo-light-2 + Timoo-light-4 (Pixoo-1 in
-      an earlier scan of the same session); `connect` succeeded for
-      Timoo-light-4; `get_brightness` read-back confirmed the link both before
-      and after a real device push; `disconnect` succeeded. Daemon-side detect +
-      connect is confirmed working end-to-end on real hardware.
-- [ ] **UI — not directly confirmed.** The user denied `request_access` for the
-      Divoom app this session (their own live app, reasonably — driving it via
-      computer-use is invasive), so no screenshot/click confirmation of the
-      packaged UI's scan/connect flow was taken. What IS confirmed: the same
-      round added/ran 10 Playwright E2E tests
-      (`tests/test_e2e_device_status_chips.py`) driving the REAL `web_ui` JS
-      (not a reimplementation) against a mocked daemon API, covering active/
-      streaming/degraded/known-undetected chip states — all pass. That's real
-      coverage of the UI's rendering LOGIC, but not a substitute for watching
-      the actual app scan+connect on screen.
-- [x] Also shipped this session while the app was live: the user reported the
-      device list gave no clear signal of which of 4 known devices were
-      currently online (3 were, 1 wasn't) — fixed in commit `2d0a845` (explicit
-      "not in range" badge + tooltip on known-but-undetected chips).
-- [ ] Daemon-down banner / reconnect regression check — not done (would need to
-      kill the live daemon mid-session, disruptive to the user's actual running
-      app; deferring rather than risking their session).
-- **Kill: daemon half MET with real hardware evidence; UI half partially MET**
-  (logic covered by E2E tests, not by direct visual confirmation — the user can
-  judge the actual on-screen result themselves since the app is running; the
-  underlying code paths are also extensively covered by the R61 test suite —
-  96% coverage, incl. `scanner_mixin.py`/`connection.py`/`ble_transport.py` at
-  100% — but that is not itself a substitute for real-hardware confirmation).
+- [x] **Daemon — DONE, hardware-confirmed (prior session).** Drove `divoomd`
+      directly over `/tmp/divoom.sock`: `scan` found Ditoo-light-2 +
+      Timoo-light-4 (Pixoo-1 in an earlier scan of the same session);
+      `connect` succeeded for Timoo-light-4; `get_brightness` read-back
+      confirmed the link both before and after a real device push;
+      `disconnect` succeeded. Daemon-side detect + connect is confirmed
+      working end-to-end on real hardware.
+- [x] **UI — now also covered by real automated e2e, not just visual
+      confirmation (follow-up session, 2026-07-13, user-directed "full e2e
+      verification tests with daemon/ui/correctness when connecting
+      disconnecting from devices with clear feedback").** The prior
+      session's Playwright suite drove the real `web_ui` against a fully
+      JS-mocked `pywebview.api` — real UI rendering logic, but no daemon
+      ever touched. This session closed that gap: a mock-transport-backed
+      daemon (real `divoomd`, isolated socket, PID-tracked — never
+      `pkill`) driving the REAL `web_ui` through a new HTTP bridge to the
+      real `DivoomGuiAPI` (`tests/e2e_gui_bridge.py`, `tests/
+      test_e2e_gui_daemon_connect_disconnect.py`). Covers connect ->
+      active dot, an unexpected drop (new `mock_simulate_drop` command,
+      `divoomd/src/daemon_mock.rs`) -> degraded then inactive dot via both
+      polling and a live `subscribe()` event relay, and a genuine
+      `connect_single_device` failure (unreachable LAN, no mock transport
+      involved) reaching the toast. 4/4 tests, stable across 20+ runs. This
+      is real, repeatable, CI-safe daemon+UI correctness coverage — a
+      durable complement to the prior session's one-time manual hardware
+      pass above, not a replacement for it.
+- [x] **New this follow-up session: a real (not test-only) product gap
+      found and fixed.** The native menubar's icon never reflected device
+      BLE/LAN connection at all — only the macOS notification-monitor's
+      state. Now it does (`native-port/divoom-menubar/src/state.rs` +
+      `daemon::subscribe()`), 10 new tests (6 pure unit, 3 integration
+      against a fake Unix-socket daemon).
+- [x] Also shipped in the prior session while the app was live: the user
+      reported the device list gave no clear signal of which of 4 known
+      devices were currently online (3 were, 1 wasn't) — fixed in commit
+      `2d0a845` (explicit "not in range" badge + tooltip on
+      known-but-undetected chips).
+- [ ] **Live-hardware re-confirmation of THIS follow-up's new code is still
+      open.** The daemon/menubar/GUI this session found running (`the
+      menubar item is live`, per the user) had stopped running by the time
+      the opt-in pass was ready to exercise it (not caused by this
+      session's work — everything above used an isolated socket, never
+      `/tmp/divoom.sock`). The infrastructure is ready: `tests/
+      test_e2e_live_hardware_connect_disconnect.py`, gated behind
+      `--run-hardware`, confirmed to skip correctly with no daemon
+      present. It's deliberately READ-ONLY (verifies `device_status`/
+      `connection_state` field consistency against whatever the real
+      state is) — it does NOT drive a real connect/disconnect cycle
+      against a live shared daemon, since there's no way to tell "idle,
+      safe to disturb" from "user mid-session" from outside the process.
+      Next time the daemon/menubar is running, `pytest tests/
+      test_e2e_live_hardware_connect_disconnect.py --run-hardware` gives
+      the read-only confirmation; the NEW menubar connection-feedback
+      feature specifically hasn't been eyeballed on a real running menubar
+      yet — that's the one open thread from this follow-up.
+- [ ] Daemon-down banner / reconnect regression check — still not done (would
+      need a live daemon to kill mid-session; deferred both sessions running).
+- **Kill: MET, plus durable follow-up coverage added.** Daemon half:
+  hardware-confirmed (prior session). UI half: hardware-confirmed
+  (prior session, visual) AND now backed by real automated daemon+UI e2e
+  tests (this session) instead of only JS-mocked logic tests. New in this
+  follow-up: the menubar connection-feedback gap found and fixed, with its
+  own test coverage — its real-hardware confirmation is the one item still
+  open, tracked above, not faked or assumed.
 
 ## 5. Release — DONE, shipped as v0.22.9
 
