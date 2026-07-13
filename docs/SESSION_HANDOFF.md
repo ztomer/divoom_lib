@@ -78,14 +78,38 @@ Claude) should read this on entry and **update it at the end of every round**
   in `ROADMAP.md`; no other undocumented loose end found; the R12 visual/hardware
   arc was already correctly marked user-driven before this round.
 
-  **Item 5 (cut a release) — paused pending user input, not attempted
-  autonomously.** Publishing a tag/GitHub release/Homebrew cask bump is a public,
-  hard-to-reverse action; this project's own history (R57-R60) shows the pattern
-  of the user driving the final release cut personally even when the underlying
-  work is done. Combined with items 3-4 being blocked (no hardware confirmation
-  this round for the show_clock fix or device connectivity), the responsible next
-  step is to ask the user how they want to proceed, not push a release
-  unattended.
+  **UPDATE (same session, later): the user started the real app** (`divoom_gui.
+  gui_main` + release `divoomd` + `divoom-menubar`), unblocking items 3-4.
+  **Item 3 (Timoo re-verify) DONE, hardware-confirmed:** scan found Timoo-
+  light-4; connected; `sync_artwork` fetched + decoded a real cached cloud file
+  and 0x8B-streamed it via `display.show_image` (`success:true`); post-push
+  `get_brightness` read back 60 (unchanged) — no device-stick. One transient
+  disconnect between connect and push (reconnected clean on retry — Timoo's
+  known marginal BLE range, not a new bug). **Item 4 (device detect/connect)
+  DONE on the daemon side** (same socket-driven scan/connect/read-back/
+  disconnect sequence); **UI side NOT directly confirmed** — the user denied
+  `request_access` for their own live Divoom app (reasonable), so no
+  screenshot/click walkthrough of the packaged UI was taken; the UI's
+  rendering logic IS covered by 10 Playwright E2E tests exercising the real
+  `web_ui` JS, but that's not a substitute for watching it on screen.
+  Remaining loose end (R60 show_clock visual pass) stays user-driven, as does
+  the daemon-down-banner regression check (skipped rather than kill the
+  user's live daemon mid-session).
+
+  **Also shipped while the app was live:** the user reported the sidebar's
+  device list gave no clear signal of which of 4 known devices were actually
+  online (3 were, 1 wasn't) — fixed in commit `2d0a845`: known-but-undetected
+  chips now carry an explicit "not in range" badge + tooltip instead of just a
+  55%-opacity fade (which was too subtle to read at a glance). Extended the
+  existing Playwright E2E test to cover it.
+
+  **Item 5 (cut a release) — still paused pending user input, not attempted
+  autonomously.** Publishing a tag/GitHub release/Homebrew cask bump is a
+  public, hard-to-reverse action; this project's own history (R57-R60) shows
+  the pattern of the user driving the final release cut personally even when
+  the underlying work is done. With items 0-4 now all done or honestly closed
+  out, this is the one remaining decision point — ask the user whether to cut
+  the release now.
 
 - **R60 open-thread verification (2026-07-12) — DONE + checkpoint `v0.22.8` (user
   drives the release).** Roadmap

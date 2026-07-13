@@ -4,6 +4,20 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## R61: hardware verification + UI clarity fix (2026-07-13)
+
+- **verify(hardware): Timoo-light-4 re-verify (R60 #2) — DONE.** With the real
+  app running, drove the live daemon over the socket: scan found it, connected,
+  `sync_artwork` fetched + decoded a real cloud file and streamed it via
+  `display.show_image` (`success:true`), and a post-push `get_brightness`
+  read-back matched the pre-push value (60) - confirming no device-stick. Also
+  confirmed daemon-side scan/connect/read-back/disconnect end-to-end.
+- **fix(ui): known-but-undetected device chips now say "not in range".** User
+  report: 4 known devices, only 3 online, no clear signal of which was which.
+  The existing `chip-known` fade (55% opacity, from R50) was too subtle -
+  added an explicit state badge + tooltip matching the existing streaming/
+  degraded chip pattern. Extended the Playwright E2E test to cover it.
+
 ## R61: cloud API parity fix (2026-07-13)
 
 - **fix(cloud): `search_weather_city` was missing the expired-token retry.**

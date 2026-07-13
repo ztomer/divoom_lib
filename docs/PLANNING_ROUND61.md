@@ -124,44 +124,59 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
 
 ## 3. Loose ends
 
-- [ ] **BLOCKED — no daemon/hardware reachable in this session.** Timoo-light-4
-      re-verify (R60 #2): scan, connect, `display.show_image` with a cloud-decoded
-      payload, post-push `get_brightness` read-back confirming no device-stick.
-      Checked: no `divoomd` running, no `/tmp/divoom.sock`, and — per the standing
-      [[divoom-ble-tcc-harness-limit]] — this shell cannot itself spawn a BLE-scanning
-      process (macOS TCC SIGABRTs it). This needs the user to start the daemon (GUI
-      or standalone) so a session can drive it over the socket. Stating that plainly
-      rather than fabricating a result.
-- [ ] **BLOCKED — same reason.** User-POV pass on physical-screen visuals for the R60
-      show_clock canonical fix (real device, real screen, light+dark check per
-      [[user-pov-debug]]) — needs eyes on a real screen, inherently user-driven.
+- [x] **Timoo-light-4 re-verify (R60 #2) — DONE, hardware-confirmed.** The user
+      started the real app (`divoom_gui.gui_main` + release `divoomd` +
+      `divoom-menubar`); this session drove the live daemon over
+      `/tmp/divoom.sock`. Scan found Timoo-light-4 in range; `connect` succeeded;
+      `sync_artwork` fetched a real cached cloud file
+      (`group1/M00/F9/67/eEwpPWFX5GyEa-PuAAAAAA4Yr8k8433156`), decoded it, and
+      0x8B-streamed it via `display.show_image` — `{"success":true}`.
+      Post-push `get_brightness` read back **60** (unchanged from the pre-push
+      read), confirming no device-stick. One transient BLE disconnect occurred
+      between an earlier connect and the push attempt (reconnected cleanly on
+      retry — consistent with Timoo's previously-noted marginal BLE range, not a
+      new bug). Disconnected cleanly after.
+- [ ] **Still blocked — needs eyes on a real screen.** User-POV pass on
+      physical-screen visuals for the R60 show_clock canonical fix (light+dark
+      check per [[user-pov-debug]]) — inherently user-driven, can't be done from
+      this session even with daemon access.
 - [x] Re-scanned `docs/ROADMAP.md` for other open threads: the Timoo re-verify is
-      already tracked there (line 78, points back to this file). R12 visual pass +
+      now closed (was line 78, tracked back to this file). R12 visual pass +
       R12 hardware verification (lines 76-77) are explicitly marked "user-driven" —
       unchanged, correctly deferred, not a new gap from this round. No other
       undocumented open thread found.
-- **Kill: partially met, honestly.** Every loose end from R60 is accounted for —
-  two are blocked on hardware/user availability (stated above, not silently
-  dropped), the rest (R12 arc) were already correctly deferred as user-driven
-  before this round and remain so.
+- **Kill: MET except the one inherently user-driven visual check.** Timoo
+  re-verify closed with real hardware evidence above; R12 arc remains correctly
+  deferred as user-driven (unchanged from before this round).
 
 ## 4. Device detect + connect verification (UI + daemon)
 
-- [ ] **BLOCKED — same hardware/harness limit as item 3.** Daemon: drive `divoomd`
-      directly over the Unix socket — `scan` finds all reachable devices, `connect`
-      succeeds per device, read-back (`get_device_name`/`get_brightness`) confirms
-      the link. Can't spawn a real BLE-scanning daemon from this shell (TCC), and
-      none is currently running for this session to attach to.
-- [ ] **BLOCKED — same reason.** UI: launch the real `Divoom.app`/`./run.sh` GUI,
-      drive scan + connect from the dashboard, confirm the device chip appears,
-      connects, and a control round-trips. Same TCC constraint applies to the GUI's
-      own spawned daemon.
-- [ ] Confirm the daemon-down banner / reconnect path still behaves (regression check
-      from R57-59 event-driven work) while doing this pass — deferred with the above,
-      needs the same live daemon.
-- **Kill: NOT MET this session — explicitly blocked, not faked.** Needs the user to
-  start the daemon/GUI (grants the TCC Bluetooth permission this shell lacks) so a
-  session can drive scan/connect over the socket or the UI. The code paths
+- [x] **Daemon — DONE, hardware-confirmed.** Drove `divoomd` directly over
+      `/tmp/divoom.sock`: `scan` found Ditoo-light-2 + Timoo-light-4 (Pixoo-1 in
+      an earlier scan of the same session); `connect` succeeded for
+      Timoo-light-4; `get_brightness` read-back confirmed the link both before
+      and after a real device push; `disconnect` succeeded. Daemon-side detect +
+      connect is confirmed working end-to-end on real hardware.
+- [ ] **UI — not directly confirmed.** The user denied `request_access` for the
+      Divoom app this session (their own live app, reasonably — driving it via
+      computer-use is invasive), so no screenshot/click confirmation of the
+      packaged UI's scan/connect flow was taken. What IS confirmed: the same
+      round added/ran 10 Playwright E2E tests
+      (`tests/test_e2e_device_status_chips.py`) driving the REAL `web_ui` JS
+      (not a reimplementation) against a mocked daemon API, covering active/
+      streaming/degraded/known-undetected chip states — all pass. That's real
+      coverage of the UI's rendering LOGIC, but not a substitute for watching
+      the actual app scan+connect on screen.
+- [x] Also shipped this session while the app was live: the user reported the
+      device list gave no clear signal of which of 4 known devices were
+      currently online (3 were, 1 wasn't) — fixed in commit `2d0a845` (explicit
+      "not in range" badge + tooltip on known-but-undetected chips).
+- [ ] Daemon-down banner / reconnect regression check — not done (would need to
+      kill the live daemon mid-session, disruptive to the user's actual running
+      app; deferring rather than risking their session).
+- **Kill: daemon half MET with real hardware evidence; UI half partially MET**
+  (logic covered by E2E tests, not by direct visual confirmation — the user can
+  judge the actual on-screen result themselves since the app is running).
   themselves are extensively covered by the R61 test suite (96% coverage, incl.
   `scanner_mixin.py`/`connection.py`/`ble_transport.py` at 100%), but that is NOT a
   substitute for the real-hardware confirmation this item asks for.
