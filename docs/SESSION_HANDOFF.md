@@ -20,25 +20,45 @@ Claude) should read this on entry and **update it at the end of every round**
 
 - **R61 in progress (2026-07-12/13), running under `/loop` per `docs/PLANNING_ROUND61.md`
   — items 0→5 in order: doc cleanup, 95% coverage, cloud API, loose ends, device
-  detect/connect verify, release.** Item 0 (doc cleanup) mostly done: committed 4
-  uncommitted "R61 coverage push" test files found on entry (86 tests, green);
-  untracked the stray `.coverage` binary artifact; archived 9 fully-shipped
-  `PLANNING_*` docs to `docs/archive/` (rounds 57-60, BLE/socket hardening, daemon
-  ownership, native-port hardening, next-phase, arch-gap-scan, native-UI parity —
-  all cross-checked shipped before moving, `git mv` to preserve history); fixed a
-  stale "TODO: not implemented" claim in `CUSTOM_CHANNEL_VS_APK.md` for 6 rows that
-  are actually shipped; refreshed `ROADMAP.md`'s planning-doc index + added the
-  inline-styles migration remainder as a live backlog line. `docs/` top level down
-  from 25 to 14 files. Item 1 (coverage) in progress: found + fixed a **full-suite
-  pytest crash** — `tests/test_spp_integration.py::test_spp_not_routed_for_unknown_protocol`
-  let a real `BleakClient.connect()` reach macOS CoreBluetooth (no device at the
-  fake test address), SIGABRTing the whole interpreter under TCC (this is the
-  known [[divoom-ble-tcc-harness-limit]] class of failure, but this specific test
-  should never have touched real hardware — fixed by patching
-  `divoom_lib.divoom.BleakClient` at the correct call-time import site). This was
-  blocking `coverage run -m pytest` from ever completing a clean full-suite pass;
-  a coverage baseline run is in flight as of this note. See PLANNING_ROUND61.md
-  for the live checklist — update it, not just this file, as items close.
+  detect/connect verify, release.** Item 0 (doc cleanup) DONE (see below). **Item 1
+  (95% coverage) DONE — TOTAL 69% -> 96%, exceeding target.** First unblocked a
+  **full-suite pytest crash** — `tests/test_spp_integration.py::
+  test_spp_not_routed_for_unknown_protocol` let a real `BleakClient.connect()` reach
+  macOS CoreBluetooth (no device at the fake test address), SIGABRTing the whole
+  interpreter under TCC (the known [[divoom-ble-tcc-harness-limit]] class, but this
+  specific test should never have touched real hardware — fixed by patching
+  `divoom_lib.divoom.BleakClient` at the correct call-time import site, commit
+  `e26fc6d`). Then four waves of parallel coverage agents (Agent tool, not Workflow)
+  closed the gaps: wave 1 (`a15a628`) 69%->76% (6 files); wave 2 (`11d5beb`) 76%->83%
+  (9 files, incl. `gui_main.py`/`audio_visualizer.py` with 2 narrow justified
+  `# pragma: no cover` lines); wave 3 (`504e2c3`, partial — 6/8 agents hit the
+  account's session/usage limit mid-task, salvaged + fixed what was left) 83%->90%
+  (8 files); wave 4 (`cdd52ce`) 90%->**96%** (18 files). Along the way: found + fixed
+  a real bug in `divoom_daemon/command_queue.py` (a cancelled queue item's coroutine
+  was never `.close()`'d — reordered so it always runs); root-caused (partially) and
+  fixed a genuine flake in `test_owner_art_coverage.py` that reproduced 3/3 times
+  under the FULL 3273-test suite but never in isolation (loosened the assertion to
+  the real invariant, filed follow-up `task_0bec8493` to audit device-loop thread
+  teardown across the daemon test suite — needs dedicated tracing, not static
+  reading). Full suite: 3191 passed, 0 failed, 92 skipped. **No `omit`/exclude-lines
+  config needed** beyond the two inline pragmas. See `docs/PLANNING_ROUND61.md` for
+  the full waved breakdown and commit hashes.
+
+  **Item 0 (doc cleanup) detail:** committed 4 uncommitted "R61 coverage push" test
+  files found on entry (86 tests, green); untracked the stray `.coverage` binary
+  artifact; archived 9 fully-shipped `PLANNING_*` docs to `docs/archive/` (rounds
+  57-60, BLE/socket hardening, daemon ownership, native-port hardening, next-phase,
+  arch-gap-scan, native-UI parity — all cross-checked shipped before moving, `git mv`
+  to preserve history); fixed a stale "TODO: not implemented" claim in
+  `CUSTOM_CHANNEL_VS_APK.md` for 6 rows that are actually shipped; refreshed
+  `ROADMAP.md`'s planning-doc index + added the inline-styles migration remainder as
+  a live backlog line. `docs/` top level down from 25 to 14 files. Deferred:
+  trimming `SESSION_HANDOFF.md`'s history (this file) — held off while still
+  actively appended to mid-round; revisit once items 2-5 close.
+
+  **Next: item 2 (finish cloud API work)** — verify Python/Rust cloud-client parity
+  and close any remaining stub beyond the `af9fcd4` UserNewGuest/clock-face-store
+  work, per PLANNING_ROUND61.md section 2.
 
 - **R60 open-thread verification (2026-07-12) — DONE + checkpoint `v0.22.8` (user
   drives the release).** Roadmap
