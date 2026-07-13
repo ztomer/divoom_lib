@@ -6,7 +6,7 @@ they prove ``DaemonClient.send_command`` returns an error dict within its read
 timeout against a daemon that (a) accepts but never replies, (b) sends a
 never-newline-terminated frame, (c) accepts then immediately closes, or (d) is
 absent. The Rust daemon side (wedged ``BleCentral``) is covered in
-``native-port/divoomd/src/central.rs``; together they guarantee a dead central
+``divoomd/src/central.rs``; together they guarantee a dead central
 can't wedge the whole toolchain.
 
 Deterministic: no hardware, a tiny fake daemon per case.

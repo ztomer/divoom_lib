@@ -20,9 +20,9 @@ pub fn find_encoder_lib() -> Option<std::path::PathBuf> {
             return Some(pb);
         }
     }
-    // binary is at native-port/divoomd/target/release/divoomd — 5 parents = project root
+    // binary is at divoomd/target/release/divoomd — 4 parents = project root
     let exe = std::env::current_exe().ok()?;
-    let root = exe.parent()?.parent()?.parent()?.parent()?.parent()?;
+    let root = exe.parent()?.parent()?.parent()?.parent()?;
     let candidate = root.join("divoom_lib").join("libdivoom_compact.dylib");
     if candidate.exists() { Some(candidate) } else { None }
 }

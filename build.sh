@@ -43,7 +43,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 info "cargo build ${FLAG:-(debug)} — divoomd"
-( cd native-port/divoomd && cargo build $FLAG )
+( cd divoomd && cargo build $FLAG )
 ok "divoomd"
 
 info "cargo build ${FLAG:-(debug)} — divoom-menubar"

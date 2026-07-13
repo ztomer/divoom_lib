@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate native-port/divoomd/src/commands.rs from divoom_lib.models.COMMANDS
+"""Generate divoomd/src/commands.rs from divoom_lib.models.COMMANDS
 (the authoritative command name -> id map). Re-run when COMMANDS changes:
 
     PYTHONPATH=<repo root> python3 native-port/gen_commands.py
@@ -35,7 +35,7 @@ def main():
         f"pub const COMMAND_COUNT: usize = {len(cmds)};",
         "",
     ]
-    dest = Path(__file__).parent / "divoomd" / "src" / "commands.rs"
+    dest = Path(__file__).parent.parent / "divoomd" / "src" / "commands.rs"
     dest.write_text("\n".join(out))
     print(f"wrote {len(cmds)} commands -> {dest}")
 

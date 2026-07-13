@@ -11,7 +11,10 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 REPO = Path(__file__).parent.parent
-APP_GLOBALS = (REPO / "divoom_gui" / "web_ui" / "app_globals.js").read_text()
+# Connection-actions logic now lives in connection_events.js (extracted for the
+# 500-LOC gate); tests that inspect the JS wiring must read both files.
+_CONNECTION_JS = (REPO / "divoom_gui" / "web_ui" / "connection_events.js").read_text()
+APP_GLOBALS = (REPO / "divoom_gui" / "web_ui" / "app_globals.js").read_text() + "\n" + _CONNECTION_JS
 APP_INIT = (REPO / "divoom_gui" / "web_ui" / "app_init.js").read_text()
 APPBAR_CSS = (REPO / "divoom_gui" / "web_ui" / "appbar.css").read_text()
 
@@ -60,10 +63,13 @@ def test_get_connection_state_swallows_errors():
 
 # ── JS wiring ───────────────────────────────────────────────────────────────
 
-def test_js_heartbeat_polls_connection_state():
+def test_js_connection_state_is_event_driven():
+    # R59: the dot is driven by the daemon's pushed `status` events, not a poll.
+    assert "window.Divoom.onDaemonEvent" in APP_GLOBALS
     assert "get_connection_state()" in APP_GLOBALS
     assert "window.refreshConnectionState" in APP_GLOBALS
-    assert "setInterval(window.refreshConnectionState" in APP_GLOBALS
+    # The 4s polling heartbeat is gone — link health now arrives as events.
+    assert "setInterval(window.refreshConnectionState" not in APP_GLOBALS
 
 
 def test_js_degraded_sets_amber_dot_class():

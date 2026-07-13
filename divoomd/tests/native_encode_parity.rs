@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::fs;
 
 fn dylib_path() -> String {
-    // crate is native-port/divoomd; the dylib lives at <repo>/divoom_lib/.
+    // crate is divoomd; the dylib lives at <repo>/divoom_lib/.
     let base = concat!(env!("CARGO_MANIFEST_DIR"), "/../../divoom_lib/");
     for name in ["libdivoom_compact.dylib", "libdivoom_compact.so"] {
         let p = format!("{base}{name}");

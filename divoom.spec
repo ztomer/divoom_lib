@@ -37,7 +37,7 @@ datas += collect_data_files("divoom_gui")          # web_ui/** (frontend)
 datas += collect_data_files("divoom_lib")          # fonts/*.bin + the native dylib
 datas += collect_data_files("divoom_daemon")       # any packaged data
 # Rust binaries the GUI spawns — bundled under bin/ (resolved via sys._MEIPASS).
-for _src in ("native-port/divoomd/target/release/divoomd",
+for _src in ("divoomd/target/release/divoomd",
              "native-port/divoom-menubar/target/release/divoom-menubar"):
     if os.path.exists(_ex(_src)):
         datas += [(_ex(_src), "bin")]

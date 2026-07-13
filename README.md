@@ -16,10 +16,10 @@ and the menu-bar agent), and a native accelerator:
 2. **`divoom_daemon/`** — a headless, always-on agent that is the **single owner**
    of the device connection and serves a command/event protocol over a Unix
    socket and (optionally) TCP. On macOS it also does notification monitoring.
-   Runs on **macOS and Linux**. The **shipped app runs the native Rust daemon**
-   `native-port/divoomd` (at parity with this Python daemon, which remains the
-   reference/fallback), and a **native Rust menu-bar agent** `native-port/divoom-menubar`
-   (replacing the older pyobjc menu bar).
+    Runs on **macOS and Linux**. The **shipped app runs the native Rust daemon**
+    `divoomd/` (the primary daemon — `divoom_daemon/` is the now-unused Python
+    reference implementation), and a **native Rust menu-bar agent**
+    `native-port/divoom-menubar/` (replacing the older pyobjc menu bar).
 3. **`divoom_gui/`** — a [pywebview](https://pywebview.flowrl.com/) desktop
    **Control Center** (macOS): live previews, channel grid, live widgets (album
    art / stocks / system monitor), a gallery, a multi-panel "virtual wall", and a

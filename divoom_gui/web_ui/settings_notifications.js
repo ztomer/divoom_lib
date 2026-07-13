@@ -136,8 +136,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     refreshMacNotifStatus();
-    // Refresh counters every 5s while the user is on the Devices card.
-    setInterval(refreshMacNotifStatus, 5000);
+    // R59/event-driven: the daemon now broadcasts `notif_status` on every
+    // monitor start/stop/error transition, so the 5s poll is gone. Keep the
+    // one-shot probe above for the already-running monitor on first open.
 
     if (macToggle) {
         macToggle.addEventListener("change", async () => {

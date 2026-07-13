@@ -96,7 +96,7 @@ See `docs/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
 
 ---
 
-## Native Rust Port (`native-port/divoomd`)
+## Native Rust daemon (`divoomd/`)
 
 **Goal:** deprecate and archive the Python daemon backend in favor of the compiled
 Rust daemon, at 100% socket + hardware parity.

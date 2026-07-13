@@ -42,7 +42,7 @@ jobs:
       - name: Build native divoomd (ble) for the Rust-daemon parity suite
         # Without this, tests/test_rust_daemon_parity.py skips (no binary) so the
         # Rust↔Python parity tests never run in CI. Default features include `ble`.
-        working-directory: native-port/divoomd
+        working-directory: divoomd
         run: cargo build --locked
 
       - name: Run tests (C + Python encoder parity + Rust-daemon parity suite)
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: native-port/divoomd
+        working-directory: divoomd
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -75,7 +75,7 @@ jobs:
       - name: Build native dylib (FFI encoder parity test dependency)
         run: bash scripts/build_libdivoom.sh
       - name: Build + test with BLE
-        working-directory: native-port/divoomd
+        working-directory: divoomd
         run: cargo test --locked
 
   rust-ble-linux:
@@ -85,7 +85,7 @@ jobs:
     continue-on-error: true
     defaults:
       run:
-        working-directory: native-port/divoomd
+        working-directory: divoomd
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

@@ -18,6 +18,78 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **EVENT-DRIVEN UI (R59, 2026-07-12) — DONE + HARDWARE-VERIFIED; shipping as v0.22.2.**
+  The dashboard learned daemon/device state by **polling on 4s heartbeats** (connection,
+  owned-devices, daemon-health) + 5s notif-status + 600ms hot-progress — flaky/laggy. This
+  round makes the daemon **push** that state and the UI **listen**. (1) **Honest, complete
+  `status` events** — connect/disconnect now carry `connected` + `mac`/`lan_ip` (was only
+  `state`/`counters`). Fixed the **subscribe snapshot lie**: a new subscriber got a hardcoded
+  `idle` even when a device was connected; `initial_status` now reports the daemon's *actual*
+  `connected`+`mac`/`lan_ip`. (2) **`owned_devices` broadcast** on connect/disconnect replaces
+  the 4s `get_device_activity` poll. (3) **`notif_status` is now a distinct event type** — the
+  macOS monitor used to broadcast `type:"status"` and collide with the connection event (would
+  wrongly flip the connection dot); now `type:"notif_status"`, replacing the 5s poll. (4)
+  **`hot_progress` broadcast** (`starting`/`done`/`error`) replaces the 600ms poll. (5)
+  **Link-health is event-driven** — `cmd_device_call` broadcasts `status` `degraded` on a
+  failed/timeout op and recovers to `active` on success. (6) **GUI subscription forwards every
+  event** to the web UI (`_make_daemon_event_handler` → `window.Divoom.onDaemonEvent` /
+  `onOwnedDevices` / `onNotifStatus` / `onHotProgress`) and **detects daemon-down via socket
+  closure** (`onDaemonDown`), self-healing (resubscribes when the daemon returns) — replacing
+  the 4s daemon-health poll. (7) **Removed the flaky polls** — `connection_events.js` (extracted
+  from `app_globals.js` to honour the 500-LOC gate) drives the dot/banner/owned/notif/hot purely
+  from events; `app_globals.js`'s daemon-health poll gone too. **HARDWARE-VERIFIED:** new
+  `tests/test_rust_daemon_parity.py::test_rust_hardware_event_broadcast` subscribes to a live
+  daemon, connects a REAL device, asserts `status`(connected) + `owned_devices`(real mac) arrive,
+  then `owned_devices`([]) on disconnect. Mock tests: `test_daemon_event_broadcast.py` (status
+  carries connected+mac; honest snapshot; owned_devices), `test_gui_event_forwarder.py`
+  (fake-window unit test of every event type + shutdown-follow). `test_p6_degraded_dot.py`
+  updated to assert the event-driven design (now reads `connection_events.js`). **Release
+  v0.22.2: version bumped (pyproject 0.22.2); CHANGELOG + this handoff updated; DMG/Homebrew
+  cut via `scripts/release.sh` (see NEXT).** Plan: `docs/PLANNING_ROUND59.md`.
+
+- **RENAME: `native-port/divoomd` → `divoomd` (repo root) — DONE (2026-07-12).** Per
+  user decree the Rust daemon is **no longer a "port"** — it now lives at the repo
+  root. `git mv` + every path reference fixed and **verified**: `cargo build --release`
+  green; 42 Rust lib tests + `native_encode_parity` (dylib root-walk) green after
+  dropping the binary's parent-count `5→4` in `native_encode.rs:25` and `spp.rs:30`;
+  `divoomd/src/live_jobs/render.rs:12` `include_bytes` `../../../../`→`../../../` (the
+  crate is now 1 dir shallower); `daemon_client.py:196` dev-tree discovery, `divoom.spec`,
+  `setup_app.py`, `build.sh`, `scripts/build_release.sh`, `scripts/rust_coverage.sh`,
+  `.github/workflows/tests.yml` (4× `working-directory`), `scripts/linux_remote/test_host.sh`,
+  `tests/test_rust_daemon_parity.py` (binary discovery + 2 inline paths), and the
+  `native-port/gen_*.py` codegen OUTPUT paths all repointed to the root `divoomd/`.
+  `build.rs` link-arg re-emitted (file touched to bust a stale cached
+  `native-port/divoomd/daemon_info.plist` link path). Python: 25 relevant tests green
+  (file-size gate + wedge + edge-e2e + 10 parity tests; 3 hw/cloud skips). **No version
+  bump** — pure path rename, behavior unchanged.
+
+- **HARDENING BLITZ (R58, 2026-07-12) — DONE + HARDWARE-VERIFIED.** Closed the gaps
+  left after R57: (1) **socket idle timeout + bounded concurrency** in `socket_server.rs`
+  — `CONNECTION_IDLE_TIMEOUT` (default 300s, `DIVOOMD_IDLE_TIMEOUT_SECS`) drops silent
+  peers; `MAX_CONNECTIONS` (default 64, `DIVOOMD_MAX_CONNECTIONS`) via a `Semaphore`
+  back-pressures a 6th+ connection (was unbounded — a silent client could pin a permit
+  + the device lock forever). The idle watchdog **also covers `subscribe`** (a silent
+  subscriber — one that gets no events for the window — is now dropped, releasing its
+  permit; an event delivery resets it). (2) **`device_call` overall timeout enforced**
+  in `cmd_device_call` (`daemon.rs`): wrapped in `tokio::time::timeout` so a hung op
+  drops + releases the device lock instead of wedging it; honors a caller `timeout`,
+  clamped 1..120s, **default 30s**. **USER-RAISED long-command concern — RESOLVED with
+  data:** measured on real Pixoo-1, normal ops are connect ~3.9s (reconnect ~1.7s),
+  brightness/clock/hot-channel 59–61ms, `hot_update.update` 1ms (no pending content) —
+  all 1–2 orders of magnitude under the 30s cap, so the timeout is a net against *hung*
+  ops only, not a cliff for slow-but-valid ones. Very large 0x8B animation / gallery
+  pushes should pass an explicit `timeout` (≤120s). **HARDWARE RUN:** 4 real devices
+  (Pixoo-1, Timoo-light-4, Tivoo-Max-light-3, Ditoo-light-2) — `test_rust_hardware_parity`
+  extended to a 3× connect→device_call→disconnect→reconnect loop **and** sequential
+  connect to every discovered device: **11 hardware assertions pass** (2 cloud skip).
+  TESTS: 3 new Rust tests in `divoomd/tests/socket_server_hardening.rs` (idle-drop +
+  back-pressure + subscribe-idle-drop), 2 in `daemon_connect.rs` (timeout not
+  false-firing + lock released), plus updated `socket_server_behavior.rs`. Full suite
+  green: 44 Rust lib + 3 socket + 2 device_call, Python wedge/edge-e2e/parity (23 pass,
+  3 hw/cloud skips), 11 hardware. Plan: `docs/PLANNING_ROUND58.md`. **No version bump**
+  (defensive change). DEFERRED: GUI-side background auto-reconnect-on-socket-drop
+  (R57 covers the connect-click path; the rest needs the app to verify).
+
 - **RELEASE v0.22.0 CUT + HOMEBREW UPDATED (2026-07-12).** Known-devices persistence
   (R50, my earlier commit 5bd42b5) shipped on top of the full v0.21.8–v0.21.23
   line. **CRITICAL cross-session catch:** the other session cut v0.21.8–v0.21.23
@@ -39,7 +111,7 @@ Claude) should read this on entry and **update it at the end of every round**
   `central.peripherals()` with **no timeout guard**, so a dead CoreBluetooth
   session hangs forever → `run_connect`/`run_scan` never error → `reset_central`
   self-heal never fires → daemon unusable for ALL devices. FIXED via a new
-  `BleCentral` abstraction (`native-port/divoomd/src/central.rs`) whose `connect`
+  `BleCentral` abstraction (`divoomd/src/central.rs`) whose `connect`
   bounds every BLE call in `tokio::time::timeout`; added a concurrent connect
   guard (`ConnectGuard`/`connecting: AtomicBool`), widened `is_dead_central` to
   match `timed out`/`stale`/`central`, made GUI connect re-ensure the daemon

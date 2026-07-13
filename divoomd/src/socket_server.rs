@@ -10,12 +10,25 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
+use tokio::sync::Semaphore;
 
 use crate::protocol::{encode_message, err_reply, iter_messages, Request, MAX_REPLY_BYTES};
+
+/// Max concurrent client connections. A 6th+ connection is back-pressured (the
+/// accept loop waits for a free permit) rather than unbounded — a runaway or
+/// hostile client can't exhaust fds/tasks. Tunable via `DIVOOMD_MAX_CONNECTIONS`.
+pub const MAX_CONNECTIONS: usize = 64;
+
+/// Drop a connection that sends nothing for this long (no newline-terminated
+/// request). Closes the "connect and hold the socket open silently" wedge where a
+/// dead client pins a permit + the device lock forever. Tunable via
+/// `DIVOOMD_IDLE_TIMEOUT_SECS`.
+pub const CONNECTION_IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// Dispatches a parsed request to a reply. Object-safe + Send-explicit so each
 /// connection can be served on its own task. The real implementation routes to the
@@ -31,6 +44,7 @@ pub trait Handler: Send + Sync + 'static {
         serde_json::json!({
             "type": "status",
             "state": "idle",
+            "connected": false,
             "counters": {}
         })
     }
@@ -62,6 +76,7 @@ pub async fn serve_connection<S, H>(
     handler: Arc<H>,
     require_auth: bool,
     token: Option<String>,
+    idle_timeout: Duration,
 ) -> std::io::Result<()>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
@@ -70,10 +85,12 @@ where
     let mut buf: Vec<u8> = Vec::new();
     let mut tmp = [0u8; 4096];
     loop {
-        let n = stream.read(&mut tmp).await?;
-        if n == 0 {
-            return Ok(()); // EOF — peer closed
-        }
+        let n = match tokio::time::timeout(idle_timeout, stream.read(&mut tmp)).await {
+            Ok(Ok(0)) => return Ok(()),                 // EOF — peer closed
+            Ok(Ok(k)) => k,
+            Ok(Err(e)) => return Err(e),
+            Err(_) => return Ok(()),                    // idle: dead/silent peer, drop
+        };
         buf.extend_from_slice(&tmp[..n]);
         if buf.len() > MAX_REPLY_BYTES {
             return Ok(()); // frame cap: a never-newline-terminated frame, drop it
@@ -102,6 +119,10 @@ where
                 if let Some(mut rx) = handler.subscribe() {
                     let initial = handler.initial_status();
                     stream.write_all(&encode_message(&initial)).await?;
+                    // Idle watchdog: a subscriber that receives no events for
+                    // `idle_timeout` is dropped (releasing its permit), so a silent
+                    // client can't pin a slot forever. Any delivered event resets it.
+                    let mut deadline = tokio::time::Instant::now() + idle_timeout;
                     loop {
                         tokio::select! {
                             n = stream.read(&mut tmp) => {
@@ -115,6 +136,7 @@ where
                                 match msg {
                                     Ok(event) => {
                                         stream.write_all(&encode_message(&event)).await?;
+                                        deadline = tokio::time::Instant::now() + idle_timeout;
                                     }
                                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
@@ -122,6 +144,7 @@ where
                                     }
                                 }
                             }
+                            _ = tokio::time::sleep_until(deadline) => break, // idle: drop
                         }
                     }
                     return Ok(());
@@ -138,14 +161,26 @@ where
 }
 
 /// Accept connections forever on Unix socket, serving each on its own task. Runs until the
-/// listener errors unrecoverably (callers normally `tokio::spawn` this).
-pub async fn serve<H: Handler>(listener: UnixListener, handler: Arc<H>) {
+/// listener errors unrecoverably (callers normally `tokio::spawn` this). Concurrent connections
+/// are capped by `max_connections` (back-pressure: the accept loop waits for a free permit).
+pub async fn serve<H: Handler>(
+    listener: UnixListener,
+    handler: Arc<H>,
+    max_connections: usize,
+    idle_timeout: Duration,
+) {
+    let sem = Arc::new(Semaphore::new(max_connections.max(1)));
     loop {
         match listener.accept().await {
             Ok((stream, _addr)) => {
+                let permit = match sem.clone().acquire_owned().await {
+                    Ok(p) => p,
+                    Err(_) => return, // semaphore closed
+                };
                 let h = handler.clone();
                 tokio::spawn(async move {
-                    let _ = serve_connection(stream, h, false, None).await;
+                    let _permit = permit; // held for the connection's lifetime
+                    let _ = serve_connection(stream, h, false, None, idle_timeout).await;
                 });
             }
             Err(_) => continue,
@@ -158,14 +193,22 @@ pub async fn serve_tcp<H: Handler>(
     listener: tokio::net::TcpListener,
     handler: Arc<H>,
     token: String,
+    max_connections: usize,
+    idle_timeout: Duration,
 ) {
+    let sem = Arc::new(Semaphore::new(max_connections.max(1)));
     loop {
         match listener.accept().await {
             Ok((stream, _addr)) => {
+                let permit = match sem.clone().acquire_owned().await {
+                    Ok(p) => p,
+                    Err(_) => return,
+                };
                 let h = handler.clone();
                 let t = token.clone();
                 tokio::spawn(async move {
-                    let _ = serve_connection(stream, h, true, Some(t)).await;
+                    let _permit = permit;
+                    let _ = serve_connection(stream, h, true, Some(t), idle_timeout).await;
                 });
             }
             Err(_) => continue,

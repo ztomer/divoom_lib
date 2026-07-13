@@ -128,7 +128,12 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.classList.add("progress-active");
 
         window.pywebview?.api?.hot_channel_update?.().then(r => {
-            _pollTimer = setInterval(pollProgress, 600);
+            // R59/event-driven: the daemon broadcasts `hot_progress` (starting/
+            // done/error) for every phase, so the 600ms poll is gone — progress
+            // is pushed live via window.Divoom.onHotProgress.
+            if (window.Divoom && window.Divoom.onHotProgress) {
+                window.Divoom.onHotProgress({ type: "hot_progress", progress: 0, phase: "starting" });
+            }
         });
     });
 

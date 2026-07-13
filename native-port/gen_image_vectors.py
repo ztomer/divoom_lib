@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate image-encoder parity vectors from the Python reference so the Rust FFI
-(native-port/divoomd src/native_encode.rs) can assert byte-for-byte parity against
+(divoomd src/native_encode.rs) can assert byte-for-byte parity against
 libdivoom_compact. The Rust FFI calls the SAME C functions, so a match confirms the
 FFI marshalling (pointers, out-buffer sizing, return-length truncation) is correct.
 

@@ -6,6 +6,7 @@
 //!   divoomd [--socket /path/to.sock]
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use divoomd::daemon::Daemon;
 use tokio::net::UnixListener;
@@ -74,7 +75,26 @@ fn bind(socket_path: &str) -> std::io::Result<UnixListener> {
     UnixListener::bind(socket_path)
 }
 
-use divoomd::socket_server::{serve, serve_tcp};
+use divoomd::socket_server::{
+    serve, serve_tcp, CONNECTION_IDLE_TIMEOUT, MAX_CONNECTIONS,
+};
+
+fn env_usize(key: &str, default: usize) -> usize {
+    match std::env::var(key) {
+        Ok(v) => v.parse().unwrap_or(default),
+        Err(_) => default,
+    }
+}
+
+fn env_duration(key: &str, default: Duration) -> Duration {
+    match std::env::var(key) {
+        Ok(v) => v
+            .parse::<u64>()
+            .map(Duration::from_secs)
+            .unwrap_or(default),
+        Err(_) => default,
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -141,11 +161,18 @@ async fn main() {
         tokio::spawn(divoomd::monthly_best::monthly_best_loop_task(daemon.clone()));
     }
 
-    let unix_fut = serve(listener, daemon.clone());
+    let max_connections = env_usize("DIVOOMD_MAX_CONNECTIONS", MAX_CONNECTIONS);
+    let idle_timeout = env_duration("DIVOOMD_IDLE_TIMEOUT_SECS", CONNECTION_IDLE_TIMEOUT);
+    eprintln!(
+        "divoomd: socket limits — max_connections={max_connections}, idle_timeout={}s",
+        idle_timeout.as_secs()
+    );
+
+    let unix_fut = serve(listener, daemon.clone(), max_connections, idle_timeout);
 
     let shutdown = daemon.shutdown.clone();
     if let (Some(l), Some(t)) = (tcp_listener, tcp_token) {
-        let tcp_fut = serve_tcp(l, daemon.clone(), t);
+        let tcp_fut = serve_tcp(l, daemon.clone(), t, max_connections, idle_timeout);
         tokio::select! {
             _ = unix_fut => {}
             _ = tcp_fut => {}

@@ -18,16 +18,16 @@ sect "host"
 uname -srm; (lsb_release -ds 2>/dev/null || true); cargo --version
 
 sect "Rust core (--no-default-features)"
-( cd native-port/divoomd && cargo test --no-default-features 2>&1 | grep -E '^error|test result|FAILED' ) || RC=1
+( cd divoomd && cargo test --no-default-features 2>&1 | grep -E '^error|test result|FAILED' ) || RC=1
 
 sect "build libdivoom (.so)"
 bash scripts/build_libdivoom.sh 2>&1 | tail -2
 
 sect "Rust full (ble / BlueZ backend)"
-( cd native-port/divoomd && cargo test 2>&1 | grep -E '^error|test result|FAILED' ) || RC=1
+( cd divoomd && cargo test 2>&1 | grep -E '^error|test result|FAILED' ) || RC=1
 
 sect "build release daemon"
-( cd native-port/divoomd && cargo build --release 2>&1 | tail -1 )
+( cd divoomd && cargo build --release 2>&1 | tail -1 )
 
 sect "BLE scan + hardware round-trip"
 groups
@@ -39,7 +39,7 @@ bluetoothctl power on  >/dev/null 2>&1 || true
 sleep 1
 pkill -f target/release/divoomd 2>/dev/null
 rm -f /tmp/divoomd.sock
-./native-port/divoomd/target/release/divoomd --socket /tmp/divoomd.sock >/tmp/divoomd.log 2>&1 &
+./divoomd/target/release/divoomd --socket /tmp/divoomd.sock >/tmp/divoomd.log 2>&1 &
 DPID=$!
 for _ in $(seq 1 50); do [ -S /tmp/divoomd.sock ] && break; sleep 0.2; done
 python3 scripts/linux_remote/scan.py /tmp/divoomd.sock || true

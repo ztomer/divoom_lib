@@ -187,7 +187,7 @@ pub async fn start_monitor(daemon: Arc<Daemon>) {
         None => {
             guard.last_db_error = Some("macOS Notification Center DB not found".to_string());
             guard.db_error_streak = 5;
-            let _ = daemon.tx.send(status_event_payload(&guard));
+            let _ = daemon.tx.send(notif_status_event(&guard));
             return;
         }
     };
@@ -198,14 +198,14 @@ pub async fn start_monitor(daemon: Arc<Daemon>) {
             if let Err(e) = conn.execute("SELECT 1", []) {
                 guard.last_db_error = Some(format!("Database read failed (FDA permission?): {e}"));
                 guard.db_error_streak = 5;
-                let _ = daemon.tx.send(status_event_payload(&guard));
+                let _ = daemon.tx.send(notif_status_event(&guard));
                 return;
             }
         }
         Err(e) => {
             guard.last_db_error = Some(format!("Database open failed: {e}"));
             guard.db_error_streak = 5;
-            let _ = daemon.tx.send(status_event_payload(&guard));
+            let _ = daemon.tx.send(notif_status_event(&guard));
             return;
         }
     }
@@ -224,7 +224,7 @@ pub async fn start_monitor(daemon: Arc<Daemon>) {
     guard.task = Some(handle);
     eprintln!("[macos_notifications] monitor started");
 
-    let _ = daemon.tx.send(status_event_payload(&guard));
+    let _ = daemon.tx.send(notif_status_event(&guard));
 }
 
 /// Stop the background notification monitor.
@@ -256,6 +256,17 @@ fn status_event_payload(guard: &MonitorState) -> Value {
             ev["error"] = json!(err);
         }
     }
+    ev
+}
+
+/// Broadcast flavour of the monitor status (R59): a distinct event type so the
+/// GUI doesn't confuse it with the device *connection* `status` event. The
+/// request/response `notification_status` command keeps `type:"status"` (the
+/// web UI's `refreshMacNotifStatus` parses that reply); the push stream uses
+/// `notif_status` so `window.Divoom.onNotifStatus` can update live.
+fn notif_status_event(guard: &MonitorState) -> Value {
+    let mut ev = status_event_payload(guard);
+    ev["type"] = json!("notif_status");
     ev
 }
 
@@ -433,7 +444,7 @@ async fn monitor_loop(daemon: Arc<Daemon>, st: Arc<Mutex<MonitorState>>, db_path
                     });
                     let _ = daemon.tx.send(notif_ev);
 
-                    let _ = daemon.tx.send(status_event_payload(&guard));
+                    let _ = daemon.tx.send(notif_status_event(&guard));
                 }
             }
             Err(e) => {
@@ -444,7 +455,7 @@ async fn monitor_loop(daemon: Arc<Daemon>, st: Arc<Mutex<MonitorState>>, db_path
                     eprintln!("[macos_notifications] query error (streak 1): {e}");
                 }
                 if guard.db_error_streak >= 5 {
-                    let _ = daemon.tx.send(status_event_payload(&guard));
+                    let _ = daemon.tx.send(notif_status_event(&guard));
                 }
             }
         }

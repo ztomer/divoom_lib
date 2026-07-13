@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Generate ground-truth framing vectors from the Python implementation, so the
-Rust port (native-port/divoomd) can assert byte-for-byte parity in its tests.
+Rust daemon (divoomd) can assert byte-for-byte parity in its tests.
 
     PYTHONPATH=<repo root> python3 native-port/gen_framing_vectors.py
 
-Writes native-port/divoomd/tests/framing_vectors.json. Re-run whenever the Python
+Writes divoomd/tests/framing_vectors.json. Re-run whenever the Python
 framing changes; the Rust tests then pin the new behavior. The Python framing is
 the AUTHORITATIVE source (parallel-build strategy — see docs/ROADMAP.md).
 """
@@ -121,7 +121,7 @@ def main():
         "parse_ios_le": parse_ios_le_cases(),
         "parse_basic": parse_basic_cases(),
     }
-    dest = Path(__file__).parent / "divoomd" / "tests" / "framing_vectors.json"
+    dest = Path(__file__).parent.parent / "divoomd" / "tests" / "framing_vectors.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(out, indent=2))
     n = sum(len(v) for v in out.values())

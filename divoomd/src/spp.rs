@@ -26,9 +26,9 @@ impl SppTransport {
         let python = std::env::var("DIVOOM_PYTHON").unwrap_or_else(|_| "python3".to_string());
         
         // Find path to spp_bridge.py relative to the binary
+        // (binary at divoomd/target/<profile>/divoomd → 4 parents = repo root)
         let exe = std::env::current_exe()?;
         let root = exe.parent().ok_or("no parent")?
-            .parent().ok_or("no parent")?
             .parent().ok_or("no parent")?
             .parent().ok_or("no parent")?
             .parent().ok_or("no parent")?;

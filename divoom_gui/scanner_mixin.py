@@ -273,7 +273,7 @@ class ScannerMixin:
             # R57: a connect click must never target a stale/dead daemon socket.
             # reconnect_daemon() is a cheap no-op when a daemon is already live
             # (it only probes get_status), and respawns one if the process died.
-            # The Rust daemon's BleCentral timeout (native-port/divoomd/src/
+            # The Rust daemon's BleCentral timeout (divoomd/src/
             # central.rs) covers the remaining wedge case (dead CoreBluetooth).
             self.reconnect_daemon()
             client = self._client()

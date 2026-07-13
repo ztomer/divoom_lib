@@ -52,7 +52,7 @@ if ! command -v cargo >/dev/null 2>&1 && [ -x "${HOME}/.cargo/bin/cargo" ]; then
 fi
 command -v cargo >/dev/null 2>&1 || { echo "ERROR: cargo not found (needed for divoomd/divoom-menubar)." >&2; exit 1; }
 echo "→ building native rust daemon (divoomd)"
-( cd native-port/divoomd && cargo build --release )
+( cd divoomd && cargo build --release )
 echo "→ building native rust menubar (divoom-menubar)"
 ( cd native-port/divoom-menubar && cargo build --release )
 

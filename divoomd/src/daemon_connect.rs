@@ -16,6 +16,50 @@ use crate::protocol::{err_reply, Request};
 #[cfg(feature = "ble")]
 use crate::ble::{self, BleTransport, Discovered};
 
+/// Build a full status event so subscribers (the GUI/web UI) can update
+/// connection state directly from the push — `connected`, `mac`/`lan_ip`, and the
+/// device id. Earlier the connect/disconnect events carried only `state`/`counters`,
+/// which forced the UI to poll `device_status()` to learn *which* device (if any)
+/// was connected; that poll lag is the "UI doesn't get the update" reliability gap.
+/// `state` overrides the derived active/idle (used to push "degraded" on a failed
+/// mid-session op — R59/event-driven link health).
+pub(crate) fn status_payload(connected: bool, device_id: Option<&str>, state: Option<&str>) -> Value {
+    let state = state
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| if connected { "active" } else { "idle" }.to_string());
+    let mut m = serde_json::Map::new();
+    m.insert("type".into(), json!("status"));
+    m.insert("state".into(), json!(state));
+    m.insert("connected".into(), json!(connected));
+    if let Some(id) = device_id {
+        if let Some(ip) = id.strip_prefix("LAN:") {
+            m.insert("lan_ip".into(), json!(ip));
+        } else {
+            m.insert("mac".into(), json!(id));
+        }
+    }
+    m.insert("counters".into(), json!({}));
+    Value::Object(m)
+}
+
+/// Owned-device list event (R59/event-driven). The daemon is the source of
+/// truth for which devices it owns (connected, often non-advertising), so it
+/// pushes the set on connect/disconnect instead of the UI polling
+/// `get_device_activity` every 4s. `devices` mirrors `get_device_activity`'s
+/// per-mac shape (`address`/`name`/`kind`/`state`) so the UI can reuse its merge.
+fn owned_devices_payload(device_id: Option<&str>) -> Value {
+    let devices = match device_id {
+        Some(id) => vec![json!({
+            "address": id,
+            "name": "",
+            "kind": "idle",
+            "state": "active",
+        })],
+        None => vec![],
+    };
+    json!({ "type": "owned_devices", "devices": devices })
+}
+
 /// btleplug surfaces a dead CoreBluetooth central (its session ended after a
 /// device disconnect or a Bluetooth toggle) as "Channel closed". The cached
 /// Adapter can't recover, so we drop it and retry once with a fresh one.
@@ -160,7 +204,8 @@ pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
         let mock_transport = crate::mock_transport::MockTransport::new();
         *daemon.device.lock().await = Some(Arc::new(DeviceTransport::Mock(mock_transport)));
         *daemon.device_id.lock().await = Some("MOCK_MAC".to_string());
-        let _ = daemon.tx.send(json!({"type":"status","state":"active","counters":{}}));
+        let _ = daemon.tx.send(status_payload(true, Some("MOCK_MAC"), None));
+        let _ = daemon.tx.send(owned_devices_payload(Some("MOCK_MAC")));
         return json!({"success":true,"connected":true,"connection_state":"connected","mac":"MOCK_MAC"});
     }
 
@@ -173,7 +218,8 @@ pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
         }
         *daemon.device.lock().await = Some(Arc::new(DeviceTransport::Lan(lan)));
         *daemon.device_id.lock().await = Some(format!("LAN:{ip}"));
-        let _ = daemon.tx.send(json!({"type":"status","state":"active","counters":{}}));
+        let _ = daemon.tx.send(status_payload(true, Some(&format!("LAN:{ip}")), None));
+        let _ = daemon.tx.send(owned_devices_payload(Some(&format!("LAN:{ip}"))));
         return json!({"success":true,"connected":true,"connection_state":"connected","lan_ip":ip});
     }
     #[cfg(feature = "ble")]
@@ -189,7 +235,8 @@ pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
                 Ok(t) => {
                     *daemon.device.lock().await = Some(Arc::new(DeviceTransport::Spp(t)));
                     *daemon.device_id.lock().await = Some(id.clone());
-                    let _ = daemon.tx.send(json!({"type":"status","state":"active","counters":{}}));
+                    let _ = daemon.tx.send(status_payload(true, Some(&id), None));
+                    let _ = daemon.tx.send(owned_devices_payload(Some(&id)));
                     return json!({"success":true,"connected":true,"connection_state":"connected","mac":id});
                 }
                 Err(e) => return err_reply(&format!("connect SPP failed: {e}")),
@@ -205,7 +252,8 @@ pub(crate) async fn cmd_connect(daemon: &Daemon, req: &Request) -> Value {
             Ok(t) => {
                 *daemon.device.lock().await = Some(Arc::new(DeviceTransport::Ble(t)));
                 *daemon.device_id.lock().await = Some(id.clone());
-                let _ = daemon.tx.send(json!({"type":"status","state":"active","counters":{}}));
+                let _ = daemon.tx.send(status_payload(true, Some(&id), None));
+                let _ = daemon.tx.send(owned_devices_payload(Some(&id)));
                 json!({"success":true,"connected":true,"connection_state":"connected","mac":id})
             }
             Err(e) => err_reply(&format!("connect failed: {e}")),
@@ -227,7 +275,8 @@ pub(crate) async fn cmd_disconnect(daemon: &Daemon) -> Value {
         }
     }
     *daemon.device_id.lock().await = None;
-    let _ = daemon.tx.send(json!({"type":"status","state":"idle","counters":{}}));
+    let _ = daemon.tx.send(status_payload(false, None, None));
+    let _ = daemon.tx.send(owned_devices_payload(None));
     json!({"success": true})
 }
 
@@ -339,5 +388,51 @@ mod scan_guard_tests {
             assert_eq!(d["success"], json!(true));
             assert!(daemon.device.lock().await.is_none());
         }
+    }
+
+    // R58: device_call is now bounded by an overall timeout (default 30s) enforced
+    // at the top level so a hung op can't hold the device lock forever. A normal
+    // mock op must complete well within that and leave the lock free for the next
+    // call (no false-fire, no wedge). Verifying the timeout *fires* on a genuinely
+    // hung op needs real hardware (or a network-blocked LAN target) — see plan.
+    #[tokio::test]
+    async fn device_call_timeout_enforced_but_not_false_firing() {
+        let daemon = Daemon::new();
+        let c = cmd_connect(&daemon, &make_request("connect", Some(json!({"mock": true})), None)).await;
+        assert_eq!(c["success"], json!(true));
+
+        let req = make_request(
+            "device_call",
+            Some(json!({ "method": "display.get_brightness" })),
+            None,
+        );
+        let res = tokio::time::timeout(std::time::Duration::from_secs(2), daemon.cmd_device_call(&req))
+            .await
+            .expect("device_call must return within 2s — the timeout path must not hang");
+        assert_eq!(res["success"], json!(true));
+
+        // The lock was released: a second call is immediately possible.
+        let req2 = make_request(
+            "device_call",
+            Some(json!({ "method": "display.get_brightness" })),
+            None,
+        );
+        let res2 = daemon.cmd_device_call(&req2).await;
+        assert_eq!(res2["success"], json!(true));
+    }
+
+    // A caller-requested short timeout on a fast mock op must still succeed — the
+    // enforced timeout is a safety net, not a cliff for slow-but-valid commands.
+    #[tokio::test]
+    async fn device_call_short_requested_timeout_still_succeeds() {
+        let daemon = Daemon::new();
+        cmd_connect(&daemon, &make_request("connect", Some(json!({"mock": true})), None)).await;
+        let req = make_request(
+            "device_call",
+            Some(json!({ "method": "display.get_brightness", "timeout": 1 })),
+            None,
+        );
+        let res = daemon.cmd_device_call(&req).await;
+        assert_eq!(res["success"], json!(true));
     }
 }

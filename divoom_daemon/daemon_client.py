@@ -193,7 +193,7 @@ def spawn_daemon(
         # why dev runs silently fell back to the Python daemon).
         repo_root = Path(__file__).resolve().parents[1]
         for folder in ["release", "debug"]:
-            p = repo_root / "native-port" / "divoomd" / "target" / folder / "divoomd"
+            p = repo_root / "divoomd" / "target" / folder / "divoomd"
             if p.exists():
                 rust_bin = str(p)
                 break

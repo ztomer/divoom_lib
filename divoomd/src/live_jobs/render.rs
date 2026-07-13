@@ -9,7 +9,7 @@ const GLYPH_BYTES: usize = 32;
 const CELL: usize = 16;
 const FALLBACK_CP: u32 = 0x3F; // '?'
 
-const FONT_BYTES: &[u8] = include_bytes!("../../../../divoom_lib/fonts/divoom_fond16_default_half.bin");
+const FONT_BYTES: &[u8] = include_bytes!("../../../divoom_lib/fonts/divoom_fond16_default_half.bin");
 
 struct BitmapFont {
     blob: &'static [u8],

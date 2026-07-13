@@ -16,5 +16,5 @@ fi
 echo "[ Ok  ] cargo-llvm-cov is installed."
 echo "[ ==> ] Running code coverage metrics (excluding external libraries)..."
 
-cd native-port/divoomd
+cd divoomd
 cargo llvm-cov --all-targets

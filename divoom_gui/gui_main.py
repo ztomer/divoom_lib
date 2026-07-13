@@ -319,30 +319,87 @@ def main():
     os._exit(0)
 
 
+def _make_daemon_event_handler(window):
+    """Build the daemon-subscription callback.
+
+    Forwards connection ``status`` events to the web UI so the dashboard updates
+    LIVE (event-driven) instead of only on its polling heartbeat — the
+    R58/UI-reliability fix. The daemon now broadcasts honest status events
+    (``connected`` + ``mac``/``lan_ip``) on connect/disconnect and as the
+    subscribe snapshot, so a freshly opened GUI no longer shows a stale
+    "disconnected" until the next poll. A shutting-down daemon still closes the
+    window when shared lifecycle is on.
+    """
+    import json as _json
+    from divoom_daemon.daemon_protocol import EVENT_SHUTDOWN
+
+    def on_event(ev: dict) -> None:
+        if not isinstance(ev, dict):
+            return
+        etype = ev.get("type")
+        if etype == EVENT_SHUTDOWN:
+            try:
+                from divoom_lib.lifecycle_config import (
+                    get_keep_daemon_alive, should_follow_daemon_shutdown)
+            except Exception:
+                return
+            if should_follow_daemon_shutdown(get_keep_daemon_alive()):
+                logger.info("Daemon shut down; closing dashboard (shared lifecycle).")
+                try:
+                    window.destroy()
+                except Exception:
+                    pass
+            return
+        # status + notification + owned_devices + notif_status + hot_progress →
+        # web UI, for immediate honest rendering (R59/event-driven; replaces the
+        # 4s polling heartbeats). Each maps to window.Divoom.on<Event>.
+        if etype in ("status", "notification", "owned_devices",
+                     "notif_status", "hot_progress"):
+            handler = {
+                "status": "onDaemonEvent",
+                "notification": "onDaemonEvent",
+                "owned_devices": "onOwnedDevices",
+                "notif_status": "onNotifStatus",
+                "hot_progress": "onHotProgress",
+            }.get(etype)
+            try:
+                payload = _json.dumps(ev, separators=(",", ":"))
+                window.evaluate_js(
+                    f"if(window.Divoom&&window.Divoom.{handler}){{"
+                    f"window.Divoom.{handler}({payload});}}")
+            except Exception:
+                pass
+    return on_event
+
+
 def _start_shutdown_follower(window) -> None:
-    """Subscribe to the daemon's shutdown event on a daemon thread; if it fires
-    while keep-alive is OFF, close the dashboard window. Event-driven — no
-    polling."""
+    """Subscribe to the daemon's event stream on a daemon thread and forward
+    connection status + shutdown to the web UI. Event-driven — no polling. When
+    the subscription ends (socket closed / daemon gone) we tell the UI the
+    daemon is down — that replaces the old 4s daemon-health poll (R59) — then
+    retry so events resume the moment the daemon comes back."""
+    import time as _time
+
     def _run():
-        try:
-            from divoom_daemon.daemon_protocol import (
-                DaemonClient, DEFAULT_SOCKET_PATH, EVENT_SHUTDOWN)
-            from divoom_lib.lifecycle_config import (
-                get_keep_daemon_alive, should_follow_daemon_shutdown)
+        from divoom_daemon.daemon_protocol import DaemonClient, DEFAULT_SOCKET_PATH
+        while True:
+            try:
+                DaemonClient(DEFAULT_SOCKET_PATH, timeout=2.0).subscribe(
+                    _make_daemon_event_handler(window))
+            except Exception as e:
+                logger.debug(f"daemon event follower stopped: {e}")
+            finally:
+                # subscribe returned → daemon is down (socket closed). Tell the UI.
+                try:
+                    window.evaluate_js(
+                        "if(window.Divoom&&window.Divoom.onDaemonDown){"
+                        "window.Divoom.onDaemonDown();}")
+                except Exception:
+                    pass
+            # back off, then resubscribe (self-heal on daemon restart)
+            _time.sleep(2.0)
 
-            def on_event(ev: dict) -> None:
-                if ev.get("type") == EVENT_SHUTDOWN and \
-                        should_follow_daemon_shutdown(get_keep_daemon_alive()):
-                    logger.info("Daemon shut down; closing dashboard (shared lifecycle).")
-                    try:
-                        window.destroy()
-                    except Exception:
-                        pass
-            DaemonClient(DEFAULT_SOCKET_PATH, timeout=2.0).subscribe(on_event)
-        except Exception as e:
-            logger.debug(f"shutdown follower stopped: {e}")
-
-    threading.Thread(target=_run, daemon=True, name="shutdown-follower").start()
+    threading.Thread(target=_run, daemon=True, name="daemon-event-follower").start()
 
 
 def _resolve_menubar_binary() -> "str | None":

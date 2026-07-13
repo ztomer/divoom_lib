@@ -416,7 +416,7 @@ impl Daemon {
     /// device_call routes a method string to a protocol op. A small set is ported
     /// first to prove op-level parity (the read-back + a write); unported methods
     /// return an honest error. The device mutex serializes device access.
-    async fn cmd_device_call(&self, req: &Request) -> Value {
+    pub(crate) async fn cmd_device_call(&self, req: &Request) -> Value {
         // The per-op token gates exclusive mode: if another session holds exclusive,
         // device_call is rejected immediately (Python parity: _cmd_queue.run(token)).
         let token = req.args.get("token").and_then(|v| v.as_str());
@@ -429,9 +429,55 @@ impl Daemon {
             Some(d) => d,
             None => return err_reply("no device connected"),
         };
-        let timeout = Duration::from_secs(5);
 
-        crate::device_call::handle_device_call(self, dev, req, timeout).await
+        // Honor a caller-requested timeout (clamped so a huge value can't wedge the
+        // device lock forever), and ENFORCE it at the top level: if the whole
+        // device op overruns, the timed-out future is dropped — which releases this
+        // lock — instead of hanging and blocking every other device call.
+        //
+        // Default is generous (30s, matching connect_timeout) and the cap is high
+        // (120s): this is a safety net against a *hung* op, NOT a cliff for
+        // slow-but-valid ones (some ops — e.g. hotchannel updates — can run long;
+        // verify exact durations on real hardware before tightening).
+        let req_timeout = req
+            .args
+            .get("timeout")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(30.0)
+            .clamp(1.0, 120.0);
+        let timeout = Duration::from_secs_f64(req_timeout);
+
+        match tokio::time::timeout(
+            timeout,
+            crate::device_call::handle_device_call(self, dev, req, timeout),
+        )
+        .await
+        {
+            Ok(reply) => {
+                // R59/event-driven link health: a failed mid-session op (or a
+                // timeout) means the link is unhealthy → push a `degraded` status
+                // so the UI flips the dot amber immediately instead of waiting for
+                // a poll. A successful op recovers it to `active`. The device is
+                // still owned (`guard` holds the lock), so connected stays true.
+                if guard.is_some() {
+                    let id = self.device_id.lock().await.clone();
+                    let degraded = reply.get("success").and_then(|v| v.as_bool()) != Some(true);
+                    let st = if degraded { "degraded" } else { "active" };
+                    let _ = self.tx.send(
+                        crate::daemon_connect::status_payload(true, id.as_deref(), Some(st)));
+                }
+                reply
+            }
+            Err(_) => {
+                let msg = format!("device op timed out after {req_timeout:.0}s");
+                if guard.is_some() {
+                    let id = self.device_id.lock().await.clone();
+                    let _ = self.tx.send(
+                        crate::daemon_connect::status_payload(true, id.as_deref(), Some("degraded")));
+                }
+                err_reply(&msg)
+            }
+        }
     }
 
     async fn cmd_disconnect(&self) -> Value {
@@ -455,13 +501,26 @@ impl Handler for Daemon {
     }
     fn initial_status(&self) -> Value {
         #[cfg(feature = "ble")]
-        let connected = self.device.try_lock().map(|g| g.is_some()).unwrap_or(false);
+        let (connected, id) = {
+            let dev = self.device.try_lock().map(|g| g.is_some()).unwrap_or(false);
+            let id = self.device_id.try_lock().ok().and_then(|g| g.clone());
+            (dev, id)
+        };
         #[cfg(not(feature = "ble"))]
-        let connected = false;
-        json!({
+        let (connected, id): (bool, Option<String>) = (false, None);
+        let mut ev = json!({
             "type": "status",
             "state": if connected { "active" } else { "idle" },
+            "connected": connected,
             "counters": {}
-        })
+        });
+        if let Some(id) = id {
+            if let Some(ip) = id.strip_prefix("LAN:") {
+                ev["lan_ip"] = json!(ip);
+            } else {
+                ev["mac"] = json!(id);
+            }
+        }
+        ev
     }
 }

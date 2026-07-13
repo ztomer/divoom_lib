@@ -182,147 +182,10 @@ window.getDeviceDimensions = function(name) {
 };
 
 // ── 3. CONNECTION ACTIONS ──
-// updateSidebarSpeakerIcon was removed — speaker status now lives in
-// Settings → Devices tables. Kept as a no-op for backward compatibility.
-window.updateSidebarSpeakerIcon = function(_hasSpeaker) {
-    return;
-};
+// Moved to connection_events.js (loaded after this file): connectDevice,
+// refreshConnectionState, the live window.Divoom.onDaemonEvent forwarder, and
+// startConnectionHeartbeat. Extracted to honour the 500-LOC gate.
 
-window.connectDevice = function(name, address) {
-    window.showToast(`Connecting to ${name}...`, "success");
-    const statusDot = document.getElementById("global-status-dot");
-    if (statusDot) { statusDot.className = "transport-dot connecting"; statusDot.removeAttribute("style"); }
-    // R35 §2: pulse the sidebar device dot being connected, in the device's
-    // own accent color (CSS var --dot-pulse-color, amber fallback for the
-    // global dot). Cleared by re-render on success or explicitly on failure.
-    const deviceDot = document.querySelector(
-        `#device-dots [data-value="${(window.CSS && CSS.escape) ? CSS.escape(address) : address}"]`);
-    if (deviceDot) {
-        deviceDot.classList.add("connecting");
-        // Pulse in the device's accent color (CSS var, fallback amber).
-        deviceDot.style.setProperty("--dot-pulse-color", window.deviceColor(address));
-    }
-
-    if (window.pywebview && window.pywebview.api) {
-        // R57 watchdog: if the daemon never answers the connect (dead/!wedged
-        // central that the Rust BleCentral timeout + client read_timeout failed
-        // to catch — defense in depth), don't leave the UI stuck on "connecting".
-        // The client read_timeout is ~30s; fire the watchdog a beat after.
-        let connectWatchdog = null;
-        connectWatchdog = setTimeout(() => {
-            window.DivoomState.appConnected = false;
-            window.showToast(`Background service not responding for ${name}. Try Reconnect.`, "error");
-            if (statusDot) { statusDot.className = "transport-dot inactive"; statusDot.removeAttribute("style"); }
-            if (window.renderDeviceDots) window.renderDeviceDots();
-            document.getElementById("banner-device-name").textContent = "None";
-            document.getElementById("banner-device-mac").textContent = "None";
-        }, 35000);
-        window.pywebview.api.connect_single_device(address).then(res => {
-            clearTimeout(connectWatchdog);
-            if (res) {
-                window.DivoomState.appConnected = true;
-                const type = address === "MatrixWall" ? "wall" : (address.startsWith("LAN:") ? "lan" : "ble");
-                const label = type === "wall" ? " Wall" : (type === "lan" ? " LAN" : " BLE");
-                window.showToast(`Connected to ${name}!`, "success", label);
-                if (statusDot) { statusDot.className = `transport-dot active ${type}`; statusDot.removeAttribute("style"); }
-                
-                document.getElementById("banner-device-name").textContent = name;
-                document.getElementById("banner-device-mac").textContent = address;
-                window._updateDeviceLabel(name);
-                // R32 §C2: prefer the last-pushed preview; fall back to the
-                // product icon when this device hasn't been pushed to yet.
-                const dims = window.getDeviceDimensions(name);
-                window.restoreDevicePreview(address, dims.image);
-                if (window.renderDeviceDots) window.renderDeviceDots();
-                if (window.loadDeviceName) window.loadDeviceName();
-                if (window.restoreActiveWidgetForDevice) window.restoreActiveWidgetForDevice(address);
-                // banner-device-res and banner-device-speaker moved to Settings → Devices.
-                // Their textContent assignments are intentionally skipped here.
-                const isSpk = name.toLowerCase().includes("timoo") || name.toLowerCase().includes("ditoo") || name.toLowerCase().includes("tivoo");
-                window.updateSidebarSpeakerIcon(isSpk);
-                const sidebarSelect = document.getElementById("sidebar-device-select");
-                if (sidebarSelect) sidebarSelect.value = address;
-                if (window.updateSyncTargetList) window.updateSyncTargetList();
-                if (window.updateChannelButtonsVisibility) window.updateChannelButtonsVisibility(name);
-            } else {
-                window.DivoomState.appConnected = false;
-                // BLE Hardening P1: show the daemon's actionable reason (asleep /
-                // BT off / held by the phone app), not a generic failure.
-                if (window.pywebview?.api?.get_last_connect_error) {
-                    window.pywebview.api.get_last_connect_error().then(msg => {
-                        window.showToast(msg && msg.trim()
-                            ? `${name}: ${msg}` : `Failed to connect to ${name}`, "error");
-                    });
-                } else {
-                    window.showToast(`Failed to connect to ${name}`, "error");
-                }
-                if (statusDot) { statusDot.className = "transport-dot inactive"; statusDot.removeAttribute("style"); }
-                // R34 §2: stop the pulse + restore the per-device hue.
-                if (window.renderDeviceDots) window.renderDeviceDots();
-                document.getElementById("banner-device-name").textContent = "None";
-                document.getElementById("banner-device-mac").textContent = "None";
-                window._updateDeviceLabel(null);
-                window.updateSidebarSpeakerIcon(false);
-                if (window.updateSyncTargetList) window.updateSyncTargetList();
-                if (window.updateChannelButtonsVisibility) window.updateChannelButtonsVisibility("None");
-            }
-        });
-    }
-};
-
-// ── BLE Hardening P6: appbar connection heartbeat ─────────────────────────
-// The connect/disconnect handlers set the dot at transition time, but a link
-// can DROP mid-session (device sleeps, RF blip). Poll the daemon's honest
-// connection_state so the dot reflects DEGRADED (amber) and a genuine drop,
-// not a stale solid "connected".
-window._activeTransportType = function() {
-    const mac = (document.getElementById("banner-device-mac")?.textContent || "").trim();
-    if (mac === "MatrixWall") return "wall";
-    if (mac.startsWith("LAN:")) return "lan";
-    return "ble";
-};
-
-window.refreshConnectionState = function() {
-    if (!window.DivoomState.appConnected) return;
-    const api = window.pywebview && window.pywebview.api;
-    if (!api || !api.get_connection_state) return;
-    api.get_connection_state().then(raw => {
-        let s;
-        try { s = JSON.parse(raw); } catch (e) { return; }
-        const dot = document.getElementById("global-status-dot");
-        if (!dot) return;
-        const state = s && s.state;
-        if (state === "degraded") {
-            // Reports connected but a write/drop just failed — show amber, keep
-            // appConnected (the daemon's live-job self-heal may revive it).
-            dot.className = "transport-dot active degraded";
-            dot.title = "Link degraded — reconnecting";
-        } else if (state === "disconnected" || !s || !s.connected) {
-            // Genuinely dropped — or the daemon explicitly reports disconnected
-            // while a stale connected:true lingered. Flip the dot + the global
-            // flag so the UI stops claiming a live link; a disconnected state
-            // must NOT be masked by a stale connected flag.
-            window.DivoomState.appConnected = false;
-            dot.className = "transport-dot inactive";
-            dot.title = "Disconnected";
-        } else {
-            // Honest connected (ble/lan/wall) — colour the dot by transport type.
-            const type = window._activeTransportType();
-            dot.className = `transport-dot active ${type}`;
-            dot.title = "";
-        }
-        dot.removeAttribute("style");
-    }).catch(() => {});
-};
-
-window.startConnectionHeartbeat = function() {
-    if (window._connHeartbeat) return;
-    window._connHeartbeat = setInterval(window.refreshConnectionState, 4000);
-    // R47: keep daemon-owned devices in the selector even when this GUI didn't
-    // start them (a widget persisted from a prior session, or another client).
-    window.refreshOwnedDevices();
-    window._ownedHeartbeat = setInterval(window.refreshOwnedDevices, 4000);
-};
 
 // ── R53: daemon-down detection + reconnect ────────────────────────────────
 // The background service (daemon) owns the device over the socket and is killed
@@ -380,10 +243,19 @@ window.reconnectDaemonManual = async function() {
     }
 };
 
+// R59/event-driven: the GUI's daemon subscription ends (socket closed) when
+// the daemon goes down — that replaces the old 4s health poll. Trigger the same
+// silent auto-reconnect + banner logic. The follower thread self-heals (it
+// resubscribes when the daemon returns), so events resume without a poll.
+window.Divoom = window.Divoom || {};
+window.Divoom.onDaemonDown = function() {
+    if (window.refreshDaemonHealth) window.refreshDaemonHealth();
+};
+
 window.startDaemonHeartbeat = function() {
+    // No polling: daemon health is event-driven (window.Divoom.onDaemonDown).
     if (window._daemonHeartbeat) return;
-    window.refreshDaemonHealth();  // probe immediately on dashboard open
-    window._daemonHeartbeat = setInterval(window.refreshDaemonHealth, 4000);
+    window._daemonHeartbeat = true;  // sentinel so this is idempotent
 };
 
 window.updateDeviceSelectorDropdown = function() {

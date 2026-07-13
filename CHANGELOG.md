@@ -4,6 +4,109 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Unreleased — chore: relocate the Rust daemon to the repo root
+
+- **rename:** the Rust daemon (`divoomd`) is no longer a "port"; it moved from
+  `native-port/divoomd` to `divoomd/` (repo root) per the user's decree. `git mv`
+  plus all path references updated and verified: `cargo build --release` green,
+  42 Rust lib tests + `native_encode_parity` green; Python daemon wedge/edge-e2e
+  + 10 parity tests green (3 hw/cloud skips). Pure path change — no behavior
+  change, so no version bump.
+- **fix(depth):** dropped the binary's repo-root parent-walk `5→4` in
+  `divoomd/src/native_encode.rs` and `divoomd/src/spp.rs`, and the
+  `divoomd/src/live_jobs/render.rs` `include_bytes` `../../../../`→`../../../`,
+  since the crate is now one directory shallower. Touched `divoomd/build.rs` to
+  re-emit the macOS Info.plist link arg (stale cached `native-port/...` path).
+- **chore:** `divoom.spec`, `setup_app.py`, `build.sh`, `scripts/build_release.sh`,
+  `scripts/rust_coverage.sh`, `.github/workflows/tests.yml`,
+  `scripts/linux_remote/test_host.sh`, `divoom_daemon/daemon_client.py`,
+  `tests/test_rust_daemon_parity.py`, and the `native-port/gen_*.py` codegen
+  output paths repointed to the root `divoomd/`.
+
+## v0.22.2 — harden + event-driven UI (R58/R59)
+
+- **fix(rust-daemon): socket idle timeout + bounded concurrency.** `socket_server.rs`
+  previously capped only incoming *frame* size; a client that connected and held the
+  socket open silently could pin a permit + the device lock forever. Added
+  `CONNECTION_IDLE_TIMEOUT` (default 300s, `DIVOOMD_IDLE_TIMEOUT_SECS`) — a connection
+  that sends no request within the window is dropped — and `MAX_CONNECTIONS` (default
+  64, `DIVOOMD_MAX_CONNECTIONS`) via a `Semaphore` so a 6th+ connection is
+  back-pressured instead of unbounded. `main.rs` reads the env overrides and logs them.
+- **fix(rust-daemon): idle watchdog also covers `subscribe`.** A subscriber that
+  receives no events for `idle_timeout` is now dropped (releasing its permit) — an
+  event delivery resets the watchdog, so legitimately-quiet-but-live subscribers stay
+  up. Prevents a silent subscriber from pinning a slot forever.
+- **fix(rust-daemon): `device_call` overall timeout enforced.** `cmd_device_call`
+  held the device lock across the whole op while `handle_device_call` ignored its
+  `_timeout` at the top level — a hung device op wedged the lock for every other call.
+  Now wrapped in `tokio::time::timeout` (drops the future, releasing the lock, on
+  overrun) and honors a caller-requested `timeout`, clamped to 1..120s, default 30s
+  (matching `connect_timeout`).
+- **hardware-verified (4 real devices: Pixoo-1, Timoo-light-4, Tivoo-Max-light-3,
+  Ditoo-light-2):** the `device_call` 30s default / 120s cap does **not** false-kill
+  normal ops — measured latencies on Pixoo-1 are connect ~3.9s (reconnect ~1.7s),
+  brightness/clock/hot-channel 59–61ms, `hot_update.update` 1ms (no pending content).
+  The cap is a net against *hung* ops only; very large 0x8B animation/gallery pushes
+  should pass an explicit `timeout` (≤120s). `test_rust_hardware_parity` now runs a
+  3× connect→device_call→disconnect→reconnect loop **and** connects to every
+  discovered device sequentially — all 11 hardware assertions pass.
+- **tests(rust):** `tests/socket_server_hardening.rs` (idle-drop + back-pressure +
+   subscribe-idle-drop), `daemon_connect.rs` (timeout not false-firing + lock
+   released); updated pre-existing `tests/socket_server_behavior.rs` to the new `serve`
+   signature.
+
+## R59 — event-driven UI: kill the flaky 4s polling heartbeats
+
+**problem:** the dashboard learned daemon/device state by *polling on timers*
+(4s heartbeats for connection state, owned-devices, and daemon health; 5s for the
+macOS notification-monitor; 600ms for hot-channel progress). Polling lags (UI shows
+stale state between ticks) and wastes cycles. The daemon already *could* push state
+(R58 proved it) — this round makes it push the rest, and the UI listens.
+
+- **fix(rust-daemon): honest, complete `status` events.** Connect/disconnect now
+  broadcast a `status` event carrying `connected` + `mac`/`lan_ip` (previously only
+  `state`/`counters`, forcing a poll to learn *which* device). Also fixed the
+  **subscribe snapshot lie**: a new subscriber got a hardcoded `state:"idle"` even
+  when a device was already connected — `initial_status` now reports the daemon's
+  *actual* `connected` + `mac`/`lan_ip`, so a freshly opened GUI never shows a stale
+  "disconnected".
+- **fix(rust-daemon): `owned_devices` broadcast.** On connect/disconnect the daemon
+  pushes `{"type":"owned_devices","devices":[...]}` — the set of daemon-owned
+  (often non-advertising) devices — replacing the UI's 4s `get_device_activity`
+  poll.
+- **fix(rust-daemon): `notif_status` is now a distinct event type.** The macOS
+  notification monitor used to broadcast `type:"status"` on every start/stop/error —
+  which collided with the *connection* `status` event and would wrongly flip the
+  connection dot. It now broadcasts `type:"notif_status"`, replacing the UI's 5s
+  `get_notification_listener_status` poll.
+- **fix(rust-daemon): `hot_progress` broadcast.** `sync_artwork` now pushes
+  `hot_progress` (phases `starting`/`done`/`error`) during a hot-channel update,
+  replacing the UI's 600ms progress poll.
+- **fix(rust-daemon): link-health is event-driven.** `cmd_device_call` now broadcasts
+  a `status` event with `state:"degraded"` on a failed/timeout op and recovers to
+  `active` on success — so the amber "link degraded" dot is immediate, not polled.
+- **fix(gui): the daemon subscription now forwards every event to the web UI**
+  (`_make_daemon_event_handler` → `window.Divoom.onDaemonEvent` / `onOwnedDevices` /
+  `onNotifStatus` / `onHotProgress`), and **detects daemon-down via socket closure**
+  (`onDaemonDown`) — the follower thread self-heals (resubscribes when the daemon
+  returns). This replaces the 4s daemon-health poll.
+- **fix(web-ui): removed the flaky polls.** `connection_events.js` (extracted from
+  `app_globals.js` to honour the 500-LOC gate) drives the connection dot + banner and
+  owned-devices + notification-monitor + hot-progress purely from events; the 4s
+  `setInterval` heartbeats are gone. `app_globals.js`'s daemon-health poll is gone
+  too (replaced by `onDaemonDown`).
+- **hardware-verified (real device, Pixoo-1):** `tests/test_rust_daemon_parity.py::
+  test_rust_hardware_event_broadcast` subscribes to a live daemon, connects a real
+  device, and asserts the subscriber receives `status`(connected) + `owned_devices`
+  (listing the real mac), then `owned_devices`([]) on disconnect — proving the UI
+  path gets honest, live updates. (Kept hardware in the loop per the user's directive.)
+- **tests:** `tests/test_daemon_event_broadcast.py` (connect/disconnect `status`
+  carries `connected`+`mac`; honest initial snapshot; `owned_devices` on
+  connect/disconnect) — mock, no hardware needed. `tests/test_gui_event_forwarder.py`
+  (fake-window unit test of every forwarded event type + shutdown-follow).
+  `test_p6_degraded_dot.py` updated to assert the event-driven design (and now reads
+  `connection_events.js`).
+
 ## v0.22.1 — fix: daemon connect can no longer wedge on a dead CoreBluetooth (R57)
 
 - **root cause (v0.22.0 regression):** `BleTransport::connect` /
