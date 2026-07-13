@@ -18,6 +18,28 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **R61 in progress (2026-07-12/13), running under `/loop` per `docs/PLANNING_ROUND61.md`
+  — items 0→5 in order: doc cleanup, 95% coverage, cloud API, loose ends, device
+  detect/connect verify, release.** Item 0 (doc cleanup) mostly done: committed 4
+  uncommitted "R61 coverage push" test files found on entry (86 tests, green);
+  untracked the stray `.coverage` binary artifact; archived 9 fully-shipped
+  `PLANNING_*` docs to `docs/archive/` (rounds 57-60, BLE/socket hardening, daemon
+  ownership, native-port hardening, next-phase, arch-gap-scan, native-UI parity —
+  all cross-checked shipped before moving, `git mv` to preserve history); fixed a
+  stale "TODO: not implemented" claim in `CUSTOM_CHANNEL_VS_APK.md` for 6 rows that
+  are actually shipped; refreshed `ROADMAP.md`'s planning-doc index + added the
+  inline-styles migration remainder as a live backlog line. `docs/` top level down
+  from 25 to 14 files. Item 1 (coverage) in progress: found + fixed a **full-suite
+  pytest crash** — `tests/test_spp_integration.py::test_spp_not_routed_for_unknown_protocol`
+  let a real `BleakClient.connect()` reach macOS CoreBluetooth (no device at the
+  fake test address), SIGABRTing the whole interpreter under TCC (this is the
+  known [[divoom-ble-tcc-harness-limit]] class of failure, but this specific test
+  should never have touched real hardware — fixed by patching
+  `divoom_lib.divoom.BleakClient` at the correct call-time import site). This was
+  blocking `coverage run -m pytest` from ever completing a clean full-suite pass;
+  a coverage baseline run is in flight as of this note. See PLANNING_ROUND61.md
+  for the live checklist — update it, not just this file, as items close.
+
 - **R60 open-thread verification (2026-07-12) — DONE + checkpoint `v0.22.8` (user
   drives the release).** Roadmap
   `docs/PLANNING_ROUND60.md`: #1 (docstring strip) DONE; #4 (durable

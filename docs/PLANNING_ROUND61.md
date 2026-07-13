@@ -24,19 +24,26 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
 
 ## 0. Doc cleanup
 
-- [ ] Commit the 4 untracked "R61 coverage push" test files (they pass; folding them in
-      is a prerequisite for an honest coverage baseline in step 1).
-- [ ] Inventory `docs/*.md` (25 files). For each: KEEP (load-bearing: AGENTS.md,
-      CHANGELOG.md, SESSION_HANDOFF.md, ROADMAP.md, CHANNEL_ARCHITECTURE.md,
-      RELEASING.md, TESTING_STRATEGY.md), CONSOLIDATE (fold into ROADMAP/SESSION_HANDOFF),
-      or REMOVE (fully-shipped, superseded `PLANNING_ROUND{n}.md` / one-off investigation
-      docs with no open thread referencing them — archive to `docs/archive/`, don't hard
-      delete, per the project's existing archive convention).
-- [ ] `SESSION_HANDOFF.md` is 1280+ lines of accreted history — trim to current state +
-      open threads; the deep history already lives in git log / CHANGELOG.
-- [ ] `grep -rn "not ported\|TODO\|FIXME\|deferred" docs/` — confirm every hit is an
-      intentional, still-true note, not stale.
-- **Kill:** `docs/` tree matches reality; no doc contradicts current code state.
+- [x] Commit the 4 untracked "R61 coverage push" test files (86 tests green) — done,
+      commit `c851811`; also untracked the stray `.coverage` binary artifact.
+- [x] Inventory `docs/*.md` (was 25 files, now 14 at top level). Archived 9 fully-shipped
+      docs to `docs/archive/` (rounds 57-60, BLE/socket hardening, daemon ownership,
+      native-port hardening, next-phase, arch-gap-scan, native-UI parity tracker) via
+      `git mv`, each cross-checked shipped first — commit `6941e5f`. Fixed a stale
+      "TODO: not implemented" claim in `CUSTOM_CHANNEL_VS_APK.md` (6 rows actually
+      shipped). Reference docs (APK_COMPARISON, CUSTOM_CHANNEL_VS_APK, CHANNEL_ARCHITECTURE,
+      DIVOOM_API_DOC, DIVOOM_PROTOCOL_SUMMARY, MCP_SERVER, NOTIFICATIONS_SETUP,
+      RELEASING, TESTING_STRATEGY, README) kept as-is — load-bearing, no false claims.
+- [x] `ROADMAP.md` refreshed: planning-doc index repointed to archive paths; added the
+      stalled inline-style migration (batch 2/5) as a live backlog line.
+- [x] `grep -rn "not ported\|TODO\|FIXME\|deferred" docs/` checked — the one stale hit
+      (CUSTOM_CHANNEL_VS_APK) fixed above; rest are intentional/accurate.
+- [ ] `SESSION_HANDOFF.md` is 1280+ lines of accreted history — still needs a trim to
+      current state + open threads (deep history already lives in git log / CHANGELOG).
+      Deferred: risky to do while the file is being actively appended to mid-round;
+      revisit once items 1-5 are closed and no more entries are landing.
+- **Kill:** `docs/` tree matches reality; no doc contradicts current code state. (Mostly
+  met — SESSION_HANDOFF trim is the one remaining sub-item, explicitly deferred above.)
 
 ## 1. Coverage >= 95%
 

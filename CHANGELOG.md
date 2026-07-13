@@ -4,6 +4,26 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## R61 in progress (2026-07-12/13) — doc cleanup + coverage-crash fix
+
+- **test: add R61 coverage-push unit tests; untrack `.coverage` artifact.**
+  Folded in 4 uncommitted test files (86 tests) left from a prior session;
+  stopped tracking the `.coverage` binary (gitignored but still in the tree
+  from before the ignore rule existed).
+- **docs: archive 9 fully-shipped planning docs to `docs/archive/`** (rounds
+  57-60, BLE/socket hardening, daemon ownership, native-port hardening,
+  next-phase, arch-gap-scan, native-UI parity tracker) — each cross-checked
+  against `SESSION_HANDOFF.md`/git log as shipped before moving with `git mv`.
+  Fixed a stale "TODO: not implemented" claim in `CUSTOM_CHANNEL_VS_APK.md`
+  (6 rows were actually shipped). Refreshed `ROADMAP.md`'s index.
+- **fix(tests): full-suite `pytest --cov` crash.**
+  `test_spp_integration.py::test_spp_not_routed_for_unknown_protocol` let a
+  real `BleakClient.connect()` reach CoreBluetooth against a fake address,
+  SIGABRTing the interpreter under TCC and killing any full-suite run partway
+  through. Patched `divoom_lib.divoom.BleakClient` (the actual call-time
+  import site) so the test simulates the failure instead of touching real
+  hardware APIs.
+
 ## Follow-up (2026-07-13) — fix CI `tests` failure + event-driven audit
 
 - **fix(tests): `test_connect_single_device` mocked the wrong seam.**
