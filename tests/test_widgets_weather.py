@@ -85,7 +85,9 @@ def test_weather_card_has_no_panel_hint() -> None:
     # Extract the weather card. Use greedy match to capture the FULL
     # card content (not stopping at the first triple </div>).
     m = re.search(
-        r'<div class="card glass-card" id="widget-card-weather"[^>]*>([\s\S]+)</div>\s*</div>\s*</div>',
+        # class list is allowed extra trailing classes (e.g. a layout utility
+        # like clip-shrink) — pin the id, not an exact class string.
+        r'<div class="card glass-card[^"]*" id="widget-card-weather"[^>]*>([\s\S]+)</div>\s*</div>\s*</div>',
         lw,
         re.DOTALL,
     )
@@ -93,7 +95,7 @@ def test_weather_card_has_no_panel_hint() -> None:
     body = m.group(1)
     # The card-header is allowed (it has the title), but the card-body
     # should not have any panel-hint.
-    body_match = re.search(r'<div class="card-body"[^>]*>([\s\S]+)</div>\s*</div>', body, re.DOTALL)
+    body_match = re.search(r'<div class="card-body[^"]*"[^>]*>([\s\S]+)</div>\s*</div>', body, re.DOTALL)
     assert body_match, "weather card-body not found"
     body_inner = body_match.group(1)
     assert "panel-hint" not in body_inner, (
