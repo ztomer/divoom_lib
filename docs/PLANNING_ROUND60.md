@@ -48,18 +48,30 @@ Add a hardware-gated parity test `test_rust_cloud_decode_renders` modelled on
 Python `media_decoder.resolve_to_gif` output is byte-equal for the resolved GIF.
 
 ## 3. `show_clock()` overlay reorder (verify vs APK C2() canonical)
-**Status:** `divoom_lib/divoom.py:37` `set_clock_rich` uses the APK `C2()`
-10-byte format `0x45 [0x00, time_type, style, 0x01, humidity, weather, date,
-R,G,B]` and is annotated "Different overlay positions than show_clock() — APK
-canonical" (L41). `show_clock()` (L51) uses a *different* overlay coordinate
-layout; ROADMAP flags "mismatched humidity/weather/date coords".
-**Plan:** treat `set_clock_rich`/APK `C2()` as ground truth. Diff
-`show_clock()`'s wire bytes against `C2()`; realign humidity/weather/date overlay
-positions. Cross-check against `references/apk/decompiled_src/` (NOT the
-convenience report, which has been wrong before).
-**Kill:** `show_clock()` emits the same overlay layout as `C2()`; hardware
-screenshot on a 16×16 device shows humidity/weather/date in the APK-canonical
-positions.
+**Status:** **CANONICAL ESTABLISHED from decompiled APK (probe-first, not the
+convenience report).** `CmdManager.java:316` `C2(i9,i10,i11,i12,i13,bArr)` builds
+`[ENV_MODE, i9, i13, bArr…, i10, i11, i12]`; caller `LightViewModel.java:222`
+passes `(f10871c, f10874f, f10875g, f10876h, f10872d, h())`. With `h()` = the
+4-byte `[0x01, humidity, weather, date]` blob and `ENV_MODE._value = 0x00`, the
+**real** 10-byte frame is:
+`[0x00, time_type, style, 0x01, humidity, weather, date, R, G, B]`.
+This matches `set_clock_rich` (`display/__init__.py:37`) — so `set_clock_rich`
+IS the APK-canonical path. **`show_clock()` (`display/__init__.py:51`) diverges:**
+it emits `[0x00, twentyfour, clock, 0x01, weather, temp, calendar, R, G, B]`,
+i.e. overlay bytes at positions 4,5,6 are `weather, temp, calendar` where the
+firmware/canonical expects `humidity, weather, date`. Confirmed real divergence.
+**BLOCKED on decision + device:** `show_clock`'s parameter *names*
+(`weather, temp, calendar`) don't map 1:1 onto the canonical fields
+(`humidity, weather, date`), so a reorder is a behavior change that needs
+(a) a parameter-semantics decision and (b) the plan's kill-criterion = a
+**hardware screenshot** (cannot be captured from this shell — `conftest` warns
+BLE scans here abort the interpreter without TCC grant). Do NOT guess-flip a
+device-facing frame. Fix + verify in the user-driven hardware loop.
+**Plan:** in the hardware loop, align `show_clock`'s positions 4,5,6 to
+`humidity, weather, date` (reconcile param names), add a wire-byte unit test
+pinning the canonical layout, then confirm on-device render.
+**Kill:** `show_clock()` emits the canonical layout; 16×16 screenshot shows
+humidity/weather/date in APK-canonical positions.
 
 ## 4. Durable device_call parity test (anti-drift)
 **Status:** **DONE** (interim tag v0.22.4). Added `tests/test_device_call_parity.py`
@@ -124,5 +136,8 @@ on at least one device each (or explicitly marked "wire-only" in docs).
 
 **Checkpoints so far:** `v0.22.3` (onDaemonEvent fix + round-60 doc accuracy),
 `v0.22.4` (#1 docstrings + #4 parity test + alias-gap closure), `v0.22.5` (#6
-Phase-5 archive docs). Next up: hardware items #2/#3/#5/#7 with the 4 devices in
-the loop.
+Phase-5 archive docs), `v0.22.6` (#3 APK C2() canonical established). Hardware-free
+#1/#4/#6 DONE. #3 canonical verified (divergence confirmed) — fix + visual
+kill-criterion need the user-driven hardware loop. Remaining device-in-loop:
+#2 (cloud-decode render), #3 (show_clock reorder + shot), #5 (get_* timeout
+bounds), #7 (Ditoo soak). No release until the roadmap is complete + hardware-verified.

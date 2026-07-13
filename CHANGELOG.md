@@ -4,6 +4,17 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.6 — R60 #3: APK C2() canonical established for show_clock (R60)
+
+- **investigation(round60 #3):** established the true APK `C2()` canonical from
+  decompiled source (`CmdManager.java:316` + caller `LightViewModel.java:222`):
+  the clock env frame is `[0x00, time_type, style, 0x01, humidity, weather, date,
+  R, G, B]`. `set_clock_rich` already matches; `show_clock()` diverges (overlay
+  bytes pos 4–6 are `weather, temp, calendar`). The reorder fix + the plan's
+  visual kill-criterion require the user-driven hardware loop (BLE scans from
+  this shell abort the interpreter). Recorded in `docs/PLANNING_ROUND60.md`; no
+  code change yet. (Interim checkpoint — not a release.)
+
 ## v0.22.5 — Phase-5 archive: Python daemon marked reference-only (R60)
 
 - **docs(phase5):** marked the Python daemon `REFERENCE/FALLBACK` — Rust

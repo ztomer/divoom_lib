@@ -23,9 +23,14 @@ Claude) should read this on entry and **update it at the end of every round**
   device_call parity test) DONE at v0.22.4 — the test caught 15 key-alias gaps
   (`system.*`/`sound.*`/`device.get_work_mode` prefixes) now closed with alias
   arms in `device_call/mod.rs` + submodules; #6 (Phase-5 archive docs) DONE at
-  v0.22.5 — Python daemon marked REFERENCE/FALLBACK, kept (`DIVOOM_USE_RUST_DAEMON=0`).
-  Interim tags: `v0.22.3`, `v0.22.4`, `v0.22.5`. Next: hardware items #2/#3/#5/#7
-  with the 4 devices in the loop. No release until the roadmap is complete.
+   v0.22.5 — Python daemon marked REFERENCE/FALLBACK, kept (`DIVOOM_USE_RUST_DAEMON=0`);
+   #3 APK `C2()` canonical established (v0.22.6) — `show_clock()` overlay bytes
+   (pos 4,5,6 = `weather,temp,calendar`) diverge from canonical
+   `humidity,weather,date`, but the fix + the plan's visual kill-criterion need the
+   user-driven hardware loop (BLE scans here abort the interpreter per `conftest`).
+   Interim tags: `v0.22.3`…`v0.22.6`. Remaining device-in-loop: #2 (cloud-decode
+   render), #3 (show_clock reorder + screenshot), #5 (get_* timeout bounds), #7
+   (Ditoo soak). No release until the roadmap is complete + hardware-verified.
 - **EVENT-DRIVEN UI (R59, 2026-07-12) — DONE + HARDWARE-VERIFIED; shipping as v0.22.2.**
   The dashboard learned daemon/device state by **polling on 4s heartbeats** (connection,
   owned-devices, daemon-health) + 5s notif-status + 600ms hot-progress — flaky/laggy. This
