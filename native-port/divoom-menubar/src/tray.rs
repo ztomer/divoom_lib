@@ -132,20 +132,76 @@ impl Tray {
     }
 }
 
-/// A 16x16 filled rounded square in `rgb` — the menubar glyph (status-coloured).
+/// A stylized "D" glyph: a flat left edge (the letter's vertical stroke) plus
+/// a rounded right side (its bowl), outlined in a fixed light border so the
+/// shape reads the same regardless of state, with the STATUS colour filling
+/// the interior. Replaces the earlier bland filled square — user feedback
+/// (2026-07-13) found a plain colored square too unrecognizable to read at a
+/// glance; a named-letter silhouette is legible even before checking color.
 fn make_icon(rgb: [u8; 3]) -> tray_icon::Icon {
-    const N: usize = 16;
+    const N: usize = 22;
+    const MARGIN: f32 = 3.0;
+    const STROKE: f32 = 2.2;
+    const BORDER: [u8; 3] = [0xf5, 0xf5, 0xf5];
+    const SUBSAMPLES: i32 = 4; // cheap supersampled AA so the bowl's curve isn't jagged at this size
+
+    let left = MARGIN;
+    let radius = (N as f32) / 2.0 - MARGIN;
+    let mid = left + radius;
+    let cy = (N as f32) / 2.0;
+    let top = cy - radius;
+    let bottom = cy + radius;
+
+    // The D's silhouette: a rectangle (the spine + body) unioned with a
+    // semicircle (the bowl) sharing the rectangle's right edge as its diameter.
+    let inside_d = |fx: f32, fy: f32| -> bool {
+        let in_rect = fx >= left && fx <= mid && fy >= top && fy <= bottom;
+        let dx = fx - mid;
+        let dy = fy - cy;
+        let in_bowl = fx >= mid && (dx * dx + dy * dy) <= radius * radius;
+        in_rect || in_bowl
+    };
+    // Within STROKE of the silhouette's own boundary (left/top/bottom edges of
+    // the rect, or the bowl's arc) — the fixed-color outline band.
+    let is_border = |fx: f32, fy: f32| -> bool {
+        let dx = fx - mid;
+        let dy = fy - cy;
+        let dist_from_arc = radius - (dx * dx + dy * dy).sqrt();
+        let near_left = fx <= mid && (fx - left).abs() <= STROKE && fy >= top - STROKE && fy <= bottom + STROKE;
+        let near_top = fx <= mid && (fy - top).abs() <= STROKE;
+        let near_bottom = fx <= mid && (fy - bottom).abs() <= STROKE;
+        let near_bowl = fx >= mid && dist_from_arc.abs() <= STROKE;
+        near_left || near_top || near_bottom || near_bowl
+    };
+
     let mut rgba = vec![0u8; N * N * 4];
     for y in 0..N {
         for x in 0..N {
-            let edge = x == 0 || y == 0 || x == N - 1 || y == N - 1;
-            if !edge {
-                let i = (y * N + x) * 4;
-                rgba[i] = rgb[0];
-                rgba[i + 1] = rgb[1];
-                rgba[i + 2] = rgb[2];
-                rgba[i + 3] = 0xff;
+            let mut coverage = 0.0f32;
+            let mut border_weight = 0.0f32;
+            for sy in 0..SUBSAMPLES {
+                for sx in 0..SUBSAMPLES {
+                    let fx = x as f32 + (sx as f32 + 0.5) / SUBSAMPLES as f32;
+                    let fy = y as f32 + (sy as f32 + 0.5) / SUBSAMPLES as f32;
+                    if inside_d(fx, fy) {
+                        coverage += 1.0;
+                        if is_border(fx, fy) {
+                            border_weight += 1.0;
+                        }
+                    }
+                }
             }
+            let total = (SUBSAMPLES * SUBSAMPLES) as f32;
+            if coverage <= 0.0 {
+                continue;
+            }
+            let border_frac = border_weight / coverage;
+            let color = if border_frac >= 0.5 { BORDER } else { rgb };
+            let i = (y * N + x) * 4;
+            rgba[i] = color[0];
+            rgba[i + 1] = color[1];
+            rgba[i + 2] = color[2];
+            rgba[i + 3] = ((coverage / total) * 255.0).round() as u8;
         }
     }
     tray_icon::Icon::from_rgba(rgba, N as u32, N as u32).expect("valid tray icon")
