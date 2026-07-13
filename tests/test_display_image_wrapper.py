@@ -169,3 +169,38 @@ async def test_get_work_mode_returns_none_on_exception(display: Display) -> None
     )
     mode = await display._get_work_mode()
     assert mode is None
+
+
+@pytest.mark.asyncio
+async def test_get_work_mode_uses_lan_when_present(display: Display) -> None:
+    """_get_work_mode routes through communicator.lan.get_work_mode() for LAN devices."""
+    display.communicator.lan = MagicMock()
+    display.communicator.lan.get_work_mode = AsyncMock(return_value=WORK_MODE_DESIGN)
+    mode = await display._get_work_mode()
+    assert mode == WORK_MODE_DESIGN
+    display.communicator.lan.get_work_mode.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_display_image_polling_loop_survives_get_work_mode_exception(
+    display: Display, test_image: str
+) -> None:
+    """R61: display_image's own polling loop wraps `self._get_work_mode()` in a
+    try/except (distinct from `_get_work_mode`'s internal exception handling) —
+    a transient failure mid-poll must not abort the wait, and the loop should
+    recover and succeed once a later poll reports the design channel."""
+    call_count = 0
+
+    async def flaky_then_ok() -> int:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise Exception("transient BLE hiccup")
+        return WORK_MODE_DESIGN
+
+    with patch.object(display, "show_image", new=AsyncMock(return_value=True)), \
+         patch.object(display, "_get_work_mode", new=AsyncMock(side_effect=flaky_then_ok)), \
+         patch("divoom_lib.display.asyncio.sleep", new=AsyncMock()):
+        result = await display.display_image(test_image, wait_for_display=True, poll_timeout_s=2.0)
+    assert result is True
+    assert call_count >= 2

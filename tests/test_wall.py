@@ -217,6 +217,201 @@ class TestDivoomWall(unittest.IsolatedAsyncioTestCase):
             self.assertIn(LPWA_CONTROL_CONTENT, controls)
 
 
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_wall_show_image_missing_file_returns_false(self, mock_divoom_class):
+        """show_image on a nonexistent path must fail fast (no crop/stream attempt)."""
+        wall = DivoomWall(self.device_configs)
+        ok = await wall.show_image("/no/such/file/anywhere.png")
+        self.assertFalse(ok)
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_is_alive_true_when_all_slots_alive(self, mock_divoom_class):
+        mock_clients = []
+        for _ in range(4):
+            mc = MagicMock()
+            mc.is_alive = True
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+        wall = DivoomWall(self.device_configs)
+        self.assertTrue(wall.is_alive)
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_is_alive_false_when_no_devices(self, mock_divoom_class):
+        wall = DivoomWall(self.device_configs)
+        wall.devices = []
+        self.assertFalse(wall.is_alive)
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_wall_set_brightness_lan_path(self, mock_divoom_class):
+        """R17: a slot with a LAN transport attached uses lan.set_brightness,
+        not the BLE device.set_brightness fallback."""
+        mock_clients = []
+        for _ in range(4):
+            mc = MagicMock()
+            mc.lan = MagicMock()
+            mc.lan.set_brightness = AsyncMock(return_value={"error_code": 0})
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+        wall = DivoomWall(self.device_configs)
+        self.assertTrue(await wall.set_brightness(42))
+        for mc in mock_clients:
+            mc.lan.set_brightness.assert_called_once_with(42)
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    @patch('divoom_lib.wall.Image.open')
+    async def test_wall_show_image_partial_slot_failure(self, mock_image_open, mock_divoom_class):
+        """A slot whose show_image returns False (not an exception) must flip
+        all_ok to False (the `elif not res` branch)."""
+        mock_img = MagicMock(spec=Image.Image)
+        mock_img.is_animated = False
+        mock_img.crop = MagicMock(return_value=mock_img)
+        mock_img.resize = MagicMock(return_value=mock_img)
+        mock_image_open.return_value = mock_img
+
+        mock_clients = []
+        for i in range(4):
+            mc = MagicMock()
+            # First slot's push reports a soft failure (False, no exception).
+            mc.display.show_image = AsyncMock(return_value=(i != 0))
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+
+        orig_exists = Path.exists
+        Path.exists = lambda self_path: "mock_path.png" in str(self_path)
+        try:
+            wall = DivoomWall(self.device_configs)
+            ok = await wall.show_image("mock_path.png")
+            self.assertFalse(ok)
+        finally:
+            Path.exists = orig_exists
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_get_last_previews_encodes_data_urls(self, mock_divoom_class):
+        """get_last_previews base64-encodes cached preview bytes and picks the
+        MIME type from the GIF magic bytes vs PNG default."""
+        wall = DivoomWall(self.device_configs)
+        wall.last_previews = {
+            "AA:BB:CC:DD:EE:01": b"GIF89a\x00\x00fakegifdata",
+            "AA:BB:CC:DD:EE:02": b"\x89PNGfakepngdata",
+            "AA:BB:CC:DD:EE:03": b"",  # empty -> skipped
+        }
+        previews = wall.get_last_previews()
+        self.assertIn("AA:BB:CC:DD:EE:01", previews)
+        self.assertTrue(previews["AA:BB:CC:DD:EE:01"].startswith("data:image/gif;base64,"))
+        self.assertTrue(previews["AA:BB:CC:DD:EE:02"].startswith("data:image/png;base64,"))
+        self.assertNotIn("AA:BB:CC:DD:EE:03", previews)
+
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_grid_animated_image_real_frames_skips_freeform_resize(self, mock_divoom_class):
+        """Uniform-grid (non-free-form) animated show_image: the per-frame
+        loop must take the `is_free_form is False` branch (crop only, no
+        extra per-slot resize)."""
+        import tempfile
+        mock_clients = []
+        for _ in range(4):
+            mc = MagicMock()
+            mc.display.show_image = AsyncMock(return_value=True)
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as home_td:
+            gif_path = str(Path(td) / "grid_anim.gif")
+            frame1 = Image.new("RGB", (32, 32), (255, 0, 0))
+            frame2 = Image.new("RGB", (32, 32), (0, 255, 0))
+            frame1.save(gif_path, save_all=True, append_images=[frame2], duration=100, loop=0)
+
+            orig_home = Path.home
+            Path.home = staticmethod(lambda: Path(home_td))
+            try:
+                wall = DivoomWall(self.device_configs)
+                ok = await wall.show_image(gif_path)
+                self.assertTrue(ok)
+                for mc in mock_clients:
+                    mc.display.show_image.assert_called_once()
+            finally:
+                Path.home = orig_home
+
+
+class TestDivoomWallFreeForm(unittest.IsolatedAsyncioTestCase):
+    """Free-form (absolute width/height, non-grid) layout — the show_image crop
+    math takes a different branch (left/upper/right/lower from absolute
+    coordinates, plus a per-slot resize down to `size`) than the uniform-grid
+    layout covered by TestDivoomWall."""
+
+    def setUp(self):
+        self.device_configs = [
+            {"mac": "AA:BB:CC:DD:EE:01", "x": 0, "y": 0, "width": 32, "height": 16, "size": 16},
+            {"mac": "AA:BB:CC:DD:EE:02", "x": 32, "y": 0, "width": 32, "height": 16, "size": 16},
+        ]
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    @patch('divoom_lib.wall.Image.open')
+    async def test_free_form_static_image_crop_and_resize(self, mock_image_open, mock_divoom_class):
+        mock_img = MagicMock(spec=Image.Image)
+        mock_img.is_animated = False
+        mock_img.crop = MagicMock(return_value=mock_img)
+        mock_img.resize = MagicMock(return_value=mock_img)
+        mock_image_open.return_value = mock_img
+
+        mock_clients = []
+        for _ in range(2):
+            mc = MagicMock()
+            mc.display.show_image = AsyncMock(return_value=True)
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+
+        import tempfile
+        with tempfile.TemporaryDirectory() as home_td:
+            orig_home = Path.home
+            Path.home = staticmethod(lambda: Path(home_td))
+            orig_exists = Path.exists
+            Path.exists = lambda self_path: "free_form.png" in str(self_path)
+            try:
+                wall = DivoomWall(self.device_configs)
+                ok = await wall.show_image("free_form.png")
+                self.assertTrue(ok)
+            finally:
+                Path.exists = orig_exists
+                Path.home = orig_home
+
+        # Free-form path resizes the crop DOWN to the slot's uniform `size`.
+        mock_img.resize.assert_any_call((16, 16), Image.NEAREST)
+        for mc in mock_clients:
+            mc.display.show_image.assert_called_once()
+
+    @patch('divoom_lib.wall.Divoom', new_callable=MagicMock)
+    async def test_free_form_animated_image_real_frames(self, mock_divoom_class):
+        """Real (non-mocked) 2-frame animated GIF through the free-form path
+        exercises the per-frame crop+resize loop and the frames[0].save call.
+        Redirects Path.home() to a tmp dir so the split-cache write doesn't
+        touch the real ~/.config/divoom-control/cache_wall."""
+        import tempfile
+        mock_clients = []
+        for _ in range(2):
+            mc = MagicMock()
+            mc.display.show_image = AsyncMock(return_value=True)
+            mock_clients.append(mc)
+        mock_divoom_class.side_effect = mock_clients
+
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as home_td:
+            gif_path = str(Path(td) / "anim.gif")
+            frame1 = Image.new("RGB", (64, 16), (255, 0, 0))
+            frame2 = Image.new("RGB", (64, 16), (0, 255, 0))
+            frame1.save(gif_path, save_all=True, append_images=[frame2], duration=100, loop=0)
+
+            orig_home = Path.home
+            Path.home = staticmethod(lambda: Path(home_td))
+            try:
+                wall = DivoomWall(self.device_configs)
+                ok = await wall.show_image(gif_path)
+                self.assertTrue(ok)
+                for mc in mock_clients:
+                    mc.display.show_image.assert_called_once()
+            finally:
+                Path.home = orig_home
+
+
 class TestWallResolution(unittest.TestCase):
     """R13 §1 — the wall_resolution() helper. It must be derived from
     panel_resolution (per-panel pixels), not the wall canvas size."""

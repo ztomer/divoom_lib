@@ -259,8 +259,8 @@ class CommandQueue:
             self._pending.clear()
             self._cond.notify_all()
         for item in remaining:
+            item.coro.close()  # prevent RuntimeWarning
             if not item.future.cancelled():
-                item.coro.close()  # prevent RuntimeWarning
                 item.future.set_exception(RuntimeError("queue stopped"))
         if self._worker is not None:
             try:
@@ -434,8 +434,8 @@ class CommandQueue:
                     item = self._pending[0]
                     if item.timeout is not None and (now - item.enqueued_at) >= item.timeout:
                         self._pending.popleft()
+                        item.coro.close()  # prevent RuntimeWarning
                         if not item.future.cancelled():
-                            item.coro.close()  # prevent RuntimeWarning
                             item.future.set_exception(TimeoutError(
                                 f"item timed out after {item.timeout:.1f}s"
                             ))

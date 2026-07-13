@@ -5,6 +5,7 @@ chunk-INDEX offset_id (0,1,2,…) with 256-byte chunks, sent as start + N data +
 terminate. The chunk size MUST be 256 — the device places chunk N at byte N*256,
 so the monthly-best daemon's 200-byte chunks left gaps and stalled the device.
 """
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -221,3 +222,201 @@ def test_listened_0x8b_retransmit_queues_without_consuming_scalar():
     not_listening = _mk(set())
     not_listening._handle_ios_le_notification(frame)
     assert not_listening.notification_queue.qsize() == 0
+
+
+# ── R61 coverage push: set_gif_speed / set_light_phone_gif ───────────────────
+
+
+@pytest.mark.asyncio
+async def test_set_gif_speed_sends_le_speed():
+    anim, comm = _make_anim()
+    result = await anim.set_gif_speed(300)
+    assert result is True
+    cmd, args = comm.send_command.await_args_list[-1].args
+    assert cmd == COMMANDS["set gif speed"]
+    assert args == list((300).to_bytes(2, byteorder='little'))
+
+
+@pytest.mark.asyncio
+async def test_set_light_phone_gif_builds_expected_payload():
+    anim, comm = _make_anim()
+    result = await anim.set_light_phone_gif(total_len=10, gif_id=2, gif_data=[1, 2, 3])
+    assert result is True
+    cmd, args = comm.send_command.await_args_list[-1].args
+    assert cmd == COMMANDS["set light phone gif"]
+    expected = list((10).to_bytes(2, byteorder='little')) + [2] + [1, 2, 3]
+    assert args == expected
+
+
+# ── R61 coverage push: app_new_send_gif_cmd handler error/edge paths ─────────
+
+
+@pytest.mark.asyncio
+async def test_app_new_send_gif_cmd_start_sending_missing_file_size():
+    anim, comm = _make_anim()
+    result = await anim.app_new_send_gif_cmd(control_word=ANSGC_CONTROL_START_SENDING)
+    assert result is False
+    comm.send_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_app_new_send_gif_cmd_sending_data_missing_params():
+    anim, comm = _make_anim()
+    result = await anim.app_new_send_gif_cmd(
+        control_word=ANSGC_CONTROL_SENDING_DATA, file_size=10
+    )
+    assert result is False
+    comm.send_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_app_new_send_gif_cmd_terminate_sending():
+    anim, comm = _make_anim()
+    result = await anim.app_new_send_gif_cmd(control_word=ANSGC_CONTROL_TERMINATE_SENDING)
+    assert result is True
+    cmd, args = comm.send_command.await_args_list[-1].args
+    assert cmd == COMMANDS["app new send gif cmd"]
+    assert args == [ANSGC_CONTROL_TERMINATE_SENDING]
+
+
+@pytest.mark.asyncio
+async def test_app_new_send_gif_cmd_unknown_control_word():
+    anim, comm = _make_anim()
+    result = await anim.app_new_send_gif_cmd(control_word=0xFF)
+    assert result is False
+    comm.send_command.assert_not_called()
+
+
+# ── R61 coverage push: stream_animation_8b non-BLE (LAN/SPP) branch ──────────
+
+
+@pytest.mark.asyncio
+async def test_stream_animation_8b_lan_transport_skips_ble_only_steps():
+    """When comm.lan is set, is_ble is False: no start-ACK wait, no listen-set
+    bookkeeping, no retransmit serving, and the finally block skips clearing
+    the (nonexistent) BLE-only scalar."""
+    comm = MagicMock()
+    comm.logger = MagicMock()
+    comm.lan = MagicMock()  # non-None -> is_lan True -> is_ble False
+    comm.use_spp = False
+    comm.send_command = AsyncMock(return_value=True)
+    comm.wait_for_response = AsyncMock(return_value=None)
+    anim = Animation(comm)
+    with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
+        ok = await anim.stream_animation_8b(bytes(300))
+    assert ok is True
+    comm.wait_for_response.assert_not_awaited()
+
+
+# ── R61 coverage push: start phase failure ───────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_stream_animation_8b_start_phase_failure_returns_false():
+    anim, comm = _make_anim()
+    comm.send_command = AsyncMock(return_value=False)  # start phase itself fails
+    with patch("divoom_lib.display.animation.asyncio.sleep", new=AsyncMock()):
+        ok = await anim.stream_animation_8b(bytes(300))
+    assert ok is False
+
+
+# ── R61 coverage push: _await_8b_device_ready direct tests ───────────────────
+
+
+@pytest.mark.asyncio
+async def test_await_8b_device_ready_no_wait_channel():
+    anim, comm = _make_anim()
+    comm.wait_for_response = None  # transport has no response channel
+    assert await anim._await_8b_device_ready(timeout=1.0) is False
+
+
+@pytest.mark.asyncio
+async def test_await_8b_device_ready_times_out_on_non_matching_payloads():
+    anim, comm = _make_anim()
+    # Never a start-ACK (payload[0] != 0) -> loop keeps waiting until the real
+    # clock exceeds the (tiny) timeout.
+    comm.wait_for_response = AsyncMock(return_value=bytes([9, 0, 0]))
+    assert await anim._await_8b_device_ready(timeout=0.05) is False
+
+
+@pytest.mark.asyncio
+async def test_await_8b_device_ready_ignores_non_ack_then_succeeds():
+    anim, comm = _make_anim()
+    comm.wait_for_response = AsyncMock(side_effect=[bytes([9]), bytes([0])])
+    assert await anim._await_8b_device_ready(timeout=1.0) is True
+
+
+# ── R61 coverage push: _serve_8b_retransmits direct tests ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_serve_8b_retransmits_no_wait_channel_returns_immediately():
+    anim, comm = _make_anim()
+    comm.wait_for_response = None
+    await anim._serve_8b_retransmits(bytes(300), 300, 256, False)
+    # No exception, and nothing sent (function returned on the `wait is None` guard).
+    comm.send_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_serve_8b_retransmits_swallows_wait_exception():
+    anim, comm = _make_anim()
+    comm.wait_for_response = AsyncMock(side_effect=Exception("BLE gone"))
+    await anim._serve_8b_retransmits(bytes(300), 300, 256, False)
+    comm.send_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_serve_8b_retransmits_ignores_non_retransmit_payload_then_stops():
+    anim, comm = _make_anim()
+    # payload[0] == 0 (late start-ACK) is neither a retransmit nor quiet -> the
+    # fallthrough branch, then the next wait goes quiet.
+    comm.wait_for_response = AsyncMock(side_effect=[bytes([0]), None])
+    await anim._serve_8b_retransmits(bytes(300), 300, 256, False)
+    comm.send_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_serve_8b_retransmits_skips_out_of_range_index():
+    anim, comm = _make_anim()
+    # idx=100 * chunk_size(256) >= file_size(300) -> out-of-range, `continue`.
+    comm.wait_for_response = AsyncMock(
+        side_effect=[bytes([1]) + (100).to_bytes(2, "little"), None]
+    )
+    await anim._serve_8b_retransmits(bytes(300), 300, 256, False)
+    comm.send_command.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_serve_8b_retransmits_exhausts_max_requests_without_going_quiet():
+    anim, comm = _make_anim()
+    # Device always asks for chunk 0 retransmit; the safety valve (max_requests)
+    # must end the loop by falling off the end, not by returning early.
+    comm.wait_for_response = AsyncMock(return_value=bytes([1, 0, 0]))
+    await anim._serve_8b_retransmits(bytes(300), 300, 256, False, max_requests=3)
+    assert comm.send_command.await_count == 3
+
+
+# ── R61 coverage push: set_rhythm_gif / app_send_eq_gif ──────────────────────
+
+
+@pytest.mark.asyncio
+async def test_set_rhythm_gif_builds_expected_payload():
+    anim, comm = _make_anim()
+    result = await anim.set_rhythm_gif(pos=1, total_length=10, gif_id=2, data=[9, 9])
+    assert result is True
+    cmd, args = comm.send_command.await_args_list[-1].args
+    assert cmd == COMMANDS["set rhythm gif"]
+    expected = [1] + list((10).to_bytes(2, byteorder='little')) + [2] + [9, 9]
+    assert args == expected
+
+
+@pytest.mark.asyncio
+async def test_app_send_eq_gif_builds_expected_payload():
+    anim, comm = _make_anim()
+    result = await anim.app_send_eq_gif(pos=1, total_length=10, gif_id=2, data=[9, 9])
+    assert result is True
+    cmd, args = comm.send_command.await_args_list[-1].args
+    assert cmd == COMMANDS["app send eq gif"]
+    expected = [1] + list((10).to_bytes(2, byteorder='little')) + [2] + [9, 9]
+    assert args == expected
