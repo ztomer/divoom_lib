@@ -1420,5 +1420,532 @@ class TestLightingApiCoverage(unittest.TestCase):
         self.assertFalse(self.api.lighting.display_custom_art("/tmp/art.png"))
 
 
+# ── R61 planning item 1 coverage push: ConnectionApi
+# (divoom_gui/api/connection.py) was 24% covered — none of its scan /
+# capabilities / probe-lan / lan-config / transport-status / window methods
+# were exercised. DivoomGuiAPI's own wrappers route scan_devices through
+# ScannerMixin and window controls through WindowApi, leaving ConnectionApi's
+# identically-named methods dead from the top-level API's perspective. These
+# tests call self.api.connection.<method>() directly instead. ──────────────
+
+class TestConnectionApiCoverage(unittest.TestCase):
+    def setUp(self):
+        self.presets_patcher = patch("pathlib.Path.exists", return_value=False)
+        self.presets_patcher.start()
+        import tempfile
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.home_patcher = patch("pathlib.Path.home", return_value=Path(self.temp_dir.name))
+        self.home_patcher.start()
+        self.api = DivoomGuiAPI()
+        self.api.window = MagicMock()
+
+    def tearDown(self):
+        self.presets_patcher.stop()
+        self.home_patcher.stop()
+        self.temp_dir.cleanup()
+
+    # ---- scan_devices: no daemon / success / exception --------------------
+
+    def test_scan_devices_no_daemon_returns_empty_list(self):
+        with patch.object(self.api.connection, "_client", return_value=None):
+            result = self.api.connection.scan_devices()
+        self.assertEqual(json.loads(result), [])
+
+    def test_scan_devices_success_returns_devices(self):
+        fake = MagicMock()
+        fake.scan.return_value = {"devices": [{"mac": "AA:BB"}]}
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            result = self.api.connection.scan_devices(timeout=5)
+        self.assertEqual(json.loads(result), [{"mac": "AA:BB"}])
+        fake.scan.assert_called_with(timeout=5, limit=4)
+
+    def test_scan_devices_exception_returns_empty_list(self):
+        fake = MagicMock()
+        fake.scan.side_effect = RuntimeError("boom")
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            result = self.api.connection.scan_devices()
+        self.assertEqual(json.loads(result), [])
+
+    # ---- get_capabilities: no daemon / success -----------------------------
+
+    def test_get_capabilities_no_daemon_returns_empty_dict(self):
+        with patch.object(self.api.connection, "_client", return_value=None):
+            result = self.api.connection.get_capabilities()
+        self.assertEqual(json.loads(result), {})
+
+    def test_get_capabilities_success(self):
+        fake = MagicMock()
+        fake.device_call.return_value = {"result": {"leds": 16}}
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            result = self.api.connection.get_capabilities()
+        self.assertEqual(json.loads(result), {"leds": 16})
+        fake.device_call.assert_called_with("get_capabilities", [], {}, target="device")
+
+    # ---- _client: lazy daemon spawn + caching ------------------------------
+
+    def test_connection_client_spawns_and_caches_daemon(self):
+        self.api._daemon_client = None
+        with patch("divoom_gui.daemon_bridge.ensure_daemon", return_value="FAKE_CLIENT") as mock_ensure:
+            result = self.api.connection._client()
+            self.assertEqual(result, "FAKE_CLIENT")
+            self.assertEqual(self.api._daemon_client, "FAKE_CLIENT")
+            # Second call must reuse the cached client, not spawn again.
+            self.api.connection._client()
+            mock_ensure.assert_called_once()
+
+    # ---- probe_lan: no daemon / no-ip / reachable / unreachable / exception
+
+    def test_probe_lan_no_daemon(self):
+        with patch.object(self.api.connection, "_client", return_value=None):
+            result = json.loads(self.api.connection.probe_lan())
+        self.assertFalse(result["reachable"])
+        self.assertIn("Daemon unavailable", result["detail"])
+
+    def test_probe_lan_no_ip_configured(self):
+        fake = MagicMock()
+        fake.probe_lan.return_value = {"device_ip": None, "reachable": False}
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            result = json.loads(self.api.connection.probe_lan())
+        self.assertFalse(result["reachable"])
+        self.assertIn("No LAN IP", result["detail"])
+
+    def test_probe_lan_reachable(self):
+        fake = MagicMock()
+        fake.probe_lan.return_value = {"device_ip": "192.168.1.5", "reachable": True}
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            result = json.loads(self.api.connection.probe_lan())
+        self.assertTrue(result["reachable"])
+        self.assertIn("192.168.1.5:9000", result["detail"])
+
+    def test_probe_lan_unreachable_with_ip(self):
+        fake = MagicMock()
+        fake.probe_lan.return_value = {"device_ip": "192.168.1.5", "reachable": False}
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            result = json.loads(self.api.connection.probe_lan())
+        self.assertFalse(result["reachable"])
+        self.assertIn("192.168.1.5:9000", result["detail"])
+
+    def test_probe_lan_exception(self):
+        fake = MagicMock()
+        fake.probe_lan.side_effect = RuntimeError("boom")
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            result = json.loads(self.api.connection.probe_lan())
+        self.assertFalse(result["reachable"])
+        self.assertIn("boom", result["detail"])
+
+    # ---- save_lan_config: fresh file / merge existing / exception ---------
+
+    def test_save_lan_config_writes_fresh_file(self):
+        with patch("divoom_lib.utils.atomic_io.atomic_write_config") as mock_write:
+            result = self.api.connection.save_lan_config("192.168.1.10", 1234)
+        self.assertTrue(result)
+        mock_write.assert_called_once()
+        cfg = mock_write.call_args.args[1]
+        self.assertEqual(cfg["lan"]["device_ip"], "192.168.1.10")
+        self.assertEqual(cfg["lan"]["local_token"], "1234")
+
+    def test_save_lan_config_merges_existing_file(self):
+        with patch.object(Path, "exists", return_value=True), \
+             patch("configparser.ConfigParser.read") as mock_read, \
+             patch("divoom_lib.utils.atomic_io.atomic_write_config") as mock_write:
+            result = self.api.connection.save_lan_config("10.0.0.5", 99)
+        self.assertTrue(result)
+        mock_read.assert_called_once()
+        mock_write.assert_called_once()
+
+    def test_save_lan_config_merges_existing_lan_section(self):
+        """The ``"lan" not in cfg`` guard's False arm: a config file that
+        already has a [lan] section must be updated in place, not replaced."""
+        def _fake_read(cfg_self, *a, **kw):
+            cfg_self["lan"] = {"device_ip": "old.ip", "local_token": "1"}
+
+        with patch.object(Path, "exists", return_value=True), \
+             patch("configparser.ConfigParser.read", _fake_read), \
+             patch("divoom_lib.utils.atomic_io.atomic_write_config") as mock_write:
+            result = self.api.connection.save_lan_config("10.0.0.5", 99)
+        self.assertTrue(result)
+        cfg = mock_write.call_args.args[1]
+        self.assertEqual(cfg["lan"]["device_ip"], "10.0.0.5")
+        self.assertEqual(cfg["lan"]["local_token"], "99")
+
+    def test_save_lan_config_exception_returns_false(self):
+        with patch("divoom_lib.utils.atomic_io.atomic_write_config", side_effect=OSError("disk full")):
+            result = self.api.connection.save_lan_config("1.2.3.4", 1)
+        self.assertFalse(result)
+
+    # ---- get_transport_status: ble/lan/cloud availability + creds error ---
+
+    def test_get_transport_status_ble_connected_no_cloud(self):
+        with patch.object(self.api.connection, "_device_status",
+                          return_value={"connected": True, "mac": "AA:BB", "lan_ip": None}), \
+             patch("divoom_lib.divoom_auth.get_cached_credentials", return_value=None):
+            result = json.loads(self.api.connection.get_transport_status())
+        self.assertTrue(result["ble"]["available"])
+        self.assertEqual(result["ble"]["detail"], "AA:BB")
+        self.assertFalse(result["lan"]["available"])
+        self.assertFalse(result["cloud"]["available"])
+        self.assertTrue(result["external"]["available"])
+
+    def test_get_transport_status_lan_and_cloud_authenticated(self):
+        creds = MagicMock()
+        creds.is_valid.return_value = True
+        with patch.object(self.api.connection, "_device_status",
+                          return_value={"connected": True, "mac": "AA:BB", "lan_ip": "10.0.0.5"}), \
+             patch("divoom_lib.divoom_auth.get_cached_credentials", return_value=creds):
+            result = json.loads(self.api.connection.get_transport_status())
+        self.assertFalse(result["ble"]["available"])
+        self.assertTrue(result["lan"]["available"])
+        self.assertEqual(result["lan"]["detail"], "10.0.0.5:9000")
+        self.assertTrue(result["cloud"]["available"])
+        self.assertEqual(result["cloud"]["detail"], "Authenticated")
+
+    def test_get_transport_status_creds_lookup_exception_is_swallowed(self):
+        with patch.object(self.api.connection, "_device_status",
+                          return_value={"connected": False, "mac": None, "lan_ip": None}), \
+             patch("divoom_lib.divoom_auth.get_cached_credentials", side_effect=RuntimeError("boom")):
+            result = json.loads(self.api.connection.get_transport_status())
+        self.assertFalse(result["cloud"]["available"])
+
+    # ---- _device_status: no daemon / success / failure --------------------
+
+    def test_device_status_no_daemon(self):
+        with patch.object(self.api.connection, "_client", return_value=None):
+            st = self.api.connection._device_status()
+        self.assertEqual(st, {"connected": False, "mac": None, "lan_ip": None, "wall": False})
+
+    def test_device_status_success(self):
+        fake = MagicMock()
+        fake.device_status.return_value = {
+            "success": True, "connected": True, "mac": "AA", "lan_ip": None, "wall": False,
+        }
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            st = self.api.connection._device_status()
+        self.assertTrue(st["connected"])
+
+    def test_device_status_failure_falls_back_to_default(self):
+        fake = MagicMock()
+        fake.device_status.return_value = {"success": False}
+        with patch.object(self.api.connection, "_client", return_value=fake):
+            st = self.api.connection._device_status()
+        self.assertEqual(st, {"connected": False, "mac": None, "lan_ip": None, "wall": False})
+
+    # ---- update_wall_slots (ConnectionApi's own copy) ----------------------
+
+    def test_connection_update_wall_slots(self):
+        slots = {"AA:BB:CC:DD:EE:FF": {"x": 0, "y": 0, "size": 16}}
+        self.api.connection.update_wall_slots(json.dumps(slots))
+        self.assertEqual(self.api.wall_slots, slots)
+
+    # ---- window controls (ConnectionApi's own copies) ----------------------
+
+    def test_connection_minimize_window_with_and_without_window(self):
+        self.api.connection.minimize_window()
+        self.api.window.minimize.assert_called_once()
+        self.api.window = None
+        self.api.connection.minimize_window()  # must not raise
+
+    def test_connection_maximize_window_with_and_without_window(self):
+        self.api.connection.maximize_window()
+        self.api.window.toggle_fullscreen.assert_called_once()
+        self.api.window = None
+        self.api.connection.maximize_window()  # must not raise
+
+    def test_connection_close_window_stops_loop_and_destroys_window(self):
+        with patch("threading.Thread") as mock_thread:
+            self.api.connection.close_window()
+        mock_thread.assert_called_once()
+
+    def test_connection_close_window_no_loop_thread(self):
+        conn = self.api.connection
+        original = conn._loop_thread
+        conn._loop_thread = None
+        try:
+            with patch("threading.Thread") as mock_thread:
+                conn.close_window()
+            mock_thread.assert_called_once()  # window destroy is still scheduled
+        finally:
+            conn._loop_thread = original
+
+    def test_connection_close_window_no_window(self):
+        self.api.window = None
+        with patch("threading.Thread") as mock_thread:
+            self.api.connection.close_window()
+        mock_thread.assert_not_called()
+
+
+# ── R61 planning item 1 coverage push: DivoomGuiAPI top-level (gui_api.py)
+# — thin pass-through wrappers (get_transport_status, switch_channel,
+# get_alarms, live_job_*, device_call, ...) that the collaborator-level tests
+# above never touch because they call self.api.<collaborator>.<method>()
+# directly. Also covers __init__ branches (cached-creds failure, virtual
+# device cache load success/failure) and the MCP subprocess controller
+# wrappers. ──────────────────────────────────────────────────────────────
+
+class TestGuiApiTopLevelCoverage(unittest.TestCase):
+    def setUp(self):
+        self.presets_patcher = patch("pathlib.Path.exists", return_value=False)
+        self.presets_patcher.start()
+        import tempfile
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.home_patcher = patch("pathlib.Path.home", return_value=Path(self.temp_dir.name))
+        self.home_patcher.start()
+        self.api = DivoomGuiAPI()
+        self.api.window = MagicMock()
+
+    def tearDown(self):
+        self.presets_patcher.stop()
+        self.home_patcher.stop()
+        self.temp_dir.cleanup()
+
+    # ---- __init__: cached-creds lookup failure is swallowed ----------------
+
+    def test_init_swallows_cached_credentials_error(self):
+        with patch("divoom_lib.divoom_auth.get_cached_credentials", side_effect=RuntimeError("boom")):
+            api = DivoomGuiAPI()
+        try:
+            self.assertIsNone(api.cached_creds)
+        finally:
+            api.loop_thread.stop()
+
+    # ---- __init__: virtual-device cache load (primary path present) -------
+
+    @staticmethod
+    def _primary_path_exists(path_obj):
+        return str(path_obj).endswith("virtual_device.json") and ".config" in str(path_obj)
+
+    def test_init_loads_virtual_device_from_primary_path(self):
+        device_info = {"BluetoothDeviceId": 42, "DevicePassword": 7}
+        with patch.object(Path, "exists", self._primary_path_exists), \
+             patch.object(Path, "read_text", return_value=json.dumps(device_info)):
+            api = DivoomGuiAPI()
+        try:
+            self.assertEqual(api.device_id, 42)
+            self.assertEqual(api.device_pw, 7)
+        finally:
+            api.loop_thread.stop()
+
+    def test_init_virtual_device_bad_json_is_swallowed(self):
+        with patch.object(Path, "exists", self._primary_path_exists), \
+             patch.object(Path, "read_text", return_value="not valid json{"):
+            api = DivoomGuiAPI()
+        try:
+            self.assertEqual(api.device_id, 0)
+            self.assertEqual(api.device_pw, 0)
+        finally:
+            api.loop_thread.stop()
+
+    # ---- _client: lazy daemon spawn -----------------------------------------
+
+    def test_client_spawns_daemon_when_none_cached(self):
+        self.api._daemon_client = None
+        with patch("divoom_gui.daemon_bridge.ensure_daemon", return_value="FAKE") as mock_ensure:
+            result = self.api._client()
+        self.assertEqual(result, "FAKE")
+        self.assertEqual(self.api._daemon_client, "FAKE")
+        mock_ensure.assert_called_once()
+
+    # ---- thin pass-through wrappers to ConnectionApi -----------------------
+
+    def test_connection_wrappers_forward_to_collaborator(self):
+        self.api.connection = MagicMock()
+        self.api.connection.get_transport_status.return_value = "TS"
+        self.api.connection.save_lan_config.return_value = True
+        self.api.connection.probe_lan.return_value = "PL"
+
+        self.assertEqual(self.api.get_transport_status(), "TS")
+        self.assertTrue(self.api.save_lan_config("1.2.3.4", 99))
+        self.api.connection.save_lan_config.assert_called_with("1.2.3.4", 99)
+        self.assertEqual(self.api.probe_lan(), "PL")
+
+    # ---- thin pass-through wrappers to Lighting/Tools/Widgets APIs ---------
+
+    def test_lighting_wrappers_forward_to_collaborator(self):
+        self.api.lighting = MagicMock()
+        self.api.lighting.switch_channel.return_value = True
+        self.assertTrue(self.api.switch_channel("clock"))
+        self.api.lighting.switch_channel.assert_called_with("clock")
+
+        self.api.lighting.set_temperature_channel.return_value = True
+        self.assertTrue(self.api.set_temperature_channel(celsius=False, color="#ABCDEF"))
+        self.api.lighting.set_temperature_channel.assert_called_with(False, "#ABCDEF")
+
+        self.api.lighting.set_clock_rich.return_value = True
+        self.assertTrue(self.api.set_clock_rich(style=1))
+
+        self.api.lighting.display_wall_image.return_value = True
+        self.assertTrue(self.api.display_wall_image("/tmp/a.png", 16))
+
+        self.api.lighting.display_custom_art.return_value = True
+        self.assertTrue(self.api.display_custom_art("/tmp/b.png"))
+
+        self.api.lighting.set_brightness.return_value = True
+        self.assertTrue(self.api.set_brightness(80))
+
+        self.api.lighting.set_volume.return_value = True
+        self.assertTrue(self.api.set_volume(5))
+
+    def test_tools_and_widgets_wrappers_forward_to_collaborator(self):
+        self.api.tools = MagicMock()
+        self.api.tools.get_alarms.return_value = "ALARMS"
+        self.assertEqual(self.api.get_alarms(), "ALARMS")
+
+        self.api.tools.set_low_power.return_value = True
+        self.assertTrue(self.api.set_low_power(True))
+        self.api.tools.set_low_power.assert_called_with(True)
+
+        self.api.tools.get_device_name.return_value = "Bedroom Pixoo"
+        self.assertEqual(self.api.get_device_name(), "Bedroom Pixoo")
+
+        self.api.widgets = MagicMock()
+        self.api.widgets.push_weather.return_value = True
+        self.assertTrue(self.api.push_weather())
+
+        self.api.widgets.get_weather.return_value = {"temp": 70}
+        self.assertEqual(self.api.get_weather(), {"temp": 70})
+
+    # ---- close_window: daemon-shutdown branch + swallowed lifecycle error -
+
+    def test_close_window_stops_daemon_when_lifecycle_shared(self):
+        fake_client = MagicMock()
+        self.api._daemon_client = fake_client
+        with patch("divoom_lib.lifecycle_config.get_keep_daemon_alive", return_value=False), \
+             patch("divoom_lib.lifecycle_config.should_stop_daemon_on_dashboard_quit", return_value=True), \
+             patch("threading.Thread"):
+            self.api.close_window()
+        fake_client.shutdown.assert_called_once()
+
+    def test_close_window_swallows_lifecycle_check_error(self):
+        fake_client = MagicMock()
+        self.api._daemon_client = fake_client
+        with patch("divoom_lib.lifecycle_config.get_keep_daemon_alive", side_effect=RuntimeError("boom")), \
+             patch("threading.Thread"):
+            self.api.close_window()  # must not raise
+        fake_client.shutdown.assert_not_called()
+
+    # ---- live_job_start / live_job_stop / live_job_list ---------------------
+
+    def test_live_job_methods_no_daemon(self):
+        with patch.object(self.api, "_client", return_value=None):
+            self.assertEqual(self.api.live_job_start("AA:BB", "kind", {}),
+                             {"success": False, "error": "daemon unavailable"})
+            self.assertEqual(self.api.live_job_stop("AA:BB", "kind"),
+                             {"success": False, "error": "daemon unavailable"})
+            self.assertEqual(self.api.live_job_list("AA:BB"),
+                             {"success": False, "error": "daemon unavailable"})
+
+    def test_live_job_methods_delegate_to_daemon(self):
+        fake = MagicMock()
+        fake.live_job_start.return_value = {"success": True}
+        fake.live_job_stop.return_value = {"success": True}
+        fake.live_job_list.return_value = {"success": True, "jobs": []}
+        with patch.object(self.api, "_client", return_value=fake):
+            self.assertEqual(self.api.live_job_start("AA:BB", "kind", {"x": 1}), {"success": True})
+            fake.live_job_start.assert_called_with("AA:BB", "kind", {"x": 1})
+            self.assertEqual(self.api.live_job_stop("AA:BB", "kind"), {"success": True})
+            fake.live_job_stop.assert_called_with("AA:BB", "kind")
+            self.assertEqual(self.api.live_job_list("AA:BB"), {"success": True, "jobs": []})
+            fake.live_job_list.assert_called_with("AA:BB")
+
+    # ---- get_notification_listener_status: daemon-unavailable branch ------
+
+    def test_get_notification_listener_status_daemon_unavailable(self):
+        with patch("sys.platform", new="darwin"), \
+             patch("divoom_daemon.macos_notifications.find_notification_db_path", return_value=None), \
+             patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[]), \
+             patch.object(self.api, "_client", return_value=None):
+            s = self.api.get_notification_listener_status()
+        self.assertTrue(s["platform_supported"])
+        self.assertFalse(s["running"])
+        self.assertEqual(s["error"], "daemon unavailable")
+
+    # ---- save_notification_routing: invalid entries + daemon-side failure --
+
+    def test_save_notification_routing_invalid_entries(self):
+        with patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[("x", 1)]):
+            result = self.api.save_notification_routing('[["whatsapp", "not-an-int"]]')
+        self.assertIsNotNone(result["error"])
+        self.assertIn("Invalid routing entries", result["error"])
+        self.assertEqual(result["rules"], [["x", 1]])
+
+    def test_save_notification_routing_set_routing_failure(self):
+        fake = MagicMock()
+        fake.set_routing.return_value = {"success": False, "error": "device busy"}
+        with patch("divoom_daemon.macos_notifications.load_routing_table", return_value=[("x", 1)]), \
+             patch.object(self.api, "_client", return_value=fake):
+            result = self.api.save_notification_routing('[["whatsapp", 6]]')
+        self.assertEqual(result["error"], "device busy")
+        self.assertEqual(result["rules"], [["x", 1]])
+
+    # ---- device_call: no daemon / delegates --------------------------------
+
+    def test_device_call_no_daemon(self):
+        with patch.object(self.api, "_client", return_value=None):
+            result = json.loads(self.api.device_call("get_capabilities"))
+        self.assertEqual(result, {"success": False, "error": "daemon unavailable"})
+
+    def test_device_call_delegates_to_daemon(self):
+        fake = MagicMock()
+        fake.device_call.return_value = {"success": True, "result": 42}
+        with patch.object(self.api, "_client", return_value=fake):
+            result = json.loads(self.api.device_call(
+                "get_brightness", [1], {"a": 2}, target="wall", blobs={"b": "x"}, token="tok"))
+        self.assertEqual(result, {"success": True, "result": 42})
+        fake.device_call.assert_called_with(
+            "get_brightness", [1], {"a": 2}, target="wall", blobs={"b": "x"}, token="tok")
+
+    # ---- open_file_dialog: no window / picked / cancelled / exception -----
+
+    def test_open_file_dialog_no_window(self):
+        self.api.window = None
+        self.assertIsNone(self.api.open_file_dialog())
+
+    def test_open_file_dialog_returns_selected_path(self):
+        self.api.window.create_file_dialog.return_value = ["/tmp/picked.png"]
+        self.assertEqual(self.api.open_file_dialog(), "/tmp/picked.png")
+
+    def test_open_file_dialog_empty_result_returns_none(self):
+        self.api.window.create_file_dialog.return_value = []
+        self.assertIsNone(self.api.open_file_dialog())
+
+    def test_open_file_dialog_none_result_returns_none(self):
+        self.api.window.create_file_dialog.return_value = None
+        self.assertIsNone(self.api.open_file_dialog())
+
+    def test_open_file_dialog_exception_returns_none(self):
+        self.api.window.create_file_dialog.side_effect = RuntimeError("boom")
+        self.assertIsNone(self.api.open_file_dialog())
+
+    # ---- MCP server subprocess controller wrappers -------------------------
+
+    def test_mcp_server_lifecycle_delegates_to_controller(self):
+        from divoom_gui.mcp_control import MCPController, MCPStatus
+        fake_ctl = MagicMock()
+        fake_ctl.start.return_value = MCPStatus(running=True, pid=123, started_at=1.0,
+                                                mac="AA:BB", log_path="/tmp/log",
+                                                last_log_lines=["hi"], error=None)
+        fake_ctl.stop.return_value = MCPStatus(running=False)
+        fake_ctl.is_running.return_value = True
+        fake_ctl.status.return_value = MCPStatus(running=True, pid=123)
+        with patch.object(MCPController, "instance", return_value=fake_ctl):
+            start_result = self.api.start_mcp_server(mac="AA:BB")
+            stop_result = self.api.stop_mcp_server()
+            running = self.api.is_mcp_server_running()
+            status = self.api.mcp_server_status()
+        self.assertTrue(start_result["running"])
+        self.assertEqual(start_result["pid"], 123)
+        fake_ctl.start.assert_called_with(mac="AA:BB")
+        self.assertFalse(stop_result["running"])
+        self.assertTrue(running)
+        self.assertTrue(status["running"])
+
+    def test_start_mcp_server_empty_mac_passes_none(self):
+        from divoom_gui.mcp_control import MCPController, MCPStatus
+        fake_ctl = MagicMock()
+        fake_ctl.start.return_value = MCPStatus(running=False)
+        with patch.object(MCPController, "instance", return_value=fake_ctl):
+            self.api.start_mcp_server(mac="")
+        fake_ctl.start.assert_called_with(mac=None)
+
+
 if __name__ == "__main__":
     unittest.main()
