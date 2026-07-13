@@ -62,9 +62,10 @@ Suite: Rust 63 passed / Python ~1750 passed / ~140 skipped (see `CHANGELOG.md` +
 
 ### Near-term (next round)
 
-Native-port hardening is the active near-term track — see
-`docs/PLANNING_NATIVE_PORT_HARDENING.md`. The two hardware-verify items
-(MCP-via-Rust, exclusive-mode-via-Rust) moved there as Phase 4.
+Native-port hardening (Phases 1-4 + Phase-5 command parity) shipped; see
+`docs/archive/superseded/PLANNING_NATIVE_PORT_HARDENING.md` for the historical
+record. Remaining thread: the irreversible `divoom_daemon/` archival stays
+gated on an explicit user sign-off + soak (not scheduled).
 
 ### Short-to-medium term
 
@@ -74,7 +75,8 @@ Native-port hardening is the active near-term track — see
 | **`get_*` read-back timeouts** | — | **DONE (R60)** — bounded + cached in both Python (`ble_reads.read_with_retry` 2.5s + last-good cache) and Rust (every `get_*` uses `ctx.timeout`; daemon wraps call in `tokio::time::timeout` 30s clamped [1,120]). |
 | **R12 visual pass** | user-driven | Glass tab strip, appbar corners, etc. |
 | **R12 hardware verification** | user-driven | Album cover, custom-art/live/weather on real device. |
-| **Timoo-light-4 re-verify (R60 #2)** | device in range | Timoo was out of BLE range in R60 and R61; re-run cloud-decode `show_image` push + no-stick when reachable. |
+| **Timoo-light-4 re-verify (R60 #2)** | device in range | Timoo was out of BLE range in R60 and R61; re-run cloud-decode `show_image` push + no-stick when reachable — tracked as `PLANNING_ROUND61.md` item 3. |
+| **Inline-style → CSS-token migration, batches 3-5** | — | Batches 1-2 shipped (utility layer + `templates_tools.js`/`templates_monthly_best.js`); `templates_routines.js` (21), `templates_widgets.js` (51), `templates_settings.js` (~39 today) never migrated. Low priority, purely visual polish, no test net — see `docs/archive/superseded/PLANNING_inline_styles.md` for the batch plan if picked up. |
 
 ### Divoom Cloud HTTP (200+ endpoints)
 
@@ -159,17 +161,18 @@ deleted. Independent of the parked v0.21.0 release (daemon BT grant).
 
 ## Planning docs by round
 
-Historical round plans (R3–R56) are archived under `docs/archive/rounds/` (recover
-from git history if needed). Active planning docs at repo root:
+Historical round plans (R3–R60) are archived under `docs/archive/rounds/`, and
+fully-shipped/superseded workstream plans under `docs/archive/superseded/`
+(recover either from git history if needed). Active planning doc at repo root:
 
-- `PLANNING_ROUND57.md`, `PLANNING_ROUND58.md`, `PLANNING_ROUND59.md` — native-port
-  hardening + event-driven UI.
-- `PLANNING_ROUND60.md` — open-thread verification (DONE).
 - `PLANNING_ROUND61.md` — this round (release + doc prune + Cloud HTTP + coverage).
-- `PLANNING_NATIVE_PORT_HARDENING.md` — Phase 5 (Python daemon archive, not delete).
-- `PLANNING_inline_styles.md`, `PLANNING_daemon_ownership.md` — next-phase UI work
-  (from `PLANNING_NEXT_PHASE.md`).
-- `PLANNING_BLE_HARDENING.md`, `PLANNING_SOCKET_HARDENING.md` — hardening reference.
+
+Archived this round (R61 #0, all fully shipped or superseded — see each file's
+own status header for detail): `PLANNING_ROUND57.md`/`58`/`59`/`60`,
+`PLANNING_BLE_HARDENING.md`, `PLANNING_SOCKET_HARDENING.md`,
+`PLANNING_daemon_ownership.md`, `PLANNING_NATIVE_PORT_HARDENING.md`,
+`PLANNING_NEXT_PHASE.md`, `PLANNING_inline_styles.md` (batches 3-5 tracked above
+instead), `ARCH_GAP_SCAN_2026-06.md`, `PARITY_TRACKER_NATIVE_UI.md`.
 
 
 

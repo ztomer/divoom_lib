@@ -84,7 +84,8 @@
 /* ── Layout + typography utilities (REVIEW_2026-06 §2.1 batch 1) ──────────
    A small token layer to replace repeated inline styles in templates_*.js.
    Pure addition — no template references them yet; the per-file batches
-   (PLANNING_inline_styles.md) migrate the markup. `.flex-row` above predates
+   (docs/archive/superseded/PLANNING_inline_styles.md) migrate the markup.
+   `.flex-row` above predates
    this and stays (gap:15px); the `.row`/`.gap-*` split below is the
    composable replacement for the many ad-hoc `display:flex` strings. */
 .flex       { display: flex; }

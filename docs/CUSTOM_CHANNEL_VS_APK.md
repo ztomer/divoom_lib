@@ -223,7 +223,7 @@ corrections** from the first draft:
 | **End** | No explicit terminator | `CmdManager.K0()` → `[0x02]` |
 | **Page select** | N/A | `0xBD [0x17, page]` |
 | **APK source** | `DesignSendModel.java` | `LightMakeNewModel.java` |
-| **Our current code** | `show_image` → `show_design` → `0x8B` | TODO: Not implemented |
+| **Our current code** | `show_image` → `show_design` → `0x8B` | DONE — `design.py` (page select/clear) + `custom_art_push.py` (push/query) + `divoomd/src/art.rs` (`custom_art_push`/`custom_art_query_page`) + `custom_art.js` gallery UI |
 
 ---
 
@@ -451,11 +451,11 @@ Divoom server values).
 | Item | Needed for | Status |
 |------|-----------|--------|
 | AA frame encoder (hVar.g parity) | Custom art encode | DONE: R35 verified |
-| 0xBD [0x17] p1(page) sub-cmd | Custom art page select | TODO: Not started |
-| 0xBD [0x16] clear sub-cmd | Custom art page clear | TODO: Not started |
-| N2() header + y() data send + K0() end (0xB1/0x8C) | Custom art push | TODO: Not started |
-| 0x8E response parser | Custom art page query | TODO: Not started |
-| Page/slot UI + push | Custom art gallery | TODO: Not started |
+| 0xBD [0x17] p1(page) sub-cmd | Custom art page select | DONE: `display/design.py` |
+| 0xBD [0x16] clear sub-cmd | Custom art page clear | DONE: `display/design.py` |
+| N2() header + y() data send + K0() end (0xB1/0x8C) | Custom art push | DONE: `custom_art_push.py` + `divoomd/src/art.rs` |
+| 0x8E response parser | Custom art page query | DONE: `custom_art_push.py::query_page` + `art.rs::cmd_custom_art_query_page` |
+| Page/slot UI + push | Custom art gallery | DONE: `custom_art.js`/`custom_art.css` |
 | `hot_update.py` (0x9B/F7/9D/9E) | Monthly best → hot | DONE: R36b HW-verified |
 | `push_file_to_hot()` | Hot push of arbitrary files | TODO: Not started |
 | Synthetic vendor/version scheme | Hot push for user files | TODO: Needs decision |

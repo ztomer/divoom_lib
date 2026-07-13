@@ -1,7 +1,8 @@
 """Bulletproof daemon-client hardening (R57) — the client must NEVER hang,
 raise, or leak a half-open socket when the daemon is wedged/silent.
 
-These are the Python side of the wedge matrix in ``docs/PLANNING_ROUND57.md``:
+These are the Python side of the wedge matrix in
+``docs/archive/rounds/PLANNING_ROUND57.md``:
 they prove ``DaemonClient.send_command`` returns an error dict within its read
 timeout against a daemon that (a) accepts but never replies, (b) sends a
 never-newline-terminated frame, (c) accepts then immediately closes, or (d) is

@@ -259,7 +259,7 @@ class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin
 
     # ── macOS notification mirroring (daemon-owned) ───────────────────────
     # The daemon is the SINGLE owner of the macOS Notification Center monitor
-    # (see docs/PLANNING_daemon_ownership.md). It polls the DB, routes each
+    # (see docs/archive/superseded/PLANNING_daemon_ownership.md). It polls the DB, routes each
     # notification to the device it owns, and broadcasts events. The GUI must
     # NOT run its own monitor — doing so double-routes every notification. These
     # methods are thin pass-throughs to the daemon's RPCs.

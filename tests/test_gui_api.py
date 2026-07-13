@@ -231,7 +231,8 @@ class TestDivoomGuiAPI(unittest.TestCase):
 
     # ── macOS notification mirroring (daemon-owned) ─────────────────────
     # The daemon is the single owner of the monitor; the GUI delegates over
-    # RPC and must NOT poll the DB itself (docs/PLANNING_daemon_ownership.md).
+    # RPC and must NOT poll the DB itself
+    # (docs/archive/superseded/PLANNING_daemon_ownership.md).
 
     def _fake_client(self, *, state="idle", counters=None, error=None):
         """A DaemonClient stub whose notification RPCs return canned replies."""
