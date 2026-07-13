@@ -4,6 +4,14 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.9 — R61: coverage 69% -> 96%, cloud API parity fix, device-chip UI clarity
+
+R61's full scope, in order: doc cleanup, a 95% test-coverage push (hit 96%),
+finishing the cloud API work, hardware-verifying the R60 loose ends, confirming
+device detect/connect end-to-end, and a user-reported UI fix. Plan + waved
+breakdown: `docs/PLANNING_ROUND61.md`. Full suite: 3195+ passed, 0 failed
+throughout. Sections below (unversioned, same day) are this release's detail.
+
 ## R61: hardware verification + UI clarity fix (2026-07-13)
 
 - **verify(hardware): Timoo-light-4 re-verify (R60 #2) — DONE.** With the real
