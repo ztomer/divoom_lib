@@ -12,6 +12,9 @@ device detect/connect end-to-end, and a user-reported UI fix. Plan + waved
 breakdown: `docs/PLANNING_ROUND61.md`. Full suite: 3195+ passed, 0 failed
 throughout. Sections below (unversioned, same day) are this release's detail.
 
+**RELEASED**: tag + GitHub release + Homebrew cask, all live and verified —
+https://github.com/ztomer/divoom_lib/releases/tag/v0.22.9
+
 ## R61: hardware verification + UI clarity fix (2026-07-13)
 
 - **verify(hardware): Timoo-light-4 re-verify (R60 #2) — DONE.** With the real

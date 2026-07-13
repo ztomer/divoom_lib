@@ -103,13 +103,27 @@ Claude) should read this on entry and **update it at the end of every round**
   55%-opacity fade (which was too subtle to read at a glance). Extended the
   existing Playwright E2E test to cover it.
 
-  **Item 5 (cut a release) — still paused pending user input, not attempted
-  autonomously.** Publishing a tag/GitHub release/Homebrew cask bump is a
-  public, hard-to-reverse action; this project's own history (R57-R60) shows
-  the pattern of the user driving the final release cut personally even when
-  the underlying work is done. With items 0-4 now all done or honestly closed
-  out, this is the one remaining decision point — ask the user whether to cut
-  the release now.
+  **Item 5 (cut a release) — DONE, RELEASED as v0.22.9.** User said "ship it."
+  Pre-flight: `git merge-base --is-ancestor v0.22.2 HEAD` (latest published GH
+  release) passed, plus all local interim tags v0.22.3-8 confirmed as ancestors
+  — no divergence. Bumped `pyproject.toml` 0.22.8->0.22.9; added a `## v0.22.9`
+  CHANGELOG header (consolidating the round's unversioned R61 sections above it
+  for `scripts/release.sh`'s note-extraction, which pulls everything down to the
+  last published release v0.22.2 — a "catch-up" release by the script's own
+  design, appropriate here since R57-R61 were all interim-tagged but never
+  published as GitHub releases). Ran `scripts/release.sh`: DMG built
+  (`dist/Divoom-v0.22.9.dmg`), tag pushed, GitHub release created. The
+  Homebrew-cask-bump step hit a one-off `gh api` JSON-parse hiccup (not
+  reproducible on manual retry seconds later); re-ran with `--skip-build`
+  (idempotent) and it completed clean. Cask bumped in `ztomer/homebrew-tap`;
+  `brew style --fix` caught a pre-existing (not new) trailing-newline nit,
+  fixed + pushed (`ce090c4`); `brew audit --cask ztomer/tap/divoom-control`
+  clean. Release: https://github.com/ztomer/divoom_lib/releases/tag/v0.22.9
+
+  **R61 COMPLETE — all 6 items (0-5) closed.** Full breakdown, all commit
+  hashes, and the honest exceptions (show_clock visual pass + `CLOCK_FACE_
+  CLASSIFY` APK verification remain user-driven/unverified, not regressions)
+  are in `docs/PLANNING_ROUND61.md`.
 
 - **R60 open-thread verification (2026-07-12) — DONE + checkpoint `v0.22.8` (user
   drives the release).** Roadmap

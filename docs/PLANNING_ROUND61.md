@@ -176,20 +176,33 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
       app; deferring rather than risking their session).
 - **Kill: daemon half MET with real hardware evidence; UI half partially MET**
   (logic covered by E2E tests, not by direct visual confirmation — the user can
-  judge the actual on-screen result themselves since the app is running).
-  themselves are extensively covered by the R61 test suite (96% coverage, incl.
-  `scanner_mixin.py`/`connection.py`/`ble_transport.py` at 100%), but that is NOT a
-  substitute for the real-hardware confirmation this item asks for.
-  here (not assumed from old rounds).
+  judge the actual on-screen result themselves since the app is running; the
+  underlying code paths are also extensively covered by the R61 test suite —
+  96% coverage, incl. `scanner_mixin.py`/`connection.py`/`ble_transport.py` at
+  100% — but that is not itself a substitute for real-hardware confirmation).
 
-## 5. Release
+## 5. Release — DONE, shipped as v0.22.9
 
-- [ ] All of 0-4 committed and green (`python3 -m pytest`, `cargo test`, no-emoji gate).
-- [ ] Bump `pyproject.toml` version; tag; `scripts/release.sh` (DMG build + GitHub
-      release + Homebrew cask bump); `brew audit` clean.
-- [ ] `git merge-base --is-ancestor <prior_release_tag> HEAD` sanity check before
-      tagging (standing rule from the v0.22.0 divergence incident).
-- **Kill:** new tag pushed, GitHub release published, Homebrew cask updated + verified.
+- [x] All of 0-4 committed and green (3195+ passed, 0 failed each run; `cargo check`
+      clean; no-emoji + file-size gates clean throughout).
+- [x] `git merge-base --is-ancestor v0.22.2 HEAD` (latest published GitHub release)
+      sanity check passed before tagging, plus all local interim tags v0.22.3-8
+      verified as ancestors too — no divergence (the v0.22.0 incident's standing
+      rule).
+- [x] Bumped `pyproject.toml` 0.22.8 -> 0.22.9; added a `## v0.22.9` CHANGELOG header
+      consolidating the round for `scripts/release.sh`'s note-extraction.
+- [x] Ran `scripts/release.sh`: DMG built (`dist/Divoom-v0.22.9.dmg`,
+      sha256 `5fdba8e6...`), tag `v0.22.9` pushed, GitHub release created with the
+      DMG asset. The Homebrew-cask-bump step hit a transient `gh api` hiccup
+      (`invalid character '<'` — worked fine on manual retry seconds later, not
+      reproducible); re-ran with `--skip-build` and it completed cleanly (idempotent
+      by design, safe to resume).
+- [x] Cask bumped to 0.22.9 in `ztomer/homebrew-tap`; `brew style --fix` caught a
+      pre-existing (not new) missing-trailing-newline nit, fixed + pushed
+      (`ce090c4`); `brew audit --cask ztomer/tap/divoom-control` clean.
+- **Kill: MET.** Tag pushed, GitHub release published
+  (https://github.com/ztomer/divoom_lib/releases/tag/v0.22.9), Homebrew cask
+  updated + audited clean.
 
 ---
 
@@ -200,6 +213,15 @@ _Each /loop iteration appends one line here: date, item worked, outcome._
 - 2026-07-12: Plan written (this file), superseding the prior draft ordering to match
   the user's explicit 0→5 sequence. Found 4 uncommitted coverage-push test files on
   entry (86 tests, green) — folded into item 0.
+- 2026-07-13: Item 0 (doc cleanup) done. Item 1 (95% coverage) done at 96% across
+  4 agent waves (one partial — session-limit interruption, salvaged cleanly).
+  Item 2 (cloud API) done — found + fixed a real Python/Rust retry-on-expiry gap.
+  Items 3-4 initially blocked (no daemon/hardware reachable); user started the
+  real app mid-round, unblocking both — Timoo-light-4 hardware-verified, daemon
+  detect/connect confirmed end-to-end. Also shipped a user-reported UI fix
+  (device-chip "not in range" clarity) while the app was live. Item 5: user said
+  "ship it" — released as v0.22.9 (DMG + GitHub release + Homebrew cask, all
+  verified). **R61 complete — all 6 items closed.**
 
 ## Risks / open questions (carried from prior draft)
 
