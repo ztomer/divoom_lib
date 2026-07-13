@@ -100,13 +100,27 @@ checkboxes + `SESSION_HANDOFF.md` + `CHANGELOG.md`, then continue.
 
 - [x] `UserNewGuest` `RC=10` fixed (commit `af9fcd4`).
 - [x] Clock-face store + weather-city search added (commit `af9fcd4`).
-- [ ] Verify parity: Python `divoom_lib` cloud client vs Rust `divoomd/src/cloud*.rs` —
-      same request/response shapes, both tested.
-- [ ] Confirm what's left of the "finish cloud API work" ask beyond `af9fcd4` — check
-      `SESSION_HANDOFF.md`/`CHANGELOG.md` for any cloud endpoint still stubbed/deferred
-      and close it, or explicitly document it as out-of-scope-for-now.
-- **Kill:** cloud client covered by tests (offline/mock mode), Python+Rust agree, no
-  silent stub left in the cloud path.
+- [x] Verify parity: Python `divoom_lib` cloud client vs Rust `divoomd/src/cloud*.rs` —
+      found and fixed a REAL gap (commit `249743c`): Rust's `fetch_gallery` +
+      `get_category_file_list` already retry once on RC 9/10/11 ("token expired")
+      with a forced credential refresh, but `search_weather_city` (both languages)
+      and Python's `CloudClient.get_category_file_list` did not — an expired token
+      would hard-fail those instead of self-healing like the sibling endpoint.
+      Fixed both languages; `divoom_lib/cloud.py` now at 100% coverage (11 tests,
+      up from 6); `cargo check` clean.
+- [x] Confirmed what's left beyond `af9fcd4`: no other cloud endpoint is stubbed —
+      `docs/SESSION_HANDOFF.md`/`CHANGELOG.md` show no other deferred cloud work.
+      One honest open item, NOT resolved this round (no APK decompile source or
+      live cloud credentials available in this session): `CLOCK_FACE_CLASSIFY = 0`
+      in both `divoom_lib/cloud.py` and `divoomd/src/cloud_category.rs` carries a
+      pre-existing "VERIFY against the APK" comment — a sample gallery response in
+      `docs/divoom_docs/category_list_sample.json` shows Classify values 3-17 for
+      ordinary gallery art but none at 0, so it neither confirms nor refutes that
+      0 means "clock faces." Left as documented, unverified — not a regression,
+      not new to this round.
+- **Kill: MET** (with the one pre-existing, explicitly-documented exception above).
+  Cloud client covered by tests (offline/mock mode, 100% on `cloud.py`), Python+Rust
+  parity confirmed and one real divergence fixed, no silent/undocumented stub left.
 
 ## 3. Loose ends
 

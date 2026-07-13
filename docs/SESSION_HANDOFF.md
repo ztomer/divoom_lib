@@ -56,9 +56,21 @@ Claude) should read this on entry and **update it at the end of every round**
   trimming `SESSION_HANDOFF.md`'s history (this file) — held off while still
   actively appended to mid-round; revisit once items 2-5 close.
 
-  **Next: item 2 (finish cloud API work)** — verify Python/Rust cloud-client parity
-  and close any remaining stub beyond the `af9fcd4` UserNewGuest/clock-face-store
-  work, per PLANNING_ROUND61.md section 2.
+  **Item 2 (finish cloud API work) DONE (commit `249743c`).** Auditing Python
+  `divoom_lib/cloud.py` vs Rust `divoomd/src/cloud_category.rs` for parity found a
+  real gap: `fetch_gallery`/`get_category_file_list` (Rust) already retried once on
+  RC 9/10/11 ("token expired") with a forced credential refresh, but
+  `search_weather_city` (both languages) and Python's `get_category_file_list`
+  didn't — an expired token would hard-fail those calls instead of self-healing.
+  Fixed both languages; `cloud.py` now 100% covered (11 tests, up from 6); `cargo
+  check` clean. One item explicitly NOT resolved: `CLOCK_FACE_CLASSIFY = 0` carries
+  a pre-existing "VERIFY against the APK" comment in both languages that this
+  session couldn't verify (no APK decompile source or live cloud credentials
+  available) — left as documented, unverified, not a regression.
+
+  **Next: item 3 (chase loose ends)** — Timoo-light-4 re-verify + user-POV
+  physical-screen visuals for the R60 show_clock fix, per PLANNING_ROUND61.md
+  section 3. Both need real hardware in BLE range.
 
 - **R60 open-thread verification (2026-07-12) — DONE + checkpoint `v0.22.8` (user
   drives the release).** Roadmap

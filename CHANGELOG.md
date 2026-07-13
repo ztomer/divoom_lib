@@ -4,6 +4,17 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## R61: cloud API parity fix (2026-07-13)
+
+- **fix(cloud): `search_weather_city` was missing the expired-token retry.**
+  Auditing Python/Rust parity for the `af9fcd4` cloud client found `divoomd`'s
+  `fetch_gallery`/`get_category_file_list` already retry once on RC 9/10/11
+  ("token expired") with a forced credential refresh, but `search_weather_city`
+  (both languages) and Python's own `get_category_file_list` didn't. Fixed both
+  languages; `divoom_lib/cloud.py` now 100% covered. `CLOCK_FACE_CLASSIFY = 0`
+  remains an open, pre-existing "VERIFY against the APK" item (no decompile
+  source / live credentials available this session).
+
 ## R61: coverage 69% -> 96% (2026-07-13)
 
 - **test: four coverage waves close the gap to the 95% target (exceeded at 96%).**
