@@ -53,8 +53,12 @@ Claude) should read this on entry and **update it at the end of every round**
     gallery decode-retry unit test + 2 hot-channel-button e2e + 2
     sync-now e2e — all proven to fail on the pre-fix code before
     verifying green).
-  - **Released as vX.Y.Z** (see the git tag / GitHub release for the exact
-    version — filled in at tag time).
+   - **Released as v0.22.18** (user: "cut a release"). Tag `v0.22.18`
+     pushed, GitHub release + DMG published
+     (https://github.com/ztomer/divoom_lib/releases/tag/v0.22.18), Homebrew
+     cask bumped to 0.22.18. Local `main` was already the v0.22.18 commit
+     (`9482899`, 1 ahead of `origin/main`); no code change this round — only
+     the tag/release/cask.
 
 - **2026-07-14 (CI fix): the `tests` GitHub Actions workflow is green again.**
   Every push since `046cdf8` (Python daemon archived) had a red `tests` job.

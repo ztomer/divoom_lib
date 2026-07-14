@@ -6,6 +6,9 @@ shipped milestone (per the project planning docs).
 
 ## v0.22.18 — Bug batch: gallery, hot-channel sync, Sync Now, theming, alignment; CI green again
 
+**RELEASED**: tag + GitHub release + Homebrew cask, all live and verified —
+https://github.com/ztomer/divoom_lib/releases/tag/v0.22.18
+
 User-reported bug batch (`docs/PLANNING_ROUND62.md`). Investigated live
 against the real Divoom cloud API and this machine's actual gallery cache,
 not just static reading — see the planning doc for the full root-cause
