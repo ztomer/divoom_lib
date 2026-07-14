@@ -18,6 +18,29 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-14 (CI fix): the `tests` GitHub Actions workflow is green again.**
+  Every push since `046cdf8` (Python daemon archived) had a red `tests` job.
+  Root cause: `archive/tests/conftest.py` shipped beside the live
+  `tests/conftest.py` and both register `--run-hardware`, so bare `pytest`
+  aborted collection (`option names {'--run-hardware'} already added`) before
+  running a single test — the other 4 jobs were green the whole time. Fixes,
+  in order (each surfaced the next, since the collection abort had masked
+  every downstream failure):
+  1. `pytest.ini` — exclude `archive/` from collection (`--ignore=archive` +
+     `norecursedirs`); it is retired reference-only code (commit `af37222`).
+  2. `tests/test_e2e_gui_daemon_connect_disconnect.py` — the two
+     `mock_simulate_drop` e2e tests now skip (not hard-fail) when the native
+     daemon reports the command missing; they already skip in CI for want of
+     Playwright, but hard-failed for any dev who has it (`af37222`).
+  3. `tests/test_audio_visualizer.py` — module-level
+     `pytest.importorskip("pyaudio")`; it hard-imported pyaudio (absent in CI,
+     no PortAudio), 7 errors (commit `8aa15d1`).
+  All 5 jobs green on `8aa15d1` (run 29326562142). Local full suite: 2767
+  passed / 94 skipped / 0 errors. Follow-ups (not blocking CI): the native
+  daemon still doesn't implement `mock_simulate_drop`; CI doesn't exercise the
+  Playwright e2e or pyaudio suites (both skip) — add the deps + `playwright
+  install` to the `test` job if that coverage is wanted.
+
 - **2026-07-14 (later still, `/loop`-continued research): AidSleep RC=3
   fixed and shipped; cloud API catalog now 533/533 complete.** User: research
   the AidSleep RC=3 mystery and finish the `misc_small.md` batch, then
