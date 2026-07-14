@@ -27,6 +27,12 @@ shipped milestone (per the project planning docs).
   `pytest.importorskip("pyaudio")` so it skips in CI and runs locally, matching
   the repo's skip-on-missing-optional-dep pattern. These were previously masked
   by the `archive/` collection abort.
+- **ci: the `test` job now installs `pyaudio` (via Homebrew PortAudio) and
+  `playwright` + a headless Chromium**, so the GUI e2e suites
+  (`tests/test_e2e_*.py`) and the audio-visualizer suite run for real in CI
+  instead of skipping. Locally these are 72 passed / 4 skipped (the 4 skips are
+  the still-unimplemented `mock_simulate_drop` pair and the live-hardware
+  pair). Blocking coverage — a real e2e/audio regression now reddens CI.
 
 ## v0.22.16 — AidSleep RC=3 mystery fixed and shipped; full cloud API catalog complete (533/533)
 
