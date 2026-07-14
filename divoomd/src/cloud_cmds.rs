@@ -67,7 +67,7 @@ pub async fn handle(command: &str, req: &Request) -> Value {
 
         "get_category_file_list" => {
             let classify = req.args.get("classify").and_then(|v| v.as_i64())
-                .unwrap_or(crate::cloud::CLOCK_FACE_CLASSIFY);
+                .unwrap_or(crate::cloud::DEFAULT_GALLERY_CLASSIFY);
             let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20);
             match crate::cloud::get_category_file_list(classify, limit).await {
                 Ok(res) => json!({ "success": true, "result": res }),
@@ -75,9 +75,27 @@ pub async fn handle(command: &str, req: &Request) -> Value {
             }
         }
 
+        "get_clock_classify_list" => match crate::cloud::get_clock_classify_list().await {
+            Ok(res) => json!({ "success": true, "result": res }),
+            Err(e) => err_reply(&e),
+        },
+
+        "get_clock_list" => {
+            let classify_id = match req.args.get("classify_id").and_then(|v| v.as_i64()) {
+                Some(c) => c,
+                None => return err_reply("get_clock_list requires 'classify_id'"),
+            };
+            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
+            match crate::cloud::get_clock_list(classify_id, 0, limit).await {
+                Ok(res) => json!({ "success": true, "result": res }),
+                Err(e) => err_reply(&e),
+            }
+        }
+
         "list_clock_faces" => {
-            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20);
-            match crate::cloud::get_category_file_list(crate::cloud::CLOCK_FACE_CLASSIFY, limit).await {
+            let classify_id = req.args.get("classify_id").and_then(|v| v.as_i64());
+            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
+            match crate::cloud::list_clock_faces(classify_id, limit).await {
                 Ok(res) => json!({ "success": true, "result": res }),
                 Err(e) => err_reply(&e),
             }

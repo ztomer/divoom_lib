@@ -35,6 +35,24 @@ def _fake_post(path, body):
     if path == "Weather/SearchCity":
         assert body["Command"] == "Weather/SearchCity"
         return {"ReturnCode": 0, "CityList": [{"CityId": "NYC", "Name": "New York"}]}
+    if path == "Channel/StoreClockGetClassify":
+        assert body["Command"] == "Channel/StoreClockGetClassify"
+        return {
+            "ReturnCode": 0,
+            "ClassifyList": [
+                {"ClassifyId": 1, "ClassifyName": "Popular"},
+                {"ClassifyId": 2, "ClassifyName": "New"},
+            ],
+        }
+    if path == "Channel/StoreClockGetList":
+        assert body["Command"] == "Channel/StoreClockGetList"
+        return {
+            "ReturnCode": 0,
+            "ClockList": [
+                {"ClockId": 101, "ClockName": "Analog", "ClockType": 0,
+                 "ImagePixelId": "px1", "AddFlag": 0},
+            ],
+        }
     raise AssertionError(f"unexpected path {path}")
 
 
@@ -92,14 +110,50 @@ def test_category_file_list_shape_and_parse():
     assert req["StartNum"] == 1 and req["EndNum"] == 20  # page 1, limit 10 -> *2
 
 
-def test_list_clock_faces_uses_clock_classify():
+def test_get_clock_classify_list_shape():
     c = _client()
     with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
-        c.list_clock_faces(limit=5)
+        classifies = c.get_clock_classify_list()
+    assert classifies == [
+        {"ClassifyId": 1, "ClassifyName": "Popular"},
+        {"ClassifyId": 2, "ClassifyName": "New"},
+    ]
     req = post.call_args_list[-1].args[1]
-    assert req["Command"] == "GetCategoryFileListV2"
-    assert req["Classify"] == cloud.CLOCK_FACE_CLASSIFY
-    assert req["EndNum"] == 10  # limit 5 -> *2
+    assert req["Command"] == cloud.CLOCK_CLASSIFY_CMD
+
+
+def test_get_clock_list_shape_and_params():
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        clocks = c.get_clock_list(1, limit=10, page=2)
+    assert clocks[0]["ClockName"] == "Analog"
+    req = post.call_args_list[-1].args[1]
+    assert req["Command"] == cloud.CLOCK_LIST_CMD
+    assert req["ClassifyId"] == 1
+    assert req["Flag"] == 0
+    assert req["StartNum"] == 11 and req["EndNum"] == 20  # page 2, limit 10
+
+
+def test_list_clock_faces_defaults_to_first_classify():
+    """Mirrors the app's own default flow (WifiChannelModel.R() in the
+    decompiled APK): no classify_id given -> fetch the classify list, use
+    its first entry."""
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        clocks = c.list_clock_faces(limit=5)
+    assert clocks[0]["ClockName"] == "Analog"
+    calls = [c.args[0] for c in post.call_args_list]
+    assert calls == [cloud.CLOCK_CLASSIFY_CMD, cloud.CLOCK_LIST_CMD]
+    list_req = post.call_args_list[-1].args[1]
+    assert list_req["ClassifyId"] == 1  # first classify from the fake response
+
+
+def test_list_clock_faces_with_explicit_classify_id_skips_classify_call():
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        c.list_clock_faces(classify_id=2, limit=5)
+    calls = [c.args[0] for c in post.call_args_list]
+    assert calls == [cloud.CLOCK_LIST_CMD]
 
 
 def test_search_weather_city():

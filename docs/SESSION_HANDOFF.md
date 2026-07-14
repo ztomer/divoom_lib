@@ -18,6 +18,27 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-13 (later same day): user provided the decompiled APK**
+  (`references/apk/decompiled_src/` — gitignored, exists on disk in the
+  main checkout, not this worktree; readable directly by absolute path)
+  in response to the Cloud HTTP "needs the user" ask below. Unblocked +
+  fixed a real bug: `list_clock_faces()`/`CLOCK_FACE_CLASSIFY` was calling
+  the WRONG endpoint (`GetCategoryFileListV2`, the pixel-art gallery, not
+  clocks) — confirmed via `HttpCommand.java` + `WifiChannelModel.java`'s
+  `R()` method that the real clock-face store is
+  `Channel/StoreClockGetClassify` + `Channel/StoreClockGetList`. Fixed in
+  `divoom_lib/cloud.py` + `divoomd/src/cloud_category.rs` (parity), tests
+  updated (`tests/test_cloud.py`), `docs/ROADMAP.md`/`CHANGELOG.md`
+  updated. Full suite 2734 passed / 97 skipped; `cargo test` 106 passed.
+  **Still open**: live round-trip against the corrected endpoint returns
+  RC=12 (`HTTP_REQUEST_EMPTY`) against the real server — reproduced with
+  both a real account and guest auth (ruled out as a token issue), root
+  cause not resolvable from the decompiled source (`BaseParams._postSync`,
+  the method that builds the actual POST, is a JADX "not decompiled"
+  stub). Not wired to any GUI action either way, so no regression risk.
+  The other ~225 `HttpCommand.java` endpoints remain unimplemented — ask
+  is now "which ones matter" rather than "we don't know the shapes."
+
 - **2026-07-13 (this round): Python daemon server archived (v0.22.12,
   not yet released) + a "/loop non-user-dependent work" hardware pass.**
   Continuation of the same day's v0.22.11 work. Two threads:

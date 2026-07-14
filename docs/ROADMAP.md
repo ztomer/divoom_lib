@@ -83,29 +83,51 @@ section below for detail. No remaining thread here.
 
 ### Divoom Cloud HTTP (200+ endpoints)
 
-**Status: BLOCKED on APK decompile access (checked 2026-07-13).** R61 stood up
-a thin cloud HTTP client (`divoom_lib/cloud.py` + `divoomd/src/cloud*.rs`,
-Python/Rust parity) and shipped 3 real endpoints: `get_category_file_list`
-(+ `list_clock_faces` wrapper), `search_weather_city`, and the
-`UserNewGuest` `RC=10` auth fix. That's the extent of what's implementable
-without a decompiled-APK reference for the other ~195+ endpoints' request
-shapes — this session tried to make further progress with live cloud creds
-alone (no APK source available) and hit a real wall: `CLOCK_FACE_CLASSIFY`
-(assumed `0`) was empirically probed against 7 different classify values,
-none of which returned anything resembling a dedicated clock-face category
-(all returned a similar mixed "new/latest" feed) — evidence the assumption
-is wrong, but live probing alone can't reverse-engineer the correct
-endpoint/param without the APK's own request definitions.
-**Next step needs the user**: either provide APK decompile source
-(`LoginServer.java`/`CmdManager` or equivalent) to reverse-engineer the
-correct endpoint shapes, or specify which of the 200+ endpoints actually
-matter for a real use case — implementing the remainder blind, without a
-GUI hook or defined purpose, isn't a good use of unattended effort.
+**Status: UNBLOCKED (2026-07-13) — user provided the decompiled APK source**
+at `references/apk/decompiled_src/` (`com/divoom/Divoom/http/HttpCommand.java`
+is the master list of all ~230 server command name constants; request/response
+field shapes live under `http/request/` and `http/response/`). This resolves
+the prior "next step needs the user" ask.
+
+**Concrete fix landed this round: the clock-face store was calling the wrong
+endpoint entirely.** `list_clock_faces()`/`CLOCK_FACE_CLASSIFY` previously
+called `GetCategoryFileListV2` with an assumed `Classify` value — confirmed
+via source to be the PIXEL-ART/monthly-best gallery endpoint (its only real
+callers are `CloudGalleriaFragment`/`CloudVerify*`/`FillGameModel`, none
+clock-related). The actual clock-face store is a dedicated two-call flow —
+`Channel/StoreClockGetClassify` (category list) then `Channel/StoreClockGetList`
+(clocks for one category id) — confirmed against
+`WifiChannelModel.java`'s `R()` method and the
+`MyClockStoreClockGet{Classify,List}{Request,Response}.java` field classes.
+Implemented in both `divoom_lib/cloud.py` (`get_clock_classify_list`/
+`get_clock_list`/`list_clock_faces`) and `divoomd/src/cloud_category.rs`
+(+ wired into `cloud_cmds.rs`/`daemon.rs` dispatch), with mocked-shape tests.
+**Still open**: a live round-trip against `Channel/StoreClockGetClassify`
+returns `RC=12` (`HTTP_REQUEST_EMPTY`) — reproduced with both a real logged-in
+account and guest auth (not a token problem; `GetCategoryFileListV2`/
+`Weather/SearchCity` both succeed with the same credentials in the same
+session), and `BaseParams._postSync` — the method that builds the actual
+generic POST — is a JADX "Method not decompiled" stub, so the exact wire gap
+can't be confirmed from source. The code is correct per the app's own
+request/response *classes*; end-to-end proof against the real server is
+unresolved (see the comment at `divoom_lib/cloud.py`'s clock-store section for
+the full writeup). Not wired to any GUI action either way (neither was the
+old, wrong version) — no user-visible regression risk either direction.
+
+**The other ~225 endpoints**: still not implemented — the APK source removes
+the "we don't know the shapes" blocker, but implementing them blind, without a
+GUI hook or defined purpose, still isn't a good use of unattended effort (per
+the prior assessment). **Ask still open**: name which endpoints matter for a
+real feature (the `HttpCommand.java` catalog covers alarms, forum/social,
+messaging, playlists, sleep-aid sync, pomodoro/Tomato timers, calendar
+integrations, and more) and they can be implemented against real request
+shapes now, or point at a specific feature gap to close.
 
 **Shipped (R61 + follow-up):**
 1. ~~Cloud auth broken (`RC=10`)~~ — fixed R61.
-2. `get_category_file_list`/`list_clock_faces`, `search_weather_city` — shipped, Python+Rust parity, tested.
-3. New transport: `divoom_lib/cloud.py` module (library was BLE-only + device LAN) — shipped.
+2. `get_category_file_list`, `search_weather_city` — shipped, Python+Rust parity, tested.
+3. `get_clock_classify_list`/`get_clock_list`/`list_clock_faces` — corrected to the real clock-face-store endpoints (2026-07-13); live end-to-end unresolved (RC=12, see above).
+4. New transport: `divoom_lib/cloud.py` module (library was BLE-only + device LAN) — shipped.
 
 ### Deferred (R12 §D)
 

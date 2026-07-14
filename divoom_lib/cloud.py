@@ -1,12 +1,16 @@
 """Divoom cloud HTTP client (appin.divoom-gz.com).
 
 Thin Python client mirroring ``divoomd/src/cloud.rs`` + the decompiled APK
-(``LoginServer.java`` / ``BaseRequestJson.java``). Provides:
+(``HttpCommand.java`` / ``BaseRequestJson.java`` — see
+``references/apk/decompiled_src/sources/com/divoom/Divoom/http/``). Provides:
 
   * guest auth — the RC=10 fix lives in ``divoom_auth._login_guest`` (the server
     now requires ``Type``/``SubType``/``DeviceId``/``devicePassword`` on
     ``User/NewGuest``; we load those from the virtual-device file).
-  * clock-face store — ``GetCategoryFileListV2``.
+  * pixel-art gallery browse — ``GetCategoryFileListV2`` (monthly-best etc.).
+  * clock-face store — ``Channel/StoreClockGetClassify`` +
+    ``Channel/StoreClockGetList`` (a *different* endpoint pair from the
+    gallery above — see ``get_clock_classify_list``/``get_clock_list``).
   * weather-city search — ``Weather/SearchCity``.
 
 All network I/O goes through ``divoom_auth._post``; tests mock that single seam.
@@ -20,20 +24,9 @@ from divoom_lib import divoom_auth as _auth
 
 BASE_URL = "https://appin.divoom-gz.com"
 
-# GetCategoryFileListV2 "Classify" for the clock-face store. VERIFY against the
-# APK — the gallery tab index the app uses for clock faces.
-# Empirically probed 2026-07-13 (live cloud creds, no APK decompile access):
-# sampled classify=0,1,2,6,20,21,22 — every value returned a similar mixed
-# "new/latest" feed (random pixel art, a couple of items whose OWN title
-# happens to mention "clock face"/"watch face", nothing resembling a
-# dedicated clock-face-only category). This is evidence AGAINST 0 being a
-# real "clock faces" category id, not confirmation of it. Either the real
-# clock-face browse uses a different endpoint/param than
-# GetCategoryFileListV2's `classify`, or the correct id is outside the
-# small sample tried. Needs APK decompile source (LoginServer.java /
-# CmdManager) to resolve properly — still open.
-CLOCK_FACE_CLASSIFY = 0
 WEATHER_SEARCH_CMD = "Weather/SearchCity"
+CLOCK_CLASSIFY_CMD = "Channel/StoreClockGetClassify"
+CLOCK_LIST_CMD = "Channel/StoreClockGetList"
 
 
 @dataclass
@@ -132,9 +125,108 @@ class CloudClient:
             )
         return data.get("FileList", data.get("List", []))
 
-    def list_clock_faces(self, limit: int = 20) -> list[dict]:
-        """Browse the cloud clock-face store (``CLOCK_FACE_CLASSIFY``)."""
-        return self.get_category_file_list(CLOCK_FACE_CLASSIFY, limit=limit)
+    # ── clock-face store (Channel/StoreClockGetClassify + …GetList) ────────
+    #
+    # Confirmed against the decompiled APK 2026-07-13
+    # (references/apk/decompiled_src/sources/com/divoom/Divoom/view/fragment/
+    # channelWifi/model/WifiChannelModel.java, method R()): the clock-face
+    # store is NOT browsed via GetCategoryFileListV2 (that endpoint is the
+    # pixel-art/monthly-best gallery — confirmed by its own callers, all in
+    # CloudGalleriaFragment/CloudVerify*/FillGameModel, none clock-related).
+    # It's a dedicated two-call flow: fetch the classify (category) list,
+    # then fetch clocks for one classify id. The app's own default flow uses
+    # Flag=0 and the FIRST classify entry returned. Request/response field
+    # names below are taken verbatim from the APK's
+    # MyClockStoreClockGet{Classify,List}{Request,Response}.java classes.
+    #
+    # STILL OPEN: a live round-trip against Channel/StoreClockGetClassify
+    # returns RC=12 (HTTP_REQUEST_EMPTY, "request data is null") — reproduced
+    # 2026-07-13 with BOTH a real logged-in email account and guest auth (not
+    # a token/auth problem; GetCategoryFileListV2 and Weather/SearchCity both
+    # succeed with the same credentials in the same session). The decompiled
+    # `BaseParams._postSync` — the method that actually builds the generic
+    # HTTP POST all non-device-routed commands go through, including this one
+    # — is a JADX "Method not decompiled" stub, so the exact wire shape it
+    # sends can't be read from source. Every field on the app's own
+    # `BaseLoadMoreRequest`/`MyClockStoreClockGetListRequest` classes is
+    # already included here; the gap is something outside what those request
+    # classes describe (WHY WEATHER/SEARCHCITY WORKS shows it's not literally
+    # about the URL having a "/" in it or fields sent minimal, so it's a
+    # subtler per-endpoint requirement, e.g. the server-side handler for this
+    # specific command may still require an actual bound device — DeviceId=0
+    # was used in this test env, which has no real paired device). Code below
+    # is correct per the app's request/response CLASSES; end-to-end proof
+    # against the real server is unresolved.
+
+    def get_clock_classify_list(self) -> list[dict]:
+        """Fetch the clock-face store's category list (``ClassifyId``/``ClassifyName``)."""
+
+        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "Command": CLOCK_CLASSIFY_CMD,
+                "Token": creds.token,
+                "UserId": creds.user_id,
+                "DeviceId": self.device_id,
+                "StartNum": 1,
+                "EndNum": 30,
+            }
+            if self.device_pw:
+                body["DevicePassword"] = self.device_pw
+            return body
+
+        data = self._post_with_refresh(CLOCK_CLASSIFY_CMD, _body)
+        rc = data.get("ReturnCode", -1)
+        if rc != 0:
+            raise RuntimeError(
+                f"{CLOCK_CLASSIFY_CMD} failed: RC={rc} {data.get('ReturnMessage')}"
+            )
+        return data.get("ClassifyList", [])
+
+    def get_clock_list(
+        self, classify_id: int, *, flag: int = 0, limit: int = 30, page: int = 1
+    ) -> list[dict]:
+        """Fetch clock faces (``ClockId``/``ClockName``/``ImagePixelId``/…) for one classify id."""
+        start = (page - 1) * limit + 1
+        end = page * limit
+
+        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "Command": CLOCK_LIST_CMD,
+                "Token": creds.token,
+                "UserId": creds.user_id,
+                "DeviceId": self.device_id,
+                "ClassifyId": classify_id,
+                "Flag": flag,
+                "StartNum": start,
+                "EndNum": end,
+            }
+            if self.device_pw:
+                body["DevicePassword"] = self.device_pw
+            return body
+
+        data = self._post_with_refresh(CLOCK_LIST_CMD, _body)
+        rc = data.get("ReturnCode", -1)
+        if rc != 0:
+            raise RuntimeError(
+                f"{CLOCK_LIST_CMD} failed: RC={rc} {data.get('ReturnMessage')}"
+            )
+        return data.get("ClockList", [])
+
+    def list_clock_faces(
+        self, classify_id: int | None = None, limit: int = 30
+    ) -> list[dict]:
+        """Browse the cloud clock-face store.
+
+        Mirrors the app's own default flow: with no ``classify_id``, fetch
+        the classify list and use its first entry (same as
+        ``WifiChannelModel.R()`` in the decompiled APK).
+        """
+        if classify_id is None:
+            classifies = self.get_clock_classify_list()
+            if not classifies:
+                return []
+            classify_id = classifies[0]["ClassifyId"]
+        return self.get_clock_list(classify_id, limit=limit)
 
     # ── weather city search ───────────────────────────────────────────────
 

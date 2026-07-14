@@ -39,17 +39,30 @@ shipped milestone (per the project planning docs).
   hardware-exercised: SD-music query and drawing-pad enter/exit ACK
   cleanly; `animation.app_get_user_define_info` (0x8e) timed out on this
   Ditoo (inconclusive, non-destructive).
-- **Divoom Cloud HTTP (200+ endpoints): status updated to BLOCKED.**
-  Live-probed `CLOCK_FACE_CLASSIFY` against 7 classify values — none
-  returned a distinct clock-face category, evidence the assumed value is
-  wrong, but reverse-engineering the correct endpoint shapes needs either
-  APK decompile source or user-specified priorities; not a good use of
-  further unattended effort.
+- **Divoom Cloud HTTP (200+ endpoints): unblocked, then a real bug fixed.**
+  Initially probed `CLOCK_FACE_CLASSIFY` live against 7 classify values with
+  no result resembling a clock-face category — evidence the assumption was
+  wrong, but blocked on needing the APK's own request definitions to resolve
+  further. The user then provided the decompiled APK source
+  (`references/apk/decompiled_src/`), which confirmed the clock-face store
+  was calling the **wrong endpoint entirely**: `GetCategoryFileListV2` is the
+  pixel-art/monthly-best gallery, not clock faces. The real clock-face store
+  is a dedicated two-call flow, `Channel/StoreClockGetClassify` +
+  `Channel/StoreClockGetList`. Fixed in `divoom_lib/cloud.py`
+  (`get_clock_classify_list`/`get_clock_list`/`list_clock_faces`) and
+  `divoomd/src/cloud_category.rs` (Python/Rust parity, wired into daemon
+  dispatch), with mocked-shape tests. Live end-to-end still unresolved: the
+  corrected endpoint returns `RC=12` (`HTTP_REQUEST_EMPTY`) against the real
+  server for a reason the decompiled source can't confirm (the method that
+  builds the actual POST wasn't decompilable) — not wired to any GUI action
+  either way, so no behavior regression regardless. Full endpoint catalog
+  (`HttpCommand.java`, ~230 commands) is now available for future work on
+  request.
 
-Full suite: 2731 passed, 0 failed, 97 skipped (down from 3200 as the
+Full suite: 2734 passed, 0 failed, 97 skipped (down from 3200 as the
 archived-server tests moved out of `tests/`; `archive/tests/` collects
-469 tests cleanly, not run by default). `check_no_emoji.py`/
-`check_file_size.py` gates clean.
+469 tests cleanly, not run by default). `cargo test` clean in `divoomd`
+(106 tests). `check_no_emoji.py`/`check_file_size.py` gates clean.
 
 ## v0.22.11 — device-selector honesty fix, menubar D glyph, CSS-token migration
 
