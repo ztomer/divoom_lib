@@ -21,6 +21,12 @@ shipped milestone (per the project planning docs).
   a reason when the daemon reports the command missing, matching the file's
   existing playwright/binary skip guards, and run for real once divoomd grows
   the command.
+- **fix(tests): `test_audio_visualizer.py` hard-imported `pyaudio`** (present
+  on the maintainer's machine, absent in CI, which has no PortAudio) — 7 tests
+  errored with `ModuleNotFoundError`. Added a module-level
+  `pytest.importorskip("pyaudio")` so it skips in CI and runs locally, matching
+  the repo's skip-on-missing-optional-dep pattern. These were previously masked
+  by the `archive/` collection abort.
 
 ## v0.22.16 — AidSleep RC=3 mystery fixed and shipped; full cloud API catalog complete (533/533)
 

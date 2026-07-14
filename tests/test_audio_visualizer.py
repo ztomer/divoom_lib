@@ -2,11 +2,14 @@
 
 The class scans real audio hardware via pyaudio inside a background thread
 (`_run`). We inject a fake `pyaudio.PyAudio` (patched at the exact
-`pyaudio.PyAudio` call site — pyaudio itself imports fine in this test env, it
-is just the real device/stream I/O we can't and shouldn't touch) so the
+`pyaudio.PyAudio` call site — only the real device/stream I/O is faked) so the
 device-scan and FFT/level-computation logic runs for real against canned
 sample buffers, without touching real hardware. numpy is real (pure, no
 hardware dependency) — only the audio backend is faked.
+
+pyaudio is an optional dep (needs the native PortAudio lib) and is absent in
+CI, so skip the whole module when it can't be imported — the tests monkeypatch
+`pyaudio.PyAudio`, which requires the module to exist.
 """
 from __future__ import annotations
 
@@ -16,6 +19,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
+pytest.importorskip("pyaudio")
 
 _REPO = Path(__file__).resolve().parents[1]
 if str(_REPO) not in sys.path:
