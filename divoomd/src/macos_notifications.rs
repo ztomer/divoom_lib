@@ -5,6 +5,10 @@
 //! and forwards them to the connected Divoom device via ANCS `0x50` command.
 //!
 //! Exposes status events and counters to match Python parity.
+//!
+//! DB access lives in `notification_db.rs`, routing-rule load/save/match in
+//! `notification_routing.rs` (both split out to stay under the 500-LOC house
+//! limit) — this file keeps the monitor state/loop and device-forwarding.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -12,6 +16,8 @@ use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
 use crate::daemon::Daemon;
+use crate::notification_db::{fetch_new_records, find_notification_db_path, initial_max_delivered_date, parse_notification_record};
+use crate::notification_routing::{load_routing_rules, route_app, save_routing_rules};
 
 // ── state ─────────────────────────────────────────────────────────────────
 
@@ -49,128 +55,6 @@ static MONITOR: std::sync::OnceLock<Arc<Mutex<MonitorState>>> = std::sync::OnceL
 
 fn state() -> Arc<Mutex<MonitorState>> {
     MONITOR.get_or_init(|| Arc::new(Mutex::new(MonitorState::new()))).clone()
-}
-
-// ── routing helper ────────────────────────────────────────────────────────
-
-const DEFAULT_ROUTING: &[(&str, u8)] = &[
-    ("whatsapp", 6),
-    ("facebook", 4),
-    ("messenger", 13),
-    ("instagram", 2),
-    ("twitter", 5),
-    ("snapchat", 3),
-    ("line", 9),
-    ("wechat", 10),
-    ("kakao", 1),
-    ("qq", 11),
-    ("viber", 12),
-    ("skype", 8),
-    ("mobilesms", 7),
-    ("messages", 7),
-    ("mail", 7),
-    ("com.apple.mail", 7),
-];
-
-fn get_routing_path() -> std::path::PathBuf {
-    if let Ok(p) = std::env::var("DIVOOM_CONTROL_ROUTING") {
-        std::path::PathBuf::from(p)
-    } else if let Ok(home) = std::env::var("HOME") {
-        std::path::PathBuf::from(home)
-            .join(".config")
-            .join("divoom-control")
-            .join("notification_routing.json")
-    } else {
-        std::path::PathBuf::from("notification_routing.json")
-    }
-}
-
-fn load_routing_rules() -> Vec<(String, u8)> {
-    let p = get_routing_path();
-    if !p.exists() {
-        return DEFAULT_ROUTING.iter().map(|(s, t)| (s.to_string(), *t)).collect();
-    }
-    let data = match std::fs::read_to_string(&p) {
-        Ok(s) => s,
-        Err(_) => return DEFAULT_ROUTING.iter().map(|(s, t)| (s.to_string(), *t)).collect(),
-    };
-    let raw: Result<Vec<Vec<serde_json::Value>>, _> = serde_json::from_str(&data);
-    match raw {
-        Ok(entries) => {
-            let mut rules = Vec::new();
-            for entry in entries {
-                if entry.len() == 2 {
-                    if let (Some(s), Some(t)) = (entry[0].as_str(), entry[1].as_u64()) {
-                        rules.push((s.to_lowercase(), t as u8));
-                    }
-                }
-            }
-            if rules.is_empty() {
-                DEFAULT_ROUTING.iter().map(|(s, t)| (s.to_string(), *t)).collect()
-            } else {
-                rules
-            }
-        }
-        Err(_) => DEFAULT_ROUTING.iter().map(|(s, t)| (s.to_string(), *t)).collect(),
-    }
-}
-
-fn save_routing_rules(rules: &[(String, u8)]) -> Result<(), String> {
-    let p = get_routing_path();
-    if let Some(parent) = p.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let mut sorted = rules.to_vec();
-    sorted.sort_by(|a, b| a.0.cmp(&b.0));
-
-    let json_val = serde_json::Value::Array(
-        sorted.iter()
-            .map(|(s, t)| serde_json::json!([s, t]))
-            .collect()
-    );
-    let serialized = serde_json::to_string_pretty(&json_val).map_err(|e| e.to_string())? + "\n";
-    std::fs::write(&p, serialized).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-fn route_app(app_id: &str, rules: &[(String, u8)]) -> Option<u8> {
-    if app_id.is_empty() { return None; }
-    let a = app_id.to_lowercase();
-    for (substr, app_type) in rules {
-        if a.contains(substr) {
-            return Some(*app_type);
-        }
-    }
-    None
-}
-
-// ── DB candidate paths ────────────────────────────────────────────────────
-
-pub fn find_notification_db_path() -> Option<std::path::PathBuf> {
-    let home = std::env::var("HOME").ok()?;
-    let home_path = std::path::PathBuf::from(&home);
-
-    // 1. Probing DARWIN_USER_DIR
-    if let Ok(out) = std::process::Command::new("getconf").arg("DARWIN_USER_DIR").output() {
-        if out.status.success() {
-            let base_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            let base = std::path::PathBuf::from(base_str);
-            for rel in &["com.apple.notificationcenter/db2/db", "com.apple.usernotifications/db2/db"] {
-                let p = base.join(rel);
-                if p.exists() {
-                    return Some(p);
-                }
-            }
-        }
-    }
-
-    // 2. Probing Group Containers path
-    let p = home_path.join("Library/Group Containers/group.com.apple.usernoted/db2/db");
-    if p.exists() {
-        return Some(p);
-    }
-
-    None
 }
 
 // ── public API ────────────────────────────────────────────────────────────
@@ -311,60 +195,6 @@ pub async fn set_routing(args: &Value) -> Value {
     guard.rules = new_rules;
 
     json!({"success": true})
-}
-
-// ── DB query helpers ──────────────────────────────────────────────────────
-
-fn initial_max_delivered_date(db_path: &std::path::Path) -> f64 {
-    let conn = match rusqlite::Connection::open_with_flags(
-        db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ) {
-        Ok(c) => c,
-        Err(_) => return 0.0,
-    };
-    let mut stmt = match conn.prepare("SELECT MAX(delivered_date) FROM record") {
-        Ok(s) => s,
-        Err(_) => return 0.0,
-    };
-    let res: Result<f64, _> = stmt.query_row([], |row| row.get(0));
-    res.unwrap_or(0.0)
-}
-
-fn fetch_new_records(db_path: &std::path::Path, last_seen: f64) -> Result<Vec<(Vec<u8>, f64)>, String> {
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ).map_err(|e| e.to_string())?;
-
-    let mut stmt = conn.prepare(
-        "SELECT data, delivered_date FROM record WHERE delivered_date > ? ORDER BY delivered_date ASC"
-    ).map_err(|e| e.to_string())?;
-
-    let rows = stmt.query_map([last_seen], |row| {
-        Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, f64>(1)?))
-    }).map_err(|e| e.to_string())?;
-
-    let mut res = Vec::new();
-    for r in rows {
-        if let Ok(item) = r {
-            res.push(item);
-        }
-    }
-    Ok(res)
-}
-
-fn parse_notification_record(raw: &[u8]) -> Option<(String, String, String)> {
-    let val: plist::Value = plist::from_bytes(raw).ok()?;
-    let dict = val.as_dictionary()?;
-    
-    let app = dict.get("app").and_then(|v| v.as_string()).unwrap_or("").to_string();
-    
-    let req = dict.get("req").and_then(|v| v.as_dictionary());
-    let title = req.and_then(|d| d.get("titl")).and_then(|v| v.as_string()).unwrap_or("").to_string();
-    let body = req.and_then(|d| d.get("body")).and_then(|v| v.as_string()).unwrap_or("").to_string();
-    
-    Some((app, title, body))
 }
 
 // ── monitor loop ──────────────────────────────────────────────────────────

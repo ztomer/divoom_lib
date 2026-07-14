@@ -38,6 +38,10 @@ pub mod art;
 pub mod hot_state;
 #[cfg(target_os = "macos")]
 pub mod macos_notifications;
+#[cfg(target_os = "macos")]
+pub mod notification_db;
+#[cfg(target_os = "macos")]
+pub mod notification_routing;
 pub mod transport;
 pub mod spp;
 pub mod cloud;
