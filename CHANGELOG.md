@@ -4,6 +4,24 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Unreleased — CI green again (pytest collection fix)
+
+- **fix(ci): `pytest` collection aborted the whole `tests` job.** Since the
+  Python daemon was archived (`046cdf8`), `archive/tests/conftest.py` shipped
+  alongside the live `tests/conftest.py`; both register `--run-hardware`, so
+  bare `pytest` hit `ValueError: option names {'--run-hardware'} already
+  added` and interrupted collection before any test ran — every push since has
+  shown a red `tests` job. `pytest.ini` now excludes `archive/` from
+  collection (`--ignore=archive` + `norecursedirs`); it is retired
+  reference-only code and was never meant to run. Verified: 2767 passed,
+  94 skipped, 0 errors (was: 1 collection error, 0 tests run).
+- **fix(tests): the two `mock_simulate_drop` e2e tests hard-failed for anyone
+  with Playwright installed** (they skip in CI, which has no Playwright) — the
+  native daemon doesn't implement `mock_simulate_drop` yet. They now skip with
+  a reason when the daemon reports the command missing, matching the file's
+  existing playwright/binary skip guards, and run for real once divoomd grows
+  the command.
+
 ## v0.22.16 — AidSleep RC=3 mystery fixed and shipped; full cloud API catalog complete (533/533)
 
 Follows up v0.22.15's "closed, not resolvable" AidSleep verdict — it was
