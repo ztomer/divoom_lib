@@ -4,6 +4,36 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.14 — R12 visual pass (Gemini-verified), Cloud API catalog, file split
+
+- **style: R12 visual pass, verified via a real Gemini design critique.**
+  Sent real screenshots (dashboard, appbar, tab strip) to Gemini Pro
+  (`gemini-bridge` skill) for a Rams/Kare critique, then checked every
+  finding against the actual source before touching anything — 3 of 5 were
+  false positives from the test screenshot itself (headless-Chromium's font
+  fallback, an already-centered appbar, already-passing text contrast). 2
+  were real: the tab strip's active state (solid `--primary` fill + white
+  text) used a different "selected" visual language than the sidebar's own
+  established translucent-tint pattern — unified `tabs.css` to match
+  `.nav-btn.active`'s treatment; the sidebar's device chips had a 2px
+  left-alignment mismatch against the nav items — fixed. Full GUI e2e suite
+  green; `tests/test_tabs_chrome.py` updated for the new (intentional)
+  active-state contract.
+- **docs: full Divoom Cloud HTTP API catalog** (`docs/cloud_api/`) — all 533
+  `HttpCommand.java` commands researched (decompiled request/response
+  shapes cross-checked with web search), 16 parallel batches by domain.
+  `README.md` is the index + findings; `UNKNOWN_COMMANDS.md` lists the
+  handful (8 of 502 documented so far) with zero signal from either source.
+  Surfaced 3 candidate new features (AidSleep browse+play, Playlist
+  browse+push, `Cloud/ToDevice`) — documented, not implemented.
+- **refactor(daemon): split `macos_notifications.rs`** to clear the 500-LOC
+  gate — `notification_db.rs` (DB access/plist parsing) and
+  `notification_routing.rs` (routing-rule load/save/match) split out; pure
+  refactor, zero behavior change.
+
+Full suite: 2740 passed, 0 failed, 97 skipped. `cargo test` clean in
+`divoomd` (106 tests). `check_no_emoji.py`/`check_file_size.py` gates clean.
+
 ## v0.22.13 — real clock-face browser (Cloud HTTP unblocked by user-provided APK)
 
 Supersedes the v0.22.12 clock-face fix below: that round landed a

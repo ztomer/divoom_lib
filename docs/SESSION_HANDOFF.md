@@ -18,6 +18,61 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-14: closed out the 5-item post-release punch list** (user gave
+  terse one-line answers to each of the 5 "what's left" items from the prior
+  round: "1. use gemini / 2. skip. known to work. I'll report if there are
+  errors / 3. do research, search the web, if not found, write it down into
+  a separate md file (unknown commands). / 4. I guess that using the actual
+  device city is more or less equivalent so we don't need to change this. /
+  5. split cleanly").
+  1. **R12 visual pass, via Gemini** — used the `gemini-bridge` skill (Chrome
+     transport) to get a real design critique of the app (screenshots of the
+     dashboard/appbar/tab-strip sent to Gemini Pro). The first ~25 minutes
+     produced no reply (a documented gemini-bridge failure mode — sustained
+     empty reply, no quota banner); a fresh chat with the same images got a
+     real reply through. Verified every finding against actual source before
+     applying anything: 3 of 5 were false positives caused by the test
+     screenshot itself (headless-Chromium fell back to literal `{}` glyphs
+     for icon characters it couldn't render; the appbar already had
+     `align-items:center`; inactive-tab-text contrast was already
+     borderline-passing WCAG AA, not failing). 2 were real and fixed: the tab
+     strip's active state (solid `--primary` fill + white text) didn't match
+     the sidebar's own established translucent-tint pattern
+     (`.nav-btn.active`) — unified them; the sidebar's device chips had a 2px
+     left-alignment mismatch against the nav items — fixed by adjusting
+     `.device-chips` padding. `tests/test_tabs_chrome.py` updated to match
+     the new (intentional) active-state contract.
+  2. **Skip** — no action (menubar D-glyph icon; user will report if issues
+     surface).
+  3. **Cloud HTTP endpoint research** — dispatched 16 parallel background
+     research agents covering all 533 `HttpCommand.java` commands, each
+     cross-referencing the decompiled APK's request/response classes with
+     web search. Result: `docs/cloud_api/README.md` (full catalog + index)
+     and `docs/cloud_api/UNKNOWN_COMMANDS.md` (8 of 502 documented commands
+     have zero signal from either source). Surfaced 3 candidate new features
+     (AidSleep browse+play, Playlist browse+push, `Cloud/ToDevice`) — not
+     implemented, just documented; see `docs/ROADMAP.md`'s Cloud HTTP
+     section. One batch (`misc_small` — Google/Outlook/Weather/Radio/
+     QingTing/BlueDevice/Dialog/NoDevice/PowerOn/Mall/AI/FillGame, 31
+     commands) was still running when this round's work was committed —
+     append it + update the README's tally when it lands.
+  4. **No change** — confirmed: the weather widget's existing system/OS
+     location is an acceptable equivalent to a Divoom-city-search feature;
+     `search_weather_city` stays implemented-but-unwired, as before.
+  5. **`macos_notifications.rs` split cleanly** — pulled DB access
+     (`notification_db.rs`) and routing-rule load/save/match
+     (`notification_routing.rs`) into their own modules; the file itself
+     keeps the monitor state/loop and device-forwarding. Pure refactor, zero
+     behavior change. Clears the file-size gate (was 503 lines, one over).
+  Verified: full `tests/` suite 2740 passed / 0 failed / 97 skipped (a
+  concurrent full-suite run showed 2 isolated failures —
+  `test_real_event_relay_degraded_then_disconnected`,
+  `test_rust_spp_connect_failure_integration` — confirmed via `git stash`
+  regression-isolation to be pre-existing flakiness unrelated to this
+  round's changes; both pass in isolation and the suite is clean end to
+  end); `cargo test` 106 passed. `check_no_emoji.py`/`check_file_size.py`
+  clean.
+
 - **2026-07-13: v0.22.13 RELEASED** (user: "commit, push a releash, tell me
   what's left"). Branch `claude/determined-curran-400d36` was a clean
   fast-forward of `origin/main` (0 behind, 3 ahead) — pushed directly to

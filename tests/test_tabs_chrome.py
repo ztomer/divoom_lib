@@ -66,7 +66,11 @@ def test_tabs_css_defines_tab_btn() -> None:
 
 
 def test_tabs_css_defines_active_state() -> None:
-    """The active state is the most important contract: --primary bg + white text."""
+    """The active state contract: a translucent --primary tint (bg + text +
+    border), matching the sidebar's .nav-btn.active pattern (sidebar.css) —
+    a solid saturated fill here read as a different, heavier "selected"
+    language than the rest of the app uses for the same state (R12 visual
+    pass, 2026-07-14)."""
     src = TABS_CSS.read_text()
     m = re.search(
         r"\.tabs-row\s+\.tab-btn\.active\s*\{([^}]+)\}",
@@ -75,8 +79,8 @@ def test_tabs_css_defines_active_state() -> None:
     )
     assert m, "tabs.css is missing .tabs-row .tab-btn.active"
     body = m.group(1)
-    assert "var(--primary)" in body, "active state must use --primary"
-    assert "#ffffff" in body or "white" in body, "active text must be white"
+    assert "var(--primary)" in body, "active text must use --primary"
+    assert "rgba(255, 90, 31" in body, "active bg/border must be a translucent --primary tint"
 
 
 def test_tabs_css_icon_slot() -> None:

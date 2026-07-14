@@ -75,7 +75,7 @@ section below for detail. No remaining thread here.
 |-----------|-----------|-------|
 | **`show_clock()` overlay reorder** | — | **DONE (R60)** — realigned to APK `C2()` canonical `[0x00, t, style, 0x01, humidity, weather, date, R,G,B]`; wire-byte test added. |
 | **`get_*` read-back timeouts** | — | **DONE (R60)** — bounded + cached in both Python (`ble_reads.read_with_retry` 2.5s + last-good cache) and Rust (every `get_*` uses `ctx.timeout`; daemon wraps call in `tokio::time::timeout` 30s clamped [1,120]). |
-| **R12 visual pass** | user-driven | Glass tab strip, appbar corners, etc. |
+| **R12 visual pass** | — | **DONE (2026-07-14).** User: "use gemini." Captured real screenshots (dashboard, appbar close-up, tab-strip close-up) and sent them to Gemini Pro (`gemini-bridge` skill, Chrome transport) for a Rams/Kare critique. Verified each finding against the actual source before applying — 3 of 5 were false positives from the test-harness screenshot (headless-Chromium font fallback rendered `{}%`/`{}/15` icon glyphs as literal braces; the appbar already had `align-items:center`; inactive-tab contrast was already borderline-passing WCAG AA). 2 were real, verified, and fixed: (1) the tab strip's active state used a solid saturated `--primary` fill + white text, a different "selected" visual language than the sidebar's own established translucent-tint pattern (`.nav-btn.active` — `rgba(255,90,31,0.12)` bg + primary text + tinted border) — unified `tabs.css`'s `.tab-btn.active` to match; (2) the sidebar's device chips (`.device-chips`) had their text starting 2px off from the nav-item text's left edge (12px sidebar + 12px nav-btn padding = 24px vs. 12px + 2px + 8px = 22px) — bumped `.device-chips` padding 2px→4px to land both at the same 24px offset. `tests/test_tabs_chrome.py` updated to pin the new contract; full GUI e2e suite green. |
 | **R12 hardware verification** | user-driven | Album cover, custom-art/live/weather on real device. |
 | **Menubar connection-feedback: live-hardware confirmation** | — | **DONE (2026-07-13, real hardware).** Launched the packaged v0.22.10 app (`dist/Divoom.app`), confirmed a real device (Pixoo-1) auto-connected, then verified the menubar icon via `screencapture` (computer-use MCP was disconnected — native CLI fallback): connected → green, `disconnect` command → orange (idle) within one poll cycle, reconnected → green again. Full round-trip confirmed on real hardware, not just the mock-transport test suite. |
 | **Daemon-down banner / reconnect regression check** | — | **DONE (2026-07-13, real hardware).** With the packaged app running and a real device connected: `kill -9` the daemon → auto-reconnect self-healed in ~1s (GUI correctly updated to reflect the dropped device). Re-ran with the daemon binary renamed away (forcing respawn to fail) → the "Background service isn't running" banner correctly appeared; restored the binary and clicked the banner's Reconnect button → banner cleared, daemon respawned and confirmed responsive. Both the auto-heal and manual-reconnect paths verified working. |
@@ -126,14 +126,26 @@ load without a tab click (the panel is active by default), switching
 categories, the existing "connect a device first" guard, and applying with
 the correct `ClockId` reaching `set_clock()`.
 
-**The other ~225 `HttpCommand.java` endpoints**: still not implemented — the
-APK source removes the "we don't know the shapes" blocker, but implementing
-them blind, without a GUI hook or defined purpose, still isn't a good use of
-unattended effort. **Ask still open**: name which endpoints matter for a real
-feature (alarms, forum/social, messaging, playlists, sleep-aid sync,
-pomodoro/Tomato timers, calendar integrations, and more) and they can be
-implemented against real request shapes now, or point at a specific feature
-gap to close.
+**The other ~500 `HttpCommand.java` endpoints: fully cataloged (2026-07-14),
+still not implemented.** User: "do research, search the web, if not found,
+write it down into a separate md file (unknown commands)." Full research
+sweep of all 533 command constants — purpose, request/response field shapes
+(from decompiled `http/request/**`/`http/response/**` classes), relevance
+(`device-control` vs. Divoom's own `account/social`/`internal/moderation`
+layer), and source confidence, dispatched as 16 parallel research batches by
+domain. Result: **`docs/cloud_api/README.md`** (index + the full catalog) and
+**`docs/cloud_api/UNKNOWN_COMMANDS.md`** (commands with zero signal beyond
+the bare string — 8 of 502 documented so far, most of the API resolved
+cleanly from the decompiled source even with no public docs). Three genuine
+new-feature leads surfaced (documented in the catalog's README, not yet
+implemented): **AidSleep browse+play** (cloud-hosted sleep-sound library,
+same shape as the shipped clock-face browser), **Playlist browse+push**
+(`Playlist/SendDevice`, confirmed live in the decompiled app), and
+`Cloud/ToDevice` (unconfirmed semantics, no live caller found — needs more
+digging before treating as real). Implementing them blind, without a GUI hook
+or defined purpose, still isn't a good use of unattended effort. **Ask still
+open**: pick one of the three leads, or name a different endpoint/feature to
+prioritize, and it can be implemented against real request shapes now.
 
 **Shipped (R61 + follow-up):**
 1. ~~Cloud auth broken (`RC=10`)~~ — fixed R61.
