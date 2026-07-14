@@ -18,10 +18,13 @@ window.DivoomTemplates.routines = `
             <div class="card glass-card">
                 <div class="card-header flex-header">
                     <h3>Auto-Sync Gallery</h3>
-                    <label class="switch">
-                        <input type="checkbox" id="routines-auto-sync-enabled">
-                        <span class="slider-round"></span>
-                    </label>
+                    <div class="row gap-8" style="align-items:center;">
+                        <button id="sync-now-btn" class="glow-btn compact">Sync Now</button>
+                        <label class="switch">
+                            <input type="checkbox" id="routines-auto-sync-enabled">
+                            <span class="slider-round"></span>
+                        </label>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div id="sync-targets-list" class="sync-targets-list mb-18"></div>
@@ -39,6 +42,7 @@ window.DivoomTemplates.routines = `
                     </div>
 
                     <span id="routines-auto-sync-status" class="panel-hint" style="display:block; margin-top:8px;"></span>
+                    <span id="sync-now-status" class="panel-hint" style="display:block; margin-top:4px;"></span>
                 </div>
             </div>
         </div>

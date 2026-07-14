@@ -7,9 +7,24 @@ document.addEventListener("DOMContentLoaded", () => {
         if (fileId && window.pywebview && window.pywebview.api && window.pywebview.api.get_animated_preview) {
             setTimeout(() => {
                 window.pywebview.api.get_animated_preview(fileId).then(gifUrl => {
+                    const img = item.querySelector(".gallery-item-preview");
+                    if (!img) return;
                     if (gifUrl) {
-                        const img = item.querySelector(".gallery-item-preview");
-                        if (img) img.src = gifUrl;
+                        img.src = gifUrl;
+                        img.classList.remove("is-loading", "is-unavailable");
+                    } else if (img.classList.contains("is-loading")) {
+                        // Still no preview after the fetch — this is a genuine
+                        // miss, not "still loading". Say so distinctly instead of
+                        // leaving the pulsing skeleton up forever (honest
+                        // placeholder: loading and failed must look different).
+                        img.classList.remove("is-loading");
+                        img.classList.add("is-unavailable");
+                    }
+                }).catch(() => {
+                    const img = item.querySelector(".gallery-item-preview");
+                    if (img && img.classList.contains("is-loading")) {
+                        img.classList.remove("is-loading");
+                        img.classList.add("is-unavailable");
                     }
                 });
             }, 50 * index);
@@ -148,10 +163,11 @@ document.addEventListener("DOMContentLoaded", () => {
     function buildGalleryItem(art, idx) {
         const item = document.createElement("div");
         item.className = "gallery-item";
+        const isLoading = !art.preview_url;
         const previewSrc = art.preview_url ? art.preview_url : "assets/pixoo.png";
         item.innerHTML = `
                 <div class="gallery-item-preview-box">
-                    <img src="${previewSrc}" class="gallery-item-preview" alt="${art.name}">
+                    <img src="${previewSrc}" class="gallery-item-preview${isLoading ? " is-loading" : ""}" alt="${art.name}">
                 </div>
                 <div class="gallery-item-info">
                     <h5>${art.name}</h5>
@@ -209,10 +225,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 "flex:0 1 auto; min-width:0; max-width:240px; overflow:hidden; "
                 + "text-overflow:ellipsis; white-space:nowrap;";
 
+            const status = document.createElement("span");
+            status.className = "sync-now-row-status";
+            status.dataset.addr = c.address;
+            status.style.cssText = "font-size:11px; color:var(--text-muted); margin-left:auto; white-space:nowrap;";
+
             const toggle = document.createElement("label");
             toggle.className = "switch";
             toggle.style.margin = "0";
-            toggle.style.marginLeft = "auto";
             const cb = document.createElement("input");
             cb.type = "checkbox";
             cb.value = c.address;
@@ -222,7 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
             slider.className = "slider-round";
             toggle.append(cb, slider);
 
-            row.append(accent, name, toggle);
+            row.append(accent, name, status, toggle);
             el.appendChild(row);
         });
     }

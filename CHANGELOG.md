@@ -4,7 +4,56 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
-## Unreleased — CI green again (pytest collection fix)
+## v0.22.18 — Bug batch: gallery, hot-channel sync, Sync Now, theming, alignment; CI green again
+
+User-reported bug batch (`docs/PLANNING_ROUND62.md`). Investigated live
+against the real Divoom cloud API and this machine's actual gallery cache,
+not just static reading — see the planning doc for the full root-cause
+writeup.
+
+- **fix(gallery): corrupt/truncated cached downloads were never retried.**
+  `download_item()` (`divoom_gui/gallery_sync.py`) only re-downloaded a
+  `.bin` if it was *missing*; a truncated download (confirmed live: AES-CBC
+  padding errors on this machine's own cache) or any other decode failure
+  left the same bad bytes cached forever, re-failing on every subsequent
+  gallery load. Decode failure now deletes the cached `.bin` so the next
+  fetch re-downloads fresh bytes.
+- **fix(gallery): loading vs. permanently-unavailable art looked identical**
+  — both fell back to the static Pixoo logo, so a gallery that was still
+  populating in the background read as broken. `gallery.js`/`gallery.css`
+  now give the loading state a distinct pulsing placeholder and a
+  genuinely-missing preview a distinct dimmed/grayscale one.
+- **fix(hot channel): the "Update" button stayed disabled after the first
+  click, forever.** `gallery_hot.js`'s `applyProgress`/`finishProgress`
+  were closure-local, but `connection_events.js`'s `onHotProgress` called
+  them as `window.applyProgress`/`window.finishProgress` — both undefined,
+  so the button-reset path silently never ran. Exposed both on `window`;
+  removed the now-fully-dead `pollProgress`/`_pollTimer` polling loop they
+  replaced.
+- **feat: "Sync Now"** (Routines > Auto-Sync) — manually push hot-channel
+  content to every toggled sync target immediately instead of waiting for
+  the scheduled interval, with per-device progress on the existing device
+  toggle rows. New `sync_now()` bridge method
+  (`divoom_gui/gallery_hot_api.py`) sequentially connects each selected
+  target (`connect_single_device`) and runs the same `hot_update` the
+  single-device button uses, tolerating a per-device failure without
+  aborting the batch; new `sync_now.js` + `onSyncNowProgress`/
+  `onSyncNowComplete` events.
+- **fix(theming): bottom-right toast popups were black-on-black in light
+  mode.** `.toast` (`widgets_extra.css`) hardcoded a dark background
+  literal instead of the theme's `var(--card-bg)`.
+- **fix(device settings): clock format / temperature / power mode pill
+  groups were center-aligned, not right-aligned.** The base `.tabs-row`
+  rule's symmetric `margin: auto` won over the parent row's
+  `justify-content: space-between`. Right-aligned to match the existing
+  Orientation row's pattern.
+- **verified, no change needed:** playlist push and photo album push
+  (the latter landed in `0d513a5`/v0.22.17, already on `main`) both work
+  correctly end-to-end — smoke-tested live.
+- **test(pytest.ini):** local dev machines with other agent sessions'
+  `.claude/worktrees/` checkouts hit an "import file mismatch" collection
+  abort (duplicate module basenames across worktrees) — excluded, same
+  treatment as `archive/`. CI is unaffected (no such directory there).
 
 - **fix(ci): `pytest` collection aborted the whole `tests` job.** Since the
   Python daemon was archived (`046cdf8`), `archive/tests/conftest.py` shipped

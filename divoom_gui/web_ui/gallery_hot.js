@@ -10,8 +10,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const btn = document.getElementById("hot-update-btn");
     if (!btn) return;
 
-    let _pollTimer = null;
-
     // ── Auto-fetch hot channel manifest on tab activation ──────────────
     window.addEventListener("tab-changed", (e) => {
         if (e.detail.tab === "hot-channel" || e.detail.tab === "pixel-art") {
@@ -137,19 +135,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    function pollProgress() {
-        window.pywebview?.api?.hot_update_status?.().then(json => {
-            let p;
-            try { p = JSON.parse(json); } catch { return; }
-            applyProgress(p);
-            if (p.phase === "done" || p.phase === "error") {
-                clearInterval(_pollTimer);
-                _pollTimer = null;
-                finishProgress(p);
-            }
-        });
-    }
-
     function applyProgress(p) {
         const fill = document.getElementById("hot-progress-fill");
         const text = document.getElementById("hot-progress-text");
@@ -245,6 +230,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         setTimeout(resetButton, 3000);
     }
+    // connection_events.js's window.Divoom.onHotProgress calls these by name
+    // on window — without this exposure they're closure-local and the calls
+    // silently no-op, so resetButton() (called from finishProgress) never
+    // runs and the button stays disabled after the first click.
+    window.applyProgress = applyProgress;
+    window.finishProgress = finishProgress;
 
     function resetButton() {
         const label = document.getElementById("hot-update-label");

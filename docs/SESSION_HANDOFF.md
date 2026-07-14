@@ -18,6 +18,44 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-14 (Round 62 — user bug batch, released): gallery cache-retry
+  fix, hot-channel button fix, Sync Now feature, light-mode toast fix,
+  device-settings alignment fix.** User filed 7 live bugs; see
+  `docs/PLANNING_ROUND62.md` for the full findings and `CHANGELOG.md`'s
+  Unreleased-turned-versioned entry for what shipped. Highlights:
+  - Local `main` was 1 commit behind `origin/main` — fast-forwarded first
+    (`0d513a5`/v0.22.17, already shipped Photo Albums end-to-end).
+  - Playlist push and photo album push were both already working
+    end-to-end; verified live, no code change.
+  - Gallery ("most images don't render"): root-caused via a **live repro
+    against the real Divoom cloud API and this machine's actual
+    `~/.config/divoom-control/cache_gallery`** — a truncated/corrupt
+    download's `.bin` was cached forever and never retried (confirmed:
+    AES-CBC padding errors on real cached files). Fixed in
+    `gallery_sync.py::download_item`; also gave the "still loading" state
+    a placeholder distinct from "permanently unavailable" (both used to
+    render the same static Pixoo logo).
+  - Hot Channel "Update" button stayed disabled forever after one click —
+    `gallery_hot.js`'s `applyProgress`/`finishProgress` were never exposed
+    on `window`, so `connection_events.js`'s event-driven
+    `onHotProgress` silently no-op'd the reset path.
+  - New **Sync Now** (Routines > Auto-Sync): `sync_now()` bridge method
+    sequentially connects+syncs every toggled target device, reusing
+    `connect_single_device` + the existing single-device `hot_update`
+    daemon call (no new Rust work), with per-device progress on the
+    existing device-toggle rows.
+  - Light-mode toast contrast + device-settings pill right-alignment: both
+    small CSS fixes.
+  - Local dev fix: `pytest.ini` now also excludes `.claude/` (other agent
+    sessions' worktrees on this shared-tree project caused an "import file
+    mismatch" collection abort local-only; CI unaffected).
+  - Full suite green: 2805 passed / 96 skipped, 0 failed (5 new tests: 1
+    gallery decode-retry unit test + 2 hot-channel-button e2e + 2
+    sync-now e2e — all proven to fail on the pre-fix code before
+    verifying green).
+  - **Released as vX.Y.Z** (see the git tag / GitHub release for the exact
+    version — filled in at tag time).
+
 - **2026-07-14 (CI fix): the `tests` GitHub Actions workflow is green again.**
   Every push since `046cdf8` (Python daemon archived) had a red `tests` job.
   Root cause: `archive/tests/conftest.py` shipped beside the live

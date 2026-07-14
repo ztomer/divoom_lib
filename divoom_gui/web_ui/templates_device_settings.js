@@ -23,7 +23,7 @@ window.DivoomTemplates.deviceSettings = `
                 <!-- 2. Clock format -->
                 <div class="ds-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <span class="form-label" style="font-size:12px;">Clock format</span>
-                    <div class="tabs-row ds-pill-2" role="tablist" id="hour24-seg" data-api="set_hour_type">
+                    <div class="tabs-row ds-pill-2" role="tablist" id="hour24-seg" data-api="set_hour_type" style="margin-right:0; margin-left:auto;">
                         <button class="tab-btn active" data-val="0">12-hour</button>
                         <button class="tab-btn" data-val="1">24-hour</button>
                     </div>
@@ -32,7 +32,7 @@ window.DivoomTemplates.deviceSettings = `
                 <!-- 3. Temperature unit -->
                 <div class="ds-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <span class="form-label" style="font-size:12px;">Temperature</span>
-                    <div class="tabs-row ds-pill-2" role="tablist" id="tempf-seg" data-api="set_temp_unit">
+                    <div class="tabs-row ds-pill-2" role="tablist" id="tempf-seg" data-api="set_temp_unit" style="margin-right:0; margin-left:auto;">
                         <button class="tab-btn active" data-val="0">Celsius</button>
                         <button class="tab-btn" data-val="1">Fahrenheit</button>
                     </div>
@@ -41,7 +41,7 @@ window.DivoomTemplates.deviceSettings = `
                 <!-- 4. Power mode -->
                 <div class="ds-row" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <span class="form-label" style="font-size:12px;">Power mode</span>
-                    <div class="tabs-row ds-pill-2" role="tablist" id="lowpower-seg" data-api="set_low_power">
+                    <div class="tabs-row ds-pill-2" role="tablist" id="lowpower-seg" data-api="set_low_power" style="margin-right:0; margin-left:auto;">
                         <button class="tab-btn active" data-val="0">Normal</button>
                         <button class="tab-btn" data-val="1">Low power</button>
                     </div>

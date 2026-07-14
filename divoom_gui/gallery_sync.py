@@ -211,22 +211,34 @@ class GallerySyncMixin(GalleryHotApiMixin):
                     # Decode in parallel if preview doesn't exist
                     has_preview = any(cache_file_item.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg"])
                     if not has_preview and cache_file_bin.exists():
+                        decoded = False
                         try:
                             raw_bytes = cache_file_bin.read_bytes()
                             extracted = media_decoder.extract_image_from_magic_43(raw_bytes)
                             if extracted:
                                 img_bytes, ext = extracted
                                 cache_file_item.with_suffix(ext).write_bytes(img_bytes)
+                                decoded = True
                             elif raw_bytes.startswith(b"GIF89a") or raw_bytes.startswith(b"GIF87a"):
                                 cache_file_item.with_suffix(".gif").write_bytes(raw_bytes)
+                                decoded = True
                             elif raw_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
                                 cache_file_item.with_suffix(".png").write_bytes(raw_bytes)
+                                decoded = True
                             elif raw_bytes.startswith(b"\xff\xd8"):
                                 cache_file_item.with_suffix(".jpg").write_bytes(raw_bytes)
+                                decoded = True
                             else:
-                                media_decoder.decode_and_save_preview(raw_bytes, cache_file_item.with_suffix(".png"))
+                                decoded = media_decoder.decode_and_save_preview(raw_bytes, cache_file_item.with_suffix(".png"))
                         except Exception as dec_err:
                             logger.warning(f"Parallel decode failed for {file_id}: {dec_err}")
+                        if not decoded:
+                            # Corrupt/incomplete cached download (e.g. truncated
+                            # mid-transfer, confirmed live via CBC-padding errors on
+                            # this project's own cache) — delete it so the NEXT
+                            # fetch re-downloads fresh bytes instead of re-failing
+                            # on the same bad cache entry forever.
+                            cache_file_bin.unlink(missing_ok=True)
 
                 with ThreadPoolExecutor(max_workers=10) as executor:
                     list(executor.map(download_item, file_list))

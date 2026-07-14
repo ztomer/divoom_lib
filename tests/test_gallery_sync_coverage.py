@@ -434,6 +434,54 @@ def test_fetch_gallery_decode_signature_branches(tmp_path, monkeypatch):
     assert (cache_dir / "is_other.png").read_bytes() == b"fallback-png"
 
 
+def test_fetch_gallery_corrupt_bin_is_deleted_so_next_fetch_redownloads(tmp_path, monkeypatch):
+    """Regression (user report: 'most images don't render'): a truncated /
+    undecodable download used to cache the bad `.bin` forever — every later
+    fetch re-decoded the same corrupt bytes and failed again, permanently.
+    Decode failure must now delete the `.bin` so the NEXT fetch re-downloads
+    fresh bytes instead of retrying the same corrupt cache entry forever."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    m = _Host()
+    m.cached_creds = MagicMock(token="tok", user_id=1)
+    file_list = [{"FileId": "corrupt", "FileName": "C", "FileType": 5}]
+    cache_dir = tmp_path / ".config" / "divoom-control" / "cache_gallery"
+
+    # Round 1: download succeeds, decode fails (simulates a truncated
+    # AES-CBC payload) — the .bin must NOT survive the run.
+    with patch("urllib.request.urlopen",
+               side_effect=_fake_urlopen_factory(file_list=file_list,
+                                                  dl_bytes_map={"corrupt": b"not a real container"})), \
+         patch("divoom_gui.gallery_sync.media_decoder.extract_image_from_magic_43", return_value=None), \
+         patch("divoom_gui.gallery_sync.media_decoder.decode_and_save_preview", return_value=False):
+        m.fetch_gallery(classify=1)
+        _wait_for_fetch_thread()
+
+    assert not (cache_dir / "corrupt.bin").exists()
+    assert not (cache_dir / "corrupt.png").exists()
+    cache_file = tmp_path / ".config" / "divoom-control" / "gallery_cache.json"
+    assert json.loads(cache_file.read_text())[0]["preview_url"] == ""
+
+    # Round 2: same file_id, decode now succeeds — because the bad .bin was
+    # deleted, this fetch re-downloads (not re-decodes stale bytes) and the
+    # item ends up with a real preview.
+    def fake_decode_ok(raw_bytes, out_path):
+        out_path.write_bytes(b"decoded-png")
+        return True
+
+    with patch("urllib.request.urlopen",
+               side_effect=_fake_urlopen_factory(file_list=file_list,
+                                                  dl_bytes_map={"corrupt": b"a real container this time"})), \
+         patch("divoom_gui.gallery_sync.media_decoder.extract_image_from_magic_43", return_value=None), \
+         patch("divoom_gui.gallery_sync.media_decoder.decode_and_save_preview",
+               side_effect=fake_decode_ok):
+        m.fetch_gallery(classify=1)
+        _wait_for_fetch_thread()
+
+    assert (cache_dir / "corrupt.png").read_bytes() == b"decoded-png"
+    saved = json.loads(cache_file.read_text())
+    assert saved[0]["preview_url"].startswith("data:image/png;base64,")
+
+
 def test_fetch_gallery_progressive_and_error_broadcast_exceptions_are_caught(tmp_path, monkeypatch, caplog):
     """If window.evaluate_js itself always raises, the per-item progressive
     send is warned and skipped, the (un-guarded) final broadcast raising

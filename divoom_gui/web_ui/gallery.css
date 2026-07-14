@@ -69,6 +69,24 @@
     object-fit: contain;
 }
 
+/* Honest placeholders: "still loading" must look different from "no preview
+   available" — both used to show the same static Pixoo logo, which read as
+   a broken gallery. */
+.gallery-item-preview.is-loading {
+    opacity: 0.35;
+    animation: gallery-item-pulse 1.4s ease-in-out infinite;
+}
+
+.gallery-item-preview.is-unavailable {
+    opacity: 0.25;
+    filter: grayscale(1);
+}
+
+@keyframes gallery-item-pulse {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 0.45; }
+}
+
 .gallery-item-meta {
     font-size: 11px;
     color: var(--text-muted);

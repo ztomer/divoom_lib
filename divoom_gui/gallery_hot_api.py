@@ -5,6 +5,8 @@
 import json
 import logging
 import base64
+import threading
+import time
 import urllib.request
 from pathlib import Path
 
@@ -52,6 +54,85 @@ class GalleryHotApiMixin:
         addr = self._active_device_mac() if hasattr(self, "_active_device_mac") else None
         r = client.hot_update(device_size=int(size), show=True, address=addr or "")
         return json.dumps(r)
+
+    def sync_now(self) -> str:
+        """Manually run Auto-Sync immediately, instead of waiting for the
+        scheduled interval. Pushes hot-channel content to every toggled sync
+        target (`hotchannel_config.get_targets()` — the same list the
+        Routines > Auto-Sync device toggles edit) one at a time — the daemon
+        owns a single active device, so this connects, runs the same
+        `hot_update` the "Update Hot Channel" button uses, waits for it to
+        finish, disconnects (implicitly, on the next `connect_single_device`),
+        and moves on. A device that can't connect or fails to sync is
+        reported and skipped, not fatal to the run (mirrors
+        `monthly_best_daemon.py::_push_items_to_target`'s per-address
+        try/except). Runs in a background thread; returns immediately."""
+        logger.info("GUI Action: Sync Now (start)...")
+        from divoom_lib import hotchannel_config
+
+        def notify(address, phase, **extra):
+            if not self.window:
+                return
+            try:
+                payload = {"address": address, "phase": phase, **extra}
+                js = f"if (window.onSyncNowProgress) {{ window.onSyncNowProgress({json.dumps(payload)}); }}"
+                self.window.evaluate_js(js)
+            except Exception as e:
+                logger.warning(f"Failed to send sync-now progress: {e}")
+
+        def worker():
+            targets = hotchannel_config.get_targets()
+            summary = {"total": len(targets), "ok": 0, "failed": 0}
+            for address in targets:
+                notify(address, "connecting")
+                try:
+                    if not self.connect_single_device(address):
+                        summary["failed"] += 1
+                        notify(address, "error", error="Could not connect")
+                        continue
+                except Exception as e:
+                    summary["failed"] += 1
+                    notify(address, "error", error=str(e))
+                    continue
+
+                try:
+                    client = self._client()
+                    if client is None:
+                        raise RuntimeError("no daemon available")
+                    size = self._active_device_size() if hasattr(self, "_active_device_size") else 16
+                    start = client.hot_update(device_size=int(size), show=True, address=address)
+                    if not start.get("success"):
+                        raise RuntimeError(start.get("error") or "could not start hot update")
+                    notify(address, "syncing")
+
+                    status = {"phase": "starting"}
+                    deadline = time.monotonic() + 120
+                    while time.monotonic() < deadline:
+                        status = client.hot_update_progress()
+                        if status.get("phase") in ("done", "error"):
+                            break
+                        time.sleep(0.6)
+
+                    if status.get("phase") == "done":
+                        summary["ok"] += 1
+                        served = len((status.get("result") or {}).get("served", []))
+                        notify(address, "done", served=served)
+                    else:
+                        summary["failed"] += 1
+                        notify(address, "error", error=status.get("error") or "timed out")
+                except Exception as e:
+                    summary["failed"] += 1
+                    notify(address, "error", error=str(e))
+
+            if self.window:
+                try:
+                    js = f"if (window.onSyncNowComplete) {{ window.onSyncNowComplete({json.dumps(summary)}); }}"
+                    self.window.evaluate_js(js)
+                except Exception as e:
+                    logger.warning(f"Failed to send sync-now completion: {e}")
+
+        threading.Thread(target=worker, name="DivoomSyncNow", daemon=True).start()
+        return json.dumps({"success": True})
 
     def hot_update_status(self) -> str:
         """Query daemon for current hot update progress."""
