@@ -128,7 +128,11 @@ class _IsolatedStack:
             time.sleep(0.05)
         pytest.fail(f"divoomd never bound {path}")
 
-    def _wait_for_http(self, port: int, timeout: float = 5.0) -> None:
+    # Generous: the bridge is a fresh interpreter that cold-imports the whole
+    # divoom_gui stack (bleak, pyobjc, PIL, aiohttp) before it binds. That is
+    # sub-second warm locally but seconds on a cold CI runner under load, so a
+    # tight timeout produced spurious "never opened port" errors.
+    def _wait_for_http(self, port: int, timeout: float = 30.0) -> None:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             try:
@@ -139,7 +143,17 @@ class _IsolatedStack:
                     out, err = self.bridge_proc.communicate(timeout=1.0)
                     pytest.fail(f"e2e_gui_bridge exited early. stdout={out} stderr={err}")
                 time.sleep(0.05)
-        pytest.fail(f"e2e_gui_bridge never opened port {port}")
+        # Still alive but never bound — kill it and surface its output so a real
+        # hang is diagnosable rather than an opaque timeout.
+        self.bridge_proc.terminate()
+        try:
+            out, err = self.bridge_proc.communicate(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            self.bridge_proc.kill()
+            out, err = self.bridge_proc.communicate(timeout=2.0)
+        pytest.fail(
+            f"e2e_gui_bridge never opened port {port} in {timeout}s. "
+            f"stdout={out} stderr={err}")
 
     def close(self) -> None:
         for proc in (self.bridge_proc, self.daemon_proc):

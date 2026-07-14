@@ -33,6 +33,13 @@ shipped milestone (per the project planning docs).
   instead of skipping. Locally these are 72 passed / 4 skipped (the 4 skips are
   the still-unimplemented `mock_simulate_drop` pair and the live-hardware
   pair). Blocking coverage — a real e2e/audio regression now reddens CI.
+- **fix(tests): the `_IsolatedStack` HTTP-bridge wait timed out on the cold CI
+  runner.** The bridge is a fresh interpreter that cold-imports the whole
+  divoom_gui stack before it binds its port — 0.18s warm locally, but >5s on a
+  cold runner under load, so all four `test_e2e_gui_daemon_connect_disconnect`
+  tests errored with "never opened port". Raised the wait to 30s and made the
+  timeout branch kill the bridge and surface its stdout/stderr so a genuine
+  hang stays diagnosable.
 
 ## v0.22.16 — AidSleep RC=3 mystery fixed and shipped; full cloud API catalog complete (533/533)
 
