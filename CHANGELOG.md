@@ -40,6 +40,15 @@ shipped milestone (per the project planning docs).
   tests errored with "never opened port". Raised the wait to 30s and made the
   timeout branch kill the bridge and surface its stdout/stderr so a genuine
   hang stays diagnosable.
+- **fix(tests): skip the real-`DivoomGuiAPI` bridge suite on CI.** The diagnostic
+  above revealed the bridge wasn't slow — it hung (empty stdout/stderr after
+  30s). Unlike the other e2e files (JS-side pywebview mock), this one imports
+  the real `divoom_gui` backend, which does `import webview` (pywebview) — that
+  initializes Cocoa and hangs without a macOS Aqua/GUI session, which the
+  headless GitHub runner lacks. Skip it when `CI`/`GITHUB_ACTIONS` is set;
+  it still runs locally where a session exists. Net CI e2e coverage added: the
+  audio-visualizer suite + all JS-mock e2e suites (aid_sleep, clock_faces,
+  playlists, ux_feedback, mock_device, status chips/dot).
 
 ## v0.22.16 — AidSleep RC=3 mystery fixed and shipped; full cloud API catalog complete (533/533)
 

@@ -205,6 +205,17 @@ class _EventRelay:
 @pytest.fixture
 def gui_daemon_stack():
     pytest.importorskip("playwright.async_api")
+    # This suite is unique among the e2e files: it spins up the REAL
+    # divoom_gui backend (DivoomGuiAPI) in the bridge subprocess. Importing it
+    # pulls in pywebview (`import webview`), which initializes Cocoa and hangs
+    # without a macOS Aqua/GUI session — which the headless GitHub runner does
+    # not have (the bridge never binds its port; see _wait_for_http). The other
+    # e2e files use a JS-side mock of pywebview.api and run fine in CI. Skip
+    # here on CI and keep running locally where a session exists.
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        pytest.skip(
+            "real-DivoomGuiAPI bridge needs a macOS GUI (Aqua) session; "
+            "pywebview import hangs on headless CI. Runs locally.")
     bin_path = _find_rust_binary()
     if bin_path is None:
         pytest.skip("Rust divoomd binary not found. Run `cargo build` in divoomd/ first.")
