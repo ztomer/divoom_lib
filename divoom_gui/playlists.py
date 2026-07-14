@@ -10,11 +10,10 @@ logger = logging.getLogger("divoom_gui")
 class PlaylistsMixin:
     """Mixin for browsing the user's cloud-hosted playlists
     (Playlist/GetMyList — see divoom_lib/cloud.py). Confirmed live working
-    2026-07-14 (unlike the AidSleep cloud sound library, which returns RC=3
-    for a reason not yet resolved — see cloud.py's writeup). Pushing a
-    playlist to the device is a separate device-touching call, on
-    LightingApi.push_playlist (needs the daemon client, not just cloud
-    auth) — forwarded from gui_api.py like every other device action.
+    2026-07-14. Pushing a playlist to the device is a separate
+    device-touching call, on LightingApi.push_playlist (needs the daemon
+    client, not just cloud auth) — forwarded from gui_api.py like every
+    other device action.
     """
 
     def get_my_playlists(self) -> list[dict]:

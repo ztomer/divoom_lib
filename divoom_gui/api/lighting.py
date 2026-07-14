@@ -253,6 +253,22 @@ class LightingApi(ApiBase):
             logger.error(f"Playlist push failed: {e}")
             return False
 
+    def play_aid_sleep(self, sleep_id: int, sleep_type: int = 0) -> bool:
+        """Play a browsed AidSleep cloud sound on the device (AidSleep/Play —
+        BLE/SPP JSON, no cloud round-trip; see divoom_lib/tools/aid_sleep.py
+        and divoomd/src/device_call/aid_sleep.rs). Not meaningful on a
+        Virtual Wall (audio is per-device, not composite)."""
+        logger.info(f"GUI Action: Playing AidSleep sound {sleep_id} (type={sleep_type})...")
+        if self._current_target_mode == "wall":
+            logger.warning("AidSleep playback is not supported on a Virtual Wall target")
+            return False
+        self._stop_live_widgets()
+        try:
+            return self._dispatch(lambda t: t.aid_sleep.play(int(sleep_id), int(sleep_type)))
+        except Exception as e:
+            logger.error(f"AidSleep play failed: {e}")
+            return False
+
     def display_custom_art(self, file_path: str) -> bool:
         logger.info(f"GUI Action: Pushing custom art {file_path!r}...")
         try:

@@ -117,6 +117,74 @@ def _post(path: str, body: dict) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
+# ── Virtual device registration (BlueDevice/NewDevice) ─────────────────────────
+#
+# 2026-07-14: this is the fix for the AidSleep/GetAllList RC=3 mystery (see
+# divoom_lib/cloud.py's writeup). Every device-scoped cloud call (AidSleep's
+# browse endpoints, and presumably others) requires a BluetoothDeviceId that
+# the SERVER has actually seen via BlueDevice/NewDevice — a client-supplied
+# placeholder (0, or any made-up int) doesn't satisfy it, confirmed by
+# Device/GetListV2 showing zero bound devices for an account that had never
+# called this. `bluetooth/f.java`'s `f(type, subType)` ("applyNewBlueDevice")
+# is the real app's registration call: APP/GetServerUTC for a signed
+# timestamp, then BlueDevice/NewDevice with UTC + UTCEncrypt (same HMAC-MD5
+# scheme as guest login) + Type/SubType, returning a real BluetoothDeviceId +
+# DevicePassword. Confirmed live 2026-07-14 — registering with Type=1/
+# SubType=1 (an arbitrary but accepted device-class pair; the exact real
+# caller values weren't decompiled, but the server accepted 0/0 and 1/1
+# identically) immediately unblocked AidSleep/GetAllList (RC=3 -> RC=0, real
+# sleep-sound catalog returned).
+
+def _register_virtual_device(creds: "DivoomCredentials") -> dict:
+    """Register a new virtual Bluetooth device identity with the cloud
+    (``BlueDevice/NewDevice``), returning ``{"BluetoothDeviceId", "DevicePassword",
+    "Type", "SubType"}``. Raises RuntimeError on failure. Does NOT persist —
+    see :func:`ensure_virtual_device`."""
+    utc = _get_server_utc()
+    utc_str = str(utc)
+    utc_encrypt = _hmac_md5(utc_str)
+    type_, subtype = 1, 1
+    body = {
+        "Command":  "BlueDevice/NewDevice",
+        "Token":    creds.token,
+        "UserId":   creds.user_id,
+        "DeviceId": 0,
+        "UTC":      utc_str,
+        "UTCEncrypt": utc_encrypt,
+        "Type":     type_,
+        "SubType":  subtype,
+    }
+    data = _post("BlueDevice/NewDevice", body)
+    rc = data.get("ReturnCode", -1)
+    if rc != 0:
+        raise RuntimeError(f"BlueDevice/NewDevice failed: RC={rc} msg={data.get('ReturnMessage')}")
+    return {
+        "BluetoothDeviceId": data.get("BluetoothDeviceId", 0),
+        "DevicePassword":    data.get("DevicePassword", 0),
+        "Type":              type_,
+        "SubType":           subtype,
+    }
+
+
+def ensure_virtual_device(creds: "DivoomCredentials") -> dict:
+    """Like :func:`_load_virtual_device`, but registers a new server-side
+    device identity via :func:`_register_virtual_device` and persists it if
+    none exists yet (or the cached one lacks a real ``BluetoothDeviceId``).
+    One-time cost per machine/account — the result is cached to
+    ``VIRTUAL_DEVICE_PATHS[0]`` and reused on every later call."""
+    dev = _load_virtual_device()
+    if dev.get("BluetoothDeviceId"):
+        return dev
+    print_info("No bound device on file — registering a new one via BlueDevice/NewDevice ...")
+    dev = _register_virtual_device(creds)
+    print_ok(f"Registered virtual device: BluetoothDeviceId={dev['BluetoothDeviceId']}")
+    from divoom_lib.utils.atomic_io import atomic_write_text
+    path = VIRTUAL_DEVICE_PATHS[0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(path, json.dumps(dev, indent=2), mode=0o600)
+    return dev
+
+
 # ── Auth path 1: Email / Password ─────────────────────────────────────────────
 
 def _login_email(email: str, password: str) -> DivoomCredentials:

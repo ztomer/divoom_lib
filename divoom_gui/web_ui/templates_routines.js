@@ -7,6 +7,7 @@ window.DivoomTemplates.routines = `
         <div class="tabs-row" role="tablist" aria-label="Schedule">
             <button class="tab-btn active" data-routines-tab="routines-schedule" data-tab="routines-schedule" role="tab" aria-selected="true"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8L8 11L12 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Auto-Sync</button>
             <button class="tab-btn" data-routines-tab="routines-time" data-tab="routines-time" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Time</button>
+            <button class="tab-btn" data-routines-tab="routines-sleep-sounds" data-tab="routines-sleep-sounds" role="tab" aria-selected="false"><svg class="tab-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5,1.5 C6,1.5 3.5,4.5 3.5,8 C3.5,11.5 6,14.5 9.5,14.5 C11,14.5 12.3,14 13.3,13.1 C11.7,13.6 9.9,13.3 8.5,12.2 C6.3,10.4 5.9,7.1 7.7,4.9 C8.5,3.9 9.6,3.3 10.8,3.1 C10.2,2.1 9.9,1.5 9.5,1.5 Z"/></svg>Sleep Sounds</button>
         </div>
         </div>
 
@@ -81,6 +82,26 @@ window.DivoomTemplates.routines = `
                 <div class="card-body">
                     <p class="panel-hint" style="margin-top:0;">Changes are sent to the device immediately. Click a weekday cell to toggle it.</p>
                     <div id="alarms-list" class="alarms-list"></div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- SLEEP SOUNDS sub-tab (AidSleep cloud sound library) -->
+        <div class="routines-subtab-content" id="routines-sleep-sounds">
+        <div class="grid-layout" style="grid-template-columns: 1fr; max-width: 600px;">
+            <div class="card glass-card">
+                <div class="card-header flex-header">
+                    <h3>Sleep Sounds</h3>
+                </div>
+                <div class="card-body">
+                    <p class="panel-hint" style="margin-top:0;">Browse Divoom's cloud-hosted sleep-sound library and play one on the device.</p>
+                    <div class="tabs-row" role="tablist" id="aid-sleep-type-tabs" style="margin-bottom:12px;">
+                        <button class="tab-btn active" data-sleep-type="0">Natural Sound</button>
+                        <button class="tab-btn" data-sleep-type="1">White Noise</button>
+                        <button class="tab-btn" data-sleep-type="2">Music</button>
+                    </div>
+                    <div id="aid-sleep-list" class="cloud-clock-list"></div>
                 </div>
             </div>
         </div>

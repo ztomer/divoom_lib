@@ -121,3 +121,32 @@ pub(crate) fn load_cache() -> Option<DivoomCredentials> {
         None
     }
 }
+
+pub(crate) fn virtual_device_file_path() -> Option<PathBuf> {
+    Some(config_dir()?.join("virtual_device.json"))
+}
+
+/// Persist a freshly `BlueDevice/NewDevice`-registered device identity —
+/// see `cloud::ensure_virtual_device`.
+pub(crate) fn save_virtual_device(device_id: i64, device_pw: i64, type_: i64, subtype: i64) -> Result<(), String> {
+    let path = virtual_device_file_path().ok_or("cannot find config directory")?;
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let val = json!({
+        "BluetoothDeviceId": device_id,
+        "DevicePassword": device_pw,
+        "Type": type_,
+        "SubType": subtype,
+    });
+    let data = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
+    let temp_path = path.with_extension("tmp");
+    std::fs::write(&temp_path, data).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&temp_path, std::fs::Permissions::from_mode(0o600));
+    }
+    std::fs::rename(temp_path, path).map_err(|e| e.to_string())?;
+    Ok(())
+}

@@ -26,6 +26,7 @@ pub mod text;
 pub mod game;
 pub mod design;
 pub mod system;
+pub mod aid_sleep;
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
@@ -156,6 +157,11 @@ pub async fn handle_device_call(
                 "sleep.set_sleep_light" | "set_sleep_light" |
                 "sleep.set_sleep_scene" | "set_sleep_scene" => {
                     sleep::handle(method, ctx).await
+                }
+
+                // aid_sleep.rs:
+                "aid_sleep.play" | "aid_sleep.exit" | "aid_sleep.delete" => {
+                    aid_sleep::handle(method, ctx).await
                 }
 
                 // timeplan.rs:

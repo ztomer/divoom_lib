@@ -107,6 +107,9 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.classList.add("active");
         const target = document.getElementById(btn.getAttribute("data-routines-tab"));
         if (target) target.classList.add("active");
+        if (btn.getAttribute("data-routines-tab") === "routines-sleep-sounds" && window.loadAidSleepList) {
+            setTimeout(window.loadAidSleepList, 50);
+        }
     });
 
     // ── Pixel Art sub-tab nav ──

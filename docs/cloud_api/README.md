@@ -46,13 +46,11 @@ fields | Relevance | Confidence) plus an `## Unknown / no signal` section.
 | [playlist_voice_timeplan.md](playlist_voice_timeplan.md) | `Playlist/*`, `Voice/*`, `Lottery/*`, `Memorial/*`, `TimePlan/*` | 38 | **`Playlist/SendDevice` + browse commands flagged as a viable new feature** — browse a cloud-hosted image/animation playlist and push it to the device (confirmed live caller, `PlayListModel.b()`) |
 | [message_forum.md](message_forum.md) | `Message/*`, `MessageGroup/*`, `Forum/*`, `Comment/GetCommentListV3` | 25 | 100% Divoom's own social messaging/forum layer (RongCloud-backed) — zero device-control relevance |
 | [vision_danmaku_game.md](vision_danmaku_game.md) | `Vision/*`, `Danmaku/*`, `Game/*` | 21 | `Danmaku/*` is a real scrolling bullet-chat/face overlay feature, distinct from the `Voice`/`Led` text-push commands; `Vision/*` is a per-device clock-gallery photo slot manager, not AI/computer-vision |
-| [misc_small.md](misc_small.md) | `Google/Outlook` calendar, `Weather/*`, `Radio/*`, `QingTing/*`, `BlueDevice/*`, `Dialog/*`, `NoDevice/*`, `PowerOn/*`, `Mall/*`, `AI/*`, `FillGame/FinishGameV2` | 31 | *(pending — see note below)* |
+| [misc_small.md](misc_small.md) | `Google/Outlook` calendar, `Weather/*`, `Radio/*`, `QingTing/*`, `BlueDevice/*`, `Dialog/*`, `NoDevice/*`, `PowerOn/*`, `Mall/*`, `AI/*`, `FillGame/FinishGameV2` | 31 | **`BlueDevice/NewDevice` turned out to be the fix for `AidSleep/GetAllList`'s RC=3 mystery** (see `tomato_sleep_alarm.md` + `docs/ROADMAP.md`) — registers a real server-side `BluetoothDeviceId`, the missing precondition for device-scoped cloud calls. Everything else is Divoom's own account/social/e-commerce layer, or a different product family (WiFi speakers' internet radio/scheduled power-on — not the BLE Pixoo/Tivoo/Ditoo/Timoo displays this project targets) |
 | [toplevel_a.md](toplevel_a.md) | top-level (no domain prefix), A–G | 32 | `GetCategoryFileListV2` already shipped (`divoom_lib/cloud.py`); `GetCategoryFileList`/`GalleryUpload`/`GalleryUploadV2` are legacy/dead duplicates |
 | [toplevel_b.md](toplevel_b.md) | top-level (no domain prefix), G–U | 31 | `UserLogin` already shipped (`divoom_lib/divoom_auth.py`) |
 
-**Total documented: 502 of 533 commands** (`misc_small.md`'s 31 commands were
-still being researched when this index was assembled — append that file's row
-above and re-tally when it lands; nothing else needs to change).
+**Total documented: 533 of 533 commands.** All 16 research batches complete.
 
 ## The real findings: candidate new features
 
@@ -62,18 +60,20 @@ already shipped in v0.22.13 (public/simple list → pick an id → apply):
 
 1. **AidSleep browse + play** (`tomato_sleep_alarm.md`) — browse Divoom's
    cloud-hosted sleep-sound/white-noise/music library, then play a track by
-   `SleepId` over BLE. Playback itself needs no cloud auth.
+   `SleepId` over BLE. **Shipped 2026-07-14** (Schedule panel's "Sleep
+   Sounds" sub-tab) — the RC=3 blocker was `AidSleep/GetAllList` needing a
+   real server-registered device (fixed via `BlueDevice/NewDevice`, found
+   in `misc_small.md`).
 2. **Playlist browse + push** (`playlist_voice_timeplan.md`) — browse a
    user's cloud-hosted image/animation playlists and push one to the device
    via `Playlist/SendDevice` (confirmed live in the decompiled app).
+   **Shipped 2026-07-14** (Pixel Art panel's "Playlists" sub-tab).
 3. **`Cloud/ToDevice`** (`cloud.md`) — possibly "push a gallery item to a
    device via the cloud", but unconfirmed (no live caller found) — needs
-   more investigation before treating it as real.
+   more investigation before treating it as real. Not implemented.
 
-None of these are implemented yet — this is a research catalog, not a
-shipped feature. See `docs/ROADMAP.md`'s "Divoom Cloud HTTP" section for
-the standing ask: point at a specific feature gap, or these three leads, to
-prioritize real implementation work.
+See `docs/ROADMAP.md`'s "Divoom Cloud HTTP" section for the full status and
+history of each lead.
 
 ## Unknown commands
 

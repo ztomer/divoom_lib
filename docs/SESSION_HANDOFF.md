@@ -18,6 +18,79 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-14 (later still, `/loop`-continued research): AidSleep RC=3
+  fixed and shipped; cloud API catalog now 533/533 complete.** User: research
+  the AidSleep RC=3 mystery and finish the `misc_small.md` batch, then
+  implement whatever comes out of it, loop until done — "if it's not
+  possible, I guess we're done" was the explicit acceptance criterion for a
+  genuine dead end. It was NOT a dead end.
+  - **Systematic re-investigation of AidSleep RC=3** (deeper than the prior
+    round's pass): tried every request-shape hypothesis exhaustively — guest
+    vs. real-login accounts, every `BaseLoadMoreRequest` field, `DeviceId`
+    0/omitted/placeholder, `Type` 0/1/2, `GetAllList` vs. `GetMyList`,
+    0-/1-based paging — all identical `RC=3`. Traced `BaseParams.postSync`'s
+    routing and `OkHttpUtils.checkServerPath`/`checkIsDivoom` line-by-line:
+    transport byte-for-byte identical to the working `Playlist/GetMyList`
+    call. The decisive datapoint: a live `Device/GetListV2` call showed the
+    account has **zero devices bound server-side** — and `AidSleep/*` is
+    device-scoped, unlike account-scoped `Playlist/GetMyList`.
+  - **The fix, found via the `misc_small.md` research pass**:
+    `BlueDevice/NewDevice` — the real app's device-registration call
+    (`bluetooth/f.java`'s `applyNewBlueDevice`: `APP/GetServerUTC` for a
+    signed timestamp, then `BlueDevice/NewDevice` with `UTC`/`UTCEncrypt` +
+    `Type`/`SubType`, returning a real `BluetoothDeviceId`/`DevicePassword`).
+    This project's `virtual_device.json` was never populated because
+    nothing had ever called it. Registered one live (Type=1, SubType=1 —
+    the server accepted this pair) and `AidSleep/GetAllList` immediately
+    went `RC=3` → `RC=0` with a real catalog (Gentle Rain, Ocean Waves,
+    Fireplace, Quiet Library, ...). Implemented as
+    `divoom_auth.ensure_virtual_device` / `divoomd::cloud::
+    ensure_virtual_device`: lazy, one-time registration per machine/
+    account, cached to `virtual_device.json`, triggered only by the feature
+    that needs it (not folded into `authenticate()`, since registering has
+    a real server-side effect on the account — kept the footprint minimal).
+  - **Shipped end-to-end**: BLE play/add/delete/exit
+    (`divoom_lib/tools/aid_sleep.py`, already existed from the prior round)
+    plus a new Rust `divoomd/src/device_call/aid_sleep.rs` module (the
+    daemon had no JSON-over-BLE send path for this command family before —
+    reused the existing generic `dev.send_command(command_id, bytes,
+    write_with_response)` transport method, command_id=1 matching the
+    decompiled `bluetooth.q#B()`). New "Sleep Sounds" sub-tab in the
+    Schedule panel (3rd tab alongside Auto-Sync/Time): type-filter tabs
+    (Natural Sound/White Noise/Music) + browse/Play list, backend
+    `divoom_gui/aid_sleep.py` + `LightingApi.play_aid_sleep`. Verified
+    visually in the Playwright-driven browser preview (tab switches, type
+    filter, no console errors) and via 4 new e2e tests
+    (`tests/test_e2e_aid_sleep.py`, mirroring the Playlist/clock-face
+    pattern).
+  - **Completed `docs/cloud_api/misc_small.md`** (the 16th and final
+    catalog batch — background research agents were unreliable this round,
+    got killed twice mid-run, so did the research directly instead): AI,
+    BlueDevice, Dialog, FillGame, Mall, NoDevice, PowerOn, QingTing, Radio,
+    Weather, Google/Outlook calendar (31 commands). **Cloud API catalog now
+    533 of 533 commands documented.** `BlueDevice/NewDevice` (in this batch)
+    is the AidSleep fix above. Everything else in the batch is Divoom's own
+    account/social/e-commerce layer, or a different product family (WiFi
+    speakers' internet radio / scheduled power-on — not the BLE Pixoo/
+    Tivoo/Ditoo/Timoo displays this project targets). `Google/EnterCalendar`
+    and `Outlook/EnterCalendar` are `DeviceAndServerCmd` members (LAN-routed)
+    with a real caller but zero decompiled payload beyond auth — flagged as
+    "thin signal," not implemented blind. `UNKNOWN_COMMANDS.md` updated (13
+    of 533 zero-signal commands total).
+  - Proved the new AidSleep-device-registration test can fail (stripped the
+    fix, watched `test_get_aid_sleep_list_registers_a_device_when_none_bound`
+    go red, restored) before trusting it green, per project discipline.
+  - Verified: full `tests/` suite 2766 passed / 0 failed / 97 skipped (10
+    more than the prior round's 2756 — the new AidSleep-registration tests
+    in `test_cloud.py`/`test_divoom_auth_coverage.py` and 4 new
+    `test_e2e_aid_sleep.py` tests); `cargo test` clean in `divoomd`; `cargo
+    build` clean; `check_no_emoji.py`/`check_file_size.py` gates clean.
+    Bumped to v0.22.16. **Not pushed or released this round** — committed
+    locally only; ask before releasing, per the user's established pattern.
+  - `Cloud/ToDevice` (the third lead from the original catalog) remains
+    unimplemented — unconfirmed semantics, no live caller found, lower
+    priority.
+
 - **2026-07-14 (later, `/loop and implement`): Playlist browse+push shipped
   end-to-end; AidSleep backend implemented, not GUI-wired.** Picked up the
   prior round's open ask ("pick one of the three leads... implemented

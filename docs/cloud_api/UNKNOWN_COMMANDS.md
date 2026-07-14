@@ -6,12 +6,9 @@ string constant**: no decompiled request/response class, no confirmed live
 caller anywhere in the decompiled APK source, and no public documentation
 found via web search. Purpose (where stated) is a guess from the name alone.
 
-This is intentionally short: 8 of 502 commands documented so far (the
-`misc_small` batch — Google/Outlook/Weather/Radio/QingTing/BlueDevice/
-Dialog/NoDevice/PowerOn/Mall/AI/FillGame — was still researching when this
-was assembled; append its unknowns here if any, and update the count). See
-`README.md` for the full catalog and what "unknown" means relative to
-`decompiled`/`name-only`.
+This is intentionally short: 13 of 533 commands (all 16 batches now
+complete). See `README.md` for the full catalog and what "unknown" means
+relative to `decompiled`/`name-only`.
 
 ## From `cloud.md`
 
@@ -33,6 +30,18 @@ was assembled; append its unknowns here if any, and update the count). See
   anywhere in the decompiled sources. May be dead/unused in this app
   version, or invoked via a code path this search missed (reflection, a
   generic conversation-delete helper).
+
+## From `misc_small.md`
+
+- **`NoDevice/GetGalleryAdvert`** — inferred from its sibling
+  `NoDevice/GetDialogInfo`'s shared `ad` package, but no distinct
+  request/response class or caller found for this specific command.
+- **`QingTing/GetFavorites`** / **`QingTing/SetFavorite`** — the
+  `bean/qingting/*` data shapes exist (`QtRadio`, `QtChannel`,
+  `QtRadioCategoriesBean`) but no `HttpCommand`-catalog request class or
+  caller specifically for these two command strings was found.
+- **`Weather/Send5Days`** / **`Weather/SendCurrent`** — constant-only in
+  `HttpCommand.java`, zero decompiled shape or caller.
 
 ## From `photo_discover.md`
 

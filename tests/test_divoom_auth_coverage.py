@@ -106,6 +106,72 @@ def test_load_virtual_device_malformed_json_returns_empty(monkeypatch, tmp_path)
     assert divoom_auth._load_virtual_device() == {}
 
 
+# ── _register_virtual_device / ensure_virtual_device ────────────────────────
+#
+# 2026-07-14 fix: AidSleep/GetAllList (and presumably other device-scoped
+# cloud calls) need a BluetoothDeviceId the SERVER actually issued via
+# BlueDevice/NewDevice, not a client-side placeholder -- see cloud.py's
+# writeup. These test the registration + persist-once-and-reuse machinery.
+
+def _mock_urlopen_by_command(monkeypatch, responses: dict):
+    """Route the mocked urlopen by the POSTed body's ``Command`` field
+    (multiple distinct commands in one test, unlike ``_mock_urlopen``'s
+    single fixed payload)."""
+    def _fake(req, timeout=None):
+        body = json.loads(req.data.decode("utf-8"))
+        command = body["Command"]
+        assert command in responses, f"unexpected command {command}"
+        return _FakeResponse(responses[command])
+    monkeypatch.setattr(divoom_auth.urllib.request, "urlopen", _fake)
+
+
+def test_register_virtual_device_success(monkeypatch):
+    _mock_urlopen_by_command(monkeypatch, {
+        "APP/GetServerUTC": {"ReturnCode": 0, "UTC": 1700000000},
+        "BlueDevice/NewDevice": {"ReturnCode": 0, "BluetoothDeviceId": 42, "DevicePassword": 99},
+    })
+    creds = divoom_auth.DivoomCredentials(token=1, user_id=2)
+    dev = divoom_auth._register_virtual_device(creds)
+    assert dev == {"BluetoothDeviceId": 42, "DevicePassword": 99, "Type": 1, "SubType": 1}
+
+
+def test_register_virtual_device_rc_nonzero_raises(monkeypatch):
+    _mock_urlopen_by_command(monkeypatch, {
+        "APP/GetServerUTC": {"ReturnCode": 0, "UTC": 1700000000},
+        "BlueDevice/NewDevice": {"ReturnCode": 3, "ReturnMessage": "Request data is incomplete"},
+    })
+    creds = divoom_auth.DivoomCredentials(token=1, user_id=2)
+    with pytest.raises(RuntimeError, match="RC=3"):
+        divoom_auth._register_virtual_device(creds)
+
+
+def test_ensure_virtual_device_returns_existing_without_registering(monkeypatch, tmp_path):
+    existing = {"BluetoothDeviceId": 600124449, "DevicePassword": 1780230545, "Type": 9, "SubType": 0}
+    monkeypatch.setattr(divoom_auth, "_load_virtual_device", lambda: existing)
+
+    def _fail_if_called(req, timeout=None):
+        raise AssertionError("should not register when a device is already on file")
+    monkeypatch.setattr(divoom_auth.urllib.request, "urlopen", _fail_if_called)
+
+    creds = divoom_auth.DivoomCredentials(token=1, user_id=2)
+    assert divoom_auth.ensure_virtual_device(creds) == existing
+
+
+def test_ensure_virtual_device_registers_and_persists_when_missing(monkeypatch, tmp_path):
+    monkeypatch.setattr(divoom_auth, "_load_virtual_device", lambda: {})
+    dest = tmp_path / "virtual_device.json"
+    monkeypatch.setattr(divoom_auth, "VIRTUAL_DEVICE_PATHS", [dest])
+    _mock_urlopen_by_command(monkeypatch, {
+        "APP/GetServerUTC": {"ReturnCode": 0, "UTC": 1700000000},
+        "BlueDevice/NewDevice": {"ReturnCode": 0, "BluetoothDeviceId": 42, "DevicePassword": 99},
+    })
+    creds = divoom_auth.DivoomCredentials(token=1, user_id=2)
+    dev = divoom_auth.ensure_virtual_device(creds)
+    assert dev["BluetoothDeviceId"] == 42
+    assert dest.exists()
+    assert json.loads(dest.read_text())["BluetoothDeviceId"] == 42
+
+
 # ── _post ──────────────────────────────────────────────────────────────────────
 
 def test_post_sends_json_body_and_parses_response(monkeypatch):

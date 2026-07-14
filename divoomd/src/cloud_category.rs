@@ -232,16 +232,16 @@ pub async fn search_weather_city(keyword: &str) -> Result<Value, String> {
 // since the daemon doesn't own a JSON-over-BLE send path for this command
 // family yet.
 //
-// STILL OPEN (mirrors divoom_lib/cloud.py's comment): a live round-trip
-// against AidSleep/GetAllList returns RC=3 ("request data is incomplete")
-// with a real logged-in account and every field the decompiled request
-// class declares — unlike the sibling Playlist/GetMyList call, confirmed
-// working live with an identical auth/field pattern. Code here is correct
-// per the app's own request CLASS; not confirmed working end-to-end.
+// FIXED (2026-07-14, full writeup in divoom_lib/cloud.py): RC=3 ("request
+// data is incomplete") on every request-shape hypothesis was a red herring —
+// the real cause was zero devices bound server-side (AidSleep is
+// device-scoped, unlike account-scoped Playlist/GetMyList). Fix:
+// `cloud::ensure_virtual_device` registers one via `BlueDevice/NewDevice`
+// (confirmed live: RC=3 -> RC=0, real sleep-sound catalog).
 
 async fn get_aid_sleep_list(cmd: &str, sleep_type: i64, limit: i64, page: i64) -> Result<Value, String> {
     let mut creds = get_credentials(false).await?;
-    let (device_id, device_pw, _, _) = load_virtual_device();
+    let (device_id, device_pw) = crate::cloud::ensure_virtual_device().await?;
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(TIMEOUT_SECS))

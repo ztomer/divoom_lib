@@ -199,25 +199,40 @@ class CloudClient:
     # (BLE/SPP JSON command straight to the device, same pattern as the
     # clock-face store's ``show_clock`` apply step).
     #
-    # STILL OPEN: a live round-trip against AidSleep/GetAllList
-    # returns RC=3 (HTTP_REGISTER_ERROR2, "request data is incomplete") —
-    # reproduced 2026-07-14 with a real logged-in account (not a guest/auth
-    # issue), with every field the decompiled request class declares
-    # (including BaseLoadMoreRequest's Language/CountryISOCode) and with
-    # DevicePassword explicitly set to 0. This mirrors the earlier
-    # Channel/StoreClockGetClassify RC=12 finding: the code here is correct
-    # per the app's own request CLASS, but something about this endpoint's
-    # server-side validation isn't satisfied by that shape alone (unlike
-    # the sibling Playlist/GetMyList call below, confirmed working live with
-    # the identical auth/field pattern). Not resolved — needs either a real
-    # bound device or further investigation before treating this as a
-    # working feature.
+    # FIXED (2026-07-14): a live round-trip against AidSleep/GetAllList
+    # reproducibly returned RC=3 (HTTP_REGISTER_ERROR2, "request data is
+    # incomplete") under every request-SHAPE hypothesis tried — every field
+    # permutation, guest vs. real accounts, GetAllList vs. GetMyList, 0- vs.
+    # 1-based paging. The actual cause was never the request shape: this
+    # account had ZERO devices bound server-side (a live Device/GetListV2
+    # call showed ``DeviceList: []``), and AidSleep/GetAllList is a
+    # per-device-scoped browse call — unlike the account-scoped
+    # Playlist/GetMyList, which works fine with no bound device. The fix is
+    # ``BlueDevice/NewDevice`` (see divoom_auth.ensure_virtual_device): the
+    # real app registers a device identity with the server (APP/GetServerUTC
+    # for a signed timestamp, then BlueDevice/NewDevice with UTC/UTCEncrypt +
+    # Type/SubType) before ever touching device-scoped endpoints; this
+    # project's virtual_device.json was never populated because nothing
+    # called that registration endpoint. Confirmed live: registering (Type=1,
+    # SubType=1 — the server accepted this pair; the real app's exact values
+    # weren't decompiled) immediately turned RC=3 into RC=0 with a real
+    # sleep-sound catalog (Gentle Rain, Ocean Waves, Fireplace, ...).
+    # ``_get_aid_sleep_list`` below lazily registers via
+    # ``ensure_virtual_device`` the first time an AidSleep call is made (not
+    # in ``authenticate()`` — this has a real server-side effect, a device
+    # registration under the account, so it's scoped to only the feature
+    # that actually needs it); the registration is cached to
+    # ``virtual_device.json`` and reused forever after.
 
     def _get_aid_sleep_list(
         self, cmd: str, sleep_type: int, *, limit: int = 30, page: int = 1
     ) -> list[dict]:
         start = (page - 1) * limit + 1
         end = page * limit
+        if not self.device_id:
+            dev = _auth.ensure_virtual_device(self._ensure_creds())
+            self.device_id = int(dev.get("BluetoothDeviceId", self.device_id))
+            self.device_pw = int(dev.get("DevicePassword", self.device_pw))
 
         def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
             body: dict[str, Any] = {

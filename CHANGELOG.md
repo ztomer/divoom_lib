@@ -4,6 +4,40 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.16 — AidSleep RC=3 mystery fixed and shipped; full cloud API catalog complete (533/533)
+
+Follows up v0.22.15's "closed, not resolvable" AidSleep verdict — it was
+wrong. Continuing the cloud API research to complete the last batch
+(`misc_small.md`) surfaced the actual fix.
+
+- **fix(cloud): AidSleep/GetAllList RC=3 — the real cause was no bound
+  device, not a bad request shape.** A live `Device/GetListV2` call showed
+  the test account had zero devices registered server-side; `AidSleep/*` is
+  a per-device-scoped browse call (unlike account-scoped
+  `Playlist/GetMyList`, which works with no bound device). The fix:
+  `BlueDevice/NewDevice` (found via the `misc_small.md` research batch) —
+  the real app's device-registration call. `divoom_auth.
+  ensure_virtual_device` / `divoomd::cloud::ensure_virtual_device` register
+  one lazily (one-time per machine/account, cached to
+  `virtual_device.json`), turning `RC=3` into `RC=0` with a real
+  sleep-sound catalog.
+- **feat: AidSleep browse+play shipped end-to-end.** New "Sleep Sounds"
+  sub-tab in the Schedule panel — pick Natural Sound/White Noise/Music,
+  browse, Play. BLE play/add/delete/exit (`divoom_lib/tools/aid_sleep.py`,
+  new Rust `device_call::aid_sleep` module) reuse the project's existing
+  SPP_JSON BLE framing unchanged. 4 new Playwright e2e tests
+  (`tests/test_e2e_aid_sleep.py`).
+- **docs: cloud API catalog complete — 533 of 533 `HttpCommand.java`
+  commands documented** (`docs/cloud_api/misc_small.md`, the 16th and final
+  batch: AI, BlueDevice, Dialog, FillGame, Mall, NoDevice, PowerOn,
+  QingTing, Radio, Weather, Google/Outlook calendar). `UNKNOWN_COMMANDS.md`
+  updated (13 of 533 with zero signal). All three candidate feature leads
+  from the catalog now resolved: AidSleep and Playlist shipped,
+  `Cloud/ToDevice` remains unimplemented (unconfirmed semantics).
+
+Full suite: 2766 passed, 0 failed, 97 skipped. `cargo test` clean in
+`divoomd`. `check_no_emoji.py`/`check_file_size.py` gates clean.
+
 ## v0.22.15 — Playlist browse+push (live, wired end-to-end); AidSleep backend (RC=3, not wired)
 
 Implements 2 of the 3 candidate features surfaced by the Cloud API catalog

@@ -325,6 +325,34 @@ def test_get_aid_sleep_list_rc_nonzero_raises():
             assert "RC=5" in str(e)
 
 
+def test_get_aid_sleep_list_registers_a_device_when_none_bound():
+    """The 2026-07-14 fix: AidSleep/GetAllList needs a real server-registered
+    BluetoothDeviceId (RC=3 otherwise) -- a client with device_id=0 must
+    register one via BlueDevice/NewDevice before the AidSleep call, then use
+    the returned id/password on the actual request."""
+    def fake_post(path, body):
+        if path == "APP/GetServerUTC":
+            return {"ReturnCode": 0, "UTC": 1700000000}
+        if path == "BlueDevice/NewDevice":
+            assert body["Command"] == path
+            assert body["UTC"] == "1700000000"
+            return {"ReturnCode": 0, "BluetoothDeviceId": 999888777, "DevicePassword": 555444333}
+        return _fake_post(path, body)
+
+    c = cloud.CloudClient(creds=divoom_auth.DivoomCredentials(token=12345, user_id=67890))
+    assert c.device_id == 0
+    with patch("divoom_lib.utils.atomic_io.atomic_write_text"), \
+         patch.object(divoom_auth, "_load_virtual_device", return_value={}), \
+         patch.object(divoom_auth, "_post", side_effect=fake_post) as post:
+        tracks = c.get_aid_sleep_list(0)
+    assert tracks[0]["Name"] == "Rain"
+    assert c.device_id == 999888777
+    assert c.device_pw == 555444333
+    aid_sleep_call = [call for call in post.call_args_list if call.args[0] == "AidSleep/GetAllList"][0]
+    assert aid_sleep_call.args[1]["DeviceId"] == 999888777
+    assert aid_sleep_call.args[1]["DevicePassword"] == 555444333
+
+
 def test_get_my_playlists_shape_and_params():
     c = _client()
     with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:

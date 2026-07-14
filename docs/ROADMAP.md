@@ -126,26 +126,20 @@ load without a tab click (the panel is active by default), switching
 categories, the existing "connect a device first" guard, and applying with
 the correct `ClockId` reaching `set_clock()`.
 
-**The other ~500 `HttpCommand.java` endpoints: fully cataloged (2026-07-14),
-still not implemented.** User: "do research, search the web, if not found,
-write it down into a separate md file (unknown commands)." Full research
-sweep of all 533 command constants — purpose, request/response field shapes
-(from decompiled `http/request/**`/`http/response/**` classes), relevance
-(`device-control` vs. Divoom's own `account/social`/`internal/moderation`
-layer), and source confidence, dispatched as 16 parallel research batches by
-domain. Result: **`docs/cloud_api/README.md`** (index + the full catalog) and
-**`docs/cloud_api/UNKNOWN_COMMANDS.md`** (commands with zero signal beyond
-the bare string — 8 of 502 documented so far, most of the API resolved
-cleanly from the decompiled source even with no public docs). Three genuine
-new-feature leads surfaced (documented in the catalog's README, not yet
-implemented): **AidSleep browse+play** (cloud-hosted sleep-sound library,
-same shape as the shipped clock-face browser), **Playlist browse+push**
-(`Playlist/SendDevice`, confirmed live in the decompiled app), and
-`Cloud/ToDevice` (unconfirmed semantics, no live caller found — needs more
-digging before treating as real). Implementing them blind, without a GUI hook
-or defined purpose, still isn't a good use of unattended effort. **Ask still
-open**: pick one of the three leads, or name a different endpoint/feature to
-prioritize, and it can be implemented against real request shapes now.
+**The other ~500 `HttpCommand.java` endpoints: fully cataloged (2026-07-14).**
+User: "do research, search the web, if not found, write it down into a
+separate md file (unknown commands)." Full research sweep of all 533 command
+constants — purpose, request/response field shapes (from decompiled
+`http/request/**`/`http/response/**` classes), relevance (`device-control`
+vs. Divoom's own `account/social`/`internal/moderation` layer), and source
+confidence, dispatched as 16 parallel research batches by domain. Result:
+**`docs/cloud_api/README.md`** (index + the full catalog, all 16 batches
+complete, **533 of 533 commands documented**) and
+**`docs/cloud_api/UNKNOWN_COMMANDS.md`** (13 of 533 commands with zero
+signal beyond the bare string). Three genuine new-feature leads surfaced:
+**AidSleep browse+play** and **Playlist browse+push** — both DONE, live,
+wired into the GUI (below); **`Cloud/ToDevice`** — unconfirmed semantics, no
+live caller found, not picked up.
 
 **Playlist browse+push: DONE, live, wired into the GUI (2026-07-14).**
 `Playlist/GetMyList`/`Playlist/GetMyImageList` confirmed RC=0 against a real
@@ -161,22 +155,38 @@ Reused the clock-face browser's list-row/Apply-button CSS verbatim (no new
 markup). 3 new Playwright e2e tests (`tests/test_e2e_playlists.py`) mirror
 `test_e2e_clock_faces.py`.
 
-**AidSleep: BLE commands implemented, cloud browse NOT confirmed working
-(2026-07-14).** `divoom_lib/tools/aid_sleep.py` — play/add/delete/exit reuse
-the project's existing SPP_JSON BLE framing unchanged (confirmed via a
-dedicated research pass reading the APK smali + Java against
-`divoom_lib/framing.py`: identical to `bluetooth.q#B()`, command_id=1, JSON
-payload). But `AidSleep/GetAllList`/`GetMyList` (the browse half) returns
-`RC=3` ("Request data is incomplete") with every request-field permutation
-tried (guest creds, real forced-login, `Language`/`CountryISOCode` added,
-`DevicePassword=0` explicit) — same unresolved-server-side-validation shape
-as the earlier `Channel/StoreClockGetClassify` RC=12 case above. Documented
-honestly in `cloud.py`/`cloud_category.rs`; per the project's "honest
-placeholders" rule, intentionally **not** wired into the GUI — a browse UI
-for a call that doesn't work live would ship a broken feature.
+**AidSleep browse+play: DONE, live, wired into the GUI (2026-07-14) — the
+RC=3 mystery is FIXED, not a dead end.** First pass concluded (wrongly) that
+`AidSleep/GetAllList`'s `RC=3` ("request data is incomplete") was
+unresolvable: every request-shape hypothesis failed identically (guest and
+real-login accounts, every request-class field, `DeviceId`
+0/omitted/placeholder, `Type` 0/1/2, `GetAllList`/`GetMyList`, 0-/1-based
+paging), and a live `Device/GetListV2` call showed this account had **zero
+devices bound server-side**. That last fact turned out to be the actual
+cause, not a dead end: continuing the `misc_small.md` cloud-API research
+batch surfaced `BlueDevice/NewDevice` — the real app's device-registration
+call (`APP/GetServerUTC` for a signed timestamp, then `BlueDevice/NewDevice`
+with `UTC`/`UTCEncrypt` + `Type`/`SubType`, returning a real
+`BluetoothDeviceId`/`DevicePassword`). This project's `virtual_device.json`
+was never populated because nothing had ever called it. Registering one
+live immediately turned `RC=3` into `RC=0` with a real sleep-sound catalog
+(Gentle Rain, Ocean Waves, Fireplace, ...). Implemented in
+`divoom_auth.ensure_virtual_device`/`divoomd::cloud::ensure_virtual_device`
+(lazy, one-time registration per machine/account, cached to
+`virtual_device.json`, only triggered by the feature that actually needs
+it — not on every `authenticate()` call, since it has a real server-side
+side effect). The BLE play/add/delete/exit commands
+(`divoom_lib/tools/aid_sleep.py`, Rust `device_call::aid_sleep`) reuse the
+project's existing SPP_JSON BLE framing unchanged (command_id=1, JSON
+payload — confirmed identical to the decompiled APK's `bluetooth.q#B()`).
+New "Sleep Sounds" sub-tab in the Schedule panel (`templates_routines.js`,
+`divoom_gui/web_ui/aid_sleep.js`, backend `divoom_gui/aid_sleep.py` +
+`LightingApi.play_aid_sleep`) — pick Natural Sound/White Noise/Music, Play.
+4 new Playwright e2e tests (`tests/test_e2e_aid_sleep.py`) mirror the
+Playlist/clock-face pattern.
 
-`Cloud/ToDevice` remains unimplemented — unconfirmed semantics, lower
-priority, not picked up this round.
+`Cloud/ToDevice` remains unimplemented — unconfirmed semantics, no live
+caller found, lower priority, not picked up this round.
 
 **Shipped (R61 + follow-up):**
 1. ~~Cloud auth broken (`RC=10`)~~ — fixed R61.

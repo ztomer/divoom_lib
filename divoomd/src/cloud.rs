@@ -218,6 +218,45 @@ pub async fn get_credentials(force_refresh: bool) -> Result<DivoomCredentials, S
     }
 }
 
+/// Register a new virtual Bluetooth device identity with the cloud
+/// (`BlueDevice/NewDevice`) and persist it to `virtual_device.json`, or
+/// return the existing one if already registered. This is the 2026-07-14
+/// fix for AidSleep/GetAllList's RC=3 mystery (see cloud_category.rs's
+/// `get_aid_sleep_list` — full writeup in divoom_lib/cloud.py, Python
+/// counterpart of this function is `divoom_auth.ensure_virtual_device`):
+/// device-scoped cloud calls need a BluetoothDeviceId the server actually
+/// issued, not a client-side placeholder. One-time cost per machine/account.
+pub(crate) async fn ensure_virtual_device() -> Result<(i64, i64), String> {
+    let (device_id, device_pw, _, _) = load_virtual_device();
+    if device_id != 0 {
+        return Ok((device_id, device_pw));
+    }
+    let creds = get_credentials(false).await?;
+    let utc = get_server_utc().await;
+    let utc_str = utc.to_string();
+    let utc_encrypt = hmac_md5_hex(&utc_str);
+    let (type_, subtype) = (1i64, 1i64);
+    let body = json!({
+        "Command": "BlueDevice/NewDevice",
+        "Token": creds.token,
+        "UserId": creds.user_id,
+        "DeviceId": 0,
+        "UTC": utc_str,
+        "UTCEncrypt": utc_encrypt,
+        "Type": type_,
+        "SubType": subtype,
+    });
+    let data = post_cloud("BlueDevice/NewDevice", &body).await?;
+    let rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+    if rc != 0 {
+        return Err(format!("BlueDevice/NewDevice failed: RC={rc} msg={:?}", data.get("ReturnMessage")));
+    }
+    let new_device_id = data.get("BluetoothDeviceId").and_then(|v| v.as_i64()).unwrap_or(0);
+    let new_device_pw = data.get("DevicePassword").and_then(|v| v.as_i64()).unwrap_or(0);
+    let _ = crate::cloud_store::save_virtual_device(new_device_id, new_device_pw, type_, subtype);
+    Ok((new_device_id, new_device_pw))
+}
+
 pub(crate) fn load_virtual_device() -> (i64, i64, i64, i64) {
     let mut device_id = 0i64;
     let mut device_pw = 0i64;
