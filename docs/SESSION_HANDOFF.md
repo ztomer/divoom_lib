@@ -59,6 +59,26 @@ Claude) should read this on entry and **update it at the end of every round**
      cask bumped to 0.22.18. Local `main` was already the v0.22.18 commit
      (`9482899`, 1 ahead of `origin/main`); no code change this round — only
      the tag/release/cask.
+   - **CI fix (follow-up, same day): the `tests` job was RED on the v0.22.18
+     tag + the handoff/docs push.** One failure:
+     `test_e2e_sync_now.py::test_sync_now_progress_updates_the_right_device_row`
+     — 30s timeout waiting for `.sync-now-row-status[data-addr="AA:BB"]`.
+     Root cause: `gallery.js`'s `setTimeout(updateSyncTargetList, 1500)`
+     fired on the slow CI runner and re-rendered the sync-targets list with
+     the test's mock `get_sync_candidates` response (`'{}'`), which
+     `renderSyncTargets` treated as a non-empty list, cleared `#sync-targets-list`,
+     then threw on `({}).forEach` — wiping the rows the test had just created.
+     Locally the test finished under 1500ms, so it never hit it. Fixes (commit
+     `d3389b7`): (1) the test mock now returns a real candidate array for
+     `get_sync_candidates`; (2) the render+progress-fire+read are collapsed
+     into one synchronous `evaluate` so the auto-refresh timer can't race it;
+     (3) `renderSyncTargets` now guards `Array.isArray` so a stray `'{}'`
+     clears the empty-list message instead of throwing. The other 9 failures
+     in the full run were pre-existing resource-contention flakiness in
+     `test_daemon_connect_edge_e2e.py` (documented in R61) — they pass in
+     isolation both with and without the change. Re-ran `tests` on `main`:
+     all 5 jobs green (run 29361659806). Not re-released (the failing test is
+     test-only; the shipped v0.22.18 DMG is unaffected).
 
 - **2026-07-14 (CI fix): the `tests` GitHub Actions workflow is green again.**
   Every push since `046cdf8` (Python daemon archived) had a red `tests` job.

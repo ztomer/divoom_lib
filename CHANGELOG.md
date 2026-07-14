@@ -4,6 +4,25 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## Unreleased — CI fix: sync-now e2e race against the 1500ms auto-refresh timer
+
+- **fix(ci): `test_sync_now_progress_updates_the_right_device_row` was red on
+  the CI runner.** `gallery.js`'s `setTimeout(updateSyncTargetList, 1500)`
+  fired on the slow runner and re-rendered the sync-targets list with the
+  test's mock `get_sync_candidates` response (`'{}'`); `renderSyncTargets`
+  treated `{}` as a non-empty list, cleared `#sync-targets-list`, then threw
+  on `({}).forEach` — wiping the rows the test had just created (30s timeout).
+  Locally the test finished under 1500ms so it never hit it. Fixes: the test
+  mock now returns a real candidate array for `get_sync_candidates`; the
+  render + progress-fire + read are collapsed into one synchronous `evaluate`
+  so the timer can't race it; `renderSyncTargets` now guards
+  `Array.isArray` so a stray `'{}'` clears the empty-list message instead of
+  throwing. The other 9 full-suite failures were pre-existing
+  resource-contention flakiness in `test_daemon_connect_edge_e2e.py` (they
+  pass in isolation with and without the change). `tests` job green on
+  `main` (run 29361659806). Test-only — the shipped v0.22.18 DMG is
+  unaffected.
+
 ## v0.22.18 — Bug batch: gallery, hot-channel sync, Sync Now, theming, alignment; CI green again
 
 **RELEASED**: tag + GitHub release + Homebrew cask, all live and verified —
