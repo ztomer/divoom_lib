@@ -36,10 +36,26 @@ Claude) should read this on entry and **update it at the end of every round**
      `pytest.importorskip("pyaudio")`; it hard-imported pyaudio (absent in CI,
      no PortAudio), 7 errors (commit `8aa15d1`).
   All 5 jobs green on `8aa15d1` (run 29326562142). Local full suite: 2767
-  passed / 94 skipped / 0 errors. Follow-ups (not blocking CI): the native
-  daemon still doesn't implement `mock_simulate_drop`; CI doesn't exercise the
-  Playwright e2e or pyaudio suites (both skip) — add the deps + `playwright
-  install` to the `test` job if that coverage is wanted.
+  passed / 94 skipped / 0 errors.
+
+  **Then wired the e2e + audio suites INTO CI** (user follow-up): the `test`
+  job now `brew install portaudio` + `pip install pyaudio playwright` +
+  `playwright install chromium`, so the audio-visualizer suite and the
+  JS-mock Playwright e2e suites (aid_sleep, clock_faces, playlists,
+  ux_feedback, mock_device, status chips/dot) run for real in CI. Two follow-on
+  fixes were needed, each found by pushing and reading the runner:
+  - `_IsolatedStack._wait_for_http` 5s → 30s + dump bridge stdout/stderr on
+    timeout (the diagnostic that revealed the next item).
+  - The ONE bridge-based file (`test_e2e_gui_daemon_connect_disconnect`) spins
+    up the REAL `DivoomGuiAPI`, whose import does `import webview` (pywebview) —
+    Cocoa init HANGS on the headless runner (no Aqua session). It now skips on
+    `CI`/`GITHUB_ACTIONS` and still runs locally. This is a hard limit of
+    hosted runners, not a fixable test.
+  Green on `17ce5f9` (run 29331997523): **2719 passed / 107 skipped / 0
+  errors**. Remaining follow-up (not blocking CI): the native daemon still
+  doesn't implement `mock_simulate_drop` (its 2 tests skip); if it grows the
+  command, guard converts to a real run. The GUI-bridge suite is local-only by
+  necessity.
 
 - **2026-07-14 (later still, `/loop`-continued research): AidSleep RC=3
   fixed and shipped; cloud API catalog now 533/533 complete.** User: research
