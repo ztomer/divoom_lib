@@ -99,6 +99,16 @@ class GallerySyncMixin(GalleryHotApiMixin):
 
     FILE_SIZE_BITMASK: dict[int, int] = {16: 1, 32: 2, 64: 4, 128: 16, 256: 32}
 
+    @staticmethod
+    def _fetch_gallery_asset(cache_dir: Path, file_id: str) -> bool:
+        """Download + decode one cloud gallery asset (see gallery_download.py).
+
+        A cached ``.bin`` that fails to decode is dropped and re-downloaded in
+        the SAME call, so a single ``fetch_gallery`` pass recovers the preview
+        instead of leaving an empty (black) gallery tile until reopened."""
+        from divoom_gui.gallery_download import fetch_gallery_asset
+        return fetch_gallery_asset(cache_dir, file_id)
+
     def fetch_gallery(self, classify: int, target_size: int = 16,
                       file_sort: int = 1, file_size: int = 0) -> str:
         """Fetch gallery items. file_size=0 means auto-detect from target_size."""
@@ -188,57 +198,14 @@ class GallerySyncMixin(GalleryHotApiMixin):
                 
                 # ── Parallel download and decode of missing .bin assets ──
                 from concurrent.futures import ThreadPoolExecutor
-                
+
                 def download_item(item):
+                    # Delegate to the module-level helper so a corrupt/stale
+                    # .bin is re-downloaded and decoded in a single pass
+                    # (see _fetch_gallery_asset for the recovery contract).
                     file_id = item.get("FileId")
-                    if not file_id:
-                        return
-                    safe_filename = file_id.replace("/", "_")
-                    cache_file_item = cache_dir / safe_filename
-                    
-                    cache_file_bin = cache_file_item.with_suffix(".bin")
-                    has_preview = any(cache_file_item.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg"])
-                    if not has_preview and not cache_file_bin.exists():
-                        try:
-                            dl_url = f"https://fin.divoom-gz.com/{file_id}"
-                            req_dl = urllib.request.Request(dl_url, headers={"User-Agent": "okhttp/4.12.0"})
-                            with urllib.request.urlopen(req_dl, timeout=5) as dl_resp:
-                                raw_bytes = dl_resp.read()
-                                cache_file_bin.write_bytes(raw_bytes)
-                        except Exception as dl_err:
-                            logger.warning(f"Parallel download failed for {file_id}: {dl_err}")
-                            
-                    # Decode in parallel if preview doesn't exist
-                    has_preview = any(cache_file_item.with_suffix(ext).exists() for ext in [".gif", ".png", ".jpg", ".jpeg"])
-                    if not has_preview and cache_file_bin.exists():
-                        decoded = False
-                        try:
-                            raw_bytes = cache_file_bin.read_bytes()
-                            extracted = media_decoder.extract_image_from_magic_43(raw_bytes)
-                            if extracted:
-                                img_bytes, ext = extracted
-                                cache_file_item.with_suffix(ext).write_bytes(img_bytes)
-                                decoded = True
-                            elif raw_bytes.startswith(b"GIF89a") or raw_bytes.startswith(b"GIF87a"):
-                                cache_file_item.with_suffix(".gif").write_bytes(raw_bytes)
-                                decoded = True
-                            elif raw_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
-                                cache_file_item.with_suffix(".png").write_bytes(raw_bytes)
-                                decoded = True
-                            elif raw_bytes.startswith(b"\xff\xd8"):
-                                cache_file_item.with_suffix(".jpg").write_bytes(raw_bytes)
-                                decoded = True
-                            else:
-                                decoded = media_decoder.decode_and_save_preview(raw_bytes, cache_file_item.with_suffix(".png"))
-                        except Exception as dec_err:
-                            logger.warning(f"Parallel decode failed for {file_id}: {dec_err}")
-                        if not decoded:
-                            # Corrupt/incomplete cached download (e.g. truncated
-                            # mid-transfer, confirmed live via CBC-padding errors on
-                            # this project's own cache) — delete it so the NEXT
-                            # fetch re-downloads fresh bytes instead of re-failing
-                            # on the same bad cache entry forever.
-                            cache_file_bin.unlink(missing_ok=True)
+                    if file_id:
+                        GallerySyncMixin._fetch_gallery_asset(cache_dir, file_id)
 
                 with ThreadPoolExecutor(max_workers=10) as executor:
                     list(executor.map(download_item, file_list))

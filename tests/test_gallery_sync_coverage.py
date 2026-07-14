@@ -18,6 +18,7 @@ import logging
 import sys
 import threading
 import types
+import urllib.request
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -226,7 +227,7 @@ def test_fetch_gallery_success_full_pipeline(tmp_path, monkeypatch):
     )
 
     with patch("urllib.request.urlopen", side_effect=urlopen_fn), \
-         patch("divoom_gui.gallery_sync.media_decoder.extract_image_from_magic_43",
+         patch("divoom_gui.gallery_download.media_decoder.extract_image_from_magic_43",
                return_value=(b"decodedpng", ".png")):
         out = m.fetch_gallery(classify=18, target_size=16)
         assert out == "[]"  # no pre-existing gallery_cache.json -> cached_data empty
@@ -381,7 +382,7 @@ def test_fetch_gallery_download_failure_continues_pipeline(tmp_path, monkeypatch
             m.fetch_gallery(classify=1)
             _wait_for_fetch_thread()
 
-    assert "Parallel download failed for flaky" in caplog.text
+    assert "Gallery download failed for flaky" in caplog.text
     cache_dir = tmp_path / ".config" / "divoom-control" / "cache_gallery"
     assert not (cache_dir / "flaky.bin").exists()
 
@@ -420,8 +421,8 @@ def test_fetch_gallery_decode_signature_branches(tmp_path, monkeypatch):
 
     with patch("urllib.request.urlopen",
                side_effect=_fake_urlopen_factory(file_list=file_list, dl_bytes_map=dl_bytes_map)), \
-         patch("divoom_gui.gallery_sync.media_decoder.extract_image_from_magic_43", return_value=None), \
-         patch("divoom_gui.gallery_sync.media_decoder.decode_and_save_preview",
+         patch("divoom_gui.gallery_download.media_decoder.extract_image_from_magic_43", return_value=None), \
+         patch("divoom_gui.gallery_download.media_decoder.decode_and_save_preview",
                side_effect=fake_decode_and_save_preview):
         m.fetch_gallery(classify=1)
         _wait_for_fetch_thread()
@@ -451,8 +452,8 @@ def test_fetch_gallery_corrupt_bin_is_deleted_so_next_fetch_redownloads(tmp_path
     with patch("urllib.request.urlopen",
                side_effect=_fake_urlopen_factory(file_list=file_list,
                                                   dl_bytes_map={"corrupt": b"not a real container"})), \
-         patch("divoom_gui.gallery_sync.media_decoder.extract_image_from_magic_43", return_value=None), \
-         patch("divoom_gui.gallery_sync.media_decoder.decode_and_save_preview", return_value=False):
+         patch("divoom_gui.gallery_download.media_decoder.extract_image_from_magic_43", return_value=None), \
+         patch("divoom_gui.gallery_download.media_decoder.decode_and_save_preview", return_value=False):
         m.fetch_gallery(classify=1)
         _wait_for_fetch_thread()
 
@@ -471,8 +472,8 @@ def test_fetch_gallery_corrupt_bin_is_deleted_so_next_fetch_redownloads(tmp_path
     with patch("urllib.request.urlopen",
                side_effect=_fake_urlopen_factory(file_list=file_list,
                                                   dl_bytes_map={"corrupt": b"a real container this time"})), \
-         patch("divoom_gui.gallery_sync.media_decoder.extract_image_from_magic_43", return_value=None), \
-         patch("divoom_gui.gallery_sync.media_decoder.decode_and_save_preview",
+         patch("divoom_gui.gallery_download.media_decoder.extract_image_from_magic_43", return_value=None), \
+         patch("divoom_gui.gallery_download.media_decoder.decode_and_save_preview",
                side_effect=fake_decode_ok):
         m.fetch_gallery(classify=1)
         _wait_for_fetch_thread()
@@ -846,3 +847,69 @@ def test_set_gallery_filter_exception_path_returns_false(tmp_path, monkeypatch):
     m = _Host()
     with patch("divoom_gui.gallery_sync.atomic_write_config", side_effect=OSError("disk full")):
         assert m.set_gallery_filter(sort=3, file_size=16) is False
+
+
+# ─────────── single-pass recovery of corrupt/stale .bin cache ───────────
+
+def test_fetch_gallery_asset_recovers_corrupt_bin_in_one_pass(tmp_path, monkeypatch):
+    """A corrupt/truncated cached .bin must be dropped and re-downloaded +
+    decoded in a single call — NOT left for a second fetch. Regression guard
+    for the "gallery items have names but render as black placeholders" bug:
+    an empty preview_url (from a .bin that failed to decode) is what the
+    frontend shows as a black tile."""
+    import divoom_gui.gallery_sync as gs_mod
+    cache_dir = tmp_path / "cache_gallery"
+    cache_dir.mkdir()
+    file_id = "group1/M00/00/AA/corrupt_test_asset"
+    safe = file_id.replace("/", "_")
+
+    # Seed a corrupt .bin (as a prior failed download would leave behind).
+    (cache_dir / f"{safe}.bin").write_bytes(b"\x00\x01TRUNCATED-GARBAGE")
+
+    # The CDN download returns a real, decodable GIF.
+    good_gif = b"GIF89a" + b"\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00;"
+    with patch.object(urllib.request, "urlopen") as mock_urlopen:
+        class _Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return good_gif
+        mock_urlopen.return_value = _Resp()
+
+        ok = gs_mod.GallerySyncMixin._fetch_gallery_asset(cache_dir, file_id)
+
+    assert ok is True
+    # The decoded preview now exists on disk...
+    assert (cache_dir / f"{safe}.gif").exists()
+    # ...and the corrupt .bin was replaced (re-downloaded), not left as-is.
+    assert (cache_dir / f"{safe}.bin").read_bytes() == good_gif
+
+
+def test_fetch_gallery_asset_skips_when_preview_already_decoded(tmp_path, monkeypatch):
+    """If a decoded preview already exists, no network call is made."""
+    import divoom_gui.gallery_sync as gs_mod
+    cache_dir = tmp_path / "cache_gallery"
+    cache_dir.mkdir()
+    file_id = "group1/M00/00/BB/already_decoded"
+    safe = file_id.replace("/", "_")
+    (cache_dir / f"{safe}.png").write_bytes(b"\x89PNG\r\n\x1a\nFAKE")
+
+    with patch.object(urllib.request, "urlopen") as mock_urlopen:
+        ok = gs_mod.GallerySyncMixin._fetch_gallery_asset(cache_dir, file_id)
+    mock_urlopen.assert_not_called()
+    assert ok is True
+
+
+def test_fetch_gallery_asset_handles_download_failure(tmp_path, monkeypatch):
+    """A failed download must not raise and must report no preview."""
+    import divoom_gui.gallery_sync as gs_mod
+    cache_dir = tmp_path / "cache_gallery"
+    cache_dir.mkdir()
+    file_id = "group1/M00/00/CC/unreachable"
+    safe = file_id.replace("/", "_")
+    (cache_dir / f"{safe}.bin").write_bytes(b"stale")
+
+    with patch.object(urllib.request, "urlopen", side_effect=OSError("offline")):
+        ok = gs_mod.GallerySyncMixin._fetch_gallery_asset(cache_dir, file_id)
+    assert ok is False
+    # stale .bin was dropped so the next fetch retries cleanly
+    assert not (cache_dir / f"{safe}.bin").exists()

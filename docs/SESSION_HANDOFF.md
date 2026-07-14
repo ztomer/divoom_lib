@@ -18,6 +18,22 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-14 (Round 63 — gallery black-tile fix, UNRELEASED):** User bug —
+  "pixel art → gallery: items have names but most are empty / black
+  placeholders." Root-caused by tracing the real render path end-to-end (real
+  `DivoomGuiAPI` over the e2e HTTP bridge driving the real `web_ui` in headless
+  Chromium): the backend emits correct `preview_url`s, and the frontend renders
+  fine when `get_animated_preview` succeeds — so the persistent black tiles came
+  from a `preview_url` left empty by a `.bin` that failed to decode. The Round
+  62 fix deleted the bad `.bin` but only *unlinked* it, so recovery still needed
+  a second `fetch_gallery` pass (tile stayed black until the gallery was
+  reopened). Fix: extracted `GallerySyncMixin._fetch_gallery_asset()` which
+  drops a `.bin` that fails to decode **and re-downloads + decodes it in the
+  same call**, so one fetch fully recovers every preview. 3 new unit tests in
+  `test_gallery_sync_coverage.py`; gallery + media-decoder suites green (99
+  passed / 2 skipped). CHANGELOG updated. NOT committed/released — ask before
+  cutting a release.
+
 - **2026-07-14 (Round 62 — user bug batch, released): gallery cache-retry
   fix, hot-channel button fix, Sync Now feature, light-mode toast fix,
   device-settings alignment fix.** User filed 7 live bugs; see

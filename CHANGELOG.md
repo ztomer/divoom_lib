@@ -4,7 +4,24 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
-## Unreleased — CI fix: sync-now e2e race against the 1500ms auto-refresh timer
+## v0.22.19 — gallery black-tile recovery; CI fix
+
+- **fix(gallery): a corrupt/truncated cached `.bin` no longer leaves a black
+   gallery tile until the gallery is opened a second time.** The prior Round 62
+   fix deleted a failed `.bin` but only *unlinked* it — recovery (re-download +
+   decode) still needed the **next** `fetch_gallery` pass, so an item whose
+   `preview_url` failed to decode rendered as a black `is-unavailable` box (name
+   present, image empty) for the rest of the session. Extracted the
+   download/decode into `GallerySyncMixin._fetch_gallery_asset()` (also clears
+   the 500-LOC hotspot) which now drops a `.bin` that fails to decode **and
+   re-downloads + decodes it in the same call**, so one fetch fully recovers the
+   preview. Decode failure (clean `False` or exception) always drops the bad
+   `.bin`; a missing preview with a working download is filled immediately.
+   Added 3 unit tests in `test_gallery_sync_coverage.py`
+   (corrupt-bin single-pass recovery, skip-when-already-decoded, download-failure
+   handling); all gallery/media-decoder suites green.
+
+### CI — sync-now e2e race against the 1500ms auto-refresh timer
 
 - **fix(ci): `test_sync_now_progress_updates_the_right_device_row` was red on
   the CI runner.** `gallery.js`'s `setTimeout(updateSyncTargetList, 1500)`
