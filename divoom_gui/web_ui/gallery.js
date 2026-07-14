@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.renderSyncTargets = function(candidates) {
         const el = document.getElementById("sync-targets-list");
         if (!el) return;
-        if (!candidates || candidates.length === 0) {
+        if (!Array.isArray(candidates) || candidates.length === 0) {
             el.innerHTML = `<span class="empty-list">No devices — scan under Settings, or add a Wi-Fi screen.</span>`;
             return;
         }
