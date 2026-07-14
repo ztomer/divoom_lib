@@ -48,6 +48,7 @@ pub mod cloud;
 pub mod cloud_cmds;
 pub mod cloud_store;
 mod cloud_category;
+mod cloud_photo;
 pub mod mcp;
 pub mod mcp_tools;
 pub mod media;

@@ -7,17 +7,38 @@
 // daemon is busy STREAMING to (connected → not advertising → scan misses it)
 // vanished from the selector. Union the fresh scan with the known devices by
 // address (fresh data wins) so an in-use device stays selectable.
+//
+// R62 (user-reported): the union was PERMANENT — once an address was seen
+// this session it never showed "not in range" again even after genuinely
+// dropping out of BLE range, since nothing ever downgraded it. A single scan
+// miss isn't reliable proof of absence (a scan can legitimately skip a
+// present device), so this counts CONSECUTIVE misses per address and only
+// flips `unconfirmed` after `MISS_THRESHOLD` in a row — same signal quality
+// as the original session-restore "not in range" state, just live instead
+// of one-shot. `daemonOwned` devices are exempt: a live-widget stream keeps
+// the device connected (hence not advertising, hence always "missed" by a
+// scan) by design — that's not absence.
+window.MISS_THRESHOLD = 2;
 window.mergeDiscoveredDevices = function(fresh) {
     const byAddr = {};
     (window.DivoomState.discoveredDevices || []).forEach(d => {
         if (d && d.address) byAddr[d.address] = d;
     });
+    const freshAddrs = new Set((fresh || []).filter(d => d && d.address).map(d => d.address));
+    Object.keys(byAddr).forEach(addr => {
+        if (freshAddrs.has(addr) || byAddr[addr].daemonOwned) return;
+        const misses = (byAddr[addr].scanMisses || 0) + 1;
+        byAddr[addr] = Object.assign({}, byAddr[addr], {
+            scanMisses: misses,
+            unconfirmed: misses >= window.MISS_THRESHOLD ? true : !!byAddr[addr].unconfirmed,
+        });
+    });
     (fresh || []).forEach(d => {
         // A fresh scan finding this address means it's confirmed present RIGHT
-        // NOW — clear any leftover "unconfirmed" (session-restore/known-cache)
-        // flag, since the union-only merge below never downgrades an address
-        // that a later scan simply doesn't happen to re-find.
-        if (d && d.address) byAddr[d.address] = Object.assign(byAddr[d.address] || {}, d, { unconfirmed: false });
+        // NOW — clear the miss counter and any "not in range" flag.
+        if (d && d.address) byAddr[d.address] = Object.assign({}, byAddr[d.address] || {}, d, {
+            scanMisses: 0, unconfirmed: false,
+        });
     });
     window.DivoomState.discoveredDevices = Object.values(byAddr);
     return window.DivoomState.discoveredDevices;

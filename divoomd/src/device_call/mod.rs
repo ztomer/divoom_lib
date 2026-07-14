@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::time::Duration;
 use crate::daemon::{Daemon, DeviceTransport};
 use crate::protocol::Request;
@@ -27,6 +27,7 @@ pub mod game;
 pub mod design;
 pub mod system;
 pub mod aid_sleep;
+mod lan;
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
@@ -80,7 +81,7 @@ pub async fn handle_device_call(
     if method.starts_with("lan.") {
         if let Some(lan_dev) = dev.lan() {
             let kwargs = req.args.get("kwargs").and_then(|v| v.as_object());
-            return handle_lan_call(lan_dev, method, &args, kwargs).await;
+            return lan::handle_lan_call(lan_dev, method, &args, kwargs).await;
         } else {
             return crate::protocol::err_reply("device is not connected via LAN");
         }
@@ -300,121 +301,3 @@ pub async fn handle_device_call(
     }
 }
 
-fn get_arg_i64(
-    args: &[i64],
-    kw: Option<&serde_json::Map<String, Value>>,
-    idx: usize,
-    name: &str,
-    default: i64,
-) -> i64 {
-    if idx < args.len() {
-        return args[idx];
-    }
-    if let Some(map) = kw {
-        if let Some(val) = map.get(name) {
-            if let Some(n) = val.as_i64() {
-                return n;
-            }
-        }
-    }
-    default
-}
-
-async fn handle_lan_call(
-    lan: &crate::lan::LanTransport,
-    method: &str,
-    args: &[i64],
-    kw: Option<&serde_json::Map<String, Value>>,
-) -> Value {
-    let res = match method {
-        "lan.set_channel" => {
-            let index = get_arg_i64(args, kw, 0, "SelectIndex", 0);
-            lan.post("Channel/SetIndex", Some(json!({ "SelectIndex": index }))).await
-        }
-        "lan.get_channel" => {
-            lan.post("Channel/GetIndex", None).await
-        }
-        "lan.set_brightness" => {
-            let val = get_arg_i64(args, kw, 0, "Brightness", 100);
-            lan.post("Channel/SetBrightness", Some(json!({ "Brightness": val }))).await
-        }
-        "lan.set_clock" => {
-            let clock_id = get_arg_i64(args, kw, 0, "ClockId", 0);
-            lan.post("Channel/SetClockSelectId", Some(json!({ "ClockId": clock_id }))).await
-        }
-        "lan.send_playlist" => {
-            let play_id = get_arg_i64(args, kw, 0, "PlayId", 0);
-            lan.post("Playlist/SendDevice", Some(json!({ "PlayId": play_id }))).await
-        }
-        "lan.on_off_screen" => {
-            let on_off = get_arg_i64(args, kw, 0, "OnOff", 1);
-            lan.post("Channel/OnOffScreen", Some(json!({ "OnOff": on_off }))).await
-        }
-        "lan.set_ambient_light" => {
-            let brightness = get_arg_i64(args, kw, 0, "Brightness", 100);
-            let color = if let Some(c) = kw.and_then(|m| m.get("Color")).and_then(|v| v.as_str()) {
-                c.to_string()
-            } else {
-                let r = get_arg_i64(args, kw, 1, "r", 0) as u8;
-                let g = get_arg_i64(args, kw, 2, "g", 0) as u8;
-                let b = get_arg_i64(args, kw, 3, "b", 0) as u8;
-                format!("#{:02X}{:02X}{:02X}", r, g, b)
-            };
-            let power = get_arg_i64(args, kw, 4, "Power", 1);
-            lan.post("Channel/SetAmbientLight", Some(json!({
-                "Brightness": brightness,
-                "Color": color,
-                "Power": power,
-            }))).await
-        }
-        "lan.set_rgb_info" => {
-            let mode = get_arg_i64(args, kw, 0, "RgbMode", 1);
-            let speed = get_arg_i64(args, kw, 1, "RgbSpeed", 50);
-            let color = if let Some(c) = kw.and_then(|m| m.get("RgbColor")).and_then(|v| v.as_str()) {
-                c.to_string()
-            } else {
-                let r = get_arg_i64(args, kw, 2, "r", 0) as u8;
-                let g = get_arg_i64(args, kw, 3, "g", 0) as u8;
-                let b = get_arg_i64(args, kw, 4, "b", 0) as u8;
-                format!("#{:02X}{:02X}{:02X}", r, g, b)
-            };
-            lan.post("Channel/SetRGBInfo", Some(json!({
-                "RgbMode": mode,
-                "RgbSpeed": speed,
-                "RgbColor": color,
-            }))).await
-        }
-        "lan.set_timer" => {
-            let minute = get_arg_i64(args, kw, 0, "Minute", 0);
-            let second = get_arg_i64(args, kw, 1, "Second", 0);
-            let status = get_arg_i64(args, kw, 2, "Status", 0);
-            lan.post("Tools/SetTimer", Some(json!({
-                "Minute": minute,
-                "Second": second,
-                "Status": status,
-            }))).await
-        }
-        "lan.set_scoreboard" => {
-            let blue = get_arg_i64(args, kw, 0, "BlueScore", 0);
-            let red = get_arg_i64(args, kw, 1, "RedScore", 0);
-            lan.post("Tools/SetScoreBoard", Some(json!({
-                "BlueScore": blue,
-                "RedScore": red,
-            }))).await
-        }
-        "lan.set_stopwatch" => {
-            let status = get_arg_i64(args, kw, 0, "Status", 0);
-            lan.post("Tools/SetStopWatch", Some(json!({ "Status": status }))).await
-        }
-        "lan.set_noise_status" => {
-            let status = get_arg_i64(args, kw, 0, "NoiseStatus", 0);
-            lan.post("Tools/SetNoiseStatus", Some(json!({ "NoiseStatus": status }))).await
-        }
-        _ => return crate::protocol::err_reply(&format!("unknown LAN method: {method}")),
-    };
-
-    match res {
-        Ok(val) => json!({ "success": true, "result": val }),
-        Err(e) => crate::protocol::err_reply(&e.to_string()),
-    }
-}

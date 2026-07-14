@@ -57,6 +57,80 @@ Claude) should read this on entry and **update it at the end of every round**
   command, guard converts to a real run. The GUI-bridge suite is local-only by
   necessity.
 
+- **2026-07-14 (later still): WiFi/LAN command completeness pass; live
+  "not in range" device-chip fix.** User: "cut a release" (v0.22.16
+  shipped), then "how many functions are wifi related? we can add the
+  support for that" — plus a bug report mid-conversation ("chips show, but
+  never say 'not in range'") that got resolved into a real fix first.
+  - **Chip badge fix (found via user report, not the WiFi count ask).**
+    Traced `device_selector.js`'s `mergeDiscoveredDevices`: the "not in
+    range" badge was seeded once at session-restore (`unconfirmed: true`)
+    and cleared by the first scan hit, but nothing ever downgraded a
+    device that was confirmed present THIS session and later genuinely
+    dropped out of range — the union-only merge (R46 #5) never removes an
+    address on a scan miss. Fixed: counts consecutive scan misses per
+    address, downgrades after `MISS_THRESHOLD=2` in a row.
+    `daemonOwned`/streaming devices are exempt (they intentionally don't
+    advertise, so a miss there is never "absence"). 5 new e2e tests in
+    `test_e2e_device_status_chips.py`; proved the key test could fail
+    (bumped the threshold to 999, watched it red, restored) before
+    trusting it green.
+  - **WiFi command count**: exactly 45 total, from `HttpCommand.java`'s
+    `DeviceAndServerCmd` (43) + `ForceDeviceHttp` (2) routing arrays —
+    the commands Divoom's own app posts to the device's local WiFi HTTP
+    API instead of the cloud. 10 were already implemented before this
+    round. User picked all 4 remaining clusters (asked via
+    `AskUserQuestion`, multi-select, all 4 chosen):
+    1. **Photo album management — DONE, live, GUI-wired.**
+       `Photo/GetAlbumList` (new `divoomd/src/cloud_photo.rs` — cloud.rs
+       and cloud_category.rs were both full) browses albums; `Photo/
+       PlayAlbum` (LAN) plays one. New "Photo Albums" 5th sub-tab in the
+       Pixel Art panel, same shape as Playlist/AidSleep. Also implemented
+       the other 4 CRUD commands (`SetAlbumCover`/`DeletePhoto`/
+       `RemovePhotoFromAlbum`/`DevicePhotoToAlbum`) plus `GetPhotoList`
+       at the plumbing layer only — full photo-level management needs a
+       thumbnail UI, out of scope this round.
+    2. **LAN-getter completeness — DONE, backend only** (no GUI needed,
+       these are internal state reads): 8 read-back counterparts of
+       already-BLE-working Set commands, now also reachable over LAN.
+    3. **Channel extras + Voice/SendText — DONE, backend only, NOT
+       GUI-wired.** 5-LCD "Times Gate" multi-panel commands need
+       hardware this project has no reason to own.
+       `Voice/SendText` specifically needs real-hardware render
+       confirmation before it's trusted — the exact same trap
+       `push_text` already fell into and climbed out of (R32 §D: a
+       superficially-similar "set light phone word" 0x87 BLE opcode
+       ACKed cleanly but never actually rendered on Pixoo-class
+       matrices; `push_text`'s fix was to render to a bitmap and push it
+       as an image instead). Implemented but deliberately not surfaced.
+    4. **Danmaku scrolling overlay — DONE, backend only, NOT GUI-wired.**
+       Same unconfirmed-render caveat on `SendText`; `RandomFace` has a
+       real request class but zero confirmed callers anywhere in the
+       decompiled app — may be dead server-side.
+  - **File-size gate hit repeatedly** as commands piled up:
+    `divoomd/src/device_call/mod.rs` split into a new `device_call::lan`
+    module (`handle_lan_call` + its helpers, ~250 lines); Python
+    `lan_transport.py` split into `lan_transport_photo.py`/
+    `lan_transport_extras.py` mixins; `divoom_gui/gui_api.py` split its
+    one-line `LightingApi` forwarding methods into a new
+    `lighting_forward.py` mixin (`LightingForwardMixin`). All four
+    follow the same mixin-split pattern already established for
+    Playlists/AidSleep/PhotoAlbums.
+  - **Caught a real regression from the gui_api.py split**:
+    `test_round6_layout_and_exposure.py::test_gui_api_exposes_set_volume_and_get_volume`
+    grepped `gui_api.py`'s raw source text for a literal `def
+    set_volume(...)`, which broke when that method moved into the new
+    mixin file — fixed the test to check both files' source (kept the
+    file's established "static analysis only, no live import" convention
+    rather than switching to runtime introspection).
+  - Verified: full `tests/` suite green (see CHANGELOG for the exact
+    count — re-ran after the gui_api.py mixin-split regression fix above);
+    `cargo build`/`cargo test` clean in `divoomd`;
+    `check_no_emoji.py`/`check_file_size.py` gates clean. Bumped to
+    v0.22.17. **Not pushed or released this round** — committed locally
+    only; ask before releasing, per the user's established pattern (this
+    round's earlier v0.22.16 WAS released, on explicit "cut a release").
+
 - **2026-07-14 (later still, `/loop`-continued research): AidSleep RC=3
   fixed and shipped; cloud API catalog now 533/533 complete.** User: research
   the AidSleep RC=3 mystery and finish the `misc_small.md` batch, then

@@ -15,6 +15,8 @@ from divoom_gui.lifecycle_mixin import LifecycleSettingsMixin
 from divoom_gui.clock_faces import ClockFacesMixin
 from divoom_gui.playlists import PlaylistsMixin
 from divoom_gui.aid_sleep import AidSleepMixin
+from divoom_gui.photo_albums import PhotoAlbumsMixin
+from divoom_gui.lighting_forward import LightingForwardMixin
 
 from divoom_gui.api import AsyncLoopThread
 from divoom_gui.api.connection import ConnectionApi
@@ -26,7 +28,8 @@ from divoom_gui.api.window import WindowApi
 logger = logging.getLogger("divoom_gui")
 
 class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin,
-                   LifecycleSettingsMixin, ClockFacesMixin, PlaylistsMixin, AidSleepMixin):
+                   LifecycleSettingsMixin, ClockFacesMixin, PlaylistsMixin, AidSleepMixin,
+                   PhotoAlbumsMixin, LightingForwardMixin):
     """The PyWebView JS api bridge orchestrator."""
     def __init__(self) -> None:
         self.loop_thread = AsyncLoopThread()
@@ -402,24 +405,6 @@ class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin
         reply = client.device_call(method, args, kwargs, target=target,
                                    blobs=blobs, token=token)
         return json.dumps(reply)
-
-    def display_wall_image(self, file_path: str, cell_size: int) -> bool:
-        return self.lighting.display_wall_image(file_path, cell_size)
-
-    def display_custom_art(self, file_path: str) -> bool:
-        return self.lighting.display_custom_art(file_path)
-
-    def push_playlist(self, play_id: int) -> bool:
-        return self.lighting.push_playlist(play_id)
-
-    def play_aid_sleep(self, sleep_id: int, sleep_type: int = 0) -> bool:
-        return self.lighting.play_aid_sleep(sleep_id, sleep_type)
-
-    def set_brightness(self, brightness: int) -> bool:
-        return self.lighting.set_brightness(brightness)
-
-    def set_volume(self, volume: int) -> bool:
-        return self.lighting.set_volume(volume)
 
     def open_file_dialog(self) -> str | None:
         logger.info("Opening native file dialog...")

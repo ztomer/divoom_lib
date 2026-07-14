@@ -195,6 +195,51 @@ caller found, lower priority, not picked up this round.
 4. New transport: `divoom_lib/cloud.py` module (library was BLE-only + device LAN) — shipped.
 5. `search_weather_city` remains implemented but NOT GUI-wired — the weather widget uses system/OS location, not a Divoom device-weather-city search; wiring it needs a UX decision (what does picking a city actually do?) that wasn't made this round.
 
+### WiFi/LAN command completeness (2026-07-14)
+
+User: "how many functions are wifi related? we can add the support for
+that." Counted precisely from `HttpCommand.java`'s routing arrays
+(`DeviceAndServerCmd` + `ForceDeviceHttp` — exactly the commands Divoom's
+own app posts to the device's local WiFi HTTP API instead of the cloud):
+**45 total.** 10 were already implemented; picked 4 clusters to close the
+rest of the gap (~8 were pure LAN duplicates of already-BLE-working
+features, low value; `Cloud/ToDevice`-adjacent calendar EnterCalendar
+commands stayed unimplemented — thin signal, no decompiled payload).
+
+1. **Photo album management — DONE, live, wired into the GUI.**
+   `Photo/GetAlbumList` (cloud browse) + `Photo/PlayAlbum` (LAN apply, in
+   `DeviceAndServerCmd`) — new "Photo Albums" 5th sub-tab in the Pixel Art
+   panel, same browse-then-apply shape as Playlist/AidSleep. Also
+   implemented (backend-only, no GUI hook — full photo-level CRUD needs
+   thumbnail UI, a bigger scope): `SetAlbumCover`, `DeletePhoto`,
+   `RemovePhotoFromAlbum`, `DevicePhotoToAlbum`, `GetPhotoList` (the last is
+   in `ForceDeviceHttp`, always local).
+2. **LAN-getter completeness pass — DONE, backend only.** 8 read-back
+   counterparts of already-implemented Set commands (EqPosition, RGBInfo,
+   AmbientLight, OnOffScreen, NoiseStatus, Timer, ScoreBoard, StopWatch) —
+   same feature, now also reachable over LAN when previously BLE-only.
+3. **Channel extras + Voice/SendText — DONE, backend only, NOT GUI-wired.**
+   `Set5LcdChannelType`/`Set5LcdWholeClockId`/`SetProduceTime` need real
+   5-LCD "Times Gate" multi-panel hardware this project doesn't own.
+   `SetNightPreview`/`ExitNightPreview` and `Voice/SendText` are
+   implemented but `Voice/SendText` specifically needs the same
+   real-hardware render confirmation `push_text` already learned the hard
+   way it can't skip (R32 §D: a superficially-similar "set light phone
+   word" command ACKed cleanly but didn't render on Pixoo-class matrices).
+4. **Danmaku scrolling overlay — DONE, backend only, NOT GUI-wired.**
+   `Danmaku/SendText` (same unconfirmed-render caveat as Voice/SendText)
+   and `Danmaku/RandomFace` (no confirmed live caller anywhere in the
+   decompiled app — may be dead/unused server-side).
+
+Also fixed while investigating: the device-selector chip's **"not in
+range" badge was startup-only** — a device confirmed present once this
+session never got flagged again even if it genuinely dropped out of BLE
+range later, since the union-only scan merge (R46 #5) never downgraded an
+address. Now counts consecutive scan misses per address and downgrades
+after 2 in a row (daemon-owned/streaming devices exempt — they don't
+advertise by design). `divoom_gui/web_ui/device_selector.js`, 5 new e2e
+tests in `test_e2e_device_status_chips.py`.
+
 ### Deferred (R12 §D)
 
 See `docs/archive/rounds/PLANNING_ROUND12_D_AUDIT.md` for the full audit:

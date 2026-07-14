@@ -30,6 +30,8 @@ except ImportError:
     _AIOHTTP_AVAILABLE = False
 
 from divoom_lib.transport import Transport, via
+from divoom_lib.lan_transport_photo import LanPhotoMixin
+from divoom_lib.lan_transport_extras import LanExtrasMixin
 
 
 class LanTransportError(Exception):
@@ -59,7 +61,7 @@ def _validate_lan_response(status: int, text: str, command: str) -> dict:
     return result
 
 
-class LanTransport:
+class LanTransport(LanPhotoMixin, LanExtrasMixin):
     """
     Sends commands to a WiFi-enabled Divoom device via its local HTTP API.
 
@@ -402,6 +404,50 @@ class LanTransport:
             await lan.set_noise_status(1)
         """
         return await self.post("Tools/SetNoiseStatus", {"NoiseStatus": noise_status})
+
+    # ── Read-back getters (LAN counterparts of the Set commands above / BLE
+    # equivalents in device_call/tools.rs) — same feature, reachable over
+    # LAN when the device is on WiFi. Bare GET requests, no body.
+
+    @via(Transport.LAN)
+    async def get_eq_position(self) -> dict:
+        """Transport: LAN. Usage:: await lan.get_eq_position()"""
+        return await self.post("Channel/GetEqPosition")
+
+    @via(Transport.LAN)
+    async def get_rgb_info(self) -> dict:
+        """Transport: LAN. Usage:: await lan.get_rgb_info()"""
+        return await self.post("Channel/GetRGBInfo")
+
+    @via(Transport.LAN)
+    async def get_ambient_light(self) -> dict:
+        """Transport: LAN. Usage:: await lan.get_ambient_light()"""
+        return await self.post("Channel/GetAmbientLight")
+
+    @via(Transport.LAN)
+    async def get_on_off_screen(self) -> dict:
+        """Transport: LAN. Usage:: await lan.get_on_off_screen()"""
+        return await self.post("Channel/GetOnOffScreen")
+
+    @via(Transport.LAN)
+    async def get_noise_status(self) -> dict:
+        """Transport: LAN. Usage:: await lan.get_noise_status()"""
+        return await self.post("Tools/GetNoiseStatus")
+
+    @via(Transport.LAN)
+    async def get_timer(self) -> dict:
+        """Transport: LAN. Usage:: await lan.get_timer()"""
+        return await self.post("Tools/GetTimer")
+
+    @via(Transport.LAN)
+    async def get_scoreboard(self) -> dict:
+        """Transport: LAN. Usage:: await lan.get_scoreboard()"""
+        return await self.post("Tools/GetScoreBoard")
+
+    @via(Transport.LAN)
+    async def get_stopwatch(self) -> dict:
+        """Transport: LAN. Usage:: await lan.get_stopwatch()"""
+        return await self.post("Tools/GetStopWatch")
 
     # ── Status / Info ─────────────────────────────────────────────────────────
 

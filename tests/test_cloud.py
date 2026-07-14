@@ -73,6 +73,12 @@ def _fake_post(path, body):
             "ReturnCode": 0,
             "FileList": [{"FileId": "f1", "FileName": "Sunset"}],
         }
+    if path == "Photo/GetAlbumList":
+        assert body["Command"] == path
+        return {
+            "ReturnCode": 0,
+            "AlbumList": [{"AlbumType": 0, "ClockId": 7, "ClockName": "Trip"}],
+        }
     raise AssertionError(f"unexpected path {path}")
 
 
@@ -383,6 +389,29 @@ def test_get_my_playlists_rc_nonzero_raises():
     with patch.object(divoom_auth, "_post", side_effect=fake_fail):
         try:
             c.get_my_playlists()
+            assert False, "expected RuntimeError"
+        except RuntimeError as e:
+            assert "RC=5" in str(e)
+
+
+def test_get_photo_albums_shape_and_params():
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        albums = c.get_photo_albums()
+    assert albums[0]["ClockName"] == "Trip"
+    req = post.call_args_list[-1].args[1]
+    assert req["Command"] == cloud.PHOTO_GET_ALBUM_LIST_CMD
+
+
+def test_get_photo_albums_rc_nonzero_raises():
+    def fake_fail(path, body):
+        if path == "Photo/GetAlbumList":
+            return {"ReturnCode": 5, "ReturnMessage": "bad"}
+        raise AssertionError(path)
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=fake_fail):
+        try:
+            c.get_photo_albums()
             assert False, "expected RuntimeError"
         except RuntimeError as e:
             assert "RC=5" in str(e)

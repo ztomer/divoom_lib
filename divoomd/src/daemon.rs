@@ -365,7 +365,8 @@ impl Daemon {
             | "get_dial_types" | "get_dial_list"
             | "list_clock_faces" | "search_weather_city"
             | "get_aid_sleep_list" | "get_my_aid_sleep_list"
-            | "get_my_playlists" | "get_playlist_images" => {
+            | "get_my_playlists" | "get_playlist_images"
+            | "get_photo_albums" => {
                 crate::cloud_cmds::handle(&req.command, &req).await
             }
 

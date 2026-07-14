@@ -36,6 +36,7 @@ INDEX_HTML = REPO_ROOT / "divoom_gui" / "web_ui" / "index.html"
 GALLERY_CSS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.css"
 GALLERY_JS = REPO_ROOT / "divoom_gui" / "web_ui" / "gallery.js"
 GUI_API_PY = REPO_ROOT / "divoom_gui" / "gui_api.py"
+LIGHTING_FORWARD_PY = REPO_ROOT / "divoom_gui" / "lighting_forward.py"
 
 def _cat(paths: list[Path]) -> str:
     """Read and concatenate multiple source files."""
@@ -285,11 +286,14 @@ def test_appbar_volume_handler_in_app_js():
 
 
 def test_gui_api_exposes_set_volume_and_get_volume():
-    """gui_api.py must have set_volume(volume: int) -> bool and
-    get_volume() -> int | None methods."""
-    src = GUI_API_PY.read_text()
+    """DivoomGuiAPI must have set_volume(volume: int) -> bool and
+    get_volume() -> int | None methods. set_volume is a one-line forward to
+    LightingApi, defined in the LightingForwardMixin (divoom_gui/
+    lighting_forward.py) that DivoomGuiAPI inherits — gui_api.py itself was
+    split to stay under the 500-line house limit, so check both files."""
+    src = GUI_API_PY.read_text() + LIGHTING_FORWARD_PY.read_text()
     assert re.search(r"def\s+set_volume\s*\(\s*self\s*,\s*volume:\s*int\s*\)", src), (
-        "gui_api.py is missing set_volume(self, volume: int) method."
+        "Neither gui_api.py nor lighting_forward.py has set_volume(self, volume: int)."
     )
     assert re.search(r"def\s+get_volume\s*\(\s*self\s*\)", src), (
         "gui_api.py is missing get_volume(self) method."

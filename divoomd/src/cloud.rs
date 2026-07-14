@@ -51,6 +51,7 @@ pub use crate::cloud_category::{
     get_dial_list, get_dial_types, get_my_playlists, get_playlist_images, list_clock_faces,
     search_weather_city, DEFAULT_GALLERY_CLASSIFY,
 };
+pub use crate::cloud_photo::get_photo_albums;
 
 fn md5_hex(s: &str) -> String {
     let mut hasher = Md5::new();

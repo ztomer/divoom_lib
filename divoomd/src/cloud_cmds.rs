@@ -149,6 +149,13 @@ pub async fn handle(command: &str, req: &Request) -> Value {
             }
         }
 
+        "get_photo_albums" => {
+            match crate::cloud::get_photo_albums().await {
+                Ok(res) => json!({ "success": true, "result": res }),
+                Err(e) => err_reply(&e),
+            }
+        }
+
         other => err_reply(&format!("not a cloud command: {other}")),
     }
 }

@@ -50,6 +50,45 @@ shipped milestone (per the project planning docs).
   audio-visualizer suite + all JS-mock e2e suites (aid_sleep, clock_faces,
   playlists, ux_feedback, mock_device, status chips/dot).
 
+## v0.22.17 — WiFi/LAN command completeness; live "not in range" device chip
+
+User: "how many functions are wifi related? we can add the support for
+that." Counted 45 total WiFi/LAN-routable commands
+(`HttpCommand.DeviceAndServerCmd` + `ForceDeviceHttp`); 10 were already
+implemented. Closed the gap across 4 clusters.
+
+- **feat: Photo album management — shipped end-to-end.** New "Photo
+  Albums" 5th sub-tab in the Pixel Art panel: browse albums
+  (`Photo/GetAlbumList`, cloud) and Play one (`Photo/PlayAlbum`, LAN) —
+  same browse-then-apply shape as Playlist/AidSleep. Also implemented
+  backend-only (no GUI hook yet — full photo CRUD needs a thumbnail UI):
+  `SetAlbumCover`, `DeletePhoto`, `RemovePhotoFromAlbum`,
+  `DevicePhotoToAlbum`, `GetPhotoList`.
+- **feat: LAN-getter completeness pass.** 8 read-back counterparts of
+  already-implemented Set commands (EqPosition, RGBInfo, AmbientLight,
+  OnOffScreen, NoiseStatus, Timer, ScoreBoard, StopWatch), now reachable
+  over LAN as well as BLE.
+- **feat: Channel extras + Voice/SendText, Danmaku overlay — backend
+  only, not GUI-wired.** 5-LCD multi-panel commands need hardware this
+  project doesn't own; `Voice/SendText`/`Danmaku/SendText` need the same
+  real-hardware render confirmation `push_text` already learned it can't
+  skip (R32 §D — a similar-looking command ACKed cleanly but didn't
+  render); `Danmaku/RandomFace` has no confirmed live caller in the
+  decompiled app.
+- **fix: the device-selector chip's "not in range" badge was
+  startup-only.** A device confirmed present once this session never got
+  re-flagged even after genuinely dropping out of BLE range later (the
+  union-only scan merge never downgraded an address). Now counts
+  consecutive scan misses per address and downgrades after 2 in a row;
+  daemon-owned/streaming devices are exempt (they don't advertise by
+  design). 5 new e2e tests.
+- New Rust module split: `device_call::lan` (was outgrowing `mod.rs`'s
+  500-line cap), Python `lan_transport_photo`/`lan_transport_extras`
+  mixins, GUI `lighting_forward` mixin (same reason).
+
+Full suite: 2798 passed, 0 failed, 97 skipped. `cargo test` clean in
+`divoomd`. `check_no_emoji.py`/`check_file_size.py` gates clean.
+
 ## v0.22.16 — AidSleep RC=3 mystery fixed and shipped; full cloud API catalog complete (533/533)
 
 Follows up v0.22.15's "closed, not resolvable" AidSleep verdict — it was

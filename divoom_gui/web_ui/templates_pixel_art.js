@@ -38,6 +38,14 @@ window.DivoomTemplates.pixelArt = `                <div class="tabs-section" sty
                         </svg>
                         <span>Playlists</span>
                     </button>
+                    <button class="tab-btn" data-pixel-tab="pixel-photo-albums" role="tab" aria-selected="false">
+                        <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                            <rect x="1" y="2" width="14" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                            <circle cx="5" cy="6" r="1.5"/>
+                            <path d="M2,12 L6,8 L9,11 L12,7 L15,10 L15,12 Z"/>
+                        </svg>
+                        <span>Photo Albums</span>
+                    </button>
                 </div>
                 </div>
 
@@ -156,6 +164,18 @@ window.DivoomTemplates.pixelArt = `                <div class="tabs-section" sty
                             <div class="card-body">
                                 <p class="panel-hint">Cloud-hosted playlists from your Divoom account. Push one to replace the device's local slideshow.</p>
                                 <div id="cloud-playlist-list" class="cloud-clock-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PHOTO ALBUMS sub-tab -->
+                <div class="pixel-subtab-content" id="pixel-photo-albums">
+                    <div class="hot-channel-layout">
+                        <div class="card glass-card" style="height: 100%;">
+                            <div class="card-body">
+                                <p class="panel-hint">Photo albums configured for this device. Play one to start its slideshow.</p>
+                                <div id="cloud-photo-album-list" class="cloud-clock-list"></div>
                             </div>
                         </div>
                     </div>

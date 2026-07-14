@@ -32,6 +32,7 @@ AID_SLEEP_GET_ALL_CMD = "AidSleep/GetAllList"
 AID_SLEEP_GET_MY_CMD = "AidSleep/GetMyList"
 PLAYLIST_GET_MY_LIST_CMD = "Playlist/GetMyList"
 PLAYLIST_GET_MY_IMAGE_LIST_CMD = "Playlist/GetMyImageList"
+PHOTO_GET_ALBUM_LIST_CMD = "Photo/GetAlbumList"
 
 
 @dataclass
@@ -346,6 +347,36 @@ class CloudClient:
             raise RuntimeError(
                 f"{PLAYLIST_GET_MY_IMAGE_LIST_CMD} failed: RC={rc} {data.get('ReturnMessage')}")
         return data.get("FileList", [])
+
+    # ── Photo album browse (Photo/GetAlbumList) ─────────────────────────────
+    #
+    # Not in HttpCommand.DeviceAndServerCmd/ForceDeviceHttp (docs/cloud_api/
+    # photo_discover.md), so this is a plain cloud call, same auth-retry
+    # pattern as get_my_playlists. Playing a selected album
+    # (Photo/PlayAlbum) is a separate, LAN-only device call — see
+    # divoom_lib.lan_transport.LanTransport.play_album.
+
+    def get_photo_albums(self) -> list[dict]:
+        """List the photo albums ("clocks") configured for the active
+        device (``AlbumType``/``ClockId``/``ClockName``)."""
+
+        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "Command": PHOTO_GET_ALBUM_LIST_CMD,
+                "Token": creds.token,
+                "UserId": creds.user_id,
+                "DeviceId": self.device_id,
+            }
+            if self.device_pw:
+                body["DevicePassword"] = self.device_pw
+            return body
+
+        data = self._post_with_refresh(PHOTO_GET_ALBUM_LIST_CMD, _body)
+        rc = data.get("ReturnCode", -1)
+        if rc != 0:
+            raise RuntimeError(
+                f"{PHOTO_GET_ALBUM_LIST_CMD} failed: RC={rc} {data.get('ReturnMessage')}")
+        return data.get("AlbumList", [])
 
     # ── weather city search ───────────────────────────────────────────────
 

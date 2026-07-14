@@ -128,6 +128,8 @@ document.addEventListener("DOMContentLoaded", () => {
             setTimeout(window.loadHotPreview, 50);
         } else if (btn.getAttribute("data-pixel-tab") === "pixel-playlists" && window.loadPlaylists) {
             setTimeout(window.loadPlaylists, 50);
+        } else if (btn.getAttribute("data-pixel-tab") === "pixel-photo-albums" && window.loadPhotoAlbums) {
+            setTimeout(window.loadPhotoAlbums, 50);
         } else if (btn.getAttribute("data-pixel-tab") === "pixel-custom-art") {
             // R42 §3: the loader is loadCustomArtCacheGrid (loadCachedGallery
             // never existed) — without it the library showed "No cached gallery

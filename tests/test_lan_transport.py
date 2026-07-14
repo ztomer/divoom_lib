@@ -252,6 +252,113 @@ class TestLanTransportCommandWrappers(unittest.IsolatedAsyncioTestCase):
         await self.lan.set_noise_status(1)
         self.lan.post.assert_called_once_with("Tools/SetNoiseStatus", {"NoiseStatus": 1})
 
+    async def test_play_album(self):
+        await self.lan.play_album(7)
+        self.lan.post.assert_called_once_with("Photo/PlayAlbum", {"AlbumId": 7})
+
+    async def test_set_album_cover(self):
+        await self.lan.set_album_cover(clock_id=7, file_id="abc123", photo_id=1)
+        self.lan.post.assert_called_once_with("Photo/SetAlbumCover", {
+            "ClockId": 7, "FileId": "abc123", "PhotoId": 1,
+        })
+
+    async def test_delete_photo(self):
+        await self.lan.delete_photo(clock_id=7, photo_list=[1, 2])
+        self.lan.post.assert_called_once_with("Photo/DeletePhoto", {
+            "ClockId": 7, "PhotoList": [1, 2],
+        })
+
+    async def test_remove_photo_from_album(self):
+        await self.lan.remove_photo_from_album(clock_id=7, photo_list=[1, 2])
+        self.lan.post.assert_called_once_with("Photo/RemovePhotoFromAlbum", {
+            "ClockId": 7, "PhotoList": [1, 2],
+        })
+
+    async def test_move_photo_to_album(self):
+        await self.lan.move_photo_to_album(to_clock_id=8, photo_list=[1, 2])
+        self.lan.post.assert_called_once_with("Photo/DevicePhotoToAlbum", {
+            "ToClockId": 8, "PhotoList": [1, 2],
+        })
+
+    async def test_get_photo_list(self):
+        await self.lan.get_photo_list(clock_id=7, limit=10, page=2)
+        self.lan.post.assert_called_once_with("Photo/GetPhotoList", {
+            "ClockId": 7, "ParentClockId": 0, "ParentItemId": 0,
+            "StartNum": 11, "EndNum": 20,
+        })
+
+    async def test_get_eq_position(self):
+        await self.lan.get_eq_position()
+        self.lan.post.assert_called_once_with("Channel/GetEqPosition")
+
+    async def test_get_rgb_info(self):
+        await self.lan.get_rgb_info()
+        self.lan.post.assert_called_once_with("Channel/GetRGBInfo")
+
+    async def test_get_ambient_light(self):
+        await self.lan.get_ambient_light()
+        self.lan.post.assert_called_once_with("Channel/GetAmbientLight")
+
+    async def test_get_on_off_screen(self):
+        await self.lan.get_on_off_screen()
+        self.lan.post.assert_called_once_with("Channel/GetOnOffScreen")
+
+    async def test_get_noise_status(self):
+        await self.lan.get_noise_status()
+        self.lan.post.assert_called_once_with("Tools/GetNoiseStatus")
+
+    async def test_get_timer_lan(self):
+        await self.lan.get_timer()
+        self.lan.post.assert_called_once_with("Tools/GetTimer")
+
+    async def test_get_scoreboard_lan(self):
+        await self.lan.get_scoreboard()
+        self.lan.post.assert_called_once_with("Tools/GetScoreBoard")
+
+    async def test_get_stopwatch_lan(self):
+        await self.lan.get_stopwatch()
+        self.lan.post.assert_called_once_with("Tools/GetStopWatch")
+
+    async def test_set_5lcd_channel_type(self):
+        await self.lan.set_5lcd_channel_type(2, lcd_independence=1)
+        self.lan.post.assert_called_once_with("Channel/Set5LcdChannelType", {
+            "ChannelType": 2, "LcdIndependence": 1,
+        })
+
+    async def test_set_5lcd_whole_clock_id(self):
+        await self.lan.set_5lcd_whole_clock_id(182)
+        self.lan.post.assert_called_once_with("Channel/Set5LcdWholeClockId", {"ClockId": 182})
+
+    async def test_set_produce_time(self):
+        await self.lan.set_produce_time(1700000000)
+        self.lan.post.assert_called_once_with("Channel/SetProduceTime", {"ProduceTime": 1700000000})
+
+    async def test_set_night_preview(self):
+        await self.lan.set_night_preview(20)
+        self.lan.post.assert_called_once_with("Channel/SetNightPreview", {"Brightness": 20})
+
+    async def test_exit_night_preview(self):
+        await self.lan.exit_night_preview()
+        self.lan.post.assert_called_once_with("Channel/ExitNightPreview")
+
+    async def test_send_voice_text(self):
+        await self.lan.send_voice_text("Hello", nickname="Bot", background="#000000",
+                                        text_color="#FF0000", speed=30)
+        self.lan.post.assert_called_once_with("Voice/SendText", {
+            "Text": "Hello", "NickName": "Bot", "Background": "#000000",
+            "TextColor": "#FF0000", "Speed": 30,
+        })
+
+    async def test_send_danmaku_text(self):
+        await self.lan.send_danmaku_text("Hello", text_color="#00FF00")
+        self.lan.post.assert_called_once_with("Danmaku/SendText", {
+            "Text": "Hello", "TextColor": "#00FF00",
+        })
+
+    async def test_danmaku_random_face(self):
+        await self.lan.danmaku_random_face()
+        self.lan.post.assert_called_once_with("Danmaku/RandomFace")
+
 
 class TestLanTransportMisc(unittest.TestCase):
     def test_transport_property_is_lan(self):

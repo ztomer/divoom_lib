@@ -236,6 +236,23 @@ class LightingApi(ApiBase):
             logger.error(f"Rich clock failed: {e}")
             return False
 
+    def play_album(self, album_id: int) -> bool:
+        """Play a cloud-browsed photo album on the device (Photo/PlayAlbum,
+        LAN-only — see divoom_lib/lan_transport.py). Not meaningful on a
+        Virtual Wall (the album targets one device's own local slideshow,
+        not a composite image), so that target mode is rejected up front."""
+        logger.info(f"GUI Action: Playing album {album_id} on device...")
+        if self._current_target_mode == "wall":
+            logger.warning("Album playback is not supported on a Virtual Wall target")
+            return False
+        self._stop_live_widgets()
+        try:
+            val = int(album_id)
+            return self._dispatch(lambda t: t.lan.play_album(val))
+        except Exception as e:
+            logger.error(f"Album playback failed: {e}")
+            return False
+
     def push_playlist(self, play_id: int) -> bool:
         """Push a cloud playlist to the device (Playlist/SendDevice, LAN-only —
         see divoom_lib/lan_transport.py). Not meaningful on a Virtual Wall

@@ -331,6 +331,105 @@ async def test_scan_merge_clears_unconfirmed_flag():
 
 
 @pytest.mark.asyncio
+async def test_single_scan_miss_does_not_downgrade():
+    # R62 (user-reported): a device present all session that a scan just
+    # happens to skip once must NOT immediately flash "not in range" — a
+    # single miss isn't reliable proof of absence.
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            res = await page.evaluate("""() => {
+                window.DivoomState.discoveredDevices = [{address:'AA', name:'Ditoo'}];
+                window.mergeDiscoveredDevices([]);   // one miss
+                window.renderDeviceDots();
+                const c = document.querySelector('#device-dots .device-chip');
+                return { known: c.classList.contains('chip-known'),
+                         badge: c.querySelector('.device-chip-state')?.textContent || '' };
+            }""")
+            assert res["known"] is False
+            assert res["badge"] == ""
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_mid_session_scan_misses_downgrade_after_threshold():
+    # R62 fix: unlike a one-shot session-restore flag, a device confirmed
+    # present THIS session must ALSO show "not in range" if it later drops
+    # out of BLE range mid-session -- consecutive scan misses (not just one)
+    # now downgrade it live, the same badge the restore path already gets.
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            res = await page.evaluate("""() => {
+                window.DivoomState.discoveredDevices = [{address:'AA', name:'Ditoo'}];
+                window.mergeDiscoveredDevices([]);   // miss 1 -- below threshold
+                window.mergeDiscoveredDevices([]);   // miss 2 -- hits threshold
+                window.renderDeviceDots();
+                const c = document.querySelector('#device-dots .device-chip');
+                return { known: c.classList.contains('chip-known'),
+                         badge: c.querySelector('.device-chip-state')?.textContent || '' };
+            }""")
+            assert res["known"] is True
+            assert "not in range" in res["badge"]
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_redetection_resets_the_miss_counter():
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            res = await page.evaluate("""() => {
+                window.DivoomState.discoveredDevices = [{address:'AA', name:'Ditoo'}];
+                window.mergeDiscoveredDevices([]);                    // miss 1
+                window.mergeDiscoveredDevices([{address:'AA', name:'Ditoo'}]);  // re-detected -- resets
+                window.mergeDiscoveredDevices([]);                    // miss 1 again, not 2
+                window.renderDeviceDots();
+                const c = document.querySelector('#device-dots .device-chip');
+                return { known: c.classList.contains('chip-known') };
+            }""")
+            assert res["known"] is False
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_daemon_owned_device_exempt_from_scan_miss_downgrade():
+    # R47: an owned/streaming device intentionally doesn't advertise (it's
+    # connected, not idle) so a scan ALWAYS misses it -- that must never be
+    # read as "not in range".
+    pytest.importorskip("playwright.async_api")
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        browser, page = await _open(p)
+        try:
+            res = await page.evaluate("""() => {
+                window.DivoomState.discoveredDevices = [{
+                    address:'AA', name:'Ditoo', daemonOwned:true,
+                    activityKind:'music', activityState:'connected'}];
+                window.mergeDiscoveredDevices([]);
+                window.mergeDiscoveredDevices([]);
+                window.mergeDiscoveredDevices([]);
+                window.renderDeviceDots();
+                const c = document.querySelector('#device-dots .device-chip');
+                return { known: c.classList.contains('chip-known'),
+                         streaming: c.classList.contains('chip-streaming') };
+            }""")
+            assert res["known"] is False
+            assert res["streaming"] is True
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
 async def test_active_device_never_shows_not_in_range_even_if_unconfirmed():
     # A device can be BOTH the currently-connected/active one AND still
     # carry a stale unconfirmed flag (the confirming scan/activity update
