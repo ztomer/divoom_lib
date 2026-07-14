@@ -379,3 +379,40 @@ body.theme-light .arranger-node-image {
     justify-content: center;
     text-align: center;
 }
+
+/* ── Cloud clock-face list (Channel/GetDialType + GetDialList browser) ── */
+.cloud-clock-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.cloud-clock-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+.cloud-clock-name {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cloud-clock-apply-btn {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-primary, inherit);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+.cloud-clock-apply-btn:hover { border-color: var(--primary); color: var(--primary); }
+.cloud-clock-apply-btn:disabled { opacity: 0.5; cursor: default; }

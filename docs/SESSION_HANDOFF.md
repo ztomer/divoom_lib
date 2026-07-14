@@ -18,7 +18,52 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **2026-07-13 (later same day): user provided the decompiled APK**
+- **2026-07-13 (later same day, v0.22.13): the clock-face store actually
+  works now, and it's wired into the GUI.** Continues the entry directly
+  below (user provided the decompiled APK). First pass landed
+  `Channel/StoreClockGetClassify`/`GetList` — correct per the APK's own
+  request/response classes, but returned RC=12 live for an unresolved
+  reason. User: **"wire up to the gui what we know that works. try harder
+  to decompile the binary, search for references online."** Went deeper:
+  read the APK's smali directly for `BaseParams._postSync` (the JADX "not
+  decompiled" stub) and found it just calls `OkHttpUtils.postSyncInternal`
+  — which IS fully decompiled and confirms no hidden headers/signing beyond
+  `Connection: close`, ruling out a transport-level explanation. Then went
+  external: found `github.com/r12f/divoom` (independent, MIT, real working
+  Rust client) which documents `Channel/GetDialType` + `Channel/GetDialList`
+  as Divoom's **public, unauthenticated developer API**
+  (doc.divoom-gz.com/web/#/12?page_id=190) — not part of the phone app's own
+  `HttpCommand.java` catalog at all. Verified live immediately: real
+  category names (`Social`, `Normal`, `financial`, …) and real
+  `ClockId`/`Name` data, zero credentials needed. Replaced the abandoned
+  `StoreClockGet*` code entirely with this in `divoom_lib/cloud.py` +
+  `divoomd/src/cloud_category.rs` (parity, daemon-dispatch wired), verified
+  against a real running `divoomd` socket end-to-end (not just mocked).
+  **Then wired to the GUI**: found `display.show_clock(clock=clock_id)`
+  already routes large ids through `lan.set_clock()`
+  (`Channel/SetClockSelectId` to the device's own LAN IP) when the device
+  has WiFi — so no new device-apply plumbing was needed, just a picker UI.
+  Added a "Cloud Clock Faces" browser to the existing Clock channel panel:
+  category dropdown + list + Apply button, reusing the existing
+  `set_clock()` GUI API verbatim (`divoom_gui/clock_faces.py` backend,
+  `divoom_gui/web_ui/cloud_clock_faces.js` + `index.html` markup +
+  `style_extra.css`). Verified in a real headless-Chromium Playwright run
+  against the actual `index.html` (screenshots taken, visually confirmed
+  matches the app's existing design language) before writing 4 permanent
+  regression tests (`tests/test_e2e_clock_faces.py`): initial load without
+  a tab click (Clock panel is active by default — a real gap `showChannel
+  Panel()`'s click-only trigger would have missed), category switching, the
+  existing "connect a device first" guard, and Apply reaching `set_clock()`
+  with the correct `ClockId`. Also confirmed via `git stash` that an
+  unrelated pre-existing `names.forEach is not a function` console error
+  (from `scan_devices` in the Playwright mock harness) predates this work —
+  not something introduced here. Full suite 2740 passed / 97 skipped;
+  `cargo test` 106 passed. Version bumped 0.22.12 → 0.22.13; **not yet
+  released**. The other ~225 `HttpCommand.java` endpoints remain
+  unimplemented — ask is now "which ones matter for a real feature" rather
+  than "we don't know the shapes."
+
+- **2026-07-13 (earlier same day): user provided the decompiled APK**
   (`references/apk/decompiled_src/` — gitignored, exists on disk in the
   main checkout, not this worktree; readable directly by absolute path)
   in response to the Cloud HTTP "needs the user" ask below. Unblocked +
@@ -30,14 +75,10 @@ Claude) should read this on entry and **update it at the end of every round**
   `divoom_lib/cloud.py` + `divoomd/src/cloud_category.rs` (parity), tests
   updated (`tests/test_cloud.py`), `docs/ROADMAP.md`/`CHANGELOG.md`
   updated. Full suite 2734 passed / 97 skipped; `cargo test` 106 passed.
-  **Still open**: live round-trip against the corrected endpoint returns
-  RC=12 (`HTTP_REQUEST_EMPTY`) against the real server — reproduced with
-  both a real account and guest auth (ruled out as a token issue), root
-  cause not resolvable from the decompiled source (`BaseParams._postSync`,
-  the method that builds the actual POST, is a JADX "not decompiled"
-  stub). Not wired to any GUI action either way, so no regression risk.
-  The other ~225 `HttpCommand.java` endpoints remain unimplemented — ask
-  is now "which ones matter" rather than "we don't know the shapes."
+  **Superseded by the entry above**: live round-trip against this endpoint
+  returned RC=12 (`HTTP_REQUEST_EMPTY`) — reproduced with both a real
+  account and guest auth (ruled out as a token issue). Kept here for the
+  investigation trail; the code itself was replaced, not just the docs.
 
 - **2026-07-13 (this round): Python daemon server archived (v0.22.12,
   not yet released) + a "/loop non-user-dependent work" hardware pass.**

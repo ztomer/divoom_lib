@@ -4,6 +4,44 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.13 — real clock-face browser (Cloud HTTP unblocked by user-provided APK)
+
+Supersedes the v0.22.12 clock-face fix below: that round landed a
+*correctly-coded-but-unverified* replacement endpoint (`Channel/
+StoreClockGetClassify`/`GetList`) which turned out to return `RC=12` against
+the real server. This round found and shipped the actual working one.
+
+- **feat: real, working clock-face browser wired into the GUI.** User: "wire
+  up to the gui what we know that works. try harder to decompile the binary,
+  search for references online." Deeper investigation (APK smali +
+  `OkHttpUtils.postSyncInternal`, which confirmed no hidden headers/signing
+  the decompiled `_postSync` stub couldn't show) plus external research
+  turned up `Channel/GetDialType` + `Channel/GetDialList` — Divoom's
+  **public, unauthenticated developer API** (documented at doc.divoom-gz.com,
+  not in the phone app's own command catalog at all; cross-checked against
+  the independent `r12f/divoom` Rust crate on GitHub). Confirmed live: real
+  category names and clock data, zero credentials needed.
+  `divoom_lib/cloud.py` and `divoomd/src/cloud_category.rs` now implement
+  `get_dial_types`/`get_dial_list`/`list_clock_faces` against this endpoint
+  (replacing the abandoned `StoreClockGet*` attempt entirely), wired into
+  daemon command dispatch and verified end-to-end against a real running
+  `divoomd` socket, not just mocked.
+- **feat(gui): new "Cloud Clock Faces" browser in the Clock channel panel** —
+  pick a category, browse the list, Apply. No new device-apply plumbing
+  needed: `display.show_clock(clock=clock_id)` already routed large ids
+  through `lan.set_clock()` (`Channel/SetClockSelectId` to the device's own
+  LAN IP) when the device has WiFi, so Apply reuses the existing
+  `set_clock()` GUI API verbatim. New files: `divoom_gui/clock_faces.py`
+  (backend mixin), `divoom_gui/web_ui/cloud_clock_faces.js` (+ markup in
+  `index.html`, styling in `style_extra.css`). 4 new Playwright e2e tests
+  (`tests/test_e2e_clock_faces.py`) verified against the real `index.html`
+  in headless Chromium: initial load without a tab click (the Clock panel is
+  active by default), category switching, the existing "connect a device
+  first" guard, and Apply reaching `set_clock()` with the correct `ClockId`.
+
+Full suite: 2740 passed, 0 failed, 97 skipped. `cargo test` clean in
+`divoomd` (106 tests). `check_no_emoji.py`/`check_file_size.py` gates clean.
+
 ## v0.22.12 — Python daemon server archived; hardware verification round
 
 - **BREAKING (internal): `divoom_daemon/` is now client-library-only.**

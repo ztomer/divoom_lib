@@ -47,7 +47,7 @@ use crate::cloud_store::{load_cache, load_config, save_cache};
 // Cloud gallery / category / weather endpoints live in `cloud_category.rs` to
 // keep this file under the 500-line house limit.
 pub use crate::cloud_category::{
-    fetch_gallery, get_category_file_list, get_clock_classify_list, get_clock_list,
+    fetch_gallery, get_category_file_list, get_dial_list, get_dial_types,
     list_clock_faces, search_weather_city, DEFAULT_GALLERY_CLASSIFY,
 };
 

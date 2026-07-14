@@ -89,45 +89,58 @@ is the master list of all ~230 server command name constants; request/response
 field shapes live under `http/request/` and `http/response/`). This resolves
 the prior "next step needs the user" ask.
 
-**Concrete fix landed this round: the clock-face store was calling the wrong
-endpoint entirely.** `list_clock_faces()`/`CLOCK_FACE_CLASSIFY` previously
-called `GetCategoryFileListV2` with an assumed `Classify` value — confirmed
-via source to be the PIXEL-ART/monthly-best gallery endpoint (its only real
+**Clock-face store: fixed, working live, and wired into the GUI (2026-07-13).**
+`list_clock_faces()`/`CLOCK_FACE_CLASSIFY` originally called
+`GetCategoryFileListV2` with an assumed `Classify` value — confirmed via
+source to be the PIXEL-ART/monthly-best gallery endpoint (its only real
 callers are `CloudGalleriaFragment`/`CloudVerify*`/`FillGameModel`, none
-clock-related). The actual clock-face store is a dedicated two-call flow —
-`Channel/StoreClockGetClassify` (category list) then `Channel/StoreClockGetList`
-(clocks for one category id) — confirmed against
-`WifiChannelModel.java`'s `R()` method and the
-`MyClockStoreClockGet{Classify,List}{Request,Response}.java` field classes.
-Implemented in both `divoom_lib/cloud.py` (`get_clock_classify_list`/
-`get_clock_list`/`list_clock_faces`) and `divoomd/src/cloud_category.rs`
-(+ wired into `cloud_cmds.rs`/`daemon.rs` dispatch), with mocked-shape tests.
-**Still open**: a live round-trip against `Channel/StoreClockGetClassify`
-returns `RC=12` (`HTTP_REQUEST_EMPTY`) — reproduced with both a real logged-in
-account and guest auth (not a token problem; `GetCategoryFileListV2`/
-`Weather/SearchCity` both succeed with the same credentials in the same
-session), and `BaseParams._postSync` — the method that builds the actual
-generic POST — is a JADX "Method not decompiled" stub, so the exact wire gap
-can't be confirmed from source. The code is correct per the app's own
-request/response *classes*; end-to-end proof against the real server is
-unresolved (see the comment at `divoom_lib/cloud.py`'s clock-store section for
-the full writeup). Not wired to any GUI action either way (neither was the
-old, wrong version) — no user-visible regression risk either direction.
+clock-related). A phone-app-internal replacement,
+`Channel/StoreClockGetClassify` + `Channel/StoreClockGetList` (per
+`WifiChannelModel.java`'s `R()` method), was tried next and abandoned: it
+returns `RC=12` (`HTTP_REQUEST_EMPTY`) against the real server for a reason
+`BaseParams._postSync` (a JADX "not decompiled" stub) can't confirm from
+source — though `OkHttpUtils.postSyncInternal`, which it calls into, IS fully
+decompiled and confirms no hidden headers/signing, so the gap is specific to
+that endpoint's body/account requirements, not the transport.
 
-**The other ~225 endpoints**: still not implemented — the APK source removes
-the "we don't know the shapes" blocker, but implementing them blind, without a
-GUI hook or defined purpose, still isn't a good use of unattended effort (per
-the prior assessment). **Ask still open**: name which endpoints matter for a
-real feature (the `HttpCommand.java` catalog covers alarms, forum/social,
-messaging, playlists, sleep-aid sync, pomodoro/Tomato timers, calendar
-integrations, and more) and they can be implemented against real request
-shapes now, or point at a specific feature gap to close.
+The actual fix: `Channel/GetDialType` + `Channel/GetDialList`, Divoom's
+**public, unauthenticated developer API** (doc.divoom-gz.com/web/#/12?
+page_id=190 — not in `HttpCommand.java`'s phone-app-internal catalog at all;
+found via the independent `r12f/divoom` Rust crate on GitHub, which documents
+the same official page). **Confirmed live** — real category names and
+`ClockId`/`Name` data, no credentials needed. Implemented in
+`divoom_lib/cloud.py` (`get_dial_types`/`get_dial_list`/`list_clock_faces`)
+and `divoomd/src/cloud_category.rs` (parity, wired into `cloud_cmds.rs`/
+`daemon.rs` dispatch) — end-to-end-tested against the real daemon socket, not
+just mocked.
+
+**Wired into the GUI**: a new "Cloud Clock Faces" browser in the Clock channel
+panel (`divoom_gui/web_ui/cloud_clock_faces.js` + `index.html`, backend
+`divoom_gui/clock_faces.py`) — pick a category, browse the list, Apply. No
+new device-apply plumbing needed: `display.show_clock(clock=clock_id)`
+already routed large ids through `lan.set_clock()`
+(`Channel/SetClockSelectId` to the device's own LAN IP) when the device has
+WiFi connectivity, so Apply reuses the existing `set_clock()` API verbatim.
+4 new Playwright e2e tests (`tests/test_e2e_clock_faces.py`) cover: initial
+load without a tab click (the panel is active by default), switching
+categories, the existing "connect a device first" guard, and applying with
+the correct `ClockId` reaching `set_clock()`.
+
+**The other ~225 `HttpCommand.java` endpoints**: still not implemented — the
+APK source removes the "we don't know the shapes" blocker, but implementing
+them blind, without a GUI hook or defined purpose, still isn't a good use of
+unattended effort. **Ask still open**: name which endpoints matter for a real
+feature (alarms, forum/social, messaging, playlists, sleep-aid sync,
+pomodoro/Tomato timers, calendar integrations, and more) and they can be
+implemented against real request shapes now, or point at a specific feature
+gap to close.
 
 **Shipped (R61 + follow-up):**
 1. ~~Cloud auth broken (`RC=10`)~~ — fixed R61.
 2. `get_category_file_list`, `search_weather_city` — shipped, Python+Rust parity, tested.
-3. `get_clock_classify_list`/`get_clock_list`/`list_clock_faces` — corrected to the real clock-face-store endpoints (2026-07-13); live end-to-end unresolved (RC=12, see above).
+3. `get_dial_types`/`get_dial_list`/`list_clock_faces` — the real, working, public clock-face endpoints (2026-07-13); confirmed live and wired into the GUI's Clock channel panel.
 4. New transport: `divoom_lib/cloud.py` module (library was BLE-only + device LAN) — shipped.
+5. `search_weather_city` remains implemented but NOT GUI-wired — the weather widget uses system/OS location, not a Divoom device-weather-city search; wiring it needs a UX decision (what does picking a city actually do?) that wasn't made this round.
 
 ### Deferred (R12 §D)
 

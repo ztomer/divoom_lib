@@ -75,27 +75,27 @@ pub async fn handle(command: &str, req: &Request) -> Value {
             }
         }
 
-        "get_clock_classify_list" => match crate::cloud::get_clock_classify_list().await {
+        "get_dial_types" => match crate::cloud::get_dial_types().await {
             Ok(res) => json!({ "success": true, "result": res }),
             Err(e) => err_reply(&e),
         },
 
-        "get_clock_list" => {
-            let classify_id = match req.args.get("classify_id").and_then(|v| v.as_i64()) {
-                Some(c) => c,
-                None => return err_reply("get_clock_list requires 'classify_id'"),
+        "get_dial_list" => {
+            let dial_type = match req.args.get("dial_type").and_then(|v| v.as_str()) {
+                Some(t) => t.to_string(),
+                None => return err_reply("get_dial_list requires 'dial_type'"),
             };
-            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
-            match crate::cloud::get_clock_list(classify_id, 0, limit).await {
+            let page = req.args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+            match crate::cloud::get_dial_list(&dial_type, page).await {
                 Ok(res) => json!({ "success": true, "result": res }),
                 Err(e) => err_reply(&e),
             }
         }
 
         "list_clock_faces" => {
-            let classify_id = req.args.get("classify_id").and_then(|v| v.as_i64());
-            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
-            match crate::cloud::list_clock_faces(classify_id, limit).await {
+            let dial_type = req.args.get("dial_type").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let page = req.args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+            match crate::cloud::list_clock_faces(dial_type, page).await {
                 Ok(res) => json!({ "success": true, "result": res }),
                 Err(e) => err_reply(&e),
             }

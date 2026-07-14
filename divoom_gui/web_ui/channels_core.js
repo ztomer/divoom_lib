@@ -16,6 +16,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (channel === "design") {
             window.loadCustomArtCacheGrid();
         }
+        if (channel === "clock" && window.loadCloudClockTypes) {
+            window.loadCloudClockTypes();
+        }
     }
 
     channelCards.forEach(card => {

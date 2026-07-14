@@ -286,6 +286,15 @@
                                         <label class="form-label" style="margin-bottom: 0; font-size: 12px; font-weight: 600; color: var(--text-muted);">Clock Color:</label>
                                         <input type="color" id="clock-color-input" value="#ffffff" style="background: none; border: none; width: 44px; height: 28px; cursor: pointer; padding: 0;">
                                     </div>
+                                    <!-- Cloud clock-face store (Channel/GetDialType + GetDialList) — browse
+                                         Divoom's public catalog and apply an id via the same set_clock() path
+                                         used above. Requires the device to be on LAN (WiFi); over BLE-only the
+                                         device silently ignores an id outside its 16 built-in styles. -->
+                                    <div class="mt-6" style="padding-top: 16px; border-top: 1px solid var(--border-color);">
+                                        <div class="label-caption mb-12">Cloud Clock Faces <span class="text-12" style="color: var(--text-muted); font-weight: 400;">(requires device on WiFi)</span></div>
+                                        <select id="cloud-clock-type-select" class="custom-select small mb-12"></select>
+                                        <div id="cloud-clock-list" class="cloud-clock-list"></div>
+                                    </div>
                                 </div>
                                 <!-- Music EQ / visualizer patterns -->
                                 <div class="channel-panel" id="panel-visualizer">
@@ -569,6 +578,7 @@
     <script src="app_init.js"></script>
     <script src="channels_core.js"></script>
     <script src="channels_grids.js"></script>
+    <script src="cloud_clock_faces.js"></script>
     <script src="widgets.js"></script>
     <script src="widgets_tickers.js"></script>
     <script src="settings_hardware.js"></script>

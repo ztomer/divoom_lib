@@ -35,23 +35,17 @@ def _fake_post(path, body):
     if path == "Weather/SearchCity":
         assert body["Command"] == "Weather/SearchCity"
         return {"ReturnCode": 0, "CityList": [{"CityId": "NYC", "Name": "New York"}]}
-    if path == "Channel/StoreClockGetClassify":
-        assert body["Command"] == "Channel/StoreClockGetClassify"
+    if path == "Channel/GetDialType":
         return {
             "ReturnCode": 0,
-            "ClassifyList": [
-                {"ClassifyId": 1, "ClassifyName": "Popular"},
-                {"ClassifyId": 2, "ClassifyName": "New"},
-            ],
+            "DialTypeList": ["Social", "Normal", "financial"],
         }
-    if path == "Channel/StoreClockGetList":
-        assert body["Command"] == "Channel/StoreClockGetList"
+    if path == "Channel/GetDialList":
+        assert body["DialType"] in ("Social", "Normal", "financial")
         return {
             "ReturnCode": 0,
-            "ClockList": [
-                {"ClockId": 101, "ClockName": "Analog", "ClockType": 0,
-                 "ImagePixelId": "px1", "AddFlag": 0},
-            ],
+            "TotalNum": 1,
+            "DialList": [{"ClockId": 101, "Name": "Analog"}],
         }
     raise AssertionError(f"unexpected path {path}")
 
@@ -110,50 +104,52 @@ def test_category_file_list_shape_and_parse():
     assert req["StartNum"] == 1 and req["EndNum"] == 20  # page 1, limit 10 -> *2
 
 
-def test_get_clock_classify_list_shape():
-    c = _client()
+def test_get_dial_types_shape():
+    """Channel/GetDialType is unauthenticated -- no CloudClient needed at all."""
     with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
-        classifies = c.get_clock_classify_list()
-    assert classifies == [
-        {"ClassifyId": 1, "ClassifyName": "Popular"},
-        {"ClassifyId": 2, "ClassifyName": "New"},
-    ]
+        types = cloud.CloudClient().get_dial_types()
+    assert types == ["Social", "Normal", "financial"]
+    assert post.call_args_list[-1].args == (cloud.DIAL_TYPE_CMD, {})
+
+
+def test_get_dial_list_shape_and_params():
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        clocks = cloud.CloudClient().get_dial_list("Social", page=2)
+    assert clocks[0]["Name"] == "Analog"
     req = post.call_args_list[-1].args[1]
-    assert req["Command"] == cloud.CLOCK_CLASSIFY_CMD
+    assert req == {"DialType": "Social", "Page": 2}
 
 
-def test_get_clock_list_shape_and_params():
-    c = _client()
+def test_list_clock_faces_defaults_to_first_dial_type():
+    c = cloud.CloudClient()
     with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
-        clocks = c.get_clock_list(1, limit=10, page=2)
-    assert clocks[0]["ClockName"] == "Analog"
-    req = post.call_args_list[-1].args[1]
-    assert req["Command"] == cloud.CLOCK_LIST_CMD
-    assert req["ClassifyId"] == 1
-    assert req["Flag"] == 0
-    assert req["StartNum"] == 11 and req["EndNum"] == 20  # page 2, limit 10
-
-
-def test_list_clock_faces_defaults_to_first_classify():
-    """Mirrors the app's own default flow (WifiChannelModel.R() in the
-    decompiled APK): no classify_id given -> fetch the classify list, use
-    its first entry."""
-    c = _client()
-    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
-        clocks = c.list_clock_faces(limit=5)
-    assert clocks[0]["ClockName"] == "Analog"
-    calls = [c.args[0] for c in post.call_args_list]
-    assert calls == [cloud.CLOCK_CLASSIFY_CMD, cloud.CLOCK_LIST_CMD]
+        clocks = c.list_clock_faces()
+    assert clocks[0]["Name"] == "Analog"
+    calls = [call.args[0] for call in post.call_args_list]
+    assert calls == [cloud.DIAL_TYPE_CMD, cloud.DIAL_LIST_CMD]
     list_req = post.call_args_list[-1].args[1]
-    assert list_req["ClassifyId"] == 1  # first classify from the fake response
+    assert list_req["DialType"] == "Social"  # first type from the fake response
 
 
-def test_list_clock_faces_with_explicit_classify_id_skips_classify_call():
-    c = _client()
+def test_list_clock_faces_with_explicit_dial_type_skips_type_call():
+    c = cloud.CloudClient()
     with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
-        c.list_clock_faces(classify_id=2, limit=5)
-    calls = [c.args[0] for c in post.call_args_list]
-    assert calls == [cloud.CLOCK_LIST_CMD]
+        c.list_clock_faces(dial_type="financial")
+    calls = [call.args[0] for call in post.call_args_list]
+    assert calls == [cloud.DIAL_LIST_CMD]
+
+
+def test_get_dial_type_rc_nonzero_raises():
+    def fake_fail(path, body):
+        if path == "Channel/GetDialType":
+            return {"ReturnCode": 5, "ReturnMessage": "bad"}
+        raise AssertionError(path)
+    with patch.object(divoom_auth, "_post", side_effect=fake_fail):
+        try:
+            cloud.CloudClient().get_dial_types()
+            assert False, "expected RuntimeError"
+        except RuntimeError as e:
+            assert "RC=5" in str(e)
 
 
 def test_search_weather_city():

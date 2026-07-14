@@ -362,7 +362,7 @@ impl Daemon {
 
             "fetch_gallery" | "save_credentials" | "get_credentials"
             | "get_cached_credentials" | "get_category_file_list"
-            | "get_clock_classify_list" | "get_clock_list"
+            | "get_dial_types" | "get_dial_list"
             | "list_clock_faces" | "search_weather_city" => {
                 crate::cloud_cmds::handle(&req.command, &req).await
             }

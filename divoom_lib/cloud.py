@@ -8,9 +8,10 @@ Thin Python client mirroring ``divoomd/src/cloud.rs`` + the decompiled APK
     now requires ``Type``/``SubType``/``DeviceId``/``devicePassword`` on
     ``User/NewGuest``; we load those from the virtual-device file).
   * pixel-art gallery browse — ``GetCategoryFileListV2`` (monthly-best etc.).
-  * clock-face store — ``Channel/StoreClockGetClassify`` +
-    ``Channel/StoreClockGetList`` (a *different* endpoint pair from the
-    gallery above — see ``get_clock_classify_list``/``get_clock_list``).
+  * clock-face store — ``Channel/GetDialType`` + ``Channel/GetDialList``,
+    Divoom's public unauthenticated developer API (a *different* endpoint
+    pair from the phone-app-internal gallery above — see
+    ``get_dial_types``/``get_dial_list``).
   * weather-city search — ``Weather/SearchCity``.
 
 All network I/O goes through ``divoom_auth._post``; tests mock that single seam.
@@ -25,8 +26,8 @@ from divoom_lib import divoom_auth as _auth
 BASE_URL = "https://appin.divoom-gz.com"
 
 WEATHER_SEARCH_CMD = "Weather/SearchCity"
-CLOCK_CLASSIFY_CMD = "Channel/StoreClockGetClassify"
-CLOCK_LIST_CMD = "Channel/StoreClockGetList"
+DIAL_TYPE_CMD = "Channel/GetDialType"
+DIAL_LIST_CMD = "Channel/GetDialList"
 
 
 @dataclass
@@ -125,108 +126,65 @@ class CloudClient:
             )
         return data.get("FileList", data.get("List", []))
 
-    # ── clock-face store (Channel/StoreClockGetClassify + …GetList) ────────
+    # ── clock-face store (Channel/GetDialType + Channel/GetDialList) ───────
     #
-    # Confirmed against the decompiled APK 2026-07-13
-    # (references/apk/decompiled_src/sources/com/divoom/Divoom/view/fragment/
-    # channelWifi/model/WifiChannelModel.java, method R()): the clock-face
-    # store is NOT browsed via GetCategoryFileListV2 (that endpoint is the
-    # pixel-art/monthly-best gallery — confirmed by its own callers, all in
-    # CloudGalleriaFragment/CloudVerify*/FillGameModel, none clock-related).
-    # It's a dedicated two-call flow: fetch the classify (category) list,
-    # then fetch clocks for one classify id. The app's own default flow uses
-    # Flag=0 and the FIRST classify entry returned. Request/response field
-    # names below are taken verbatim from the APK's
-    # MyClockStoreClockGet{Classify,List}{Request,Response}.java classes.
+    # This is Divoom's PUBLIC developer API (doc.divoom-gz.com/web/#/12?
+    # page_id=190), not part of HttpCommand.java's phone-app-internal command
+    # catalog — confirmed live 2026-07-13 (real ClockId/Name data returned)
+    # and requires NO auth at all (no Token/UserId/DeviceId in the request).
+    # Field names/URL paths confirmed against the independent r12f/divoom
+    # Rust crate (github.com/r12f/divoom, MIT), which documents the same
+    # official doc.divoom-gz.com page as its source.
     #
-    # STILL OPEN: a live round-trip against Channel/StoreClockGetClassify
-    # returns RC=12 (HTTP_REQUEST_EMPTY, "request data is null") — reproduced
-    # 2026-07-13 with BOTH a real logged-in email account and guest auth (not
-    # a token/auth problem; GetCategoryFileListV2 and Weather/SearchCity both
-    # succeed with the same credentials in the same session). The decompiled
-    # `BaseParams._postSync` — the method that actually builds the generic
-    # HTTP POST all non-device-routed commands go through, including this one
-    # — is a JADX "Method not decompiled" stub, so the exact wire shape it
-    # sends can't be read from source. Every field on the app's own
-    # `BaseLoadMoreRequest`/`MyClockStoreClockGetListRequest` classes is
-    # already included here; the gap is something outside what those request
-    # classes describe (WHY WEATHER/SEARCHCITY WORKS shows it's not literally
-    # about the URL having a "/" in it or fields sent minimal, so it's a
-    # subtler per-endpoint requirement, e.g. the server-side handler for this
-    # specific command may still require an actual bound device — DeviceId=0
-    # was used in this test env, which has no real paired device). Code below
-    # is correct per the app's request/response CLASSES; end-to-end proof
-    # against the real server is unresolved.
+    # A phone-app-internal alternative, Channel/StoreClockGetClassify +
+    # Channel/StoreClockGetList (per HttpCommand.java + WifiChannelModel.java
+    # in the decompiled APK), was tried first and abandoned: it returns RC=12
+    # (HTTP_REQUEST_EMPTY) against the real server for a reason the
+    # decompiled source can't confirm (BaseParams._postSync, the method that
+    # builds the actual POST, is a JADX "not decompiled" stub; OkHttpUtils.
+    # postSyncInternal — which _postSync calls into — IS fully decompiled and
+    # confirms no hidden headers/signing beyond `Connection: close`, so the
+    # gap is specifically in that endpoint's expected body/account state, not
+    # the transport). Not worth chasing further now that a confirmed-working
+    # public alternative exists.
+    #
+    # Applying a selected ClockId to a device: ``divoom_lib.display.
+    # show_clock(clock=clock_id)`` already routes large ids through
+    # ``lan.set_clock()`` (``Channel/SetClockSelectId`` posted directly to
+    # the device's own LAN IP) when the device has LAN connectivity — no new
+    # device-apply plumbing needed.
 
-    def get_clock_classify_list(self) -> list[dict]:
-        """Fetch the clock-face store's category list (``ClassifyId``/``ClassifyName``)."""
-
-        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
-            body: dict[str, Any] = {
-                "Command": CLOCK_CLASSIFY_CMD,
-                "Token": creds.token,
-                "UserId": creds.user_id,
-                "DeviceId": self.device_id,
-                "StartNum": 1,
-                "EndNum": 30,
-            }
-            if self.device_pw:
-                body["DevicePassword"] = self.device_pw
-            return body
-
-        data = self._post_with_refresh(CLOCK_CLASSIFY_CMD, _body)
+    def get_dial_types(self) -> list[str]:
+        """Fetch the clock-face store's category names (``Channel/GetDialType``)."""
+        data = _auth._post(DIAL_TYPE_CMD, {})
         rc = data.get("ReturnCode", -1)
         if rc != 0:
             raise RuntimeError(
-                f"{CLOCK_CLASSIFY_CMD} failed: RC={rc} {data.get('ReturnMessage')}"
+                f"{DIAL_TYPE_CMD} failed: RC={rc} {data.get('ReturnMessage')}"
             )
-        return data.get("ClassifyList", [])
+        return data.get("DialTypeList", [])
 
-    def get_clock_list(
-        self, classify_id: int, *, flag: int = 0, limit: int = 30, page: int = 1
-    ) -> list[dict]:
-        """Fetch clock faces (``ClockId``/``ClockName``/``ImagePixelId``/…) for one classify id."""
-        start = (page - 1) * limit + 1
-        end = page * limit
-
-        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
-            body: dict[str, Any] = {
-                "Command": CLOCK_LIST_CMD,
-                "Token": creds.token,
-                "UserId": creds.user_id,
-                "DeviceId": self.device_id,
-                "ClassifyId": classify_id,
-                "Flag": flag,
-                "StartNum": start,
-                "EndNum": end,
-            }
-            if self.device_pw:
-                body["DevicePassword"] = self.device_pw
-            return body
-
-        data = self._post_with_refresh(CLOCK_LIST_CMD, _body)
+    def get_dial_list(self, dial_type: str, page: int = 1) -> list[dict]:
+        """Fetch clock faces (``ClockId``/``Name``) for one category name."""
+        data = _auth._post(DIAL_LIST_CMD, {"DialType": dial_type, "Page": page})
         rc = data.get("ReturnCode", -1)
         if rc != 0:
             raise RuntimeError(
-                f"{CLOCK_LIST_CMD} failed: RC={rc} {data.get('ReturnMessage')}"
+                f"{DIAL_LIST_CMD} failed: RC={rc} {data.get('ReturnMessage')}"
             )
-        return data.get("ClockList", [])
+        return data.get("DialList", [])
 
     def list_clock_faces(
-        self, classify_id: int | None = None, limit: int = 30
+        self, dial_type: str | None = None, page: int = 1
     ) -> list[dict]:
-        """Browse the cloud clock-face store.
-
-        Mirrors the app's own default flow: with no ``classify_id``, fetch
-        the classify list and use its first entry (same as
-        ``WifiChannelModel.R()`` in the decompiled APK).
-        """
-        if classify_id is None:
-            classifies = self.get_clock_classify_list()
-            if not classifies:
+        """Browse the cloud clock-face store. With no ``dial_type``, use the
+        first category from :meth:`get_dial_types`."""
+        if dial_type is None:
+            types = self.get_dial_types()
+            if not types:
                 return []
-            classify_id = classifies[0]["ClassifyId"]
-        return self.get_clock_list(classify_id, limit=limit)
+            dial_type = types[0]
+        return self.get_dial_list(dial_type, page=page)
 
     # ── weather city search ───────────────────────────────────────────────
 

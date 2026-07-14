@@ -12,6 +12,7 @@ from divoom_gui.media_sync import MediaSyncMixin
 from divoom_gui.scanner_mixin import ScannerMixin
 from divoom_gui.debug_mixin import DebugMixin
 from divoom_gui.lifecycle_mixin import LifecycleSettingsMixin
+from divoom_gui.clock_faces import ClockFacesMixin
 
 from divoom_gui.api import AsyncLoopThread
 from divoom_gui.api.connection import ConnectionApi
@@ -23,7 +24,7 @@ from divoom_gui.api.window import WindowApi
 logger = logging.getLogger("divoom_gui")
 
 class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin,
-                   LifecycleSettingsMixin):
+                   LifecycleSettingsMixin, ClockFacesMixin):
     """The PyWebView JS api bridge orchestrator."""
     def __init__(self) -> None:
         self.loop_thread = AsyncLoopThread()
