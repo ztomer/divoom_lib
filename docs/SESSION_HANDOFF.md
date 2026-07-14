@@ -18,7 +18,7 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
-- **2026-07-14 (Round 63 — gallery black-tile fix, UNRELEASED):** User bug —
+- **2026-07-14 (Round 63 — gallery black-tile fix, RELEASED v0.22.19):** User bug —
   "pixel art → gallery: items have names but most are empty / black
   placeholders." Root-caused by tracing the real render path end-to-end (real
   `DivoomGuiAPI` over the e2e HTTP bridge driving the real `web_ui` in headless
@@ -31,8 +31,11 @@ Claude) should read this on entry and **update it at the end of every round**
   drops a `.bin` that fails to decode **and re-downloads + decodes it in the
   same call**, so one fetch fully recovers every preview. 3 new unit tests in
   `test_gallery_sync_coverage.py`; gallery + media-decoder suites green (99
-  passed / 2 skipped). CHANGELOG updated. NOT committed/released — ask before
-  cutting a release.
+  passed / 2 skipped). CHANGELOG + version bumped to 0.22.19; **released**
+  (commit `eb7805c`, tag + GitHub release + Homebrew cask bump all live;
+  `main` pushed). The 500-LOC gate forced a split of the download/decode into
+  `divoom_gui/gallery_download.py` (`fetch_gallery_asset`);
+  `GallerySyncMixin._fetch_gallery_asset` now delegates to it.
 
 - **2026-07-14 (Round 62 — user bug batch, released): gallery cache-retry
   fix, hot-channel button fix, Sync Now feature, light-mode toast fix,
