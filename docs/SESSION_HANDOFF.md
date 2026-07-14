@@ -18,6 +18,20 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-13: v0.22.13 RELEASED** (user: "commit, push a releash, tell me
+  what's left"). Branch `claude/determined-curran-400d36` was a clean
+  fast-forward of `origin/main` (0 behind, 3 ahead) — pushed directly to
+  `main`, then `scripts/release.sh` (symlinked `.buildvenv` from the main
+  checkout into this worktree, since worktrees don't share it): DMG built,
+  tag `v0.22.13` pushed, GitHub release published
+  (https://github.com/ztomer/divoom_lib/releases/tag/v0.22.13), Homebrew cask
+  bumped + verified (`version "0.22.13"`, sha256 matches the uploaded DMG).
+  Covers the daemon archival (v0.22.12) + the clock-face store fix (v0.22.13)
+  in one release. Remaining open items are listed in `docs/ROADMAP.md`'s
+  "Open workstreams" — all either DONE, user-driven (R12 visual pass/hardware
+  verification), or blocked on user input (Cloud HTTP endpoint priorities,
+  weather-city-search UX decision).
+
 - **2026-07-13 (later same day, v0.22.13): the clock-face store actually
   works now, and it's wired into the GUI.** Continues the entry directly
   below (user provided the decompiled APK). First pass landed
