@@ -249,6 +249,32 @@ class LanTransport:
         return await self.post("Channel/SetClockSelectId", {"ClockId": clock_id})
 
     @via(Transport.LAN)
+    async def send_playlist(self, play_id: int) -> dict:
+        """
+        Push a cloud-hosted playlist's contents to this device.
+
+        Transport:  LAN
+
+        Confirmed live caller in the decompiled Divoom app
+        (``PlayListModel.b()``), which POSTs ``{"PlayId": play_id}`` to
+        ``Playlist/SendDevice`` — listed in the app's own
+        ``HttpCommand.DeviceAndServerCmd`` array, meaning the app treats
+        it as a combined device+server command rather than a pure cloud
+        call, same as ``Channel/SetClockSelectId``. See
+        ``divoom_lib.cloud.CloudClient.get_my_playlists`` /
+        ``get_playlist_images`` to find a ``play_id``.
+
+        Args:
+            play_id: The playlist's ``PlayId`` (from
+                ``CloudClient.get_my_playlists``).
+
+        Usage::
+
+            await lan.send_playlist(42)
+        """
+        return await self.post("Playlist/SendDevice", {"PlayId": play_id})
+
+    @via(Transport.LAN)
     async def on_off_screen(self, on_off: int) -> dict:
         """
         Turn the screen on (1) or off (0).

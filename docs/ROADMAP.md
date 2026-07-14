@@ -147,6 +147,37 @@ or defined purpose, still isn't a good use of unattended effort. **Ask still
 open**: pick one of the three leads, or name a different endpoint/feature to
 prioritize, and it can be implemented against real request shapes now.
 
+**Playlist browse+push: DONE, live, wired into the GUI (2026-07-14).**
+`Playlist/GetMyList`/`Playlist/GetMyImageList` confirmed RC=0 against a real
+account (`divoom_lib/cloud.py`'s `get_my_playlists`/`get_playlist_images`,
+Rust parity in `cloud_category.rs`). Push reuses the existing LAN transport
+— `Playlist/SendDevice` is in `HttpCommand.java`'s `DeviceAndServerCmd`
+array, so it's a local-device-HTTP-only call, not cloud
+(`lan_transport.py`'s `send_playlist`, Rust `device_call`'s
+`lan.send_playlist`). New "Playlists" sub-tab in the Pixel Art panel
+(`templates_pixel_art.js`, `divoom_gui/web_ui/playlists.js`, backend
+`divoom_gui/playlists.py` + `LightingApi.push_playlist`) — browse, Push.
+Reused the clock-face browser's list-row/Apply-button CSS verbatim (no new
+markup). 3 new Playwright e2e tests (`tests/test_e2e_playlists.py`) mirror
+`test_e2e_clock_faces.py`.
+
+**AidSleep: BLE commands implemented, cloud browse NOT confirmed working
+(2026-07-14).** `divoom_lib/tools/aid_sleep.py` — play/add/delete/exit reuse
+the project's existing SPP_JSON BLE framing unchanged (confirmed via a
+dedicated research pass reading the APK smali + Java against
+`divoom_lib/framing.py`: identical to `bluetooth.q#B()`, command_id=1, JSON
+payload). But `AidSleep/GetAllList`/`GetMyList` (the browse half) returns
+`RC=3` ("Request data is incomplete") with every request-field permutation
+tried (guest creds, real forced-login, `Language`/`CountryISOCode` added,
+`DevicePassword=0` explicit) — same unresolved-server-side-validation shape
+as the earlier `Channel/StoreClockGetClassify` RC=12 case above. Documented
+honestly in `cloud.py`/`cloud_category.rs`; per the project's "honest
+placeholders" rule, intentionally **not** wired into the GUI — a browse UI
+for a call that doesn't work live would ship a broken feature.
+
+`Cloud/ToDevice` remains unimplemented — unconfirmed semantics, lower
+priority, not picked up this round.
+
 **Shipped (R61 + follow-up):**
 1. ~~Cloud auth broken (`RC=10`)~~ — fixed R61.
 2. `get_category_file_list`, `search_weather_city` — shipped, Python+Rust parity, tested.

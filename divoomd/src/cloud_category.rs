@@ -222,6 +222,88 @@ pub async fn search_weather_city(keyword: &str) -> Result<Value, String> {
 // needed on the Rust side either (the daemon's `display.show_clock` device
 // call already exists).
 
+// ── AidSleep cloud sound library (natural sounds / white noise / music) ────
+//
+// Request shape confirmed from the decompiled APK 2026-07-14 (docs/cloud_api/
+// tomato_sleep_alarm.md), filtered by `Type` (0=Natural Sound, 1=White
+// Noise, 2=Music). Playback needs no cloud call at all — it's a BLE/SPP
+// JSON command straight to the device (Python side: `divoom_lib.tools.
+// aid_sleep.AidSleep.play`); there is no Rust-daemon equivalent to add here
+// since the daemon doesn't own a JSON-over-BLE send path for this command
+// family yet.
+//
+// STILL OPEN (mirrors divoom_lib/cloud.py's comment): a live round-trip
+// against AidSleep/GetAllList returns RC=3 ("request data is incomplete")
+// with a real logged-in account and every field the decompiled request
+// class declares — unlike the sibling Playlist/GetMyList call, confirmed
+// working live with an identical auth/field pattern. Code here is correct
+// per the app's own request CLASS; not confirmed working end-to-end.
+
+async fn get_aid_sleep_list(cmd: &str, sleep_type: i64, limit: i64, page: i64) -> Result<Value, String> {
+    let mut creds = get_credentials(false).await?;
+    let (device_id, device_pw, _, _) = load_virtual_device();
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(TIMEOUT_SECS))
+        .user_agent("okhttp/4.12.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let start = (page - 1) * limit + 1;
+    let end = page * limit;
+    let make_request = |creds: &DivoomCredentials| -> Value {
+        let mut body = json!({
+            "Command": cmd,
+            "Token": creds.token,
+            "UserId": creds.user_id,
+            "DeviceId": device_id,
+            "Type": sleep_type,
+            "StartNum": start,
+            "EndNum": end,
+        });
+        if device_pw != 0 {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("DevicePassword".to_string(), json!(device_pw));
+            }
+        }
+        body
+    };
+
+    let url = format!("{}/{}", BASE_URL, cmd);
+    let mut req_body = make_request(&creds);
+    let mut resp = client.post(&url).json(&req_body).send().await
+        .map_err(|e| e.to_string())?;
+    let mut data: Value = resp.json().await.map_err(|e| e.to_string())?;
+    let mut rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+
+    if rc == 9 || rc == 10 || rc == 11 {
+        creds = get_credentials(true).await?;
+        req_body = make_request(&creds);
+        resp = client.post(&url).json(&req_body).send().await
+            .map_err(|e| e.to_string())?;
+        data = resp.json().await.map_err(|e| e.to_string())?;
+        rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+    }
+
+    if rc != 0 {
+        let msg = data.get("ReturnMessage").and_then(|v| v.as_str()).unwrap_or("Unknown cloud error");
+        return Err(format!("{cmd} failed (RC={rc}): {msg}"));
+    }
+    Ok(data.get("SleepList").cloned().unwrap_or(Value::Array(vec![])))
+}
+
+/// Browse Divoom's full cloud AidSleep catalog. `sleep_type`: 0=Natural
+/// Sound, 1=White Noise, 2=Music.
+pub async fn fetch_aid_sleep_list(sleep_type: i64, limit: i64, page: i64) -> Result<Value, String> {
+    get_aid_sleep_list("AidSleep/GetAllList", sleep_type, limit, page).await
+}
+
+/// Same shape as `fetch_aid_sleep_list`, scoped to the user's own
+/// saved/added tracks.
+pub async fn fetch_my_aid_sleep_list(sleep_type: i64, limit: i64, page: i64) -> Result<Value, String> {
+    get_aid_sleep_list("AidSleep/GetMyList", sleep_type, limit, page).await
+}
+
 /// Fetch the clock-face store's category names (`Channel/GetDialType`).
 pub async fn get_dial_types() -> Result<Value, String> {
     let client = reqwest::Client::builder()
@@ -279,4 +361,123 @@ pub async fn list_clock_faces(dial_type: Option<String>, page: i64) -> Result<Va
         }
     };
     get_dial_list(&dial_type, page).await
+}
+
+// ── Playlist browse + push to device ────────────────────────────────────
+//
+// Confirmed LIVE working 2026-07-14 (real logged-in account, RC=0). Pushing
+// a playlist to the connected device is NOT a cloud call — see
+// `device_call::mod::lan.send_playlist` (`Playlist/SendDevice` posted
+// directly to the device's own LAN IP, same mechanism as `lan.set_clock`).
+
+/// List the current user's cloud-hosted playlists (`PlayId`/`Name`/`Count`/…).
+pub async fn get_my_playlists(limit: i64, page: i64) -> Result<Value, String> {
+    let mut creds = get_credentials(false).await?;
+    let (device_id, device_pw, _, _) = load_virtual_device();
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(TIMEOUT_SECS))
+        .user_agent("okhttp/4.12.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let start = (page - 1) * limit + 1;
+    let end = page * limit;
+    let make_request = |creds: &DivoomCredentials| -> Value {
+        let mut body = json!({
+            "Command": "Playlist/GetMyList",
+            "Token": creds.token,
+            "UserId": creds.user_id,
+            "DeviceId": device_id,
+            "StartNum": start,
+            "EndNum": end,
+        });
+        if device_pw != 0 {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("DevicePassword".to_string(), json!(device_pw));
+            }
+        }
+        body
+    };
+
+    let url = format!("{}/Playlist/GetMyList", BASE_URL);
+    let mut req_body = make_request(&creds);
+    let mut resp = client.post(&url).json(&req_body).send().await
+        .map_err(|e| e.to_string())?;
+    let mut data: Value = resp.json().await.map_err(|e| e.to_string())?;
+    let mut rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+
+    if rc == 9 || rc == 10 || rc == 11 {
+        creds = get_credentials(true).await?;
+        req_body = make_request(&creds);
+        resp = client.post(&url).json(&req_body).send().await
+            .map_err(|e| e.to_string())?;
+        data = resp.json().await.map_err(|e| e.to_string())?;
+        rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+    }
+
+    if rc != 0 {
+        let msg = data.get("ReturnMessage").and_then(|v| v.as_str()).unwrap_or("Unknown cloud error");
+        return Err(format!("Playlist/GetMyList failed (RC={rc}): {msg}"));
+    }
+    Ok(data.get("PlayList").cloned().unwrap_or(Value::Array(vec![])))
+}
+
+/// List the images/animations inside one of the user's own playlists.
+pub async fn get_playlist_images(play_id: i64, limit: i64, page: i64) -> Result<Value, String> {
+    let mut creds = get_credentials(false).await?;
+    let (device_id, device_pw, _, _) = load_virtual_device();
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(TIMEOUT_SECS))
+        .user_agent("okhttp/4.12.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let start = (page - 1) * limit + 1;
+    let end = page * limit * 2;
+    let make_request = |creds: &DivoomCredentials| -> Value {
+        let mut body = json!({
+            "Command": "Playlist/GetMyImageList",
+            "Token": creds.token,
+            "UserId": creds.user_id,
+            "DeviceId": device_id,
+            "PlayId": play_id,
+            "FileSort": 0,
+            "FileType": 5,
+            "FileSize": 0,
+            "Version": 19,
+            "StartNum": start,
+            "EndNum": end,
+            "RefreshIndex": 0,
+        });
+        if device_pw != 0 {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("DevicePassword".to_string(), json!(device_pw));
+            }
+        }
+        body
+    };
+
+    let url = format!("{}/Playlist/GetMyImageList", BASE_URL);
+    let mut req_body = make_request(&creds);
+    let mut resp = client.post(&url).json(&req_body).send().await
+        .map_err(|e| e.to_string())?;
+    let mut data: Value = resp.json().await.map_err(|e| e.to_string())?;
+    let mut rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+
+    if rc == 9 || rc == 10 || rc == 11 {
+        creds = get_credentials(true).await?;
+        req_body = make_request(&creds);
+        resp = client.post(&url).json(&req_body).send().await
+            .map_err(|e| e.to_string())?;
+        data = resp.json().await.map_err(|e| e.to_string())?;
+        rc = data.get("ReturnCode").and_then(|v| v.as_i64()).unwrap_or(-1);
+    }
+
+    if rc != 0 {
+        let msg = data.get("ReturnMessage").and_then(|v| v.as_str()).unwrap_or("Unknown cloud error");
+        return Err(format!("Playlist/GetMyImageList failed (RC={rc}): {msg}"));
+    }
+    Ok(data.get("FileList").cloned().unwrap_or(Value::Array(vec![])))
 }

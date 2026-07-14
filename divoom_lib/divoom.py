@@ -29,6 +29,7 @@ from .tools.countdown import Countdown
 from .tools.noise import Noise
 from .tools.notification import Notification
 from .tools.hot_update import HotUpdate
+from .tools.aid_sleep import AidSleep
 from .display import Display
 from .display.design import Design
 from .system import System
@@ -119,6 +120,7 @@ class Divoom:
         self.noise = Noise(self)
         self.notification = Notification(self)
         self.hot_update = HotUpdate(self)
+        self.aid_sleep = AidSleep(self)
 
         self.display = Display(self)
         self.system = System(self)

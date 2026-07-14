@@ -4,6 +4,40 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.15 — Playlist browse+push (live, wired end-to-end); AidSleep backend (RC=3, not wired)
+
+Implements 2 of the 3 candidate features surfaced by the Cloud API catalog
+(v0.22.14): `Playlist/GetMyList` + `Playlist/SendDevice` end-to-end, and the
+`AidSleep` BLE-JSON play/add/delete/exit commands.
+
+- **feat: cloud playlist browse + push, fully wired into the GUI.** New
+  "Playlists" sub-tab in the Pixel Art panel (`templates_pixel_art.js`,
+  `playlists.js`) lists the user's cloud-hosted playlists
+  (`divoom_lib/cloud.py`'s `get_my_playlists`/`get_playlist_images`, both
+  confirmed live RC=0) and pushes one to the device over the existing LAN
+  transport (`Playlist/SendDevice` — `lan_transport.py`'s `send_playlist`,
+  Rust `device_call`'s `lan.send_playlist`). Reuses the clock-face browser's
+  proven list-row/Apply-button pattern (`cloud-clock-list`/`cloud-clock-row`
+  CSS) rather than inventing new markup. 3 new Playwright e2e tests
+  (`test_e2e_playlists.py`) mirror `test_e2e_clock_faces.py`'s coverage:
+  initial load, "connect a device first" guard, and Apply reaching
+  `push_playlist` with the real `PlayId`.
+- **feat(daemon): AidSleep BLE commands (play/add/delete/exit) — backend
+  only, not wired into the GUI.** `divoom_lib/tools/aid_sleep.py` reuses the
+  project's existing SPP_JSON BLE framing (`framing.py`) unchanged — the
+  wire mechanism is confirmed to match the decompiled APK's
+  `bluetooth.q#B()` exactly (command_id=1, JSON payload). The cloud browse
+  half (`AidSleep/GetAllList`/`GetMyList`) reproducibly returns RC=3
+  ("Request data is incomplete") with every request-field permutation tried
+  against a real account — same shape as the earlier `Channel/
+  StoreClockGetClassify` RC=12 mystery. Documented honestly in both
+  `cloud.py` and `cloud_category.rs`; intentionally NOT surfaced in the GUI
+  per the project's "honest placeholders" rule (no browse UI for a call that
+  doesn't work live).
+
+Full suite: 2756 passed, 0 failed, 97 skipped. `cargo test` clean in
+`divoomd`. `check_no_emoji.py`/`check_file_size.py` gates clean.
+
 ## v0.22.14 — R12 visual pass (Gemini-verified), Cloud API catalog, file split
 
 - **style: R12 visual pass, verified via a real Gemini design critique.**

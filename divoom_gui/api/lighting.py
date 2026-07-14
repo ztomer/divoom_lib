@@ -236,6 +236,23 @@ class LightingApi(ApiBase):
             logger.error(f"Rich clock failed: {e}")
             return False
 
+    def push_playlist(self, play_id: int) -> bool:
+        """Push a cloud playlist to the device (Playlist/SendDevice, LAN-only —
+        see divoom_lib/lan_transport.py). Not meaningful on a Virtual Wall
+        (the playlist targets one device's own local slideshow, not a
+        composite image), so that target mode is rejected up front."""
+        logger.info(f"GUI Action: Pushing playlist {play_id} to device...")
+        if self._current_target_mode == "wall":
+            logger.warning("Playlist push is not supported on a Virtual Wall target")
+            return False
+        self._stop_live_widgets()
+        try:
+            val = int(play_id)
+            return self._dispatch(lambda t: t.lan.send_playlist(val))
+        except Exception as e:
+            logger.error(f"Playlist push failed: {e}")
+            return False
+
     def display_custom_art(self, file_path: str) -> bool:
         logger.info(f"GUI Action: Pushing custom art {file_path!r}...")
         try:

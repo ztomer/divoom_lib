@@ -28,6 +28,16 @@ window.DivoomTemplates.pixelArt = `                <div class="tabs-section" sty
                         </svg>
                         <span>Hot Channel</span>
                     </button>
+                    <button class="tab-btn" data-pixel-tab="pixel-playlists" role="tab" aria-selected="false">
+                        <svg class="kare-icon tab-icon" viewBox="0 0 16 16" aria-hidden="true">
+                            <rect x="1" y="2" width="9" height="2"/>
+                            <rect x="1" y="7" width="9" height="2"/>
+                            <rect x="1" y="12" width="6" height="2"/>
+                            <circle cx="13" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                            <path d="M14,12 L14,3 L15,3.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                        <span>Playlists</span>
+                    </button>
                 </div>
                 </div>
 
@@ -134,6 +144,18 @@ window.DivoomTemplates.pixelArt = `                <div class="tabs-section" sty
                                          "up to date" verdict is dated, not blind. -->
                                     <div id="hot-last-checked" class="hot-last-checked"></div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PLAYLISTS sub-tab -->
+                <div class="pixel-subtab-content" id="pixel-playlists">
+                    <div class="hot-channel-layout">
+                        <div class="card glass-card" style="height: 100%;">
+                            <div class="card-body">
+                                <p class="panel-hint">Cloud-hosted playlists from your Divoom account. Push one to replace the device's local slideshow.</p>
+                                <div id="cloud-playlist-list" class="cloud-clock-list"></div>
                             </div>
                         </div>
                     </div>

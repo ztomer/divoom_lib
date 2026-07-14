@@ -28,6 +28,10 @@ BASE_URL = "https://appin.divoom-gz.com"
 WEATHER_SEARCH_CMD = "Weather/SearchCity"
 DIAL_TYPE_CMD = "Channel/GetDialType"
 DIAL_LIST_CMD = "Channel/GetDialList"
+AID_SLEEP_GET_ALL_CMD = "AidSleep/GetAllList"
+AID_SLEEP_GET_MY_CMD = "AidSleep/GetMyList"
+PLAYLIST_GET_MY_LIST_CMD = "Playlist/GetMyList"
+PLAYLIST_GET_MY_IMAGE_LIST_CMD = "Playlist/GetMyImageList"
 
 
 @dataclass
@@ -185,6 +189,148 @@ class CloudClient:
                 return []
             dial_type = types[0]
         return self.get_dial_list(dial_type, page=page)
+
+    # ── AidSleep cloud sound library (natural sounds / white noise / music) ─
+    #
+    # Request shape confirmed from the decompiled APK 2026-07-14 (docs/
+    # cloud_api/tomato_sleep_alarm.md; AidSleepGetAllListRequest extends
+    # BaseLoadMoreRequest + Type). Playback of a chosen ``SleepId`` needs no
+    # cloud call at all — see ``divoom_lib.tools.aid_sleep.AidSleep.play``
+    # (BLE/SPP JSON command straight to the device, same pattern as the
+    # clock-face store's ``show_clock`` apply step).
+    #
+    # STILL OPEN: a live round-trip against AidSleep/GetAllList
+    # returns RC=3 (HTTP_REGISTER_ERROR2, "request data is incomplete") —
+    # reproduced 2026-07-14 with a real logged-in account (not a guest/auth
+    # issue), with every field the decompiled request class declares
+    # (including BaseLoadMoreRequest's Language/CountryISOCode) and with
+    # DevicePassword explicitly set to 0. This mirrors the earlier
+    # Channel/StoreClockGetClassify RC=12 finding: the code here is correct
+    # per the app's own request CLASS, but something about this endpoint's
+    # server-side validation isn't satisfied by that shape alone (unlike
+    # the sibling Playlist/GetMyList call below, confirmed working live with
+    # the identical auth/field pattern). Not resolved — needs either a real
+    # bound device or further investigation before treating this as a
+    # working feature.
+
+    def _get_aid_sleep_list(
+        self, cmd: str, sleep_type: int, *, limit: int = 30, page: int = 1
+    ) -> list[dict]:
+        start = (page - 1) * limit + 1
+        end = page * limit
+
+        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "Command": cmd,
+                "Token": creds.token,
+                "UserId": creds.user_id,
+                "DeviceId": self.device_id,
+                "Type": sleep_type,
+                "StartNum": start,
+                "EndNum": end,
+            }
+            if self.device_pw:
+                body["DevicePassword"] = self.device_pw
+            return body
+
+        data = self._post_with_refresh(cmd, _body)
+        rc = data.get("ReturnCode", -1)
+        if rc != 0:
+            raise RuntimeError(f"{cmd} failed: RC={rc} {data.get('ReturnMessage')}")
+        return data.get("SleepList", [])
+
+    def get_aid_sleep_list(
+        self, sleep_type: int, *, limit: int = 30, page: int = 1
+    ) -> list[dict]:
+        """Browse Divoom's full cloud AidSleep catalog.
+
+        Args:
+            sleep_type: 0=Natural Sound, 1=White Noise, 2=Music.
+        """
+        return self._get_aid_sleep_list(
+            AID_SLEEP_GET_ALL_CMD, sleep_type, limit=limit, page=page)
+
+    def get_my_aid_sleep_list(
+        self, sleep_type: int, *, limit: int = 30, page: int = 1
+    ) -> list[dict]:
+        """Same shape as :meth:`get_aid_sleep_list`, scoped to the user's own
+        saved/added tracks."""
+        return self._get_aid_sleep_list(
+            AID_SLEEP_GET_MY_CMD, sleep_type, limit=limit, page=page)
+
+    # ── Playlist browse + push to device ────────────────────────────────────
+    #
+    # Confirmed LIVE working 2026-07-14 (real logged-in account, RC=0 both
+    # calls — an empty PlayList/FileList is this account genuinely having no
+    # playlists, not a request-shape failure). Request shapes confirmed
+    # against the decompiled APK (docs/cloud_api/playlist_voice_timeplan.md):
+    # ``Playlist/GetMyList`` (paginated, ``BaseLoadMoreRequest``) then
+    # ``Playlist/GetMyImageList`` (``PlayId`` + the same ``GetCloudBaseRequestV2``
+    # shape ``GetCategoryFileListV2`` already uses). Pushing a playlist to
+    # the connected device is NOT a cloud call — see
+    # ``divoom_lib.lan_transport.LanTransport.send_playlist`` (confirmed live
+    # caller in the decompiled app, ``PlayListModel.b()``, POSTs ``{PlayId}``
+    # to the device's own local LAN endpoint, same mechanism as
+    # ``set_clock``).
+
+    def get_my_playlists(self, *, limit: int = 30, page: int = 1) -> list[dict]:
+        """List the current user's cloud-hosted playlists (``PlayId``/``Name``/
+        ``Count``/``CoverFileId``/…)."""
+        start = (page - 1) * limit + 1
+        end = page * limit
+
+        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "Command": PLAYLIST_GET_MY_LIST_CMD,
+                "Token": creds.token,
+                "UserId": creds.user_id,
+                "DeviceId": self.device_id,
+                "StartNum": start,
+                "EndNum": end,
+            }
+            if self.device_pw:
+                body["DevicePassword"] = self.device_pw
+            return body
+
+        data = self._post_with_refresh(PLAYLIST_GET_MY_LIST_CMD, _body)
+        rc = data.get("ReturnCode", -1)
+        if rc != 0:
+            raise RuntimeError(
+                f"{PLAYLIST_GET_MY_LIST_CMD} failed: RC={rc} {data.get('ReturnMessage')}")
+        return data.get("PlayList", [])
+
+    def get_playlist_images(
+        self, play_id: int, *, limit: int = 30, page: int = 1
+    ) -> list[dict]:
+        """List the images/animations inside one of the user's own playlists."""
+        start = (page - 1) * limit + 1
+        end = page * limit * 2
+
+        def _body(creds: _auth.DivoomCredentials) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "Command": PLAYLIST_GET_MY_IMAGE_LIST_CMD,
+                "Token": creds.token,
+                "UserId": creds.user_id,
+                "DeviceId": self.device_id,
+                "PlayId": play_id,
+                "FileSort": 0,
+                "FileType": 5,
+                "FileSize": 0,
+                "Version": 19,
+                "StartNum": start,
+                "EndNum": end,
+                "RefreshIndex": 0,
+            }
+            if self.device_pw:
+                body["DevicePassword"] = self.device_pw
+            return body
+
+        data = self._post_with_refresh(PLAYLIST_GET_MY_IMAGE_LIST_CMD, _body)
+        rc = data.get("ReturnCode", -1)
+        if rc != 0:
+            raise RuntimeError(
+                f"{PLAYLIST_GET_MY_IMAGE_LIST_CMD} failed: RC={rc} {data.get('ReturnMessage')}")
+        return data.get("FileList", [])
 
     # ── weather city search ───────────────────────────────────────────────
 

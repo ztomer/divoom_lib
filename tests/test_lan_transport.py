@@ -212,6 +212,10 @@ class TestLanTransportCommandWrappers(unittest.IsolatedAsyncioTestCase):
         await self.lan.set_clock(182)
         self.lan.post.assert_called_once_with("Channel/SetClockSelectId", {"ClockId": 182})
 
+    async def test_send_playlist(self):
+        await self.lan.send_playlist(42)
+        self.lan.post.assert_called_once_with("Playlist/SendDevice", {"PlayId": 42})
+
     async def test_on_off_screen(self):
         await self.lan.on_off_screen(0)
         self.lan.post.assert_called_once_with("Channel/OnOffScreen", {"OnOff": 0})

@@ -109,6 +109,46 @@ pub async fn handle(command: &str, req: &Request) -> Value {
             }
         }
 
+        "get_aid_sleep_list" | "get_my_aid_sleep_list" => {
+            let sleep_type = match req.args.get("sleep_type").and_then(|v| v.as_i64()) {
+                Some(t) => t,
+                None => return err_reply(&format!("{command} requires 'sleep_type'")),
+            };
+            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
+            let page = req.args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+            let result = if command == "get_aid_sleep_list" {
+                crate::cloud::fetch_aid_sleep_list(sleep_type, limit, page).await
+            } else {
+                crate::cloud::fetch_my_aid_sleep_list(sleep_type, limit, page).await
+            };
+            match result {
+                Ok(res) => json!({ "success": true, "result": res }),
+                Err(e) => err_reply(&e),
+            }
+        }
+
+        "get_my_playlists" => {
+            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
+            let page = req.args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+            match crate::cloud::get_my_playlists(limit, page).await {
+                Ok(res) => json!({ "success": true, "result": res }),
+                Err(e) => err_reply(&e),
+            }
+        }
+
+        "get_playlist_images" => {
+            let play_id = match req.args.get("play_id").and_then(|v| v.as_i64()) {
+                Some(id) => id,
+                None => return err_reply("get_playlist_images requires 'play_id'"),
+            };
+            let limit = req.args.get("limit").and_then(|v| v.as_i64()).unwrap_or(30);
+            let page = req.args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+            match crate::cloud::get_playlist_images(play_id, limit, page).await {
+                Ok(res) => json!({ "success": true, "result": res }),
+                Err(e) => err_reply(&e),
+            }
+        }
+
         other => err_reply(&format!("not a cloud command: {other}")),
     }
 }

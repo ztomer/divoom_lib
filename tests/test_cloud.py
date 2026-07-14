@@ -47,6 +47,32 @@ def _fake_post(path, body):
             "TotalNum": 1,
             "DialList": [{"ClockId": 101, "Name": "Analog"}],
         }
+    if path in ("AidSleep/GetAllList", "AidSleep/GetMyList"):
+        assert body["Command"] == path
+        assert "Type" in body
+        return {
+            "ReturnCode": 0,
+            "SleepList": [
+                {"SleepId": 7, "Name": "Rain", "FileId": "f1", "Language": "en",
+                 "AudioType": 0, "VideoType": 0, "AddFlag": 0},
+            ],
+        }
+    if path == "Playlist/GetMyList":
+        assert body["Command"] == path
+        return {
+            "ReturnCode": 0,
+            "PlayList": [
+                {"PlayId": 42, "Name": "Chill", "Count": 3, "CoverFileId": "c1",
+                 "Describe": "", "HideFlag": 0, "AddFlag": 0},
+            ],
+        }
+    if path == "Playlist/GetMyImageList":
+        assert body["Command"] == path
+        assert body["PlayId"] == 42
+        return {
+            "ReturnCode": 0,
+            "FileList": [{"FileId": "f1", "FileName": "Sunset"}],
+        }
     raise AssertionError(f"unexpected path {path}")
 
 
@@ -264,3 +290,71 @@ def test_search_weather_city_retries_once_on_expired_token():
         cities = c.search_weather_city("New")
     assert calls["n"] == 2
     assert cities[0]["Name"] == "New York"
+
+
+def test_get_aid_sleep_list_shape_and_params():
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        tracks = c.get_aid_sleep_list(1, limit=10, page=2)
+    assert tracks[0]["Name"] == "Rain"
+    req = post.call_args_list[-1].args[1]
+    assert req["Command"] == cloud.AID_SLEEP_GET_ALL_CMD
+    assert req["Type"] == 1
+    assert req["StartNum"] == 11 and req["EndNum"] == 20  # page 2, limit 10
+
+
+def test_get_my_aid_sleep_list_uses_the_my_list_command():
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        c.get_my_aid_sleep_list(0)
+    req = post.call_args_list[-1].args[1]
+    assert req["Command"] == cloud.AID_SLEEP_GET_MY_CMD
+
+
+def test_get_aid_sleep_list_rc_nonzero_raises():
+    def fake_fail(path, body):
+        if path == "AidSleep/GetAllList":
+            return {"ReturnCode": 5, "ReturnMessage": "bad"}
+        raise AssertionError(path)
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=fake_fail):
+        try:
+            c.get_aid_sleep_list(0)
+            assert False, "expected RuntimeError"
+        except RuntimeError as e:
+            assert "RC=5" in str(e)
+
+
+def test_get_my_playlists_shape_and_params():
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        playlists = c.get_my_playlists(limit=10, page=1)
+    assert playlists[0]["Name"] == "Chill"
+    req = post.call_args_list[-1].args[1]
+    assert req["Command"] == cloud.PLAYLIST_GET_MY_LIST_CMD
+    assert req["StartNum"] == 1 and req["EndNum"] == 10
+
+
+def test_get_playlist_images_shape_and_params():
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=_fake_post) as post:
+        images = c.get_playlist_images(42, limit=10)
+    assert images[0]["FileName"] == "Sunset"
+    req = post.call_args_list[-1].args[1]
+    assert req["Command"] == cloud.PLAYLIST_GET_MY_IMAGE_LIST_CMD
+    assert req["PlayId"] == 42
+    assert req["StartNum"] == 1 and req["EndNum"] == 20  # page 1, limit 10 -> *2
+
+
+def test_get_my_playlists_rc_nonzero_raises():
+    def fake_fail(path, body):
+        if path == "Playlist/GetMyList":
+            return {"ReturnCode": 5, "ReturnMessage": "bad"}
+        raise AssertionError(path)
+    c = _client()
+    with patch.object(divoom_auth, "_post", side_effect=fake_fail):
+        try:
+            c.get_my_playlists()
+            assert False, "expected RuntimeError"
+        except RuntimeError as e:
+            assert "RC=5" in str(e)

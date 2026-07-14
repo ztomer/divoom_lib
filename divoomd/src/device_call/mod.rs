@@ -336,6 +336,10 @@ async fn handle_lan_call(
             let clock_id = get_arg_i64(args, kw, 0, "ClockId", 0);
             lan.post("Channel/SetClockSelectId", Some(json!({ "ClockId": clock_id }))).await
         }
+        "lan.send_playlist" => {
+            let play_id = get_arg_i64(args, kw, 0, "PlayId", 0);
+            lan.post("Playlist/SendDevice", Some(json!({ "PlayId": play_id }))).await
+        }
         "lan.on_off_screen" => {
             let on_off = get_arg_i64(args, kw, 0, "OnOff", 1);
             lan.post("Channel/OnOffScreen", Some(json!({ "OnOff": on_off }))).await

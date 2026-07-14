@@ -13,6 +13,7 @@ from divoom_gui.scanner_mixin import ScannerMixin
 from divoom_gui.debug_mixin import DebugMixin
 from divoom_gui.lifecycle_mixin import LifecycleSettingsMixin
 from divoom_gui.clock_faces import ClockFacesMixin
+from divoom_gui.playlists import PlaylistsMixin
 
 from divoom_gui.api import AsyncLoopThread
 from divoom_gui.api.connection import ConnectionApi
@@ -24,7 +25,7 @@ from divoom_gui.api.window import WindowApi
 logger = logging.getLogger("divoom_gui")
 
 class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin,
-                   LifecycleSettingsMixin, ClockFacesMixin):
+                   LifecycleSettingsMixin, ClockFacesMixin, PlaylistsMixin):
     """The PyWebView JS api bridge orchestrator."""
     def __init__(self) -> None:
         self.loop_thread = AsyncLoopThread()
@@ -406,6 +407,9 @@ class DivoomGuiAPI(DebugMixin, MediaSyncMixin, PresetsManagerMixin, ScannerMixin
 
     def display_custom_art(self, file_path: str) -> bool:
         return self.lighting.display_custom_art(file_path)
+
+    def push_playlist(self, play_id: int) -> bool:
+        return self.lighting.push_playlist(play_id)
 
     def set_brightness(self, brightness: int) -> bool:
         return self.lighting.set_brightness(brightness)

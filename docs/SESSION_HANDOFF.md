@@ -18,6 +18,56 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-14 (later, `/loop and implement`): Playlist browse+push shipped
+  end-to-end; AidSleep backend implemented, not GUI-wired.** Picked up the
+  prior round's open ask ("pick one of the three leads... implemented
+  against real request shapes now") and did two of the three.
+  - **Playlist browse+push — DONE, live, in the GUI.**
+    `Playlist/GetMyList`/`GetMyImageList` confirmed RC=0 with a real account
+    (`divoom_lib/cloud.py`). Push is LAN-only per `HttpCommand.java`'s
+    `DeviceAndServerCmd` array (`Playlist/SendDevice` routes to the device's
+    own local HTTP API, not cloud) — added `lan_transport.py`'s
+    `send_playlist` + Rust `device_call`'s `lan.send_playlist`. New
+    "Playlists" sub-tab in the Pixel Art panel (4th tab alongside Custom
+    Art/Gallery/Hot Channel): `divoom_gui/web_ui/playlists.js` +
+    `templates_pixel_art.js` markup, backend `divoom_gui/playlists.py`
+    (`PlaylistsMixin`) + `LightingApi.push_playlist`. Reused the shipped
+    clock-face browser's list-row/Apply-button CSS (`cloud-clock-list`/
+    `-row`/`-apply-btn`) verbatim — no new CSS needed. Verified visually in
+    the Playwright-driven browser preview (tab switches correctly, active
+    state matches the R12-fixed translucent-tint pattern, no console
+    errors) and via 3 new e2e tests (`tests/test_e2e_playlists.py`,
+    mirroring `test_e2e_clock_faces.py`): list renders, "connect a device
+    first" guard, Apply reaches `push_playlist` with the real `PlayId`.
+  - **AidSleep — BLE commands (play/add/delete/exit) implemented; cloud
+    browse NOT wired into the GUI.** `divoom_lib/tools/aid_sleep.py` reuses
+    the existing SPP_JSON BLE framing unchanged (confirmed via a dedicated
+    research pass: identical to the decompiled APK's `bluetooth.q#B()`,
+    command_id=1, JSON payload — zero new low-level protocol code needed).
+    But `AidSleep/GetAllList`/`GetMyList` reproducibly returns `RC=3`
+    ("Request data is incomplete") against a real account, tried with every
+    request-field permutation the decompiled request class allows (guest
+    creds, forced real login, `Language`/`CountryISOCode`,
+    `DevicePassword=0`) — same unresolved-server-side-validation shape as
+    the earlier `Channel/StoreClockGetClassify` RC=12 case. Documented
+    honestly in both `divoom_lib/cloud.py` and `divoomd/src/
+    cloud_category.rs`. Per the project's "honest placeholders" rule,
+    deliberately **not** surfaced in the GUI — no browse UI for a call that
+    doesn't work live.
+  - `Cloud/ToDevice` (the third lead) not picked up — lower priority,
+    unconfirmed semantics.
+  - Mid-session the user manually relayed a real Gemini design-critique
+    reply after interrupting an in-progress Gemini-bridge `navigate` call
+    (the reply had landed in the original chat right as/after I navigated
+    to a fresh one) — no data was lost, verified every finding against
+    source as usual.
+  - Verified: full `tests/` suite 2756 passed / 0 failed / 97 skipped
+    (16 more than the prior round's 2740, matching the new AidSleep/cloud/
+    lan_transport/e2e-playlists tests added); `cargo test` clean in
+    `divoomd`; `cargo build` clean; `check_no_emoji.py`/`check_file_size.py`
+    gates clean. Bumped to v0.22.15. **Not pushed or released** — committed
+    locally only, per the user's existing pattern of not auto-releasing.
+
 - **2026-07-14: closed out the 5-item post-release punch list** (user gave
   terse one-line answers to each of the 5 "what's left" items from the prior
   round: "1. use gemini / 2. skip. known to work. I'll report if there are
