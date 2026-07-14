@@ -22,6 +22,16 @@ BASE_URL = "https://appin.divoom-gz.com"
 
 # GetCategoryFileListV2 "Classify" for the clock-face store. VERIFY against the
 # APK — the gallery tab index the app uses for clock faces.
+# Empirically probed 2026-07-13 (live cloud creds, no APK decompile access):
+# sampled classify=0,1,2,6,20,21,22 — every value returned a similar mixed
+# "new/latest" feed (random pixel art, a couple of items whose OWN title
+# happens to mention "clock face"/"watch face", nothing resembling a
+# dedicated clock-face-only category). This is evidence AGAINST 0 being a
+# real "clock faces" category id, not confirmation of it. Either the real
+# clock-face browse uses a different endpoint/param than
+# GetCategoryFileListV2's `classify`, or the correct id is outside the
+# small sample tried. Needs APK decompile source (LoginServer.java /
+# CmdManager) to resolve properly — still open.
 CLOCK_FACE_CLASSIFY = 0
 WEATHER_SEARCH_CMD = "Weather/SearchCity"
 

@@ -9,6 +9,11 @@ use crate::cloud::{get_credentials, load_virtual_device, BASE_URL, TIMEOUT_SECS,
 
 /// GetCategoryFileListV2 "Classify" for the clock-face store. VERIFY against the
 /// APK — the gallery tab index the app uses for clock faces.
+/// Empirically probed 2026-07-13 (live cloud creds, no APK decompile access):
+/// sampled classify=0,1,2,6,20,21,22 — every value returned a similar mixed
+/// "new/latest" feed, nothing resembling a dedicated clock-face-only
+/// category. Evidence AGAINST 0 being correct, not confirmation. Needs APK
+/// decompile source to resolve properly — still open.
 pub const CLOCK_FACE_CLASSIFY: i64 = 0;
 
 pub async fn fetch_gallery(

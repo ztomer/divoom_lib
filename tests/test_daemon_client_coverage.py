@@ -5,7 +5,7 @@ test_daemon_client_wedge.py (client-side socket timeouts).
 Gaps closed here, all against mocks — no real subprocess, socket, or daemon:
   * spawn_daemon()'s binary-resolution chain (DIVOOM_RUST_BINARY pointing at a
     missing file, the PyInstaller _MEIPASS layout, the py2app RESOURCEPATH
-    layout, the Python-daemon "else" branch, the disclaimed-spawn-raises ->
+    layout, the no-binary-resolves RuntimeError, the disclaimed-spawn-raises ->
     Popen fallback, and the log-file-unwritable OSError guard).
   * ensure_daemon()'s remote-host (DIVOOM_DAEMON_HOST) branch, never reached
     by the local-socket tests in test_daemon_bridge.py.
@@ -108,13 +108,29 @@ def _clean_spawn_env(monkeypatch):
 
 def test_spawn_daemon_rust_binary_env_invalid_path_falls_through(monkeypatch, tmp_path):
     """DIVOOM_RUST_BINARY pointing at a nonexistent file must be discarded,
-    not used, and resolution must continue (not crash)."""
+    not used, and resolution must continue to the dev build tree (not crash)."""
     monkeypatch.setenv("DIVOOM_RUST_BINARY", str(tmp_path / "nope-not-here"))
-    monkeypatch.setenv("DIVOOM_USE_RUST_DAEMON", "0")  # force the Python path deterministically
-    monkeypatch.setattr(daemon_client, "_spawn_disclaimed_macos",
-                         lambda cmd, log_path, env=None: 999)
+    seen = {}
+
+    def fake_disclaim(cmd, log_path, env=None):
+        seen["cmd"] = cmd
+        return 999
+
+    monkeypatch.setattr(daemon_client, "_spawn_disclaimed_macos", fake_disclaim)
     pid = daemon_client.spawn_daemon(str(tmp_path / "sock"))
     assert pid == 999
+    # Resolved via the dev build tree fallback, not the discarded env path.
+    assert seen["cmd"][0].endswith("/divoomd/target/release/divoomd") or \
+        seen["cmd"][0].endswith("/divoomd/target/debug/divoomd")
+
+
+def test_spawn_daemon_raises_when_no_rust_binary_resolves(monkeypatch, tmp_path):
+    """No env override, no _MEIPASS, no RESOURCEPATH, and a dev tree that
+    doesn't resolve (patched away) must raise a clear RuntimeError instead of
+    emitting a broken `-m divoom_lib.cli daemon` command."""
+    monkeypatch.setattr(daemon_client.Path, "exists", lambda self: False)
+    with pytest.raises(RuntimeError, match="divoomd .* binary not found"):
+        daemon_client.spawn_daemon(str(tmp_path / "sock"))
 
 
 def test_spawn_daemon_meipass_resolves_binary_and_dylib(monkeypatch, tmp_path):
@@ -159,25 +175,6 @@ def test_spawn_daemon_resourcepath_resolves_binary_and_dylib(monkeypatch, tmp_pa
     assert seen["env"]["DIVOOMD_ENCODER_LIB"] == str(tmp_path / "libdivoom_compact.dylib")
 
 
-def test_spawn_daemon_python_path_with_mac(monkeypatch, tmp_path):
-    """The 'else' (Python daemon) branch of spawn_daemon, including the
-    --mac passthrough, is only reachable when no rust binary resolves and
-    DIVOOM_USE_RUST_DAEMON forces it off."""
-    monkeypatch.setenv("DIVOOM_USE_RUST_DAEMON", "0")
-    seen = {}
-
-    def fake_disclaim(cmd, log_path, env=None):
-        seen["cmd"] = cmd
-        return 333
-
-    monkeypatch.setattr(daemon_client, "_spawn_disclaimed_macos", fake_disclaim)
-    pid = daemon_client.spawn_daemon(str(tmp_path / "sock"), mac="AA:BB:CC")
-    assert pid == 333
-    assert seen["cmd"][0] == sys.executable
-    assert "-m" in seen["cmd"] and "divoom_lib.cli" in seen["cmd"]
-    assert seen["cmd"][-2:] == ["--mac", "AA:BB:CC"]
-
-
 def test_spawn_daemon_rust_path_with_mac(monkeypatch, tmp_path):
     rust_bin = tmp_path / "divoomd"
     rust_bin.write_text("")
@@ -196,7 +193,9 @@ def test_spawn_daemon_rust_path_with_mac(monkeypatch, tmp_path):
 
 def test_spawn_daemon_log_open_failure_is_swallowed(monkeypatch, tmp_path):
     """An unwritable DIVOOM_DAEMON_LOG path must not crash the spawn."""
-    monkeypatch.setenv("DIVOOM_USE_RUST_DAEMON", "0")
+    rust_bin = tmp_path / "divoomd"
+    rust_bin.write_text("")
+    monkeypatch.setenv("DIVOOM_RUST_BINARY", str(rust_bin))
     monkeypatch.setenv("DIVOOM_DAEMON_LOG", str(tmp_path / "no" / "such" / "dir" / "log.txt"))
     monkeypatch.setattr(daemon_client, "_spawn_disclaimed_macos",
                          lambda cmd, log_path, env=None: 555)
@@ -208,7 +207,9 @@ def test_spawn_daemon_log_open_failure_is_swallowed(monkeypatch, tmp_path):
 def test_spawn_daemon_disclaim_raises_falls_back_to_popen(monkeypatch, tmp_path):
     """If the disclaimed spawn itself raises, spawn_daemon must fall back to
     plain Popen rather than propagating."""
-    monkeypatch.setenv("DIVOOM_USE_RUST_DAEMON", "0")
+    rust_bin = tmp_path / "divoomd"
+    rust_bin.write_text("")
+    monkeypatch.setenv("DIVOOM_RUST_BINARY", str(rust_bin))
 
     def boom(cmd, log_path, env=None):
         raise OSError("disclaim broke")
@@ -223,7 +224,9 @@ def test_spawn_daemon_disclaim_raises_falls_back_to_popen(monkeypatch, tmp_path)
 
 @pytest.mark.skipif(sys.platform == "darwin", reason="non-darwin Popen-only path")
 def test_spawn_daemon_non_darwin_uses_popen_directly(monkeypatch, tmp_path):
-    monkeypatch.setenv("DIVOOM_USE_RUST_DAEMON", "0")
+    rust_bin = tmp_path / "divoomd"
+    rust_bin.write_text("")
+    monkeypatch.setenv("DIVOOM_RUST_BINARY", str(rust_bin))
     fake_popen = MagicMock(return_value="popen-handle")
     monkeypatch.setattr(daemon_client.subprocess, "Popen", fake_popen)
     result = daemon_client.spawn_daemon(str(tmp_path / "sock"))

@@ -18,6 +18,57 @@ Claude) should read this on entry and **update it at the end of every round**
 
 ## Current state — _update this section each round_
 
+- **2026-07-13 (this round): Python daemon server archived (v0.22.12,
+  not yet released) + a "/loop non-user-dependent work" hardware pass.**
+  Continuation of the same day's v0.22.11 work. Two threads:
+  1. **Hardware verification (user: "/loop and finish the non-user
+     dependant work. hardware is available")**: `pic_scan_ctrl` 0x35 —
+     both control-mode GATT writes ACK cleanly on a real Pixoo-1
+     (transport-level only, no on-device visual confirmation possible).
+     Ditoo-light-2 re-verified end-to-end (cloud fetch → `sync_artwork`
+     push → brightness read-back). Niche Rust-daemon subsystems
+     exercised: SD-music query + drawing-pad enter/exit ACK; the 0x8e
+     animation user-define read-back timed out on this Ditoo
+     (inconclusive, non-destructive). Cloud HTTP (200+ endpoints)
+     investigated further and reclassified BLOCKED — `CLOCK_FACE_CLASSIFY`
+     probed against 7 values, none matched, but the correct shape can't
+     be reverse-engineered from live probing alone; needs APK source or
+     user priorities. Findings written inline at each call site
+     (`divoom_lib/display/drawing.py`, `divoomd/src/device_call/{drawing,
+     animation}.rs`, `divoom_lib/cloud.py`, `divoomd/src/cloud_category.rs`)
+     and in `docs/ROADMAP.md`.
+  2. **Python daemon archival (user: "the python daemon version can be
+     archived"** — sign-off on the previously-deferred, explicitly
+     irreversible Phase 5 step 5.3). Clarified scope first via
+     AskUserQuestion (client vs. server code split) — user confirmed:
+     keep client infra active, archive server-only code and its tests.
+     `git mv`'d 13 server-only modules from `divoom_daemon/` to
+     `archive/divoom_daemon/` (cross-imports rewritten to
+     `archive.divoom_daemon.*`); `divoom_daemon/__init__.py` rewritten to
+     document its new client-library-only role;
+     `daemon_client.spawn_daemon()`'s Python-fallback branch replaced
+     with a clear `RuntimeError` when no `divoomd` binary resolves;
+     `cli_commands.cmd_daemon()` replaced with a stderr pointer at
+     `divoomd` (returns 1). 47 test files that exercised only the
+     archived server moved to `archive/tests/` (outside `pytest`'s
+     `testpaths`, so excluded from default/CI runs) — 6 were split
+     file-by-file (delegated to a general-purpose Agent) where some
+     tests needed the archived server and others tested still-active
+     client code, which stayed in `tests/`. `archive/tests/conftest.py`
+     is a copy of `tests/conftest.py` so the archived suite still
+     collects/runs standalone on request. `README.md`/`docs/ROADMAP.md`
+     updated to declare `divoomd` the sole daemon.
+     **Verified:** full `tests/` suite 2731 passed / 97 skipped (0
+     failed); `archive/tests/` collects 469 tests with zero errors (not
+     run by default); `check_no_emoji.py`/`check_file_size.py` clean
+     (the one file-size violation, `divoomd/src/macos_notifications.rs`,
+     predates this change). Version bumped to 0.22.12 in `pyproject.toml`
+     + `CHANGELOG.md`; **not yet released** (no "cut a release" ask this
+     round).
+  Also noted, unresolved: user reported "gh fails" but gave no specific
+  command/error and it wasn't reproducible in this session's `gh auth
+  status` — flagged back to the user, no further action taken.
+
 - **R61 follow-up (2026-07-13): full daemon+UI e2e connect/disconnect
   verification DONE (user-requested; "the menubar item is live... full e2e
   verification tests with daemon/ui/correctness when connecting
@@ -1161,14 +1212,15 @@ Claude) should read this on entry and **update it at the end of every round**
    banners added to `divoom_daemon/__init__.py`, `daemon.py`, `device_owner.py`; hardening-plan
    Phase-5 wording corrected to "archive, not delete." Python still selectable via
    `DIVOOM_USE_RUST_DAEMON=0`.
-- **Phase 5 archival = ARCHIVE, NOT DELETE (user directive 2026-06-28).** Keep the
-  Python `divoom_daemon`/`divoom_lib` as the **reference implementation** (it's
-  mostly complete and is the parity oracle). Do not delete it. "Archival" means
-  marking Rust authoritative in docs while Python stays in-tree for reference +
-  fallback.
-- **Phase 5 archival (NEEDS USER SIGN-OFF)** — moving/deleting `divoom_daemon/` is
-  irreversible and breaks the GUI/menubar/CLI imports; hold until a green soak +
-  explicit go. Will NOT be done autonomously.
+- **Phase 5 archival = ARCHIVE, NOT DELETE (user directive 2026-06-28, superseded
+  2026-07-13).** The 2026-06-28 directive was to keep `divoom_daemon` in-tree as
+  reference/fallback, never delete. **RESOLVED/SUPERSEDED (2026-07-13):** explicit
+  fresh sign-off ("the python daemon version can be archived") authorized the
+  actual move — server-only modules `git mv`'d to `archive/divoom_daemon/`
+  (history preserved, still importable, just not built/run/tested by default).
+  See this file's top "Current state" entry for the 2026-07-13 round and
+  `docs/ROADMAP.md`'s "Native Rust daemon" section for the full detail. No
+  longer an open thread.
 - _(RESOLVED this round: all of Phase 4 — Tier A, B (real device), C; plus the BLE
   connect-robustness bug and the `shutdown` parity gap.)_
 

@@ -13,13 +13,17 @@ and the menu-bar agent), and a native accelerator:
    (plus Bluetooth-Classic SPP and LAN where supported): channels, image/animation
    push, text, clock, brightness, alarms, FM radio, notifications, and more. Runs
    on **macOS and Linux**. Includes the CLI (`divoom-control`) and an MCP server.
-2. **`divoom_daemon/`** — a headless, always-on agent that is the **single owner**
-   of the device connection and serves a command/event protocol over a Unix
-   socket and (optionally) TCP. On macOS it also does notification monitoring.
-    Runs on **macOS and Linux**. The **shipped app runs the native Rust daemon**
-    `divoomd/` (the primary daemon — `divoom_daemon/` is the now-unused Python
-    reference implementation), and a **native Rust menu-bar agent**
-    `native-port/divoom-menubar/` (replacing the older pyobjc menu bar).
+2. **`divoomd/`** — the native **Rust** daemon: a headless, always-on agent that
+   is the **single owner** of the device connection and serves a command/event
+   protocol over a Unix socket and (optionally) TCP. On macOS it also does
+   notification monitoring. Runs on **macOS and Linux**. Paired with a **native
+   Rust menu-bar agent**, `native-port/divoom-menubar/` — together these are what
+   the shipped app runs. `divoom_daemon/` (the Python package) is now client-only:
+   the shared NDJSON-socket client library every consumer (GUI, menubar, CLI,
+   MCP) uses to talk to whichever daemon is running. The original Python daemon
+   *server* implementation was archived to `archive/divoom_daemon/` (2026-07-13)
+   once the Rust daemon reached parity — kept for historical reference only, not
+   built, run, or tested by anything in this repo.
 3. **`divoom_gui/`** — a [pywebview](https://pywebview.flowrl.com/) desktop
    **Control Center** (macOS): live previews, channel grid, live widgets (album
    art / stocks / system monitor), a gallery, a multi-panel "virtual wall", and a
@@ -58,13 +62,14 @@ both are held to the same correctness tests (see *Testing*).
 
 ## Requirements
 
-- **macOS or Linux** for `divoom_lib` + `divoom_daemon` (BLE via `bleak` —
-  CoreBluetooth on macOS, BlueZ on Linux). The **GUI + menu-bar + now-playing
-  sync are macOS-only** today.
+- **macOS or Linux** for `divoom_lib` + `divoomd` (BLE via `bleak` in Python /
+  `btleplug` in Rust — CoreBluetooth on macOS, BlueZ on Linux). The **GUI +
+  menu-bar + now-playing sync are macOS-only** today.
 - **Python 3.10+** (uses `X | None` type syntax). CI and the shipped app build on
   **Python 3.14**.
 - Python deps in `requirements.txt` (`bleak`, `aiohttp`, `pillow`, `pywebview`, …).
-- **Rust** (stable, via `rustup`) to build the native daemon + menu-bar — `./build.sh`.
+- **Rust** (stable, via `rustup`) to build the daemon (`divoomd`) + menu-bar —
+  `./build.sh`.
 - A C compiler (clang/gcc) is optional — only to build the native accelerator;
   without it everything falls back to pure Python.
 
@@ -101,12 +106,15 @@ just the C accelerator — the Python fallback works without it.)
 
 ## Run the daemon (headless)
 
+Run the native `divoomd` binary directly (the GUI auto-spawns it for you; this
+is only for headless/networked use):
+
 ```bash
 # local only (Unix socket; the GUI auto-spawns this for you)
-divoom-control daemon
+./divoomd/target/release/divoomd --socket /tmp/divoom.sock
 
 # headless network server on a LAN, token-authenticated (R19)
-divoom-control daemon --host 0.0.0.0 --port 9009 --token "$DIVOOM_DAEMON_TOKEN"
+./divoomd/target/release/divoomd --host 0.0.0.0 --port 9009 --token "$DIVOOM_DAEMON_TOKEN"
 ```
 
 Remote clients (including the GUI) target it by setting `DIVOOM_DAEMON_HOST`,
@@ -177,18 +185,21 @@ divoom_lib/            Async BLE/LAN library (macOS + Linux)
   display/ system/ scheduling/ media/ tools/ utils/   domain submodules
   native/ + native_src/  ctypes wrappers + C sources for encoders/downsampler
   libdivoom_compact.*    built native library (.dylib / .so)
-  cli.py                 the `divoom-control` CLI (incl. `daemon` subcommand)
-divoom_daemon/         Headless device owner + Unix/TCP server (+ macOS menubar)
-  daemon.py              DivoomDaemon: device ownership, command dispatch, server
+  cli.py                 the `divoom-control` CLI
+divoom_daemon/         Daemon CLIENT library (spawn/find/talk to divoomd)
+  daemon_client.py        spawn_daemon()/ensure_daemon(), DaemonDeviceProxy
   daemon_protocol.py     NDJSON wire protocol + DaemonClient
-  macos_notifications.py menubar.py menubar_status.py   (macOS only)
+  macos_notifications.py notification_router.py   notification plumbing (macOS)
+divoomd/               The daemon (Rust): device ownership, command dispatch,
+                          Unix/TCP server, macOS notification monitoring
 divoom_gui/            Desktop Control Center (pywebview, macOS) — daemon client
   gui_main.py            launcher + Python↔JS bridge; spawns divoomd + divoom-menubar
-  daemon_bridge.py       ensure_daemon() + DaemonDeviceProxy
+  daemon_bridge.py       re-exports ensure_daemon()/DaemonDeviceProxy for the GUI
   web_ui/                frontend (app.js, channels.js, widgets.js, …)
-native-port/           Native Rust binaries (bundled in the shipped .app)
-  divoomd/               the daemon (NDJSON socket; default at runtime)
+native-port/           Other native Rust binaries (bundled in the shipped .app)
   divoom-menubar/        the menu-bar/tray agent (tao + tray-icon)
+archive/divoom_daemon/ Archived Python daemon SERVER (superseded by divoomd,
+                          2026-07-13) — historical reference only, not built/run
 build.sh / run.sh      build the Rust binaries / run the GUI (+ daemon + menubar)
 scripts/build_libdivoom.sh   cross-platform native (C accelerator) build
 scripts/build_release.sh     build the shippable Divoom.app + dmg (py2app)

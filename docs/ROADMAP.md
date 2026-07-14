@@ -65,8 +65,9 @@ Suite: Rust 63+ passed / Python 3197 passed / 97 skipped (see `CHANGELOG.md` + C
 
 Native-port hardening (Phases 1-4 + Phase-5 command parity) shipped; see
 `docs/archive/superseded/PLANNING_NATIVE_PORT_HARDENING.md` for the historical
-record. Remaining thread: the irreversible `divoom_daemon/` archival stays
-gated on an explicit user sign-off + soak (not scheduled).
+record. Phase 5 step 5.3 (the irreversible `divoom_daemon/` server archival)
+shipped 2026-07-13 on explicit user sign-off — see the "Native Rust daemon"
+section below for detail. No remaining thread here.
 
 ### Short-to-medium term
 
@@ -82,16 +83,29 @@ gated on an explicit user sign-off + soak (not scheduled).
 
 ### Divoom Cloud HTTP (200+ endpoints)
 
-**Status: IN PROGRESS (R61).** Stand up a thin cloud HTTP client + fix `UserNewGuest`
-`RC=10` (auth flow changed — see `divoom_lib/divoom_auth.py` vs decompiled
-`LoginServer.java`). First slice: **clock-face store** (browse clock faces from the
-cloud) + 1–2 dependent endpoints, with Python + `divoomd` Rust parity and tests.
-Remaining 200+ endpoints are follow-on rounds.
+**Status: BLOCKED on APK decompile access (checked 2026-07-13).** R61 stood up
+a thin cloud HTTP client (`divoom_lib/cloud.py` + `divoomd/src/cloud*.rs`,
+Python/Rust parity) and shipped 3 real endpoints: `get_category_file_list`
+(+ `list_clock_faces` wrapper), `search_weather_city`, and the
+`UserNewGuest` `RC=10` auth fix. That's the extent of what's implementable
+without a decompiled-APK reference for the other ~195+ endpoints' request
+shapes — this session tried to make further progress with live cloud creds
+alone (no APK source available) and hit a real wall: `CLOCK_FACE_CLASSIFY`
+(assumed `0`) was empirically probed against 7 different classify values,
+none of which returned anything resembling a dedicated clock-face category
+(all returned a similar mixed "new/latest" feed) — evidence the assumption
+is wrong, but live probing alone can't reverse-engineer the correct
+endpoint/param without the APK's own request definitions.
+**Next step needs the user**: either provide APK decompile source
+(`LoginServer.java`/`CmdManager` or equivalent) to reverse-engineer the
+correct endpoint shapes, or specify which of the 200+ endpoints actually
+matter for a real use case — implementing the remainder blind, without a
+GUI hook or defined purpose, isn't a good use of unattended effort.
 
-**Blockers (R9 §D, R12_D_AUDIT):**
-1. ~~Cloud auth broken (`RC=10`)~~ — being addressed in R61.
-2. Scope: 200+ endpoints — R61 picks clock-face store + 1–2 others.
-3. New transport: `divoom_lib/cloud.py` module (library was BLE-only + device LAN).
+**Shipped (R61 + follow-up):**
+1. ~~Cloud auth broken (`RC=10`)~~ — fixed R61.
+2. `get_category_file_list`/`list_clock_faces`, `search_weather_city` — shipped, Python+Rust parity, tested.
+3. New transport: `divoom_lib/cloud.py` module (library was BLE-only + device LAN) — shipped.
 
 ### Deferred (R12 §D)
 
@@ -113,8 +127,9 @@ See `docs/archive/rounds/PLANNING_ROUND12_D_AUDIT.md` for the full audit:
 
 ## Native Rust daemon (`divoomd/`)
 
-**Goal:** deprecate and archive the Python daemon backend in favor of the compiled
-Rust daemon, at 100% socket + hardware parity.
+**Goal: ACHIEVED.** The Python daemon backend was deprecated in favor of the
+compiled Rust daemon (100% socket + hardware parity reached 2026-06-29) and
+archived 2026-07-13 — see "Archived" below.
 
 **Decision: Rust** (over C / C++ / Zig). `btleplug` is the one mature
 cross-platform BLE API (the bleak analog); `tokio` maps the asyncio-heavy daemon
@@ -140,10 +155,11 @@ exclusive/MCP/disconnect). `cargo test` 63/63 both matrices.
 **Parity (2026-06-29): COMPLETE.** Full `device_call` method parity (54 → 0 gaps vs
 the Python Divoom API) + full cloud image-decode parity (magic 9/18/26 AES/LZO +
 0xAA → GIF, byte-verified vs the Python oracle, rendered on Pixoo/Tivoo-Max/Timoo).
-The Rust daemon is now the **default** (`DIVOOM_USE_RUST_DAEMON` on when `divoomd`
-is present); the Python backend is **kept as the reference/fallback implementation,
-never deleted** (per user directive). Niche subsystems (drawing-pad, SD-music,
-animation gif-chunk primitives) are wire-tested but not hardware-verified.
+The Rust daemon became the **default** (`DIVOOM_USE_RUST_DAEMON` on when `divoomd`
+is present); the Python backend was **kept as the reference/fallback implementation**
+at the time (per user directive then in force) until the archival below
+superseded that directive. Niche subsystems (drawing-pad, SD-music, animation
+gif-chunk primitives) are wire-tested but not hardware-verified.
 
 **Remaining (optional): DONE (2026-07-13, real hardware).** Ditoo-light-2 was back
 in range — connected, fetched a real cloud gallery file (`fetch_gallery`
@@ -157,6 +173,47 @@ timed out with no reply on this Ditoo — inconclusive (unsupported vs. no
 saved slot to report) but confirmed non-destructive: no crash/wedge, device
 stayed responsive to further calls. Findings documented inline at each
 call site.
+
+### Archived: Python daemon server (2026-07-13, explicit user sign-off)
+
+`divoomd` (Rust) is now the **sole shipping daemon** — no fallback, no
+`DIVOOM_USE_RUST_DAEMON` opt-out. The Python daemon *server* implementation was
+moved (not deleted — `git mv`, full history preserved) from `divoom_daemon/` to
+`archive/divoom_daemon/`:
+
+- **Moved:** `daemon.py`, `device_owner.py`, `socket_server.py`,
+  `command_queue.py`, `notification_service.py`, `live_jobs.py`, and the
+  `owner_*.py` handler modules (art/connect/live/loop/notify/wall/util) — 13
+  files, internal cross-imports rewritten to `archive.divoom_daemon.*`.
+- **Stayed active** in `divoom_daemon/` (client-side infra every consumer
+  still needs, regardless of which daemon implementation is running):
+  `daemon_client.py` (spawn/find/`ensure_daemon()`), `daemon_protocol.py` (the
+  NDJSON wire client), `daemon_config.py`, `spp_bridge.py`,
+  `macos_notifications.py`/`notification_router.py` (GUI Settings still calls
+  these directly). `divoom_daemon/__init__.py` now documents the
+  client-library-only role.
+- **`daemon_client.spawn_daemon()`** no longer has a `-m divoom_lib.cli daemon`
+  Python-fallback branch — it raises a clear `RuntimeError` if no `divoomd`
+  binary resolves, instead of emitting a command that no longer works.
+- **`divoom-control daemon`** (the CLI subcommand, `cli_commands.cmd_daemon()`)
+  now prints a pointer at `divoomd` and returns 1, rather than importing the
+  archived server module.
+- **Tests:** 47 test files that exercised only the archived server code moved
+  to `archive/tests/` (excluded from `pytest`'s `testpaths = ["tests"]`, so no
+  longer run by default/CI — same treatment as the source); 6 of those were
+  *split* file-by-file where some tests needed the archived server
+  (`DivoomDaemon`/`DeviceOwner`/`SocketServer` fixtures) and others tested
+  still-active client code (`spawn_daemon`, `bundle_python`, TCC-disclaim,
+  `DaemonDeviceProxy`'s status cache) — the client-side tests stayed in
+  `tests/`. `archive/tests/conftest.py` is a copy of `tests/conftest.py` so the
+  archived suite is still independently runnable/collectible on request.
+- **Verified:** full `tests/` suite green post-move (2731 passed, 97 skipped);
+  `archive/tests/` collects cleanly (469 tests, zero collection errors, not run
+  by default); `check_no_emoji.py`/`check_file_size.py` gates clean (the one
+  file-size violation, `divoomd/src/macos_notifications.rs`, predates this
+  change and is untouched by it).
+- **Docs updated:** `README.md` (package description, requirements, "Run the
+  daemon" instructions now point at `divoomd` directly, project layout).
 
 ### Native menubar (done) + UI decision (2026-06-30)
 

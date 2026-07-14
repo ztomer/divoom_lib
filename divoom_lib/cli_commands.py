@@ -349,18 +349,22 @@ async def cmd_mcp_server(args: argparse.Namespace) -> int:
 
 
 async def cmd_daemon(args: argparse.Namespace) -> int:
-    """Run the headless daemon (R16). Owns the device + the macOS notification
-    monitor and serves events over a Unix socket. Does NOT pre-connect a device
-    (the daemon manages its own lazy connection), so it starts on any host."""
-    repo_root = Path(__file__).resolve().parents[1]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-    from divoom_daemon.daemon import run as run_daemon
-    return run_daemon(mac=getattr(args, "mac", None),
-                      socket_path=getattr(args, "socket", "/tmp/divoom.sock"),
-                      host=getattr(args, "host", None),
-                      port=getattr(args, "port", 9009),
-                      token=getattr(args, "token", None))
+    """The Python daemon server was archived 2026-07-13 (explicit user
+    sign-off) in favor of the Rust `divoomd` binary — see `docs/ROADMAP.md`'s
+    "Native Rust daemon" section. This subcommand is kept only to give a
+    clear, actionable error instead of a raw ImportError; the historical
+    implementation still exists (moved, not deleted) at
+    `archive/divoom_daemon/daemon.py` if it's ever needed for reference."""
+    print(
+        "The Python daemon server has been archived — divoomd (Rust) is now "
+        "the only supported daemon. Build/run divoomd directly, or use "
+        "divoom_daemon.daemon_client.ensure_daemon()/spawn_daemon() which "
+        "auto-spawns it. The archived Python implementation is kept for "
+        "reference at archive/divoom_daemon/ but is no longer runnable via "
+        "this CLI command.",
+        file=sys.stderr,
+    )
+    return 1
 
 
 def cmd_menubar(args: argparse.Namespace) -> int:

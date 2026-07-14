@@ -546,21 +546,14 @@ async def test_cmd_mcp_server_remote_host_sets_env(monkeypatch) -> None:
 # ── cmd_daemon ───────────────────────────────────────────────────────────
 
 
-async def test_cmd_daemon_delegates_to_run(monkeypatch) -> None:
-    captured = {}
-
-    def fake_run(mac=None, socket_path="/tmp/divoom.sock", host=None, port=9009,
-                 token=None):
-        captured.update(mac=mac, socket_path=socket_path, host=host, port=port,
-                        token=token)
-        return 0
-
-    monkeypatch.setattr("divoom_daemon.daemon.run", fake_run)
+async def test_cmd_daemon_reports_archived_and_fails(capsys) -> None:
+    """The Python daemon server was archived 2026-07-13; this subcommand now
+    prints a clear pointer at divoomd instead of an ImportError."""
     rc = await cli_commands.cmd_daemon(
         _parse("daemon", "--socket", "/tmp/fake-daemon-test.sock")
     )
-    assert rc == 0
-    assert captured["socket_path"] == "/tmp/fake-daemon-test.sock"
+    assert rc == 1
+    assert "divoomd" in capsys.readouterr().err
 
 
 # ── cmd_menubar ──────────────────────────────────────────────────────────

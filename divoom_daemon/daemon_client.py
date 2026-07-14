@@ -144,16 +144,15 @@ def spawn_daemon(
     socket_path: str = DEFAULT_SOCKET_PATH,
     *,
     mac: str | None = None,
-    python: str | None = None,
     detach: bool = False,
 ):
-    """Launch the daemon process (``python -m divoom_lib.cli daemon``).
+    """Launch the ``divoomd`` (Rust) daemon process.
 
-    On macOS, spawn it with TCC responsibility DISCLAIMED so it's attributed to
-    the granted python binary (not the GUI's ungranted Python.app) — this is what
-    makes BLE work from the GUI with no user intervention (see
-    :func:`_spawn_disclaimed_macos`). Falls back to ``subprocess.Popen`` on other
-    platforms or if the disclaim spawn is unavailable.
+    On macOS, spawn it with TCC responsibility DISCLAIMED so it's its own
+    responsible process rather than inheriting the launcher's (unset) Bluetooth
+    usage description — this is what makes BLE work from the GUI with no user
+    intervention (see :func:`_spawn_disclaimed_macos`). Falls back to
+    ``subprocess.Popen`` on other platforms or if the disclaim spawn fails.
 
     Caller waits until the socket is live (see :func:`ensure_daemon`).
     """
@@ -189,40 +188,26 @@ def spawn_daemon(
                 rust_env_extra["DIVOOMD_ENCODER_LIB"] = str(dylib)
     if not rust_bin:
         # daemon_client.py lives at <repo>/divoom_daemon/daemon_client.py, so the
-        # repo root is parents[1] (parents[2] pointed one level too high, which is
-        # why dev runs silently fell back to the Python daemon).
+        # repo root is parents[1].
         repo_root = Path(__file__).resolve().parents[1]
         for folder in ["release", "debug"]:
             p = repo_root / "divoomd" / "target" / folder / "divoomd"
             if p.exists():
                 rust_bin = str(p)
                 break
-    # Default to the native Rust daemon when its binary is available (it is now at
-    # parity with the Python daemon + cloud-decode-verified); fall back to the Python
-    # daemon otherwise. An explicit DIVOOM_USE_RUST_DAEMON=0/1 overrides the
-    # auto-detection (Python kept as the reference/fallback implementation).
-    _flag = os.environ.get("DIVOOM_USE_RUST_DAEMON")
-    if _flag is not None:
-        use_rust = _flag.lower() in ("1", "true", "yes")
-    else:
-        use_rust = rust_bin is not None
-    # Resolve the bundled python up front: it's None outside a py2app .app, and the
-    # disclaim decision below reads it for BOTH daemon kinds.
-    bundle_py = bundle_python()
-    if use_rust:
-        bin_path = rust_bin or "divoomd"
-        cmd = [bin_path, "--socket", socket_path]
-        if mac:
-            cmd += ["--mac", mac]
-    else:
-        # In a py2app .app, sys.executable is the GUI stub — use the bundled python
-        # so `-m divoom_lib.cli` resolves; and DON'T disclaim, because the .app is
-        # already the BT-responsible process (its Info.plist declares the usage), so
-        # the daemon inherits a correct, granted responsibility.
-        exe = bundle_py or python or sys.executable
-        cmd = [exe, "-m", "divoom_lib.cli", "daemon", "--socket", socket_path]
-        if mac:
-            cmd += ["--mac", mac]
+    # The Rust daemon is the sole shipping daemon (the Python reference server was
+    # archived 2026-07-13 — see divoom_daemon/__init__.py); there is no longer a
+    # Python-daemon spawn fallback. Raise clearly rather than emitting a
+    # `-m divoom_lib.cli daemon` command that no longer works.
+    if rust_bin is None:
+        raise RuntimeError(
+            "divoomd (Rust daemon) binary not found — set DIVOOM_RUST_BINARY, "
+            "build divoomd/, or run from a packaged .app. The Python daemon "
+            "server was archived; see divoom_daemon/__init__.py."
+        )
+    cmd = [rust_bin, "--socket", socket_path]
+    if mac:
+        cmd += ["--mac", mac]
     log_path = os.environ.get("DIVOOM_DAEMON_LOG", "/tmp/divoom_daemon.log")
     try:
         with open(log_path, "a", buffering=1) as fh:
@@ -233,16 +218,14 @@ def spawn_daemon(
     # macOS TCC: an undisclaimed child inherits its launcher's responsible
     # process; if that launcher lacks a Bluetooth usage description (e.g. the .app
     # was started under Terminal / Claude Desktop), CoreBluetooth SIGABRTs the
-    # daemon the instant it scans. Disclaim so the daemon is its OWN responsible
-    # process — native divoomd via its embedded com.divoom.divoomd Info.plist
-    # (build.rs __TEXT,__info_plist), the dev Python daemon via the granted python
-    # identity. Skip only a py2app bundle's Python daemon (bundle_py set), where
-    # the .app is itself the declared BT-responsible process.
-    if sys.platform == "darwin" and (use_rust or bundle_py is None):
+    # daemon the instant it scans. Disclaim so divoomd is its OWN responsible
+    # process, via its embedded com.divoom.divoomd Info.plist (build.rs
+    # __TEXT,__info_plist).
+    if sys.platform == "darwin":
         try:
             disclaim_env = {**os.environ, **rust_env_extra}
             pid = _spawn_disclaimed_macos(cmd, log_path, env=disclaim_env)
-            logger.info("Spawned daemon (TCC-disclaimed, rust=%s) pid=%s", use_rust, pid)
+            logger.info("Spawned daemon (TCC-disclaimed) pid=%s", pid)
             return pid
         except Exception as e:
             logger.warning("Disclaimed spawn failed (%s); falling back to Popen.", e)

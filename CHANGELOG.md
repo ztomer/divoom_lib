@@ -4,6 +4,53 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.12 — Python daemon server archived; hardware verification round
+
+- **BREAKING (internal): `divoom_daemon/` is now client-library-only.**
+  The Python reference daemon *server* implementation was archived
+  (explicit user sign-off, 2026-07-13) to `archive/divoom_daemon/` —
+  `daemon.py`, `device_owner.py`, `socket_server.py`, `command_queue.py`,
+  `notification_service.py`, `live_jobs.py`, and the 7 `owner_*.py`
+  handler modules (13 files, `git mv`'d, internal cross-imports rewritten
+  to `archive.divoom_daemon.*`). `divoomd` (Rust) is now the **sole**
+  shipping daemon, no fallback. Still-active client infra
+  (`daemon_client.py`, `daemon_protocol.py`, `daemon_config.py`,
+  `spp_bridge.py`, `macos_notifications.py`, `notification_router.py`)
+  stayed in `divoom_daemon/`, which now documents that client-only role.
+  `daemon_client.spawn_daemon()` no longer has a `-m divoom_lib.cli
+  daemon` Python fallback — it raises a clear `RuntimeError` if no
+  `divoomd` binary resolves. `divoom-control daemon` (the CLI subcommand)
+  now prints a pointer at `divoomd` and exits 1 instead of importing the
+  archived module.
+- **tests: 47 files that only exercised the archived server code moved**
+  to `archive/tests/` (outside `pytest`'s `testpaths`, so no longer run
+  by default/CI, matching the source archival) — 6 were split file-by-
+  file where some tests needed the archived server and others tested
+  still-active client code, which stayed in `tests/`.
+- **docs: README.md, ROADMAP.md updated** to describe `divoomd` as the
+  sole daemon and document the archival (see ROADMAP's "Native Rust
+  daemon" section for the full before/after).
+- **verify(hardware, 2026-07-13):** `pic_scan_ctrl` (0x35) — both
+  `control=0`/`control=1` GATT writes ACK cleanly on a real Pixoo-1, no
+  rejection/disconnect (transport-level confirmation only; no visual
+  on-device effect could be confirmed). Ditoo-light-2 re-verified: cloud
+  gallery fetch → `sync_artwork` push → brightness read-back round-trip,
+  same pattern as Pixoo/Timoo. Niche Rust-daemon subsystems
+  hardware-exercised: SD-music query and drawing-pad enter/exit ACK
+  cleanly; `animation.app_get_user_define_info` (0x8e) timed out on this
+  Ditoo (inconclusive, non-destructive).
+- **Divoom Cloud HTTP (200+ endpoints): status updated to BLOCKED.**
+  Live-probed `CLOCK_FACE_CLASSIFY` against 7 classify values — none
+  returned a distinct clock-face category, evidence the assumed value is
+  wrong, but reverse-engineering the correct endpoint shapes needs either
+  APK decompile source or user-specified priorities; not a good use of
+  further unattended effort.
+
+Full suite: 2731 passed, 0 failed, 97 skipped (down from 3200 as the
+archived-server tests moved out of `tests/`; `archive/tests/` collects
+469 tests cleanly, not run by default). `check_no_emoji.py`/
+`check_file_size.py` gates clean.
+
 ## v0.22.11 — device-selector honesty fix, menubar D glyph, CSS-token migration
 
 Closes out the three remaining R61-follow-up threads (hardware-confirmed
