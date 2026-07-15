@@ -26,9 +26,32 @@ def fetch_gallery_asset(cache_dir: Path, file_id: str) -> bool:
     cache_file_item = cache_dir / safe_filename
     cache_file_bin = cache_file_item.with_suffix(".bin")
 
+    def existing_preview():
+        for ext in (".gif", ".png", ".jpg", ".jpeg"):
+            p = cache_file_item.with_suffix(ext)
+            if p.exists():
+                return p
+        return None
+
+    def preview_valid():
+        """A preview counts only if it opens AND is not blank.
+
+        A stale/corrupt preview (all-black / unreadable — e.g. written by a
+        pre-fix build) is dropped, along with its ``.bin``, so the asset is
+        re-downloaded and re-decoded in the same pass instead of rendering a
+        permanent black tile (R64)."""
+        p = existing_preview()
+        if p is None:
+            return False
+        if media_decoder.is_black_image(p):
+            logger.warning(f"Gallery: dropping blank/corrupt preview {p.name}")
+            p.unlink(missing_ok=True)
+            cache_file_bin.unlink(missing_ok=True)
+            return False
+        return True
+
     def has_preview():
-        return any(cache_file_item.with_suffix(ext).exists()
-                   for ext in (".gif", ".png", ".jpg", ".jpeg"))
+        return existing_preview() is not None
 
     def decode_bin():
         try:
@@ -74,10 +97,10 @@ def fetch_gallery_asset(cache_dir: Path, file_id: str) -> bool:
             logger.warning(f"Gallery download failed for {file_id}: {dl_err}")
             return False
 
-    if has_preview():
+    if preview_valid():
         return True
     if cache_file_bin.exists():
         if decode_bin():
             return True
         cache_file_bin.unlink(missing_ok=True)
-    return bool(download_bin() and not has_preview() and decode_bin())
+    return bool(download_bin() and existing_preview() is None and decode_bin())

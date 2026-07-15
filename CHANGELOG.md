@@ -4,6 +4,52 @@ All notable changes to divoom-control are documented here. The
 format is loosely Keep-A-Changelog; entries are grouped by
 shipped milestone (per the project planning docs).
 
+## v0.22.20 — gallery: decode the rest (magic 8 / 12) + broken-image removal
+
+- **fix(gallery decode):** `decode_cloud_frames` only handled magic
+  9/18/26 — the other two cloud container magics were left as
+  black/empty tiles. **magic 8** is a static AES image (strip 1
+  header byte, decrypt with the same `78hrey23y28ogs89` key/IV as
+  magic 9 → a 16×16 frame); **magic 12** is a scroll/marquee
+  buffer (`[12][scrollMode][speed:2 BE]`, strip 4 bytes, decrypt
+  → a 64×16 frame). Both now decode and render. Confirmed
+  live: a full 16-category probe decoded **all 455 items** with
+  **zero undecodable / zero broken frames** (the prior run had 29
+  undecodable — exactly the magic 8/12 items).
+- **fix(packaging):** `pycryptodome` and `lzallright` were
+  required by `decode_cloud_frames` but **not declared deps** — a
+  clean install (or the shipped DMG) decoded *zero* cloud items
+  because `Crypto` was missing (only present by accident on the
+  dev box). Added to `pyproject.toml` + `requirements.txt`, and
+  force-collected in `divoom.spec` so PyInstaller bundles them.
+- **fix(gallery broken-image removal):**
+  - *load time* (`gallery_download.fetch_gallery_asset`): a
+    `validate_preview()` step now opens any cached preview and drops
+    it if it is **unreadable / degenerate / fully-transparent**, so a
+    stale/corrupt preview is re-decoded in the same pass instead of
+    rendering a permanent black tile. (Solid-color / near-black art
+    is valid and is *not* dropped.)
+  - *runtime* (`web_ui/gallery.js`): the preview `<img>` gets an
+    `onerror` handler that **removes the tile** when a broken cached
+    preview fails to load, and the decode-failed path now removes
+    the tile (previously it was left as a dead `is-unavailable`
+    skeleton).
+- **tooling:** new `scripts/verify_gallery_render.py` — an offscreen
+  contact-sheet harness that decodes every gallery asset across all
+  16 categories and asserts zero broken frames (the
+  `media_decoder` pipeline is the source of truth that feeds the
+  UI). Used to verify the fix end-to-end.
+- **tests:** fixtures `tests/fixtures/gallery_magic{8,12}.bin`
+  (recorded live), new `test_media_decoder_cloud.py` cases for
+  magic 8/12 decode + `is_black_image`, and
+  `test_gallery_sync_coverage.py` cases for the blank-preview drop
+  behavior. Full suite green (numpy-gated modules excluded on this
+  box); emoji + 500-LOC gates clean.
+
+### Follow-ups
+- Round 64 work; ship as v0.22.20 once the user confirms the
+  live gallery renders fully.
+
 ## v0.22.19 — gallery black-tile recovery; CI fix
 
 - **fix(gallery): a corrupt/truncated cached `.bin` no longer leaves a black

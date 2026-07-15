@@ -3,6 +3,16 @@
 document.addEventListener("DOMContentLoaded", () => {
     const galleryContainer = document.getElementById("gallery-container");
 
+    function removeTile(item) {
+        // A genuinely broken image (decode failed, or a corrupt cached
+        // preview that wouldn't load) gets removed from the gallery rather
+        // than left as a black/unavailable tile (R64).
+        if (!item || !item.parentNode) return;
+        item.style.transition = "opacity .18s ease";
+        item.style.opacity = "0";
+        setTimeout(() => item.remove(), 180);
+    }
+
     function lazyLoadAnimatedPreview(item, fileId, index) {
         if (fileId && window.pywebview && window.pywebview.api && window.pywebview.api.get_animated_preview) {
             setTimeout(() => {
@@ -13,18 +23,16 @@ document.addEventListener("DOMContentLoaded", () => {
                         img.src = gifUrl;
                         img.classList.remove("is-loading", "is-unavailable");
                     } else if (img.classList.contains("is-loading")) {
-                        // Still no preview after the fetch — this is a genuine
-                        // miss, not "still loading". Say so distinctly instead of
-                        // leaving the pulsing skeleton up forever (honest
-                        // placeholder: loading and failed must look different).
-                        img.classList.remove("is-loading");
-                        img.classList.add("is-unavailable");
+                        // No cached preview at all AND the live decode also
+                        // missed — this is a broken asset, not "still loading".
+                        // Remove the tile rather than leave a dead skeleton.
+                        removeTile(item);
                     }
                 }).catch(() => {
                     const img = item.querySelector(".gallery-item-preview");
                     if (img && img.classList.contains("is-loading")) {
-                        img.classList.remove("is-loading");
-                        img.classList.add("is-unavailable");
+                        // Live fetch threw — broken asset, drop the tile.
+                        removeTile(item);
                     }
                 });
             }, 50 * index);
@@ -175,6 +183,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             `;
         item.dataset.idx = String(idx);
+        const img = item.querySelector(".gallery-item-preview");
+        if (img) {
+            // A cached preview file that is corrupt/unreadable will fail to
+            // load — drop the tile instead of showing a broken image.
+            img.addEventListener("error", () => removeTile(item));
+        }
         return item;
     }
 

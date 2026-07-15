@@ -51,6 +51,12 @@ hiddenimports = [
 hiddenimports += collect_submodules("bleak")
 hiddenimports += collect_submodules("aiohttp")
 hiddenimports += collect_submodules("webview")
+# Cloud-container gallery decode (media_decoder) needs these; they are
+# imported lazily inside functions, so force-collect to guarantee the
+# DMG bundles them (a clean install with no system Crypto would
+# otherwise render ZERO cloud gallery items). R64.
+hiddenimports += collect_submodules("Crypto")
+hiddenimports += collect_submodules("lzallright")
 
 a = Analysis(
     ["divoom_gui/gui_main.py"],

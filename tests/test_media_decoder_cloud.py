@@ -67,7 +67,7 @@ def test_decode_cloud_frames_rejects_non_container():
 
 
 def test_cloud_magics_constant_covers_known_containers():
-    assert set(media_decoder.CLOUD_CONTAINER_MAGICS) == {9, 18, 26}
+    assert set(media_decoder.CLOUD_CONTAINER_MAGICS) == {8, 9, 12, 18, 26}
 
 
 def test_preview_wrapper_still_upscales(tmp_path):
@@ -77,3 +77,57 @@ def test_preview_wrapper_still_upscales(tmp_path):
     assert media_decoder.decode_and_save_preview(payload, png) is True
     with Image.open(png) as img:
         assert img.size == (128, 128)
+
+
+# R64 — magic 8 (static AES image) and magic 12 (scroll/marquee AES).
+# Recorded live from the real Divoom CDN (no network in tests).
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+def test_magic8_static_aes_decodes():
+    raw = (FIXTURE_DIR / "gallery_magic8.bin").read_bytes()
+    assert raw[0] == 8
+    frames, duration = media_decoder.decode_cloud_frames(raw)
+    assert frames is not None and len(frames) == 1
+    assert frames[0].size == (16, 16)
+    assert duration == 100
+    # Not a blank frame.
+    extrema = frames[0].convert("RGB").getextrema()
+    assert any(lo != hi for lo, hi in extrema)
+
+
+def test_magic12_scroll_aes_decodes():
+    raw = (FIXTURE_DIR / "gallery_magic12.bin").read_bytes()
+    assert raw[0] == 12
+    frames, duration = media_decoder.decode_cloud_frames(raw)
+    assert frames is not None and len(frames) == 1
+    # 3072-byte scroll buffer -> 64x16 RGB.
+    assert frames[0].size == (64, 16)
+    assert duration == 100
+    extrema = frames[0].convert("RGB").getextrema()
+    assert any(lo != hi for lo, hi in extrema)
+
+
+def test_decode_and_save_preview_handles_magic8_and_12(tmp_path):
+    for magic, fname in [(8, "gallery_magic8.bin"), (12, "gallery_magic12.bin")]:
+        raw = (FIXTURE_DIR / fname).read_bytes()
+        assert raw[0] == magic
+        out = tmp_path / f"prev_{magic}.png"
+        assert media_decoder.decode_and_save_preview(raw, out) is True
+        assert out.exists()
+        assert media_decoder.is_black_image(out) is False
+
+
+def test_is_black_image(tmp_path):
+    # A solid-black image is valid dark ART, not a broken preview.
+    black = tmp_path / "black.png"
+    Image.new("RGB", (16, 16), (0, 0, 0)).save(black)
+    assert media_decoder.is_black_image(black) is False
+    # An all-transparent PNG -> nothing drawn -> broken/blank.
+    trans = tmp_path / "trans.png"
+    Image.new("RGBA", (16, 16), (0, 0, 0, 0)).save(trans)
+    assert media_decoder.is_black_image(trans) is True
+    # A 0-byte / unreadable file -> broken.
+    (tmp_path / "empty.png").write_bytes(b"")
+    assert media_decoder.is_black_image(tmp_path / "empty.png") is True
+    assert media_decoder.is_black_image(tmp_path / "nope.png") is True

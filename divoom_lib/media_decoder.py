@@ -68,16 +68,19 @@ def extract_gif_from_magic_43(file_data: bytes) -> bytes | None:
 _CLOUD_AES_KEY = b'78hrey23y28ogs89'
 _CLOUD_AES_IV = b'1234567890123456'
 
-CLOUD_CONTAINER_MAGICS = (9, 18, 26)
+CLOUD_CONTAINER_MAGICS = (8, 9, 12, 18, 26)
 
 
 def decode_cloud_frames(raw_bytes: bytes, *, max_frames: int = 24):
-    """Decode a Divoom cloud container (magic 9 / 18 / 26) into native-size
-    PIL frames.
+    """Decode a Divoom cloud container (magic 8 / 9 / 12 / 18 / 26) into
+    native-size PIL frames.
 
     Magic 9: ``[magic][total_frames][speed:2 BE]`` + AES-CBC-encrypted raw RGB
-    16×16 frames (768 bytes each). Magic 18/26 add per-frame LZO compression
-    and a row/column tile layout.
+    16×16 frames (768 bytes each). Magic 8 is the static variant (1 header
+    byte, then the same AES container → a single 16×16 frame). Magic 12 is a
+    scroll/marquee buffer (``[12][scrollMode][speed:2 BE]`` + AES → a 64×16
+    RGB frame). Magic 18/26 add per-frame LZO compression and a row/column
+    tile layout.
 
     R36: this is the SEND-path decoder, not just a preview helper — the cloud
     container is app-side ciphertext. The official APK decodes it
@@ -113,6 +116,22 @@ def decode_cloud_frames(raw_bytes: bytes, *, max_frames: int = 24):
                     break
                 frames.append(Image.frombytes("RGB", (16, 16), bytes(decrypted[start:end])))
             return (frames or None), (speed if speed >= 10 else 100)
+
+        if magic == 8:
+            # Static AES image (W2.b.s): strip 1 header byte, decrypt with
+            # the SAME cloud AES key/IV as magic 9, then 768 bytes = 16x16 RGB.
+            decrypted = decrypt_aes(raw_bytes[1:])
+            if len(decrypted) < 768:
+                return None, 0
+            return [Image.frombytes("RGB", (16, 16), bytes(decrypted[:768]))], 100
+
+        if magic == 12:
+            # Scroll / marquee (W2.b.v): header is [12][scrollMode][speed:2 BE],
+            # strip 4 bytes, decrypt -> a 3072-byte (64x16) RGB scroll buffer.
+            decrypted = decrypt_aes(raw_bytes[4:])
+            if len(decrypted) < 3072:
+                return None, 0
+            return [Image.frombytes("RGB", (64, 16), bytes(decrypted[:3072]))], 100
 
         if magic in (18, 26):
             import lzallright
@@ -299,6 +318,38 @@ def _compact_tiles(frame_data: bytes, row_count: int, column_count: int):
                         pixels[grid_x * 16 + x, grid_y * 16 + y] = (frame_data[pos], frame_data[pos+1], frame_data[pos+2])
                         pos += 3
     return img
+
+
+def is_black_image(path: Path) -> bool:
+    """Return True if ``path`` is a *broken* preview, not merely a dark one.
+
+    Used at gallery load time to detect stale/corrupt preview files so
+    they are dropped and re-decoded instead of rendering a permanent
+    black/broken tile (R64).
+
+    Broken == one of:
+      - unreadable / degenerate (truncated, 0-byte, or 0-size),
+      - fully transparent (nothing was actually drawn).
+
+    A genuinely dark or solid-color image (e.g. a near-black pixel
+    animation, or a solid-red 16x16) is VALID art and is NOT
+    flagged — dropping it would hide real community uploads."""
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            w, h = im.size
+            if w == 0 or h == 0:
+                return True  # degenerate dimensions
+            im = im.convert("RGBA")
+            extrema = im.getextrema()
+        # Fully transparent -> nothing was drawn -> blank/broken.
+        alpha_lo, alpha_hi = extrema[-1]
+        if alpha_lo == 0 and alpha_hi == 0:
+            return True
+        return False
+    except Exception:
+        # Unreadable -> treat as broken so the caller re-decodes.
+        return True
 
 
 def resolve_to_gif(raw_bytes: bytes, scratch_path: Path) -> bytes | None:
